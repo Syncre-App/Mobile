@@ -168,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 children: [
                                   CupertinoSwitch(
                                     value: _remember,
-                                    activeColor: const Color(0xFF2C82FF),
+                                    activeTrackColor: const Color(0xFF2C82FF),
                                     onChanged: (v) => setState(() => _remember = v),
                                   ),
                                   const SizedBox(width: 8),
@@ -282,7 +282,7 @@ class _TransparentField extends StatelessWidget {
   final Widget? suffix;
   final bool obscure;
 
-  const _TransparentField({Key? key, required this.controller, required this.hint, this.prefix, this.suffix, this.obscure = false}) : super(key: key);
+  const _TransparentField({required this.controller, required this.hint, this.prefix, this.suffix, this.obscure = false});
 
   @override
   Widget build(BuildContext context) {
