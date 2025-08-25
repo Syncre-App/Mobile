@@ -14,6 +14,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _remember = true;
+  bool _obscurePassword = true;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -35,6 +36,27 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+  }
+
+  void _handleLogin() {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill in both email and password')));
+      return;
+    }
+
+    // Simple email check
+    final emailValid = RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email);
+    if (!emailValid) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email')));
+      return;
+    }
+
+    // Mock authentication success
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logged in as $email')));
+    // TODO: replace with real authentication; persist session if _remember
   }
 
   @override
@@ -131,7 +153,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _passwordController,
                           hint: 'Password',
                           prefix: const Icon(Icons.lock, color: Colors.white70, size: 18),
-                          obscure: true,
+                          obscure: _obscurePassword,
+                          suffix: IconButton(
+                            icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off, color: Colors.white70, size: 18),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
                         ),
 
                         const SizedBox(height: 12),
@@ -162,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: () {},
+                            onPressed: _handleLogin,
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               backgroundColor: Colors.transparent,
@@ -253,9 +279,10 @@ class _TransparentField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final Widget? prefix;
+  final Widget? suffix;
   final bool obscure;
 
-  const _TransparentField({Key? key, required this.controller, required this.hint, this.prefix, this.obscure = false}) : super(key: key);
+  const _TransparentField({Key? key, required this.controller, required this.hint, this.prefix, this.suffix, this.obscure = false}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -272,6 +299,7 @@ class _TransparentField extends StatelessWidget {
         cursorColor: const Color(0xFF2C82FF),
         decoration: InputDecoration(
           prefixIcon: prefix == null ? null : Padding(padding: const EdgeInsets.only(right: 8), child: prefix),
+          suffixIcon: suffix,
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.white54),
           border: InputBorder.none,
