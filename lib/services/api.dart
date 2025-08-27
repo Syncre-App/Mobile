@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:io';
 
 class Api {
-  static const String baseUrl = 'http://localhost:3000/';
+  static const String baseUrl = 'http://localhost:3000';
 
   static Future<http.Response> post(String path, Map<String, dynamic> body, {Map<String, String>? headers}) async {
     final uri = Uri.parse('$baseUrl$path');

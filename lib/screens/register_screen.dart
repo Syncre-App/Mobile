@@ -84,7 +84,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
                           colors: [Color(0xFF0EA5FF), Color(0xFF2C82FF)], begin: Alignment.topCenter, end: Alignment.bottomCenter),
-                      boxShadow: [BoxShadow(color: const Color(0xFF2C82FF).withOpacity(0.4), blurRadius: 18, spreadRadius: 4)],
+                      boxShadow: [BoxShadow(color: const Color(0xFF2C82FF).withAlpha((0.4 * 255).round()), blurRadius: 18, spreadRadius: 4)],
                     ),
                     child: const Center(child: Icon(Icons.menu, color: Colors.white, size: 36)),
                   ),
@@ -117,9 +117,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             onPressed: _loading ? null : _register,
                             style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 14), backgroundColor: Colors.transparent, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
-                            child: Ink(
-                              decoration: BoxDecoration(
-                                  gradient: const LinearGradient(colors: [Color(0xFF2C82FF), Color(0xFF0EA5FF)]), borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF2C82FF).withOpacity(0.3), blurRadius: 14, spreadRadius: 1)]),
+                child: Ink(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF2C82FF), Color(0xFF0EA5FF)]), borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF2C82FF).withAlpha((0.3 * 255).round()), blurRadius: 14, spreadRadius: 1)]),
                               child: Container(height: 46, alignment: Alignment.center, child: _loading ? const CircularProgressIndicator() : const Text('REGISTER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                             ),
                           ),

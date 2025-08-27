@@ -117,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2C82FF).withOpacity(0.4),
+                          color: const Color(0xFF2C82FF).withAlpha((0.4 * 255).round()),
                           blurRadius: 18,
                           spreadRadius: 4,
                         ),
@@ -221,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(colors: [Color(0xFF2C82FF), Color(0xFF0EA5FF)]),
                                 borderRadius: BorderRadius.circular(24),
-                                boxShadow: [BoxShadow(color: const Color(0xFF2C82FF).withOpacity(0.3), blurRadius: 14, spreadRadius: 1)],
+                                boxShadow: [BoxShadow(color: const Color(0xFF2C82FF).withAlpha((0.3 * 255).round()), blurRadius: 14, spreadRadius: 1)],
                               ),
                               child: Container(
                                 height: 46,
