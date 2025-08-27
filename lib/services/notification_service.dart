@@ -140,28 +140,36 @@ class _NotificationProviderState extends State<NotificationProvider> {
       alignment: Alignment.center,
       children: [
         widget.child,
-        // overlay layer: center of screen, allow taps through except toast buttons
+        // overlay layer: place toasts near the top, under status bar / dynamic island
         Positioned.fill(
           child: IgnorePointer(
             ignoring: _items.isEmpty,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: _items.map((entry) {
-                  return Padding(
-                    key: ValueKey(entry.id),
-                    padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 24.0),
-                    child: _ToastCard(
-                      entry: entry,
-                      bgColor: _bgColor(entry.type),
-                      borderColor: _borderColor(entry.type),
-                      icon: _iconFor(entry.type),
-                      onClose: () => _remove(entry.id),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+            child: LayoutBuilder(builder: (context, _) {
+              final topPad = MediaQuery.of(context).padding.top + 12.0; // under dynamic island / status bar
+              return Stack(children: [
+                Positioned(
+                  top: topPad,
+                  left: 0,
+                  right: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _items.map((entry) {
+                      return Padding(
+                        key: ValueKey(entry.id),
+                        padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 24.0),
+                        child: _ToastCard(
+                          entry: entry,
+                          bgColor: _bgColor(entry.type),
+                          borderColor: _borderColor(entry.type),
+                          icon: _iconFor(entry.type),
+                          onClose: () => _remove(entry.id),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ]);
+            }),
           ),
         ),
       ],
@@ -192,13 +200,18 @@ class _ToastCardState extends State<_ToastCard> with SingleTickerProviderStateMi
   late final AnimationController _ctrl;
   late final Animation<Offset> _offset;
   late final Animation<double> _opacity;
+  late final Animation<double> _scale;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
-    _offset = Tween(begin: const Offset(0, -0.15), end: Offset.zero).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
-    _opacity = Tween(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _offset = Tween(begin: const Offset(0, -0.15), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
+    _opacity = Tween(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _scale = Tween(begin: 0.98, end: 1.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
     _ctrl.forward();
   }
 
@@ -214,31 +227,34 @@ class _ToastCardState extends State<_ToastCard> with SingleTickerProviderStateMi
       position: _offset,
       child: FadeTransition(
         opacity: _opacity,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 200, maxWidth: 520),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: widget.bgColor,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: widget.borderColor.withAlpha(204)),
-              boxShadow: [BoxShadow(color: Colors.black.withAlpha(46), blurRadius: 16, offset: const Offset(0, 4))],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                widget.icon,
-                const SizedBox(width: 12),
-                Flexible(child: Text(widget.entry.message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: () {
-                    widget.onClose();
-                  },
-                  child: const Icon(Icons.close, size: 20, color: Colors.white70),
-                ),
-              ],
+        child: ScaleTransition(
+          scale: _scale,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 200, maxWidth: 520),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: widget.bgColor,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: widget.borderColor.withAlpha(204)),
+                boxShadow: [BoxShadow(color: Colors.black.withAlpha(46), blurRadius: 16, offset: const Offset(0, 4))],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  widget.icon,
+                  const SizedBox(width: 12),
+                  Flexible(child: Text(widget.entry.message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () {
+                      widget.onClose();
+                    },
+                    child: const Icon(Icons.close, size: 20, color: Colors.white70),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

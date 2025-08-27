@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
       if (token == null) {
+        if (!mounted) return;
         setState(() {
           error = 'No auth token found. Please log in.';
           loading = false;
@@ -53,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
           loading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           error = 'Failed to fetch user: ${res.statusCode} ${res.body}';
           loading = false;
@@ -105,10 +107,11 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Logout',
             icon: const Icon(Icons.logout),
             onPressed: () async {
+              final navigator = Navigator.of(context);
               final prefs = await SharedPreferences.getInstance();
               await prefs.remove('auth_token');
               if (!mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
+              navigator.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
               );

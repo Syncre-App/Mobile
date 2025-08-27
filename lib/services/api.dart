@@ -3,7 +3,21 @@ import 'package:http/http.dart' as http;
 import 'dart:io';
 
 class Api {
-  static const String baseUrl = 'http://localhost:3000';
+  // Default base - can be overridden at runtime.
+  // On Android emulators, use 10.0.2.2 to reach the host machine. On iOS simulators
+  // and real devices that can reach the host via localhost/proxy, use localhost.
+  static String _overrideBaseUrl = '';
+
+  static String get baseUrl {
+    if (_overrideBaseUrl.isNotEmpty) return _overrideBaseUrl;
+    if (Platform.isAndroid) {
+      return 'http://10.0.2.2:3000';
+    }
+    return 'http://localhost:3000';
+  }
+
+  /// Call this at runtime to force a specific base URL (useful for physical devices)
+  static void setBaseUrl(String url) => _overrideBaseUrl = url;
 
   static Future<http.Response> post(String path, Map<String, dynamic> body, {Map<String, String>? headers}) async {
     final uri = Uri.parse('$baseUrl$path');
