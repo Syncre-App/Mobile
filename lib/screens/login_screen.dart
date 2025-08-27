@@ -255,6 +255,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
-
-// uses shared GlassCard / TransparentField from widgets/glass_widgets.dart
