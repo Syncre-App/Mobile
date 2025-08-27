@@ -137,6 +137,7 @@ class _NotificationProviderState extends State<NotificationProvider> {
   @override
   Widget build(BuildContext context) {
     return Stack(
+      alignment: Alignment.center,
       children: [
         widget.child,
         // overlay layer: center of screen, allow taps through except toast buttons

@@ -12,15 +12,16 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NotificationProvider(
-      child: MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0D0D12),
       ),
       home: const LoginScreen(),
-      ),
+      builder: (context, child) {
+        return NotificationProvider(child: child ?? const SizedBox());
+      },
     );
   }
 }
