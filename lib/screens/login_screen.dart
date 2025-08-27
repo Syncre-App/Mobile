@@ -2,8 +2,12 @@ import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../services/api.dart';
+import 'register_screen.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/glass_widgets.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,26 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
-  void _loginWithDiscord(BuildContext context) {
-    final Uri discordAuthUrl = Uri.parse(
-        'https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI&response_type=code&scope=identify%20email');
-
-    final browser = InAppBrowser();
-    browser.openUrlRequest(
-      urlRequest: URLRequest(url: WebUri.uri(discordAuthUrl)),
-      options: InAppBrowserClassOptions(
-        crossPlatform: InAppBrowserOptions(
-          toolbarTopBackgroundColor: const Color(0xFF1E1F22),
-        ),
-        inAppWebViewGroupOptions: InAppWebViewGroupOptions(
-          crossPlatform: InAppWebViewOptions(
-            javaScriptEnabled: true,
-          ),
-        ),
-      ),
-    );
-  }
 
   void _handleLogin() {
     final email = _emailController.text.trim();
@@ -54,9 +38,47 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Mock authentication success
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logged in as $email')));
-    // TODO: replace with real authentication; persist session if _remember
+    // Call backend login
+    _performLogin(email, password);
+  }
+
+  Future<void> _performLogin(String email, String password) async {
+    try {
+      final res = await Api.post('/v1/auth/login', {'email': email, 'password': password});
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        final token = body['token'] as String?;
+    if (token != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', token);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login success')));
+          // fetch user
+          final meRes = await Api.get('/v1/user/me', headers: Api.authHeaders(token));
+          if (meRes.statusCode == 200) {
+            final user = jsonDecode(meRes.body);
+            // In real app, navigate to home with user
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(user: user)));
+          }
+        } else {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No token in response')));
+        }
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed: ${res.body}')));
+      }
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('Connection refused')) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kapcsolódási hiba: a backend nem fut (http://localhost:3000)')));
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   @override
@@ -142,14 +164,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 20),
 
                         // Email field
-                        _TransparentField(
+                        TransparentField(
                           controller: _emailController,
                           hint: 'Email or username',
                           prefix: const Icon(Icons.person, color: Colors.white70, size: 18),
                         ),
                         const SizedBox(height: 12),
                         // Password field
-                        _TransparentField(
+                        TransparentField(
                           controller: _passwordController,
                           hint: 'Password',
                           prefix: const Icon(Icons.lock, color: Colors.white70, size: 18),
@@ -213,21 +235,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 14),
                         Row(children: const [Expanded(child: Divider(color: Colors.white12)), Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('OR', style: TextStyle(color: Colors.white54))), Expanded(child: Divider(color: Colors.white12))]),
                         const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              onPressed: () => _loginWithDiscord(context),
-                              icon: const FaIcon(FontAwesomeIcons.discord, color: Colors.white),
-                              splashRadius: 26,
-                            ),
-                            const SizedBox(width: 16),
-                            IconButton(
-                              onPressed: () {},
-                              icon: const FaIcon(FontAwesomeIcons.apple, color: Colors.white),
-                              splashRadius: 26,
-                            ),
-                          ],
+                        // Social login removed per request
+                        TextButton(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                          child: const Text('Don\'t have an account? Register', style: TextStyle(color: Colors.white70)),
                         ),
                         const SizedBox(height: 12),
                         const Text('By continuing you agree to our Terms', style: TextStyle(color: Colors.white38, fontSize: 12)),
@@ -246,66 +257,4 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 
-class GlassCard extends StatelessWidget {
-  final double width;
-  final Widget child;
-
-  const GlassCard({super.key, required this.width, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          width: width,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: LinearGradient(colors: [Colors.white.withOpacity(0.04), Colors.white.withOpacity(0.02)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 8))],
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-
-class _TransparentField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final Widget? prefix;
-  final Widget? suffix;
-  final bool obscure;
-
-  const _TransparentField({required this.controller, required this.hint, this.prefix, this.suffix, this.obscure = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.02),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: TextField(
-        controller: controller,
-        obscureText: obscure,
-        style: const TextStyle(color: Colors.white),
-        cursorColor: const Color(0xFF2C82FF),
-        decoration: InputDecoration(
-          prefixIcon: prefix == null ? null : Padding(padding: const EdgeInsets.only(right: 8), child: prefix),
-          suffixIcon: suffix,
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white54),
-          border: InputBorder.none,
-          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: const Color(0xFF2C82FF).withOpacity(0.9))),
-        ),
-      ),
-    );
-  }
-}
+// uses shared GlassCard / TransparentField from widgets/glass_widgets.dart

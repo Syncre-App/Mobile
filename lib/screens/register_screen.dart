@@ -1,0 +1,245 @@
+import 'package:flutter/material.dart';
+import '../services/api.dart';
+import '../widgets/glass_widgets.dart';
+
+import 'login_screen.dart';
+
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final TextEditingController _username = TextEditingController();
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _password = TextEditingController();
+  final TextEditingController _password2 = TextEditingController();
+  bool _loading = false;
+
+  Future<void> _register() async {
+    final u = _username.text.trim();
+    final e = _email.text.trim();
+    final p = _password.text;
+    final p2 = _password2.text;
+
+    if (u.isEmpty || e.isEmpty || p.isEmpty || p2.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All fields are required')));
+      return;
+    }
+    if (p != p2) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final res = await Api.post('/v1/auth/register', {'email': e, 'username': u, 'password': p});
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registered — please check email')));
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => VerifyScreen(email: e)));
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Register failed: ${res.body}')));
+      }
+    } catch (e) {
+      final msg = e.toString();
+      if (!mounted) return;
+      if (msg.contains('Connection refused')) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kapcsolódási hiba: a backend nem fut (http://localhost:3000)')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF03040A), Color(0xFF071026)],
+              ),
+            ),
+          ),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 48),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 84,
+                    height: 84,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                          colors: [Color(0xFF0EA5FF), Color(0xFF2C82FF)], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+                      boxShadow: [BoxShadow(color: const Color(0xFF2C82FF).withOpacity(0.4), blurRadius: 18, spreadRadius: 4)],
+                    ),
+                    child: const Center(child: Icon(Icons.menu, color: Colors.white, size: 36)),
+                  ),
+                  const SizedBox(height: 24),
+                  GlassCard(
+                    width: 360,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 10),
+                        const Text('REGISTER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 120,
+                          height: 3,
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(2), gradient: const LinearGradient(colors: [Color(0xFF2C82FF), Color(0xFF0EA5FF)])),
+                        ),
+                        const SizedBox(height: 20),
+                        TransparentField(controller: _username, hint: 'Username', prefix: const Icon(Icons.person, color: Colors.white70, size: 18)),
+                        const SizedBox(height: 12),
+                        TransparentField(controller: _email, hint: 'Email', prefix: const Icon(Icons.email, color: Colors.white70, size: 18)),
+                        const SizedBox(height: 12),
+                        TransparentField(controller: _password, hint: 'Password', prefix: const Icon(Icons.lock, color: Colors.white70, size: 18), obscure: true),
+                        const SizedBox(height: 12),
+                        TransparentField(controller: _password2, hint: 'Confirm password', prefix: const Icon(Icons.lock, color: Colors.white70, size: 18), obscure: true),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _loading ? null : _register,
+                            style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14), backgroundColor: Colors.transparent, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
+                            child: Ink(
+                              decoration: BoxDecoration(
+                                  gradient: const LinearGradient(colors: [Color(0xFF2C82FF), Color(0xFF0EA5FF)]), borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF2C82FF).withOpacity(0.3), blurRadius: 14, spreadRadius: 1)]),
+                              child: Container(height: 46, alignment: Alignment.center, child: _loading ? const CircularProgressIndicator() : const Text('REGISTER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())), child: const Text('Already have an account? Login', style: TextStyle(color: Colors.white70))),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class VerifyScreen extends StatefulWidget {
+  final String email;
+  const VerifyScreen({super.key, required this.email});
+
+  @override
+  State<VerifyScreen> createState() => _VerifyScreenState();
+}
+
+class _VerifyScreenState extends State<VerifyScreen> {
+  final TextEditingController _code = TextEditingController();
+  bool _loading = false;
+
+  Future<void> _verify() async {
+    final c = _code.text.trim();
+    if (c.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter code')));
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final res = await Api.post('/v1/auth/verify', {'email': widget.email, 'code': c});
+      if (res.statusCode == 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verified')));
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Verify failed: ${res.body}')));
+      }
+    } catch (e) {
+      final msg = e.toString();
+      if (!mounted) return;
+      if (msg.contains('Connection refused')) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kapcsolódási hiba: a backend nem fut (http://localhost:3000)')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF03040A), Color(0xFF071026)],
+              ),
+            ),
+          ),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 48),
+              child: GlassCard(
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('VERIFY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                    const SizedBox(height: 20),
+                    Text('A verification code was sent to ${widget.email}', style: const TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 12),
+                    TransparentField(controller: _code, hint: 'Code'),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _loading ? null : _verify,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        ),
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF2C82FF), Color(0xFF0EA5FF)]),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Container(
+                            height: 46,
+                            alignment: Alignment.center,
+                            child: _loading ? const CircularProgressIndicator() : const Text('VERIFY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
