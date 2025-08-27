@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api.dart';
+import '../services/notification_service.dart';
 import '../widgets/glass_widgets.dart';
 
 import 'login_screen.dart';
@@ -25,11 +26,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final p2 = _password2.text;
 
     if (u.isEmpty || e.isEmpty || p.isEmpty || p2.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All fields are required')));
+      NotificationService.instance.show(NotificationType.warning, 'All fields are required');
       return;
     }
     if (p != p2) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+      NotificationService.instance.show(NotificationType.warning, 'Passwords do not match');
       return;
     }
 
@@ -37,20 +38,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final res = await Api.post('/v1/auth/register', {'email': e, 'username': u, 'password': p});
       if (res.statusCode == 200 || res.statusCode == 201) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registered — please check email')));
+  if (!mounted) return;
+  NotificationService.instance.show(NotificationType.info, 'Registered — please check email');
         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => VerifyScreen(email: e)));
       } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Register failed: ${res.body}')));
+  if (!mounted) return;
+  NotificationService.instance.show(NotificationType.error, 'Register failed: ${res.body}');
       }
     } catch (e) {
       final msg = e.toString();
       if (!mounted) return;
       if (msg.contains('Connection refused')) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kapcsolódási hiba: a backend nem fut (http://localhost:3000)')));
+        NotificationService.instance.show(NotificationType.error, 'Kapcsolódási hiba: a backend nem fut (http://localhost:3000)');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        NotificationService.instance.show(NotificationType.error, 'Error: $e');
       }
     } finally {
       setState(() => _loading = false);
@@ -155,27 +156,27 @@ class _VerifyScreenState extends State<VerifyScreen> {
   Future<void> _verify() async {
     final c = _code.text.trim();
     if (c.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter code')));
+      NotificationService.instance.show(NotificationType.warning, 'Please enter code');
       return;
     }
     setState(() => _loading = true);
     try {
       final res = await Api.post('/v1/auth/verify', {'email': widget.email, 'code': c});
       if (res.statusCode == 200) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verified')));
+  if (!mounted) return;
+  NotificationService.instance.show(NotificationType.success, 'Verified');
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Verify failed: ${res.body}')));
+  if (!mounted) return;
+  NotificationService.instance.show(NotificationType.error, 'Verify failed: ${res.body}');
       }
     } catch (e) {
       final msg = e.toString();
       if (!mounted) return;
       if (msg.contains('Connection refused')) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kapcsolódási hiba: a backend nem fut (http://localhost:3000)')));
+        NotificationService.instance.show(NotificationType.error, 'Kapcsolódási hiba: a backend nem fut (http://localhost:3000)');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        NotificationService.instance.show(NotificationType.error, 'Error: $e');
       }
     } finally {
       setState(() => _loading = false);

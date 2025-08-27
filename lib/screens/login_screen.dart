@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../services/api.dart';
+import '../services/notification_service.dart';
 import 'register_screen.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,14 +26,14 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill in both email and password')));
+      NotificationService.instance.show(NotificationType.warning, 'Please fill in both email and password');
       return;
     }
 
     // Simple email check
     final emailValid = RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(email);
     if (!emailValid) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email')));
+      NotificationService.instance.show(NotificationType.warning, 'Please enter a valid email');
       return;
     }
 
@@ -50,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', token);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login success')));
+          NotificationService.instance.show(NotificationType.success, 'Login success');
           // fetch user
           final meRes = await Api.get('/v1/user/me', headers: Api.authHeaders(token));
           if (meRes.statusCode == 200) {
@@ -61,20 +62,20 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         } else {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No token in response')));
+          NotificationService.instance.show(NotificationType.error, 'No token in response');
         }
       } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed: ${res.body}')));
+  if (!mounted) return;
+  NotificationService.instance.show(NotificationType.error, 'Login failed: ${res.body}');
       }
     } catch (e) {
       final msg = e.toString();
       if (msg.contains('Connection refused')) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kapcsolódási hiba: a backend nem fut (http://localhost:3000)')));
+        NotificationService.instance.show(NotificationType.error, 'Kapcsolódási hiba: a backend nem fut (http://localhost:3000)');
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        NotificationService.instance.show(NotificationType.error, 'Error: $e');
       }
     }
   }
