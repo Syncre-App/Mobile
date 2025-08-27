@@ -164,8 +164,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         // Email field
                         TransparentField(
                           controller: _emailController,
-                          hint: 'Email or username',
-                          prefix: const Icon(Icons.person, color: Colors.white70, size: 18),
+                          hint: 'Email',
+                          prefix: const Icon(Icons.email, color: Colors.white70, size: 18),
                         ),
                         const SizedBox(height: 12),
                         // Password field
