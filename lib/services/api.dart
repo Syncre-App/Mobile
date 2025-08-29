@@ -14,9 +14,11 @@ class Api {
   static void setBaseUrl(String url) => _overrideBaseUrl = url;
 
   static Future<http.Response> post(String path, Map<String, dynamic> body, {Map<String, String>? headers}) async {
-    final uri = Uri.parse('$baseUrl$path');
+    final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    final uri = Uri.parse('$normalizedBase$normalizedPath');
     if (kDebugMode) {
-      print('Api.post -> $uri');
+      print('Api.post -> base: $baseUrl, path: $path -> uri: $uri');
     }
     final h = {'Content-Type': 'application/json', if (headers != null) ...headers};
     try {
@@ -31,9 +33,11 @@ class Api {
   }
 
   static Future<http.Response> get(String path, {Map<String, String>? headers}) async {
-    final uri = Uri.parse('$baseUrl$path');
+    final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    final uri = Uri.parse('$normalizedBase$normalizedPath');
     if (kDebugMode) {
-      print('Api.get -> $uri');
+      print('Api.get  -> base: $baseUrl, path: $path -> uri: $uri');
     }
     final h = {'Content-Type': 'application/json', if (headers != null) ...headers};
     try {
