@@ -51,13 +51,24 @@ class _LoginScreenState extends State<LoginScreen> {
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body);
         final token = body['token'] as String?;
+        final verified = body['verified'] as bool? ?? true; // Default to true if not specified
         print('🔐 Extracted token: ${token != null ? "✅ Found" : "❌ Missing"}');
+        print('🔐 User verified status: $verified');
         
-    if (token != null) {
+        if (token != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', token);
           if (!mounted) return;
-          NotificationService.instance.show(NotificationType.success, 'Login success');
+          
+          // Check if user needs verification
+          if (!verified) {
+            print('📧 User needs verification, redirecting to verify screen');
+            NotificationService.instance.show(NotificationType.info, 'Please verify your email before continuing.');
+            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => VerifyScreen(email: email)));
+            return;
+          }
+          
+          NotificationService.instance.show(NotificationType.success, 'Login successful');
           
           // fetch user
           print('👤 Fetching user data...');
@@ -69,19 +80,35 @@ class _LoginScreenState extends State<LoginScreen> {
             final user = jsonDecode(meRes.body);
             print('👤 Parsed user: $user');
             // In real app, navigate to home with user
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(user: user)));
+            if (!mounted) return;
+            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(user: user)));
           } else {
             print('❌ Failed to fetch user data');
+            if (!mounted) return;
+            NotificationService.instance.show(NotificationType.error, 'Failed to fetch user data');
           }
         } else {
           if (!mounted) return;
-          NotificationService.instance.show(NotificationType.error, 'No token in response');
+          NotificationService.instance.show(NotificationType.error, 'Invalid login response');
         }
       } else {
         print('❌ Login failed with status: ${res.statusCode}');
-  if (!mounted) return;
-  NotificationService.instance.show(NotificationType.error, 'Login failed: ${res.body}');
+        if (!mounted) return;
+        
+        // Parse error message from response
+        String errorMessage = 'Login failed';
+        try {
+          final errorBody = jsonDecode(res.body);
+          if (errorBody['message'] != null) {
+            errorMessage = errorBody['message'];
+          } else if (errorBody['error'] != null) {
+            errorMessage = errorBody['error'];
+          }
+        } catch (e) {
+          errorMessage = 'Login failed (${res.statusCode})';
+        }
+        
+        NotificationService.instance.show(NotificationType.error, errorMessage);
       }
     } catch (e) {
       print('❌ Login exception: $e');

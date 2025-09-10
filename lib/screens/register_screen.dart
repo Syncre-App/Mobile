@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api.dart';
 import '../services/notification_service.dart';
@@ -42,14 +43,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
       print('📝 Register response body: ${res.body}');
       
       if (res.statusCode == 200 || res.statusCode == 201) {
-        print('✅ Registration successful');
-  if (!mounted) return;
-  NotificationService.instance.show(NotificationType.info, 'Registered — please check email');
-        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => VerifyScreen(email: e)));
+        final body = jsonDecode(res.body);
+        print('✅ Registration response parsed: $body');
+        
+        // Check if user needs verification
+        final verified = body['verified'] as bool? ?? false;
+        print('📧 User verified status: $verified');
+        
+        if (!mounted) return;
+        
+        if (!verified) {
+          print('📧 User needs verification, redirecting to verify screen');
+          NotificationService.instance.show(NotificationType.info, 'Registration successful! Please check your email for verification.');
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => VerifyScreen(email: e)));
+        } else {
+          print('✅ User already verified, registration complete');
+          NotificationService.instance.show(NotificationType.success, 'Registration complete!');
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => VerifyScreen(email: e)));
+        }
       } else {
         print('❌ Registration failed with status: ${res.statusCode}');
-  if (!mounted) return;
-  NotificationService.instance.show(NotificationType.error, 'Register failed: ${res.body}');
+        if (!mounted) return;
+        
+        // Parse error message from response
+        String errorMessage = 'Registration failed';
+        try {
+          final errorBody = jsonDecode(res.body);
+          if (errorBody['message'] != null) {
+            errorMessage = errorBody['message'];
+          } else if (errorBody['error'] != null) {
+            errorMessage = errorBody['error'];
+          }
+        } catch (e) {
+          errorMessage = 'Registration failed (${res.statusCode})';
+        }
+        
+        NotificationService.instance.show(NotificationType.error, errorMessage);
       }
     } catch (e) {
       print('❌ Registration exception: $e');

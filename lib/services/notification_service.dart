@@ -63,15 +63,17 @@ class NotificationProvider extends StatefulWidget {
 class _NotificationProviderState extends State<NotificationProvider> {
   final List<NotificationEntry> _items = [];
   final Map<String, Timer> _timers = {};
+  final Map<String, GlobalKey<_ToastCardState>> _cardKeys = {};
   late final StreamSubscription<NotificationEntry> _sub;
 
   @override
   void initState() {
     super.initState();
     _sub = NotificationService.instance.stream.listen((entry) {
+      _cardKeys[entry.id] = GlobalKey<_ToastCardState>();
       setState(() => _items.add(entry));
       if (entry.duration.inMilliseconds > 0) {
-        _timers[entry.id] = Timer(entry.duration, () => _remove(entry.id));
+        _timers[entry.id] = Timer(entry.duration, () => _animateOutAndRemove(entry.id));
       }
     });
   }
@@ -85,12 +87,23 @@ class _NotificationProviderState extends State<NotificationProvider> {
     super.dispose();
   }
 
+  void _animateOutAndRemove(String id) {
+    final key = _cardKeys[id];
+    if (key?.currentState != null) {
+      // Trigger animation, then remove
+      key!.currentState!.animateOut().then((_) => _remove(id));
+    } else {
+      _remove(id);
+    }
+  }
+
   void _remove(String id) {
     if (!mounted) return;
     setState(() {
       _items.removeWhere((e) => e.id == id);
     });
     _timers.remove(id)?.cancel();
+    _cardKeys.remove(id);
   }
 
   Color _bgColor(NotificationType t) {
@@ -156,11 +169,12 @@ class _NotificationProviderState extends State<NotificationProvider> {
                         key: ValueKey(entry.id),
                         padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 24.0),
                         child: _ToastCard(
+                          key: _cardKeys[entry.id],
                           entry: entry,
                           bgColor: _bgColor(entry.type),
                           borderColor: _borderColor(entry.type),
                           icon: _iconFor(entry.type),
-                          onClose: () => _remove(entry.id),
+                          onClose: () => _animateOutAndRemove(entry.id),
                         ),
                       );
                     }).toList(),
@@ -183,6 +197,7 @@ class _ToastCard extends StatefulWidget {
   final VoidCallback onClose;
 
   const _ToastCard({
+    super.key,
     required this.entry,
     required this.bgColor,
     required this.borderColor,
@@ -199,6 +214,7 @@ class _ToastCardState extends State<_ToastCard> with SingleTickerProviderStateMi
   late final Animation<Offset> _offset;
   late final Animation<double> _opacity;
   late final Animation<double> _scale;
+  bool _isClosing = false;
 
   @override
   void initState() {
@@ -217,6 +233,27 @@ class _ToastCardState extends State<_ToastCard> with SingleTickerProviderStateMi
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _animateOut() async {
+    if (_isClosing) return;
+    setState(() => _isClosing = true);
+    
+    // Reverse the animation for smooth exit
+    await _ctrl.reverse();
+    
+    // Call the actual close callback after animation completes
+    if (mounted) {
+      widget.onClose();
+    }
+  }
+
+  Future<void> animateOut() async {
+    if (_isClosing) return;
+    setState(() => _isClosing = true);
+    
+    // Reverse the animation for smooth exit
+    await _ctrl.reverse();
   }
 
   @override
@@ -246,9 +283,7 @@ class _ToastCardState extends State<_ToastCard> with SingleTickerProviderStateMi
                   Flexible(child: Text(widget.entry.message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
                   const SizedBox(width: 12),
                   GestureDetector(
-                    onTap: () {
-                      widget.onClose();
-                    },
+                    onTap: _animateOut,
                     child: const Icon(Icons.close, size: 20, color: Colors.white70),
                   ),
                 ],
