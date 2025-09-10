@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/login_screen.dart';
+import '../screens/settings_screen.dart';
+import '../screens/edit_profile_screen.dart';
 
 class ProfileHeaderWidget extends StatelessWidget {
   final Map<String, dynamic> user;
@@ -101,7 +103,12 @@ class ProfileHeaderWidget extends StatelessWidget {
                 title: const Text('Edit Profile', style: TextStyle(color: Colors.white70)),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: Navigate to profile edit screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditProfileScreen(user: user),
+                    ),
+                  );
                 },
               ),
               
@@ -110,7 +117,12 @@ class ProfileHeaderWidget extends StatelessWidget {
                 title: const Text('Settings', style: TextStyle(color: Colors.white70)),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: Navigate to settings screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ),
+                  );
                 },
               ),
               
