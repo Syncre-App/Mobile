@@ -37,9 +37,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
+      print('🏠 Loading user data...');
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
+      print('🏠 Token found: ${token != null ? "✅ Yes" : "❌ No"}');
+      
       if (token == null) {
+        print('❌ No auth token found');
         if (!mounted) return;
         setState(() {
           error = 'No auth token found. Please log in.';
@@ -49,8 +53,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       final res = await Api.get('v1/user/me', headers: Api.authHeaders(token));
+      print('🏠 User data response status: ${res.statusCode}');
+      print('🏠 User data response body: ${res.body}');
+      
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
+        print('🏠 Parsed user data: $body');
         if (!mounted) return;
         setState(() {
           user = body;
@@ -58,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
         _checkAndShowWelcomeDialog();
       } else {
+        print('❌ Failed to fetch user data');
         if (!mounted) return;
         setState(() {
           error = 'Failed to fetch user: ${res.statusCode} ${res.body}';
@@ -65,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
+      print('❌ Home screen exception: $e');
       if (!mounted) return;
       setState(() {
         error = e.toString();

@@ -35,21 +35,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     setState(() => _loading = true);
+    print('📝 Starting registration for: $e (username: $u)');
     try {
       final res = await Api.post('/v1/auth/register', {'email': e, 'username': u, 'password': p});
+      print('📝 Register response status: ${res.statusCode}');
+      print('📝 Register response body: ${res.body}');
+      
       if (res.statusCode == 200 || res.statusCode == 201) {
+        print('✅ Registration successful');
   if (!mounted) return;
   NotificationService.instance.show(NotificationType.info, 'Registered — please check email');
         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => VerifyScreen(email: e)));
       } else {
+        print('❌ Registration failed with status: ${res.statusCode}');
   if (!mounted) return;
   NotificationService.instance.show(NotificationType.error, 'Register failed: ${res.body}');
       }
     } catch (e) {
+      print('❌ Registration exception: $e');
       final msg = e.toString();
       if (!mounted) return;
       if (msg.contains('Connection refused')) {
-        NotificationService.instance.show(NotificationType.error, 'Kapcsolódási hiba: a backend nem fut (http://localhost:3000)');
+        NotificationService.instance.show(NotificationType.error, 'Kapcsolódási hiba: a backend nem fut (${Api.baseUrl})');
       } else {
         NotificationService.instance.show(NotificationType.error, 'Error: $e');
       }
@@ -160,21 +167,28 @@ class _VerifyScreenState extends State<VerifyScreen> {
       return;
     }
     setState(() => _loading = true);
+    print('✅ Starting verification for: ${widget.email} with code: $c');
     try {
       final res = await Api.post('/v1/auth/verify', {'email': widget.email, 'code': c});
+      print('✅ Verify response status: ${res.statusCode}');
+      print('✅ Verify response body: ${res.body}');
+      
       if (res.statusCode == 200) {
+        print('✅ Verification successful');
   if (!mounted) return;
   NotificationService.instance.show(NotificationType.success, 'Verified');
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
+        print('❌ Verification failed with status: ${res.statusCode}');
   if (!mounted) return;
   NotificationService.instance.show(NotificationType.error, 'Verify failed: ${res.body}');
       }
     } catch (e) {
+      print('❌ Verification exception: $e');
       final msg = e.toString();
       if (!mounted) return;
       if (msg.contains('Connection refused')) {
-        NotificationService.instance.show(NotificationType.error, 'Kapcsolódási hiba: a backend nem fut (http://localhost:3000)');
+        NotificationService.instance.show(NotificationType.error, 'Kapcsolódási hiba: a backend nem fut (${Api.baseUrl})');
       } else {
         NotificationService.instance.show(NotificationType.error, 'Error: $e');
       }

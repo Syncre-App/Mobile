@@ -18,13 +18,23 @@ class Api {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     final uri = Uri.parse('$normalizedBase$normalizedPath');
     if (kDebugMode) {
-      print('Api.post -> base: $baseUrl, path: $path -> uri: $uri');
+      print('🚀 Api.post -> URL: $uri');
+      print('📤 Request body: ${jsonEncode(body)}');
+      print('📋 Headers: ${{'Content-Type': 'application/json', if (headers != null) ...headers}}');
     }
     final h = {'Content-Type': 'application/json', if (headers != null) ...headers};
     try {
       final res = await http.post(uri, headers: h, body: jsonEncode(body)).timeout(const Duration(seconds: 8));
+      if (kDebugMode) {
+        print('📥 Response status: ${res.statusCode}');
+        print('📥 Response body: ${res.body}');
+        print('📥 Response headers: ${res.headers}');
+      }
       return res;
     } catch (e) {
+      if (kDebugMode) {
+        print('❌ API Error: $e');
+      }
       if (e is SocketException) {
         throw Exception('Connection refused (is backend running at $baseUrl)?');
       }
@@ -37,13 +47,22 @@ class Api {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     final uri = Uri.parse('$normalizedBase$normalizedPath');
     if (kDebugMode) {
-      print('Api.get  -> base: $baseUrl, path: $path -> uri: $uri');
+      print('🚀 Api.get -> URL: $uri');
+      print('📋 Headers: ${{'Content-Type': 'application/json', if (headers != null) ...headers}}');
     }
     final h = {'Content-Type': 'application/json', if (headers != null) ...headers};
     try {
       final res = await http.get(uri, headers: h).timeout(const Duration(seconds: 8));
+      if (kDebugMode) {
+        print('📥 Response status: ${res.statusCode}');
+        print('📥 Response body: ${res.body}');
+        print('📥 Response headers: ${res.headers}');
+      }
       return res;
     } catch (e) {
+      if (kDebugMode) {
+        print('❌ API Error: $e');
+      }
       if (e is SocketException) {
         throw Exception('Connection refused (is backend running at $baseUrl)?');
       }

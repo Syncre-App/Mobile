@@ -42,37 +42,53 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _performLogin(String email, String password) async {
+    print('🔐 Starting login for: $email');
     try {
       final res = await Api.post('/v1/auth/login', {'email': email, 'password': password});
+      print('🔐 Login response status: ${res.statusCode}');
+      print('🔐 Login response body: ${res.body}');
+      
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body);
         final token = body['token'] as String?;
+        print('🔐 Extracted token: ${token != null ? "✅ Found" : "❌ Missing"}');
+        
     if (token != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', token);
           if (!mounted) return;
           NotificationService.instance.show(NotificationType.success, 'Login success');
+          
           // fetch user
+          print('👤 Fetching user data...');
           final meRes = await Api.get('/v1/user/me', headers: Api.authHeaders(token));
+          print('👤 User data response status: ${meRes.statusCode}');
+          print('👤 User data response body: ${meRes.body}');
+          
           if (meRes.statusCode == 200) {
             final user = jsonDecode(meRes.body);
+            print('👤 Parsed user: $user');
             // In real app, navigate to home with user
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(user: user)));
+          } else {
+            print('❌ Failed to fetch user data');
           }
         } else {
           if (!mounted) return;
           NotificationService.instance.show(NotificationType.error, 'No token in response');
         }
       } else {
+        print('❌ Login failed with status: ${res.statusCode}');
   if (!mounted) return;
   NotificationService.instance.show(NotificationType.error, 'Login failed: ${res.body}');
       }
     } catch (e) {
+      print('❌ Login exception: $e');
       final msg = e.toString();
       if (msg.contains('Connection refused')) {
         if (!mounted) return;
-        NotificationService.instance.show(NotificationType.error, 'Kapcsolódási hiba: a backend nem fut (http://localhost:3000)');
+        NotificationService.instance.show(NotificationType.error, 'Kapcsolódási hiba: a backend nem fut (${Api.baseUrl})');
       } else {
         if (!mounted) return;
         NotificationService.instance.show(NotificationType.error, 'Error: $e');
