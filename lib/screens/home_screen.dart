@@ -52,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      final res = await Api.get('v1/user/me', headers: Api.authHeaders(token));
+      final res = await Api.get('/user/me', headers: Api.authHeaders(token));
       print('🏠 User data response status: ${res.statusCode}');
       print('🏠 User data response body: ${res.body}');
       
