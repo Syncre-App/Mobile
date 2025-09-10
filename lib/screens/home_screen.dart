@@ -110,26 +110,30 @@ class _HomeScreenState extends State<HomeScreen> {
           _chats = chatsData.cast<Map<String, dynamic>>();
           _loadingChats = false;
         });
-        print('💬 Loaded ${_chats.length} chats');
+        if (_chats.isEmpty) {
+          print('💬 No chats found - user has no conversations yet');
+        } else {
+          print('💬 Loaded ${_chats.length} chats successfully');
+        }
       } else {
-        print('❌ Failed to load chats');
+        print('❌ Failed to load chats - HTTP ${response.statusCode}');
         setState(() => _loadingChats = false);
         NotificationService.instance.show(NotificationType.error, 'Failed to load chats');
       }
     } catch (e) {
-      print('❌ Exception loading chats: $e');
+      print('❌ Network error loading chats: $e');
       if (!mounted) return;
       setState(() => _loadingChats = false);
       
-      // Show user-friendly error message
-      String errorMessage = 'Unable to load chats';
+      // Only show user notification for actual network errors, not empty results
       if (e.toString().contains('timeout')) {
-        errorMessage = 'Connection timeout - please check your internet';
+        print('⏰ Chat loading timed out - this might be normal if server is slow');
+        // Don't show error notification for timeout, just log it
       } else if (e.toString().contains('Connection refused')) {
-        errorMessage = 'Server unavailable - please try again later';
+        NotificationService.instance.show(NotificationType.error, 'Server unavailable - please try again later');
+      } else {
+        NotificationService.instance.show(NotificationType.error, 'Unable to load chats');
       }
-      
-      NotificationService.instance.show(NotificationType.error, errorMessage);
     }
   }
 
