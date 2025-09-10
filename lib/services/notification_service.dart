@@ -18,8 +18,6 @@ class NotificationEntry {
   });
 }
 
-/// Singleton service you can call from anywhere:
-/// NotificationService.instance.show(NotificationType.success, 'Saved');
 class NotificationService {
   NotificationService._internal();
   static final NotificationService instance = NotificationService._internal();
