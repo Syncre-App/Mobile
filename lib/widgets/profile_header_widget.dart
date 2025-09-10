@@ -6,8 +6,13 @@ import '../screens/edit_profile_screen.dart';
 
 class ProfileHeaderWidget extends StatelessWidget {
   final Map<String, dynamic> user;
+  final Map<String, String> userStatuses;
   
-  const ProfileHeaderWidget({super.key, required this.user});
+  const ProfileHeaderWidget({
+    super.key, 
+    required this.user,
+    this.userStatuses = const {},
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -77,18 +82,39 @@ class ProfileHeaderWidget extends StatelessWidget {
                   ],
                 ),
               ),
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.purple.withOpacity(0.3),
-                backgroundImage: user['profile_picture'] != null 
-                  ? NetworkImage(user['profile_picture']) 
-                  : null,
-                child: user['profile_picture'] == null 
-                  ? Text(
-                      (user['username'] ?? user['email'] ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                    )
-                  : null,
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.purple.withOpacity(0.3),
+                    backgroundImage: user['profile_picture'] != null 
+                      ? NetworkImage(user['profile_picture']) 
+                      : null,
+                    child: user['profile_picture'] == null 
+                      ? Text(
+                          (user['username'] ?? user['email'] ?? 'U')[0].toUpperCase(),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        )
+                      : null,
+                  ),
+                  // Online status indicator
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _getMyOnlineStatus() ? Colors.green : Colors.grey,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -129,5 +155,11 @@ class ProfileHeaderWidget extends StatelessWidget {
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
+  }
+
+  bool _getMyOnlineStatus() {
+    // We can consider ourselves online if we have any user statuses 
+    // (meaning WebSocket is connected and working)
+    return userStatuses.isNotEmpty;
   }
 }

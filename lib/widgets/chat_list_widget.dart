@@ -8,12 +8,14 @@ class ChatListWidget extends StatefulWidget {
   final bool isLoading;
   final List<Map<String, dynamic>> chats;
   final VoidCallback onRefresh;
+  final Map<String, String> userStatuses;
   
   const ChatListWidget({
     super.key, 
     required this.isLoading,
     required this.chats,
     required this.onRefresh,
+    this.userStatuses = const {},
   });
 
   @override
@@ -196,18 +198,40 @@ class _ChatListWidgetState extends State<ChatListWidget> {
             final isLoading = snapshot.connectionState == ConnectionState.waiting;
             
             return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.purple.withOpacity(0.3),
-                child: isLoading 
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(
-                      chatName[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              leading: Stack(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.purple.withOpacity(0.3),
+                    child: isLoading 
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(
+                          chatName[0].toUpperCase(),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                  ),
+                  // Online status indicator (for 1-on-1 chats)
+                  if (userIds.length == 2) // Only show for 1-on-1 chats
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _getOtherUserOnlineStatus(userIds),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 2,
+                          ),
+                        ),
+                      ),
                     ),
+                ],
               ),
               title: Text(
                 chatName,
@@ -276,5 +300,21 @@ class _ChatListWidgetState extends State<ChatListWidget> {
 
   Future<void> _removeFriend(Map<String, dynamic> chat) async {
     NotificationService.instance.show(NotificationType.info, 'Remove friend coming soon!');
+  }
+
+  Color _getOtherUserOnlineStatus(List<dynamic> userIds) {
+    // Get the other user's ID (not current user)
+    final otherUserIds = userIds
+        .map((id) => id.toString())
+        .where((id) => id != _currentUserId)
+        .toList();
+    
+    if (otherUserIds.isEmpty) return Colors.grey;
+    
+    // Check if the other user is online
+    final otherUserId = otherUserIds.first;
+    final status = widget.userStatuses[otherUserId];
+    
+    return status == 'online' ? Colors.green : Colors.grey;
   }
 }

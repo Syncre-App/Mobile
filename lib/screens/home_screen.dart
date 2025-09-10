@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api.dart';
 import '../services/notification_service.dart';
+import '../services/websocket_service.dart';
 import '../widgets/friend_search_widget.dart';
 import '../widgets/chat_list_widget.dart';
 import '../widgets/profile_header_widget.dart';
@@ -20,11 +21,37 @@ class _HomeScreenState extends State<HomeScreen> {
   String? error;
   List<Map<String, dynamic>> _chats = [];
   bool _loadingChats = false;
+  final WebSocketService _wsService = WebSocketService();
+  Map<String, String> _userStatuses = {};
 
   @override
   void initState() {
     super.initState();
     _loadMe();
+    _initializeWebSocket();
+  }
+
+  @override
+  void dispose() {
+    _wsService.disconnect();
+    super.dispose();
+  }
+
+  Future<void> _initializeWebSocket() async {
+    print('🌐 Initializing WebSocket connection...');
+    
+    // Listen to status changes
+    _wsService.statusStream.listen((statuses) {
+      if (mounted) {
+        setState(() {
+          _userStatuses = statuses;
+        });
+        print('👤 User statuses updated: ${statuses.length} users');
+      }
+    });
+
+    // Connect to WebSocket
+    await _wsService.connect();
   }
 
   Future<void> _loadMe() async {
@@ -210,7 +237,10 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               // Profile Header
-              if (user != null) ProfileHeaderWidget(user: user!),
+              if (user != null) ProfileHeaderWidget(
+                user: user!,
+                userStatuses: _userStatuses,
+              ),
               
               // Friend Search Widget
               FriendSearchWidget(
@@ -223,6 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   chats: _chats,
                   isLoading: _loadingChats,
                   onRefresh: _loadChats,
+                  userStatuses: _userStatuses,
                 ),
               ),
             ],
