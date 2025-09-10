@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'api.dart';
 
 class WebSocketService {
   static final WebSocketService _instance = WebSocketService._internal();
@@ -90,6 +91,7 @@ class WebSocketService {
           _isConnected = true; // Only set connected after successful auth
           print('✅ WebSocket authentication successful - Now ONLINE');
           _startPingTimer(); // Start ping timer after successful auth
+          _loadFriendsStatus(); // Load friends status after successful auth
           break;
 
         case 'friend_status_change':
@@ -187,8 +189,137 @@ class WebSocketService {
     return _userStatuses[userId] == 'online';
   }
 
+  // Manually refresh friends status
+  Future<void> refreshFriendsStatus() async {
+    if (_isConnected) {
+      await _loadFriendsStatus();
+    }
+  }
+
   void dispose() {
     disconnect();
     _statusController.close();
+  }
+
+  Future<void> _loadFriendsStatus() async {
+    try {
+      print('👥 Loading friends status on app start...');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      
+      if (token == null) {
+        print('❌ No auth token for loading friends status');
+        return;
+      }
+
+      // Try to get friends list first
+      final friendsResponse = await Api.get('/user/friends', headers: Api.authHeaders(token));
+      print('👥 Friends response status: ${friendsResponse.statusCode}');
+      
+      if (friendsResponse.statusCode == 200) {
+        final friendsData = jsonDecode(friendsResponse.body);
+        List<dynamic> friends = [];
+        
+        // Handle different response formats
+        if (friendsData is List) {
+          friends = friendsData;
+        } else if (friendsData is Map && friendsData['friends'] != null) {
+          friends = friendsData['friends'];
+        }
+        
+        print('👥 Found ${friends.length} friends, checking their status...');
+        
+        // Load status for each friend
+        for (final friend in friends) {
+          final friendId = friend['id']?.toString() ?? friend['friend_id']?.toString();
+          if (friendId != null) {
+            await _loadUserStatus(friendId);
+          }
+        }
+        
+        // Notify listeners about status updates
+        _statusController.add(Map.from(_userStatuses));
+        
+      } else if (friendsResponse.statusCode == 404) {
+        print('👥 No friends endpoint available, trying alternative approach...');
+        // Alternative: load from chat participants
+        await _loadStatusFromChats();
+      } else {
+        print('❌ Failed to load friends: ${friendsResponse.statusCode}');
+      }
+      
+    } catch (e) {
+      print('❌ Error loading friends status: $e');
+      // Try alternative approach if main method fails
+      await _loadStatusFromChats();
+    }
+  }
+
+  Future<void> _loadUserStatus(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      
+      if (token == null) return;
+      
+      final response = await Api.get('/user/$userId', headers: Api.authHeaders(token));
+      if (response.statusCode == 200) {
+        final userData = jsonDecode(response.body);
+        final status = userData['status']?.toString() ?? 'offline';
+        _userStatuses[userId] = status;
+        print('👤 User $userId status: $status');
+      }
+    } catch (e) {
+      print('❌ Error loading status for user $userId: $e');
+    }
+  }
+
+  Future<void> _loadStatusFromChats() async {
+    try {
+      print('💬 Loading status from chat participants...');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      
+      if (token == null) return;
+      
+      final chatsResponse = await Api.get('/chat/', headers: Api.authHeaders(token));
+      if (chatsResponse.statusCode == 200) {
+        final responseData = jsonDecode(chatsResponse.body);
+        List<dynamic> chatsData = [];
+        
+        if (responseData is List) {
+          chatsData = responseData;
+        } else if (responseData is Map && responseData['chats'] != null) {
+          chatsData = responseData['chats'];
+        }
+        
+        // Extract unique user IDs from chats
+        Set<String> userIds = {};
+        for (final chat in chatsData) {
+          String usersString = chat['users'] ?? '[]';
+          try {
+            usersString = usersString.replaceAll(r'\', '');
+            List<dynamic> chatUserIds = jsonDecode(usersString);
+            for (final userId in chatUserIds) {
+              userIds.add(userId.toString());
+            }
+          } catch (e) {
+            print('❌ Error parsing chat users: $e');
+          }
+        }
+        
+        print('👥 Found ${userIds.length} unique users in chats, loading their status...');
+        
+        // Load status for each user
+        for (final userId in userIds) {
+          await _loadUserStatus(userId);
+        }
+        
+        // Notify listeners
+        _statusController.add(Map.from(_userStatuses));
+      }
+    } catch (e) {
+      print('❌ Error loading status from chats: $e');
+    }
   }
 }

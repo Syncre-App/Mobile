@@ -181,6 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
           _loadChats(); // Reload chats when friend is added
+          _wsService.refreshFriendsStatus(); // Refresh friends status
         }
       });
     }

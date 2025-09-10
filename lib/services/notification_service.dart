@@ -26,7 +26,7 @@ class NotificationService {
 
   Stream<NotificationEntry> get stream => _controller.stream;
 
-  String show(NotificationType type, String message, {Duration duration = const Duration(milliseconds: 4500)}) {
+  String show(NotificationType type, String message, {Duration duration = const Duration(milliseconds: 3000)}) {
     final id = _makeId();
     final entry = NotificationEntry(id: id, type: type, message: message, duration: duration);
     _controller.add(entry);
@@ -151,23 +151,23 @@ class _NotificationProviderState extends State<NotificationProvider> {
       alignment: Alignment.center,
       children: [
         widget.child,
-        // overlay layer: place toasts near the top, under status bar / dynamic island
+        // overlay layer: place toasts at the bottom, above navigation
         Positioned.fill(
           child: IgnorePointer(
             ignoring: _items.isEmpty,
             child: LayoutBuilder(builder: (context, _) {
-              final topPad = MediaQuery.of(context).padding.top + 12.0; // under dynamic island / status bar
+              final bottomPad = MediaQuery.of(context).padding.bottom + 80.0; // above navigation/home indicator
               return Stack(children: [
                 Positioned(
-                  top: topPad,
+                  bottom: bottomPad,
                   left: 0,
                   right: 0,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: _items.map((entry) {
+                    children: _items.reversed.map((entry) { // Reverse to show newest at bottom
                       return Padding(
                         key: ValueKey(entry.id),
-                        padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 24.0),
+                        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
                         child: _ToastCard(
                           key: _cardKeys[entry.id],
                           entry: entry,
@@ -220,7 +220,7 @@ class _ToastCardState extends State<_ToastCard> with SingleTickerProviderStateMi
   void initState() {
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
-    _offset = Tween(begin: const Offset(0, -0.15), end: Offset.zero)
+    _offset = Tween(begin: const Offset(0, 0.15), end: Offset.zero) // Changed to slide up from bottom
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
     _opacity = Tween(begin: 0.0, end: 1.0)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
@@ -267,24 +267,28 @@ class _ToastCardState extends State<_ToastCard> with SingleTickerProviderStateMi
           child: Material(
             color: Colors.transparent,
             child: Container(
-              constraints: const BoxConstraints(minWidth: 200, maxWidth: 520),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              constraints: const BoxConstraints(minWidth: 200, maxWidth: 400),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: widget.bgColor,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: widget.borderColor.withAlpha(204)),
-                boxShadow: [BoxShadow(color: Colors.black.withAlpha(46), blurRadius: 16, offset: const Offset(0, 4))],
+                boxShadow: [BoxShadow(color: Colors.black.withAlpha(46), blurRadius: 12, offset: const Offset(0, 2))],
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  widget.icon,
-                  const SizedBox(width: 12),
-                  Flexible(child: Text(widget.entry.message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
-                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: widget.icon,
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(child: Text(widget.entry.message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 14))),
+                  const SizedBox(width: 10),
                   GestureDetector(
                     onTap: _animateOut,
-                    child: const Icon(Icons.close, size: 20, color: Colors.white70),
+                    child: const Icon(Icons.close, size: 18, color: Colors.white70),
                   ),
                 ],
               ),
