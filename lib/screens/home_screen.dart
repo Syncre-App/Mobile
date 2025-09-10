@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import '../services/api.dart';
+import '../widgets/welcome_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic>? user;
@@ -24,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
     user = widget.user;
     if (user == null) {
       _loadMe();
+    } else {
+      _checkAndShowWelcomeDialog();
     }
   }
 
@@ -53,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
           user = body;
           loading = false;
         });
+        _checkAndShowWelcomeDialog();
       } else {
         if (!mounted) return;
         setState(() {
@@ -66,6 +70,12 @@ class _HomeScreenState extends State<HomeScreen> {
         error = e.toString();
         loading = false;
       });
+    }
+  }
+
+  Future<void> _checkAndShowWelcomeDialog() async {
+    if (mounted) {
+      await WelcomeDialog.showIfFirstTime(context);
     }
   }
 
@@ -103,19 +113,49 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Home'),
         actions: [
-          IconButton(
-            tooltip: 'Logout',
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (String value) async {
               final navigator = Navigator.of(context);
               final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('auth_token');
-              if (!mounted) return;
-              navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
+              
+              if (value == 'logout') {
+                await prefs.remove('auth_token');
+                if (!mounted) return;
+                navigator.pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              } else if (value == 'reset_welcome') {
+                await WelcomeDialog.resetWelcomeDialog();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Welcome dialog reset! Restart app to see it again.')),
+                );
+              }
             },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'reset_welcome',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('Reset Welcome'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('Logout'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
