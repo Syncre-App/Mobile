@@ -4,11 +4,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class Api {
-  static String _overrideBaseUrl = 'http://192.168.1.253:3000';
+  static String _overrideBaseUrl = 'https://api.syncre.xyz';
 
   static String get baseUrl {
     if (_overrideBaseUrl.isNotEmpty) return _overrideBaseUrl;
-    return 'http://localhost:3000';
+    return 'https://api.syncre.xyz';
   }
 
   static void setBaseUrl(String url) => _overrideBaseUrl = url;
