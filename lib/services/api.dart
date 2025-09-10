@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 class Api {
@@ -31,12 +32,19 @@ class Api {
         print('📥 Response headers: ${res.headers}');
       }
       return res;
+    } on TimeoutException {
+      if (kDebugMode) {
+        print('⏰ Network timeout after 8 seconds');
+      }
+      throw Exception('Network timeout - please check your internet connection');
+    } on SocketException {
+      if (kDebugMode) {
+        print('🔌 Connection refused - backend not reachable');
+      }
+      throw Exception('Connection refused (is backend running at $baseUrl)?');
     } catch (e) {
       if (kDebugMode) {
-        print('❌ API Error: $e');
-      }
-      if (e is SocketException) {
-        throw Exception('Connection refused (is backend running at $baseUrl)?');
+        print('❌ Unexpected API error: $e');
       }
       throw Exception('Network error: $e');
     }
@@ -59,12 +67,19 @@ class Api {
         print('📥 Response headers: ${res.headers}');
       }
       return res;
+    } on TimeoutException {
+      if (kDebugMode) {
+        print('⏰ Network timeout after 8 seconds');
+      }
+      throw Exception('Network timeout - please check your internet connection');
+    } on SocketException {
+      if (kDebugMode) {
+        print('🔌 Connection refused - backend not reachable');
+      }
+      throw Exception('Connection refused (is backend running at $baseUrl)?');
     } catch (e) {
       if (kDebugMode) {
-        print('❌ API Error: $e');
-      }
-      if (e is SocketException) {
-        throw Exception('Connection refused (is backend running at $baseUrl)?');
+        print('❌ Unexpected API error: $e');
       }
       throw Exception('Network error: $e');
     }

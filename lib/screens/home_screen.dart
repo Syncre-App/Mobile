@@ -28,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadMe() async {
+    if (!mounted) return;
     setState(() {
       loading = true;
       error = null;
@@ -53,10 +54,11 @@ class _HomeScreenState extends State<HomeScreen> {
       print('🏠 Me response status: ${meRes.statusCode}');
       print('🏠 Me response body: ${meRes.body}');
       
+      if (!mounted) return;
+      
       if (meRes.statusCode == 200) {
         final userData = jsonDecode(meRes.body);
         print('🏠 User data loaded successfully');
-        if (!mounted) return;
         setState(() {
           user = userData;
           loading = false;
@@ -65,7 +67,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadChats();
       } else {
         print('❌ Failed to load user data');
-        if (!mounted) return;
         setState(() {
           error = 'Failed to load user data';
           loading = false;
@@ -82,6 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadChats() async {
+    if (!mounted) return;
     setState(() => _loadingChats = true);
     
     try {
@@ -91,6 +93,8 @@ class _HomeScreenState extends State<HomeScreen> {
       
       if (token == null) {
         print('❌ No auth token for chats');
+        if (!mounted) return;
+        setState(() => _loadingChats = false);
         return;
       }
       
@@ -98,9 +102,10 @@ class _HomeScreenState extends State<HomeScreen> {
       print('💬 Chats response status: ${response.statusCode}');
       print('💬 Chats response body: ${response.body}');
       
+      if (!mounted) return;
+      
       if (response.statusCode == 200) {
         final List<dynamic> chatsData = jsonDecode(response.body);
-        if (!mounted) return;
         setState(() {
           _chats = chatsData.cast<Map<String, dynamic>>();
           _loadingChats = false;
@@ -108,7 +113,6 @@ class _HomeScreenState extends State<HomeScreen> {
         print('💬 Loaded ${_chats.length} chats');
       } else {
         print('❌ Failed to load chats');
-        if (!mounted) return;
         setState(() => _loadingChats = false);
         NotificationService.instance.show(NotificationType.error, 'Failed to load chats');
       }
@@ -116,12 +120,23 @@ class _HomeScreenState extends State<HomeScreen> {
       print('❌ Exception loading chats: $e');
       if (!mounted) return;
       setState(() => _loadingChats = false);
-      NotificationService.instance.show(NotificationType.error, 'Error loading chats: $e');
+      
+      // Show user-friendly error message
+      String errorMessage = 'Unable to load chats';
+      if (e.toString().contains('timeout')) {
+        errorMessage = 'Connection timeout - please check your internet';
+      } else if (e.toString().contains('Connection refused')) {
+        errorMessage = 'Server unavailable - please try again later';
+      }
+      
+      NotificationService.instance.show(NotificationType.error, errorMessage);
     }
   }
 
   void _onFriendAdded() {
-    _loadChats(); // Reload chats when friend is added
+    if (mounted) {
+      _loadChats(); // Reload chats when friend is added
+    }
   }
 
   Future<void> _checkAndShowWelcomeDialog() async {

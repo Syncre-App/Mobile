@@ -27,14 +27,18 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
   // Search for users/friends
   Future<void> _searchUsers(String query) async {
     if (query.trim().isEmpty) {
-      setState(() {
-        _searchResults = [];
-        _isSearching = false;
-      });
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
+        });
+      }
       return;
     }
     
-    setState(() => _isSearching = true);
+    if (mounted) {
+      setState(() => _isSearching = true);
+    }
     
     try {
       print('🔍 Searching users with query: $query');
@@ -43,6 +47,9 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
       
       if (token == null) {
         print('❌ No auth token for search');
+        if (mounted) {
+          setState(() => _isSearching = false);
+        }
         return;
       }
       
@@ -50,9 +57,10 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
       print('🔍 Search response status: ${response.statusCode}');
       print('🔍 Search response body: ${response.body}');
       
+      if (!mounted) return;
+      
       if (response.statusCode == 200) {
         final List<dynamic> searchData = jsonDecode(response.body);
-        if (!mounted) return;
         setState(() {
           _searchResults = searchData.cast<Map<String, dynamic>>();
           _isSearching = false;
@@ -60,7 +68,6 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
         print('🔍 Found ${_searchResults.length} users');
       } else {
         print('❌ Search failed');
-        if (!mounted) return;
         setState(() => _isSearching = false);
         NotificationService.instance.show(NotificationType.error, 'Search failed');
       }
@@ -68,7 +75,16 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
       print('❌ Exception during search: $e');
       if (!mounted) return;
       setState(() => _isSearching = false);
-      NotificationService.instance.show(NotificationType.error, 'Search error: $e');
+      
+      // Show user-friendly error message
+      String errorMessage = 'Search failed';
+      if (e.toString().contains('timeout')) {
+        errorMessage = 'Search timeout - please try again';
+      } else if (e.toString().contains('Connection refused')) {
+        errorMessage = 'Server unavailable - please try again later';
+      }
+      
+      NotificationService.instance.show(NotificationType.error, errorMessage);
     }
   }
 
@@ -88,8 +104,9 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
       print('👥 Add friend response status: ${response.statusCode}');
       print('👥 Add friend response body: ${response.body}');
       
+      if (!mounted) return;
+      
       if (response.statusCode == 200) {
-        if (!mounted) return;
         NotificationService.instance.show(NotificationType.success, 'Friend added successfully!');
         widget.onFriendAdded(); // Notify parent to reload chats
         // Clear search after adding
@@ -99,7 +116,6 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
         });
       } else {
         print('❌ Failed to add friend');
-        if (!mounted) return;
         String errorMessage = 'Failed to add friend';
         try {
           final errorBody = jsonDecode(response.body);
@@ -114,13 +130,23 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
     } catch (e) {
       print('❌ Exception adding friend: $e');
       if (!mounted) return;
-      NotificationService.instance.show(NotificationType.error, 'Error adding friend: $e');
+      
+      // Show user-friendly error message
+      String errorMessage = 'Failed to add friend';
+      if (e.toString().contains('timeout')) {
+        errorMessage = 'Connection timeout - please try again';
+      } else if (e.toString().contains('Connection refused')) {
+        errorMessage = 'Server unavailable - please try again later';
+      }
+      
+      NotificationService.instance.show(NotificationType.error, errorMessage);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         // Search bar
         Padding(
@@ -156,7 +182,11 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
         const SizedBox(height: 16),
         
         // Search results
-        Expanded(child: _buildSearchResults()),
+        if (_searchController.text.isNotEmpty) 
+          Container(
+            height: 300, // Fixed height instead of Expanded
+            child: _buildSearchResults(),
+          ),
       ],
     );
   }
