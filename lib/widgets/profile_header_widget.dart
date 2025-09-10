@@ -25,53 +25,60 @@ class ProfileHeaderWidget extends StatelessWidget {
               ),
             ),
           ),
-          GestureDetector(
-            onTap: () => _showProfileMenu(context),
-            child: CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.purple.withOpacity(0.3),
-              backgroundImage: user['profile_picture'] != null 
-                ? NetworkImage(user['profile_picture']) 
-                : null,
-              child: user['profile_picture'] == null 
-                ? Text(
-                    (user['username'] ?? user['email'] ?? 'U')[0].toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  )
-                : null,
+          PopupMenuButton<String>(
+            onSelected: (value) => _handleMenuSelection(context, value),
+            color: const Color(0xFF1A1B2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.white.withOpacity(0.2)),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showProfileMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1B2E).withOpacity(0.95),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(Icons.person, color: Colors.white70, size: 20),
+                    const SizedBox(width: 12),
+                    const Text('Edit Profile', style: TextStyle(color: Colors.white70)),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
-              
-              CircleAvatar(
-                radius: 40,
+              PopupMenuItem(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings, color: Colors.white70, size: 20),
+                    const SizedBox(width: 12),
+                    const Text('Settings', style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.red, size: 20),
+                    const SizedBox(width: 12),
+                    const Text('Logout', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.1),
+                    Colors.white.withOpacity(0.05),
+                  ],
+                ),
+              ),
+              child: CircleAvatar(
+                radius: 18,
                 backgroundColor: Colors.purple.withOpacity(0.3),
                 backgroundImage: user['profile_picture'] != null 
                   ? NetworkImage(user['profile_picture']) 
@@ -79,75 +86,48 @@ class ProfileHeaderWidget extends StatelessWidget {
                 child: user['profile_picture'] == null 
                   ? Text(
                       (user['username'] ?? user['email'] ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                     )
                   : null,
               ),
-              
-              const SizedBox(height: 16),
-              
-              Text(
-                user['username'] ?? user['email'] ?? 'User',
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              
-              Text(
-                user['email'] ?? '',
-                style: const TextStyle(color: Colors.white54, fontSize: 14),
-              ),
-              
-              const SizedBox(height: 32),
-              
-              ListTile(
-                leading: const Icon(Icons.person, color: Colors.white70),
-                title: const Text('Edit Profile', style: TextStyle(color: Colors.white70)),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EditProfileScreen(user: user),
-                    ),
-                  );
-                },
-              ),
-              
-              ListTile(
-                leading: const Icon(Icons.settings, color: Colors.white70),
-                title: const Text('Settings', style: TextStyle(color: Colors.white70)),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SettingsScreen(),
-                    ),
-                  );
-                },
-              ),
-              
-              const Divider(color: Colors.white24),
-              
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Logout', style: TextStyle(color: Colors.red)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.remove('auth_token');
-                  if (!context.mounted) return;
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    (route) => false,
-                  );
-                },
-              ),
-              
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  void _handleMenuSelection(BuildContext context, String value) {
+    switch (value) {
+      case 'profile':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EditProfileScreen(user: user),
+          ),
+        );
+        break;
+      case 'settings':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const SettingsScreen(),
+          ),
+        );
+        break;
+      case 'logout':
+        _logout(context);
+        break;
+    }
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    if (!context.mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
     );
   }
 }

@@ -105,7 +105,18 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       
       if (response.statusCode == 200) {
-        final List<dynamic> chatsData = jsonDecode(response.body);
+        final responseData = jsonDecode(response.body);
+        List<dynamic> chatsData;
+        
+        // Handle both array response and object with chats property
+        if (responseData is List) {
+          chatsData = responseData;
+        } else if (responseData is Map && responseData['chats'] != null) {
+          chatsData = responseData['chats'];
+        } else {
+          chatsData = [];
+        }
+        
         setState(() {
           _chats = chatsData.cast<Map<String, dynamic>>();
           _loadingChats = false;
@@ -139,7 +150,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onFriendAdded() {
     if (mounted) {
-      _loadChats(); // Reload chats when friend is added
+      // Add a small delay to ensure server has processed the friend addition
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          _loadChats(); // Reload chats when friend is added
+        }
+      });
     }
   }
 

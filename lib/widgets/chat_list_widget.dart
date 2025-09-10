@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/notification_service.dart';
 
@@ -61,9 +62,41 @@ class _ChatListWidgetState extends State<ChatListWidget> {
   }
 
   Widget _buildChatItem(Map<String, dynamic> chat) {
-    // Extract chat info
-    final chatName = chat['name'] ?? 'Chat';
+    // Parse users from string format "[\"5573173894499053\",1763791841522611]"
+    String usersString = chat['users'] ?? '[]';
+    List<dynamic> userIds = [];
+    
+    try {
+      // Clean up the string and parse as JSON
+      usersString = usersString.replaceAll(r'\', '');
+      userIds = jsonDecode(usersString);
+    } catch (e) {
+      print('❌ Error parsing user IDs: $e');
+    }
+    
+    // For now, just show "Chat" as name - we'd need to fetch user details to get proper names
+    final chatName = 'Chat ${chat['id']}';
     final chatId = chat['id'];
+    
+    // Format the date
+    String timeText = '';
+    try {
+      final updatedAt = DateTime.parse(chat['updated_at']);
+      final now = DateTime.now();
+      final difference = now.difference(updatedAt);
+      
+      if (difference.inDays > 0) {
+        timeText = '${difference.inDays}d ago';
+      } else if (difference.inHours > 0) {
+        timeText = '${difference.inHours}h ago';
+      } else if (difference.inMinutes > 0) {
+        timeText = '${difference.inMinutes}m ago';
+      } else {
+        timeText = 'now';
+      }
+    } catch (e) {
+      timeText = '';
+    }
     
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -76,9 +109,9 @@ class _ChatListWidgetState extends State<ChatListWidget> {
         child: ListTile(
           leading: CircleAvatar(
             backgroundColor: Colors.purple.withOpacity(0.3),
-            child: Text(
-              chatName[0].toUpperCase(),
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            child: const Icon(
+              Icons.chat_bubble_outline,
+              color: Colors.white,
             ),
           ),
           title: Text(
@@ -86,11 +119,11 @@ class _ChatListWidgetState extends State<ChatListWidget> {
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
           subtitle: Text(
-            'Last message...', // TODO: Get last message from chat
+            '${userIds.length} participants', 
             style: const TextStyle(color: Colors.white54),
           ),
           trailing: Text(
-            '12:00', // TODO: Get time from last message
+            timeText,
             style: const TextStyle(color: Colors.white38, fontSize: 12),
           ),
           onTap: () => _openChat(chatId, chatName),

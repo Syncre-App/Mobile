@@ -17,7 +17,6 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _searchResults = [];
   bool _isSearching = false;
-  String? _lastApiResponse; // Store last API response for debugging
 
   @override
   void dispose() {
@@ -57,9 +56,6 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
       final response = await Api.get('/user/search?q=${Uri.encodeComponent(query)}', headers: Api.authHeaders(token));
       print('🔍 Search response status: ${response.statusCode}');
       print('🔍 Search response body: ${response.body}');
-      
-      // Store response for debugging
-      _lastApiResponse = response.body;
       
       if (!mounted) return;
       
@@ -110,7 +106,7 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
       
       if (!mounted) return;
       
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         NotificationService.instance.show(NotificationType.success, 'Friend added successfully!');
         widget.onFriendAdded(); // Notify parent to reload chats
         // Clear search after adding
@@ -155,45 +151,31 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
         // Search bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      hintText: 'Search for friends...',
-                      hintStyle: TextStyle(color: Colors.white54),
-                      prefixIcon: Icon(Icons.search, color: Colors.white54),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    onChanged: (value) {
-                      // Debounce search
-                      Future.delayed(const Duration(milliseconds: 500), () {
-                        if (_searchController.text == value) {
-                          _searchUsers(value);
-                        }
-                      });
-                    },
-                  ),
-                ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'Search for friends...',
+                hintStyle: TextStyle(color: Colors.white54),
+                prefixIcon: Icon(Icons.search, color: Colors.white54),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-              const SizedBox(width: 8),
-              // Debug button to view API response
-              if (_lastApiResponse != null)
-                IconButton(
-                  icon: const Icon(Icons.bug_report, color: Colors.orange),
-                  onPressed: _showApiResponse,
-                  tooltip: 'View API Response',
-                ),
-            ],
+              onChanged: (value) {
+                // Debounce search
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  if (_searchController.text == value) {
+                    _searchUsers(value);
+                  }
+                });
+              },
+            ),
           ),
         ),
         
@@ -259,47 +241,12 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
               ),
               trailing: IconButton(
                 icon: const Icon(Icons.person_add, color: Colors.green),
-                onPressed: () => _addFriend(userResult['id']),
+                onPressed: () => _addFriend(int.parse(userResult['id'].toString())),
               ),
             ),
           ),
         );
       },
-    );
-  }
-
-  void _showApiResponse() {
-    if (_lastApiResponse == null) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1B2E),
-        title: const Text(
-          'API Response',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Container(
-          width: double.maxFinite,
-          height: 400,
-          child: SingleChildScrollView(
-            child: Text(
-              _lastApiResponse!,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontFamily: 'monospace',
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.blue)),
-          ),
-        ],
-      ),
     );
   }
 }
