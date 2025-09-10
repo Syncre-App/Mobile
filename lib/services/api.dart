@@ -4,11 +4,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class Api {
-  static String _overrideBaseUrl = 'https://api.syncre.xyz';
+  static String _overrideBaseUrl = 'https://api.syncre.xyz/v1';
 
   static String get baseUrl {
     if (_overrideBaseUrl.isNotEmpty) return _overrideBaseUrl;
-    return 'https://api.syncre.xyz';
+    return 'https://api.syncre.xyz/v1';
   }
 
   static void setBaseUrl(String url) => _overrideBaseUrl = url;

@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _performLogin(String email, String password) async {
     print('🔐 Starting login for: $email');
     try {
-      final res = await Api.post('/v1/auth/login', {'email': email, 'password': password});
+      final res = await Api.post('/auth/login', {'email': email, 'password': password});
       print('🔐 Login response status: ${res.statusCode}');
       print('🔐 Login response body: ${res.body}');
       
@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
           
           // fetch user
           print('👤 Fetching user data...');
-          final meRes = await Api.get('/v1/user/me', headers: Api.authHeaders(token));
+          final meRes = await Api.get('/user/me', headers: Api.authHeaders(token));
           print('👤 User data response status: ${meRes.statusCode}');
           print('👤 User data response body: ${meRes.body}');
           

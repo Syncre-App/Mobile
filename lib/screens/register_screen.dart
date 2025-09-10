@@ -37,7 +37,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _loading = true);
     print('📝 Starting registration for: $e (username: $u)');
     try {
-      final res = await Api.post('/v1/auth/register', {'email': e, 'username': u, 'password': p});
+      final res = await Api.post('/auth/register', {'email': e, 'username': u, 'password': p});
       print('📝 Register response status: ${res.statusCode}');
       print('📝 Register response body: ${res.body}');
       
@@ -169,7 +169,7 @@ class _VerifyScreenState extends State<VerifyScreen> {
     setState(() => _loading = true);
     print('✅ Starting verification for: ${widget.email} with code: $c');
     try {
-      final res = await Api.post('/v1/auth/verify', {'email': widget.email, 'code': c});
+      final res = await Api.post('/auth/verify', {'email': widget.email, 'code': c});
       print('✅ Verify response status: ${res.statusCode}');
       print('✅ Verify response body: ${res.body}');
       
