@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/login_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
+import '../services/websocket_service.dart';
 
 class ProfileHeaderWidget extends StatelessWidget {
   final Map<String, dynamic> user;
@@ -158,8 +159,7 @@ class ProfileHeaderWidget extends StatelessWidget {
   }
 
   bool _getMyOnlineStatus() {
-    // We can consider ourselves online if we have any user statuses 
-    // (meaning WebSocket is connected and working)
-    return userStatuses.isNotEmpty;
+    // Check if WebSocket is actually connected
+    return WebSocketService().isConnected;
   }
 }

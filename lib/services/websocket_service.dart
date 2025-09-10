@@ -57,14 +57,10 @@ class WebSocketService {
         onDone: _handleDisconnect,
       );
 
-      _isConnected = true;
       print('🌐 WebSocket connected, authenticating...');
 
       // Authenticate within 5 seconds
       _authenticate();
-
-      // Start ping timer (every 30 seconds)
-      _startPingTimer();
 
     } catch (e) {
       print('❌ WebSocket connection error: $e');
@@ -73,7 +69,7 @@ class WebSocketService {
   }
 
   void _authenticate() {
-    if (_currentToken != null && _isConnected) {
+    if (_currentToken != null && _channel != null) {
       final authMessage = {
         'type': 'auth',
         'token': _currentToken,
@@ -91,7 +87,9 @@ class WebSocketService {
 
       switch (message['type']) {
         case 'auth_success':
-          print('✅ WebSocket authentication successful');
+          _isConnected = true; // Only set connected after successful auth
+          print('✅ WebSocket authentication successful - Now ONLINE');
+          _startPingTimer(); // Start ping timer after successful auth
           break;
 
         case 'friend_status_change':
@@ -135,7 +133,7 @@ class WebSocketService {
   void _startPingTimer() {
     _pingTimer?.cancel();
     _pingTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (_isConnected) {
+      if (_isConnected && _channel != null) {
         _sendPing();
       } else {
         timer.cancel();
@@ -144,7 +142,7 @@ class WebSocketService {
   }
 
   void _sendPing() {
-    if (_isConnected) {
+    if (_isConnected && _channel != null) {
       final pingMessage = {'type': 'ping'};
       _channel?.sink.add(jsonEncode(pingMessage));
       print('🏓 Ping sent');
