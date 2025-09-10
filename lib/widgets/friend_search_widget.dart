@@ -143,12 +143,29 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
     }
   }
 
+  void _handleSearchMenuAction(String action) {
+    switch (action) {
+      case 'clear':
+        _searchController.clear();
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
+        });
+        break;
+      case 'refresh':
+        if (_searchController.text.isNotEmpty) {
+          _searchUsers(_searchController.text);
+        }
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Search bar
+        // Search bar with dropdown
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Container(
@@ -157,24 +174,62 @@ class _FriendSearchWidgetState extends State<FriendSearchWidget> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white.withOpacity(0.2)),
             ),
-            child: TextField(
-              controller: _searchController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                hintText: 'Search for friends...',
-                hintStyle: TextStyle(color: Colors.white54),
-                prefixIcon: Icon(Icons.search, color: Colors.white54),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              onChanged: (value) {
-                // Debounce search
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  if (_searchController.text == value) {
-                    _searchUsers(value);
-                  }
-                });
-              },
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Search for friends...',
+                      hintStyle: TextStyle(color: Colors.white54),
+                      prefixIcon: Icon(Icons.search, color: Colors.white54),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onChanged: (value) {
+                      // Debounce search
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        if (_searchController.text == value) {
+                          _searchUsers(value);
+                        }
+                      });
+                    },
+                  ),
+                ),
+                // Dropdown menu for search options
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.white54),
+                  color: const Color(0xFF1A1B2E),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                  ),
+                  onSelected: (value) => _handleSearchMenuAction(value),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'clear',
+                      child: Row(
+                        children: [
+                          Icon(Icons.clear, color: Colors.white70, size: 20),
+                          SizedBox(width: 12),
+                          Text('Clear Search', style: TextStyle(color: Colors.white70)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'refresh',
+                      child: Row(
+                        children: [
+                          Icon(Icons.refresh, color: Colors.white70, size: 20),
+                          SizedBox(width: 12),
+                          Text('Refresh', style: TextStyle(color: Colors.white70)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),

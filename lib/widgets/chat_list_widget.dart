@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api.dart';
 import '../services/notification_service.dart';
 
 class ChatListWidget extends StatefulWidget {
@@ -19,6 +21,89 @@ class ChatListWidget extends StatefulWidget {
 }
 
 class _ChatListWidgetState extends State<ChatListWidget> {
+  Map<String, Map<String, dynamic>> _userCache = {}; // Cache user data by ID
+  String? _currentUserId; // Current user's ID to exclude from chat names
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentUserId();
+  }
+
+  Future<void> _getCurrentUserId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      if (token != null) {
+        final response = await Api.get('/user/me', headers: Api.authHeaders(token));
+        if (response.statusCode == 200) {
+          final userData = jsonDecode(response.body);
+          setState(() {
+            _currentUserId = userData['id'].toString();
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error getting current user ID: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _getUserById(String userId) async {
+    // Check cache first
+    if (_userCache.containsKey(userId)) {
+      return _userCache[userId];
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      if (token == null) return null;
+
+      final response = await Api.get('/user/$userId', headers: Api.authHeaders(token));
+      print('👤 User $userId response: ${response.statusCode} - ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final userData = jsonDecode(response.body);
+        // Cache the user data
+        _userCache[userId] = userData;
+        return userData;
+      }
+    } catch (e) {
+      print('❌ Error fetching user $userId: $e');
+    }
+    return null;
+  }
+
+  Future<String> _getChatDisplayName(List<dynamic> userIds) async {
+    if (userIds.isEmpty) return 'Empty Chat';
+    
+    // Filter out current user ID to get the other participant(s)
+    final otherUserIds = userIds
+        .map((id) => id.toString())
+        .where((id) => id != _currentUserId)
+        .toList();
+    
+    if (otherUserIds.isEmpty) return 'You';
+    
+    // For 1-on-1 chats, show the other user's name
+    if (otherUserIds.length == 1) {
+      final userData = await _getUserById(otherUserIds[0]);
+      return userData?['username'] ?? 'User ${otherUserIds[0]}';
+    }
+    
+    // For group chats, show multiple names or count
+    if (otherUserIds.length <= 3) {
+      List<String> names = [];
+      for (String userId in otherUserIds) {
+        final userData = await _getUserById(userId);
+        names.add(userData?['username'] ?? 'User $userId');
+      }
+      return names.join(', ');
+    }
+    
+    return 'Group (${otherUserIds.length} people)';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.isLoading) {
@@ -73,9 +158,7 @@ class _ChatListWidgetState extends State<ChatListWidget> {
     } catch (e) {
       print('❌ Error parsing user IDs: $e');
     }
-    
-    // For now, just show "Chat" as name - we'd need to fetch user details to get proper names
-    final chatName = 'Chat ${chat['id']}';
+
     final chatId = chat['id'];
     
     // Format the date
@@ -97,7 +180,7 @@ class _ChatListWidgetState extends State<ChatListWidget> {
     } catch (e) {
       timeText = '';
     }
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
@@ -106,28 +189,42 @@ class _ChatListWidgetState extends State<ChatListWidget> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white.withOpacity(0.2)),
         ),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Colors.purple.withOpacity(0.3),
-            child: const Icon(
-              Icons.chat_bubble_outline,
-              color: Colors.white,
-            ),
-          ),
-          title: Text(
-            chatName,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            '${userIds.length} participants', 
-            style: const TextStyle(color: Colors.white54),
-          ),
-          trailing: Text(
-            timeText,
-            style: const TextStyle(color: Colors.white38, fontSize: 12),
-          ),
-          onTap: () => _openChat(chatId, chatName),
-          onLongPress: () => _showChatOptions(context, chat),
+        child: FutureBuilder<String>(
+          future: _getChatDisplayName(userIds),
+          builder: (context, snapshot) {
+            final chatName = snapshot.data ?? 'Chat $chatId';
+            final isLoading = snapshot.connectionState == ConnectionState.waiting;
+            
+            return ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.purple.withOpacity(0.3),
+                child: isLoading 
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      chatName[0].toUpperCase(),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+              ),
+              title: Text(
+                chatName,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                '${userIds.length} participants', 
+                style: const TextStyle(color: Colors.white54),
+              ),
+              trailing: Text(
+                timeText,
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+              onTap: () => _openChat(chatId, chatName),
+              onLongPress: () => _showChatOptions(context, chat),
+            );
+          },
         ),
       ),
     );
@@ -135,10 +232,7 @@ class _ChatListWidgetState extends State<ChatListWidget> {
 
   void _openChat(int chatId, String chatName) {
     // TODO: Navigate to chat screen
-    NotificationService.instance.show(
-      NotificationType.info, 
-      'Opening chat: $chatName (ID: $chatId)',
-    );
+    NotificationService.instance.show(NotificationType.info, 'Opening chat: $chatName');
   }
 
   void _showChatOptions(BuildContext context, Map<String, dynamic> chat) {
@@ -164,14 +258,6 @@ class _ChatListWidgetState extends State<ChatListWidget> {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              Text(
-                chat['name'] ?? 'Chat',
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              
-              const SizedBox(height: 20),
-              
               ListTile(
                 leading: const Icon(Icons.person_remove, color: Colors.red),
                 title: const Text('Remove Friend', style: TextStyle(color: Colors.red)),
@@ -180,17 +266,6 @@ class _ChatListWidgetState extends State<ChatListWidget> {
                   _removeFriend(chat);
                 },
               ),
-              
-              ListTile(
-                leading: const Icon(Icons.block, color: Colors.red),
-                title: const Text('Block User', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  // TODO: Block user functionality
-                  NotificationService.instance.show(NotificationType.info, 'Block user coming soon!');
-                },
-              ),
-              
               const SizedBox(height: 16),
             ],
           ),
@@ -200,21 +275,6 @@ class _ChatListWidgetState extends State<ChatListWidget> {
   }
 
   Future<void> _removeFriend(Map<String, dynamic> chat) async {
-    // TODO: Extract friend ID from chat users array
-    // For now, show placeholder
     NotificationService.instance.show(NotificationType.info, 'Remove friend coming soon!');
-    
-    // Implementation would be:
-    // try {
-    //   final prefs = await SharedPreferences.getInstance();
-    //   final token = prefs.getString('auth_token');
-    //   final response = await Api.post('/user/remove', {'friendId': friendId}, headers: Api.authHeaders(token));
-    //   if (response.statusCode == 200) {
-    //     widget.onRefresh();
-    //     NotificationService.instance.show(NotificationType.success, 'Friend removed');
-    //   }
-    // } catch (e) {
-    //   NotificationService.instance.show(NotificationType.error, 'Error removing friend');
-    // }
   }
 }
