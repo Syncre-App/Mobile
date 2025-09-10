@@ -81,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
             print('👤 Parsed user: $user');
             // In real app, navigate to home with user
             if (!mounted) return;
-            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(user: user)));
+            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
           } else {
             print('❌ Failed to fetch user data');
             if (!mounted) return;

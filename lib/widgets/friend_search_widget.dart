@@ -1,0 +1,222 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api.dart';
+import '../services/notification_service.dart';
+
+class FriendSearchWidget extends StatefulWidget {
+  final VoidCallback onFriendAdded;
+  
+  const FriendSearchWidget({super.key, required this.onFriendAdded});
+
+  @override
+  State<FriendSearchWidget> createState() => _FriendSearchWidgetState();
+}
+
+class _FriendSearchWidgetState extends State<FriendSearchWidget> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // Search for users/friends
+  Future<void> _searchUsers(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+    
+    setState(() => _isSearching = true);
+    
+    try {
+      print('🔍 Searching users with query: $query');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      
+      if (token == null) {
+        print('❌ No auth token for search');
+        return;
+      }
+      
+      final response = await Api.get('/user/search?q=${Uri.encodeComponent(query)}', headers: Api.authHeaders(token));
+      print('🔍 Search response status: ${response.statusCode}');
+      print('🔍 Search response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> searchData = jsonDecode(response.body);
+        if (!mounted) return;
+        setState(() {
+          _searchResults = searchData.cast<Map<String, dynamic>>();
+          _isSearching = false;
+        });
+        print('🔍 Found ${_searchResults.length} users');
+      } else {
+        print('❌ Search failed');
+        if (!mounted) return;
+        setState(() => _isSearching = false);
+        NotificationService.instance.show(NotificationType.error, 'Search failed');
+      }
+    } catch (e) {
+      print('❌ Exception during search: $e');
+      if (!mounted) return;
+      setState(() => _isSearching = false);
+      NotificationService.instance.show(NotificationType.error, 'Search error: $e');
+    }
+  }
+
+  // Add friend
+  Future<void> _addFriend(int friendId) async {
+    try {
+      print('👥 Adding friend with ID: $friendId');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      
+      if (token == null) {
+        print('❌ No auth token for adding friend');
+        return;
+      }
+      
+      final response = await Api.post('/user/add', {'friendId': friendId}, headers: Api.authHeaders(token));
+      print('👥 Add friend response status: ${response.statusCode}');
+      print('👥 Add friend response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        NotificationService.instance.show(NotificationType.success, 'Friend added successfully!');
+        widget.onFriendAdded(); // Notify parent to reload chats
+        // Clear search after adding
+        _searchController.clear();
+        setState(() {
+          _searchResults = [];
+        });
+      } else {
+        print('❌ Failed to add friend');
+        if (!mounted) return;
+        String errorMessage = 'Failed to add friend';
+        try {
+          final errorBody = jsonDecode(response.body);
+          if (errorBody['message'] != null) {
+            errorMessage = errorBody['message'];
+          }
+        } catch (e) {
+          // Keep default message
+        }
+        NotificationService.instance.show(NotificationType.error, errorMessage);
+      }
+    } catch (e) {
+      print('❌ Exception adding friend: $e');
+      if (!mounted) return;
+      NotificationService.instance.show(NotificationType.error, 'Error adding friend: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Search bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'Search for friends...',
+                hintStyle: TextStyle(color: Colors.white54),
+                prefixIcon: Icon(Icons.search, color: Colors.white54),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              onChanged: (value) {
+                // Debounce search
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  if (_searchController.text == value) {
+                    _searchUsers(value);
+                  }
+                });
+              },
+            ),
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Search results
+        Expanded(child: _buildSearchResults()),
+      ],
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_isSearching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_searchResults.isEmpty) {
+      return const Center(
+        child: Text(
+          'No users found',
+          style: TextStyle(color: Colors.white54),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        final userResult = _searchResults[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
+            ),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.purple.withOpacity(0.3),
+                backgroundImage: userResult['profile_picture'] != null 
+                  ? NetworkImage(userResult['profile_picture']) 
+                  : null,
+                child: userResult['profile_picture'] == null 
+                  ? Text(
+                      (userResult['username'] ?? 'U')[0].toUpperCase(),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    )
+                  : null,
+              ),
+              title: Text(
+                userResult['username'] ?? 'Unknown',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                userResult['email'] ?? '',
+                style: const TextStyle(color: Colors.white54),
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.person_add, color: Colors.green),
+                onPressed: () => _addFriend(userResult['id']),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
