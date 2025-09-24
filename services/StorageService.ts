@@ -39,6 +39,12 @@ export class StorageService {
 
   static async setObject(key: string, value: any): Promise<void> {
     try {
+      if (value === undefined || value === null) {
+        // AsyncStorage does not accept undefined; remove the key instead
+        console.warn(`StorageService.setObject: value for key '${key}' is null/undefined — removing key`);
+        await AsyncStorage.removeItem(key);
+        return;
+      }
       const jsonValue = JSON.stringify(value);
       await AsyncStorage.setItem(key, jsonValue);
     } catch (error) {

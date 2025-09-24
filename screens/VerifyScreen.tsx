@@ -43,11 +43,20 @@ export const VerifyScreen: React.FC = () => {
       if (response.success && response.data) {
         console.log('✅ Verification successful');
         
-        const { token, user } = response.data;
+        const { token, user } = response.data as any;
         
-        // Save token and user data
-        await StorageService.setAuthToken(token);
-        await StorageService.setObject('user_data', user);
+        // Save token and user data if present
+        if (token) {
+          await StorageService.setAuthToken(token);
+        } else {
+          console.warn('Verify: server returned no token');
+        }
+
+        if (user) {
+          await StorageService.setObject('user_data', user);
+        } else {
+          console.warn('Verify: server returned no user object');
+        }
         
   notificationService.show('success', 'Account verification successful!', 'Success');
         router.replace('/home' as any);

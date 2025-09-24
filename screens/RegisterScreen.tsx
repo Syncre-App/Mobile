@@ -72,7 +72,7 @@ export const RegisterScreen: React.FC = () => {
         }
       } else {
         console.log('❌ Registration failed:', response.error);
-        const errorMessage = response.error || 'Regisztrációs hiba történt';
+        const errorMessage = response.error || 'Registration error occurred';
           notificationService.show('error', errorMessage || 'Registration failed', 'Error');
       }
     } catch (error: any) {

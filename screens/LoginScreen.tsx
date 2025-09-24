@@ -45,13 +45,24 @@ export const LoginScreen: React.FC = () => {
       });
 
       if (response.success && response.data) {
-        const { token, user } = response.data;
-        await StorageService.setAuthToken(token);
-        await StorageService.setObject('user_data', user);
-  notificationService.show('success', `Welcome, ${user.username || user.name || email}!`, 'Login successful');
+        const { token, user } = response.data as any;
+        if (token) {
+          await StorageService.setAuthToken(token);
+        } else {
+          console.warn('Login: server returned no token');
+        }
+
+        if (user) {
+          await StorageService.setObject('user_data', user);
+        } else {
+          console.warn('Login: server returned no user object');
+        }
+
+        notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');
         router.replace('/home' as any);
       } else {
-  notificationService.show('error', response.error || 'Login failed', 'Error');
+        console.warn('Login failed response:', response);
+        notificationService.show('error', response.error || 'Login failed', 'Error');
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -75,7 +86,7 @@ export const LoginScreen: React.FC = () => {
 
         <GlassCard width={360} style={styles.card}>
           <View style={styles.cardContent}>
-            <Text style={styles.title}>BEJELENTKEZÉS</Text>
+            <Text style={styles.title}>LOGIN</Text>
             <LinearGradient colors={['#2C82FF', '#0EA5FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.underline} />
 
             <TransparentField
@@ -89,7 +100,7 @@ export const LoginScreen: React.FC = () => {
             />
 
             <TransparentField
-              placeholder="Jelszó"
+              placeholder="Password"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={obscurePassword}
@@ -102,21 +113,21 @@ export const LoginScreen: React.FC = () => {
             <View style={styles.row}>
               <View style={styles.rememberRow}>
                 <Switch value={remember} onValueChange={setRemember} trackColor={{ false: '#767577', true: '#2C82FF' }} thumbColor="#fff" ios_backgroundColor="#3e3e3e" />
-                <Text style={styles.rememberText}>Emlékezz rám</Text>
+                <Text style={styles.rememberText}>Remember me</Text>
               </View>
               <TouchableOpacity>
-                <Text style={styles.forgotText}>Elfelejtette?</Text>
+                <Text style={styles.forgotText}>Forgot?</Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} onPress={handleLogin} activeOpacity={0.8} disabled={isLoading}>
               <LinearGradient colors={isLoading ? ['#999', '#777'] : ['#2C82FF', '#0EA5FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.loginGradient}>
-                {isLoading ? <ActivityIndicator color="white" size="small" /> : <Text style={styles.loginButtonText}>BEJELENTKEZÉS</Text>}
+                {isLoading ? <ActivityIndicator color="white" size="small" /> : <Text style={styles.loginButtonText}>LOGIN</Text>}
               </LinearGradient>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => router.push('/register' as any)} style={styles.registerLink}>
-              <Text style={styles.registerText}>Még nincs fiókod? <Text style={styles.registerTextHighlight}>Regisztrálj</Text></Text>
+              <Text style={styles.registerText}>Don't have an account? <Text style={styles.registerTextHighlight}>Register</Text></Text>
             </TouchableOpacity>
           </View>
         </GlassCard>
