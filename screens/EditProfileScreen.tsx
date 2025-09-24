@@ -1,23 +1,23 @@
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  StatusBar,
+  Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
-import { ApiService } from '../../services/ApiService';
-import { NotificationService } from '../../services/NotificationService';
-import { StorageService } from '../../services/StorageService';
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
+import { ApiService } from '../services/ApiService';
+import { StorageService } from '../services/StorageService';
+import { NotificationService } from '../services/NotificationService';
 
 interface User {
   id: string;

@@ -1,25 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  StatusBar,
-  ActivityIndicator,
-  TouchableOpacity,
-  ScrollView,
-  RefreshControl,
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
-import { ApiService } from '../services/ApiService';
-import { StorageService } from '../services/StorageService';
-import { NotificationService } from '../services/NotificationService';
-import { WebSocketService, UserStatus } from '../services/WebSocketService';
-import { ProfileHeaderWidget } from '../components/ProfileHeaderWidget';
-import { FriendSearchWidget } from '../components/FriendSearchWidget';
+import { ApiService } from '../../services/ApiService';
+import { NotificationService } from '../../services/NotificationService';
+import { StorageService } from '../../services/StorageService';
+import { UserStatus, WebSocketService } from '../../services/WebSocketService';
 import { ChatListWidget } from '../components/ChatListWidget';
+import { FriendSearchWidget } from '../components/FriendSearchWidget';
+import { ProfileHeaderWidget } from '../components/ProfileHeaderWidget';
 
 interface User {
   id: string;

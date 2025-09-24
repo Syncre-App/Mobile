@@ -1,16 +1,16 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React from 'react';
 import {
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
-import { StorageService } from '../../services/StorageService';
-import { UserStatus } from '../../services/WebSocketService';
+import { StorageService } from '../services/StorageService';
+import { UserStatus } from '../services/WebSocketService';
 
 interface User {
   id: string;

@@ -1,20 +1,20 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  StatusBar,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, useLocalSearchParams } from 'expo-router';
 
-import { ApiService } from '../../services/ApiService';
-import { NotificationService } from '../../services/NotificationService';
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
+import { ApiService } from '../services/ApiService';
+import { NotificationService } from '../services/NotificationService';
 
 export const VerifyScreen: React.FC = () => {
   const { email } = useLocalSearchParams();

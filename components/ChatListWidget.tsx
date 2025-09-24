@@ -1,20 +1,20 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
 
-import { ApiService } from '../../services/ApiService';
-import { StorageService } from '../../services/StorageService';
-import { UserStatus } from '../../services/WebSocketService';
 import { GlassCard } from './GlassCard';
+import { ApiService } from '../services/ApiService';
+import { StorageService } from '../services/StorageService';
+import { UserStatus } from '../services/WebSocketService';
 
 interface Chat {
   id: string;

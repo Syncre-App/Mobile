@@ -1,21 +1,21 @@
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  StyleSheet,
+  StatusBar,
+  Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
-import { NotificationService } from '../../services/NotificationService';
-import { StorageService } from '../../services/StorageService';
 import { GlassCard } from '../components/GlassCard';
+import { StorageService } from '../services/StorageService';
+import { NotificationService } from '../services/NotificationService';
 
 export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);

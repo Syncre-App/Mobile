@@ -1,3 +1,3 @@
-import { VerifyScreen } from '../screens/VerifyScreen';
+import { VerifyScreen } from '../../screens/VerifyScreen';
 
 export default VerifyScreen;

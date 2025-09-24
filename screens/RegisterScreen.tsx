@@ -1,21 +1,21 @@
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  StatusBar,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
-import { ApiService } from '../../services/ApiService';
-import { NotificationService } from '../../services/NotificationService';
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
+import { ApiService } from '../services/ApiService';
+import { NotificationService } from '../services/NotificationService';
 
 export const RegisterScreen: React.FC = () => {
   const [username, setUsername] = useState('');

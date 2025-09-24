@@ -1,20 +1,20 @@
-import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  FlatList,
+  Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { ApiService } from '../../services/ApiService';
-import { NotificationService } from '../../services/NotificationService';
-import { StorageService } from '../../services/StorageService';
 import { GlassCard } from './GlassCard';
 import { TransparentField } from './TransparentField';
+import { ApiService } from '../services/ApiService';
+import { StorageService } from '../services/StorageService';
+import { NotificationService } from '../services/NotificationService';
 
 interface User {
   id: string;
