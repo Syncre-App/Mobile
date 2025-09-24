@@ -49,9 +49,20 @@ export class WebSocketService {
       this.currentToken = token;
       
   // Connect to WebSocket (include token in query to ensure server receives it immediately)
+  // Try query param plus subprotocol header for servers that require Authorization header during handshake
   const wsUrl = `wss://api.syncre.xyz/ws?token=${encodeURIComponent(this.currentToken || '')}`;
   console.log('🌐 WebSocket URL:', wsUrl);
-  this.ws = new WebSocket(wsUrl);
+
+  try {
+    // Some servers require the token in the Sec-WebSocket-Protocol header or as a header during handshake. React Native's WebSocket
+    // supports a third argument for protocols which can be used to pass a token-like value that some servers read.
+    // Provide both forms: query param and a protocol value of 'token:<token>' as a best-effort.
+    const protocol = this.currentToken ? `token:${this.currentToken}` : undefined;
+    this.ws = protocol ? new WebSocket(wsUrl, protocol) : new WebSocket(wsUrl);
+  } catch (err) {
+    console.error('❌ WebSocket constructor failed:', err);
+    throw err;
+  }
       
       this.ws.onopen = () => {
         console.log('🌐 WebSocket connected');
@@ -129,12 +140,13 @@ export class WebSocketService {
   private scheduleReconnect(): void {
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Exponential backoff, max 30s
-    
+
     console.log(`🔄 Scheduling WebSocket reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
-    
+
+    // Use setTimeout (returns number) and store id
     this.reconnectInterval = setTimeout(() => {
       this.connect();
-    }, delay);
+    }, delay) as unknown as number;
   }
 
   private startPingPong(): void {
