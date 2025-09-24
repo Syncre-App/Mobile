@@ -48,8 +48,10 @@ export class WebSocketService {
 
       this.currentToken = token;
       
-      // Connect to WebSocket
-      this.ws = new WebSocket('wss://api.syncre.xyz/ws');
+  // Connect to WebSocket (include token in query to ensure server receives it immediately)
+  const wsUrl = `wss://api.syncre.xyz/ws?token=${encodeURIComponent(this.currentToken || '')}`;
+  console.log('🌐 WebSocket URL:', wsUrl);
+  this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
         console.log('🌐 WebSocket connected');

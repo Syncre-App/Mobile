@@ -26,12 +26,20 @@ export class ApiService {
         body: JSON.stringify(data),
       });
 
-      const responseData = await response.json();
-      
+      let responseData: any = undefined;
+      try {
+        responseData = await response.json();
+      } catch (e) {
+        // Non-JSON response — capture text for debugging
+        const text = await response.text();
+        console.warn('ApiService: Non-JSON response:', text);
+        responseData = { text };
+      }
+
       return {
         success: response.ok,
         data: response.ok ? responseData : undefined,
-        error: !response.ok ? (responseData.message || responseData.error || `Request failed with status ${response.status}`) : undefined,
+        error: !response.ok ? (responseData?.message || responseData?.error || responseData?.text || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
     } catch (error: any) {

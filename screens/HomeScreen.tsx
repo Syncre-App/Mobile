@@ -48,11 +48,17 @@ export const HomeScreen: React.FC = () => {
     setChatsLoading(true);
     try {
       const token = await StorageService.getAuthToken();
+      console.log('loadChats: token=', !!token);
       if (token) {
         const response = await ApiService.get('/chats', token);
+        console.log('loadChats: response=', response);
         if (response.success) {
           setChats(response.data || []);
+        } else {
+          console.warn('loadChats: failed to fetch chats:', response.error);
         }
+      } else {
+        console.warn('loadChats: no auth token, skipping chats fetch');
       }
     } catch (error) {
       console.error('Failed to load chats:', error);
