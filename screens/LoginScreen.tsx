@@ -44,10 +44,18 @@ export const LoginScreen: React.FC = () => {
         password: password,
       });
 
+      console.log('Login response raw =', response);
+
       if (response.success && response.data) {
-        const { token, user } = response.data as any;
+        const data = response.data as any;
+        const token = data?.token || data?.accessToken || data?.authToken || data?.jwt;
+        const user = data?.user || data?.profile || data?.user_data || data;
+        console.log('Login parsed token=', !!token, 'user present=', !!user);
+
         if (token) {
           await StorageService.setAuthToken(token);
+          const verify = await StorageService.getAuthToken();
+          console.log('StorageService.getAuthToken() =>', verify ? '[present]' : '[missing]');
         } else {
           console.warn('Login: server returned no token');
         }
@@ -66,7 +74,7 @@ export const LoginScreen: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Login error:', error);
-  notificationService.show('error', 'Network error or server issue', 'Error');
+      notificationService.show('error', 'Network error or server issue', 'Error');
     } finally {
       setIsLoading(false);
     }

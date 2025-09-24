@@ -48,21 +48,41 @@ export class WebSocketService {
 
       this.currentToken = token;
       
-  // Connect to WebSocket (include token in query to ensure server receives it immediately)
-  // Try query param plus subprotocol header for servers that require Authorization header during handshake
-  const wsUrl = `wss://api.syncre.xyz/ws?token=${encodeURIComponent(this.currentToken || '')}`;
-  console.log('🌐 WebSocket URL:', wsUrl);
+      // Try obtaining a short-lived websocket token from the API if the server supports it.
+      // This helps when the server requires a pre-auth handshake rather than query params.
+      let wsToken: string | null = null;
+      try {
+        // Try common endpoints for obtaining a ws token. If none exist, ApiService will return success = false
+        const { ApiService } = await import('./ApiService');
+        const tryEndpoints = ['/auth/ws', '/ws/token', '/auth/ws-token'];
+        for (const ep of tryEndpoints) {
+          try {
+            const res = await ApiService.post(ep, {}, this.currentToken || undefined);
+            if (res.success && res.data) {
+              wsToken = (res.data as any).token || (res.data as any).wsToken || (res.data as any).wstoken || null;
+              if (wsToken) break;
+            }
+          } catch (e) {
+            // ignore endpoint errors
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
 
-  try {
-    // Some servers require the token in the Sec-WebSocket-Protocol header or as a header during handshake. React Native's WebSocket
-    // supports a third argument for protocols which can be used to pass a token-like value that some servers read.
-    // Provide both forms: query param and a protocol value of 'token:<token>' as a best-effort.
-    const protocol = this.currentToken ? `token:${this.currentToken}` : undefined;
-    this.ws = protocol ? new WebSocket(wsUrl, protocol) : new WebSocket(wsUrl);
-  } catch (err) {
-    console.error('❌ WebSocket constructor failed:', err);
-    throw err;
-  }
+      // Build websocket URL. Prefer wsToken if obtained, else include the auth token as 'token' query param.
+      const wsUrl = wsToken
+        ? `wss://api.syncre.xyz/ws?wstoken=${encodeURIComponent(wsToken)}`
+        : `wss://api.syncre.xyz/ws?token=${encodeURIComponent(this.currentToken || '')}`;
+      console.log('🌐 WebSocket URL:', wsUrl);
+
+      try {
+        const protocol = wsToken ? `wstoken:${wsToken}` : (this.currentToken ? `token:${this.currentToken}` : undefined);
+        this.ws = protocol ? new WebSocket(wsUrl, protocol) : new WebSocket(wsUrl);
+      } catch (err) {
+        console.error('❌ WebSocket constructor failed:', err);
+        throw err;
+      }
       
       this.ws.onopen = () => {
         console.log('🌐 WebSocket connected');
