@@ -1,13 +1,11 @@
 import React from 'react';
-import { View, TextInput, StyleSheet, TouchableOpacity, ViewStyle, KeyboardTypeOptions } from 'react-native';
+import { View, TextInput, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 
 interface TransparentFieldProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
   secureTextEntry?: boolean;
-  keyboardType?: KeyboardTypeOptions;
-  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   prefixIcon?: React.ReactNode;
   suffixIcon?: React.ReactNode;
   style?: ViewStyle;
@@ -19,8 +17,6 @@ export const TransparentField: React.FC<TransparentFieldProps> = ({
   onChangeText,
   placeholder,
   secureTextEntry = false,
-  keyboardType,
-  autoCapitalize,
   prefixIcon,
   suffixIcon,
   style,
@@ -36,8 +32,6 @@ export const TransparentField: React.FC<TransparentFieldProps> = ({
         placeholder={placeholder}
         placeholderTextColor="rgba(255, 255, 255, 0.54)"
         secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
         selectionColor="#2C82FF"
       />
       {suffixIcon && (

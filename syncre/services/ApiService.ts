@@ -1,69 +1,142 @@
-const BASE_URL = 'http://localhost:3000'; // Update with your backend URL
+const BASE_URL = 'https://api.syncre.xyz/v1'; // Update with your backend URL
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  statusCode: number;
+}
 
 export class ApiService {
-  private static baseUrl = BASE_URL;
+  public static readonly baseUrl = BASE_URL;
 
-  static async post(endpoint: string, data: any): Promise<Response> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'POST',
-      headers: {
+  static async post<T = any>(endpoint: string, data: any, token?: string): Promise<ApiResponse<T>> {
+    try {
+      const headers: HeadersInit = {
         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+      };
 
-    return response;
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
+
+      const responseData = await response.json();
+      
+      return {
+        success: response.ok,
+        data: response.ok ? responseData : undefined,
+        error: !response.ok ? (responseData.message || responseData.error || `Request failed with status ${response.status}`) : undefined,
+        statusCode: response.status,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Network error',
+        statusCode: 0,
+      };
+    }
   }
 
-  static async get(endpoint: string, token?: string): Promise<Response> {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
+  static async get<T = any>(endpoint: string, token?: string): Promise<ApiResponse<T>> {
+    try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'GET',
+        headers,
+      });
+
+      const responseData = await response.json();
+      
+      return {
+        success: response.ok,
+        data: response.ok ? responseData : undefined,
+        error: !response.ok ? (responseData.message || responseData.error || `Request failed with status ${response.status}`) : undefined,
+        statusCode: response.status,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Network error',
+        statusCode: 0,
+      };
     }
-
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'GET',
-      headers,
-    });
-
-    return response;
   }
 
-  static async put(endpoint: string, data: any, token?: string): Promise<Response> {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
+  static async put<T = any>(endpoint: string, data: any, token?: string): Promise<ApiResponse<T>> {
+    try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(data),
+      });
+
+      const responseData = await response.json();
+      
+      return {
+        success: response.ok,
+        data: response.ok ? responseData : undefined,
+        error: !response.ok ? (responseData.message || responseData.error || `Request failed with status ${response.status}`) : undefined,
+        statusCode: response.status,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Network error',
+        statusCode: 0,
+      };
     }
-
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(data),
-    });
-
-    return response;
   }
 
-  static async delete(endpoint: string, token?: string): Promise<Response> {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
+  static async delete<T = any>(endpoint: string, token?: string): Promise<ApiResponse<T>> {
+    try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'DELETE',
+        headers,
+      });
+
+      const responseData = await response.json();
+      
+      return {
+        success: response.ok,
+        data: response.ok ? responseData : undefined,
+        error: !response.ok ? (responseData.message || responseData.error || `Request failed with status ${response.status}`) : undefined,
+        statusCode: response.status,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Network error',
+        statusCode: 0,
+      };
     }
-
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'DELETE',
-      headers,
-    });
-
-    return response;
   }
 }

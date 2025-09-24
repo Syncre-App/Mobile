@@ -17,28 +17,17 @@ export class NotificationService {
     return NotificationService.instance;
   }
 
-  static show(type: NotificationType | string, message: string, title?: string): void {
-    const instance = NotificationService.getInstance();
-    const notificationType = typeof type === 'string' ? type as NotificationType : type;
-    
+  show(type: NotificationType, message: string, title?: string): void {
     if (Platform.OS === 'android') {
       ToastAndroid.show(message, ToastAndroid.SHORT);
     } else {
-      const alertTitle = title || instance.getDefaultTitle(notificationType);
+      const alertTitle = title || this.getDefaultTitle(type);
       Alert.alert(alertTitle, message);
     }
   }
 
-  show(type: NotificationType, message: string, title?: string): void {
-    NotificationService.show(type, message, title);
-  }
-
-  static showAlert(title: string, message: string, buttons?: any[]): void {
-    Alert.alert(title, message, buttons);
-  }
-
   showAlert(title: string, message: string, buttons?: any[]): void {
-    NotificationService.showAlert(title, message, buttons);
+    Alert.alert(title, message, buttons);
   }
 
   private getDefaultTitle(type: NotificationType): string {

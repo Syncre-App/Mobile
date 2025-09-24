@@ -11,7 +11,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 
@@ -168,16 +167,6 @@ export const LoginScreen: React.FC = () => {
             <Text style={styles.termsText}>
               By continuing you agree to our Terms
             </Text>
-
-            {/* Register Link */}
-            <TouchableOpacity
-              onPress={() => router.push('/register')}
-              style={styles.registerLink}
-            >
-              <Text style={styles.registerText}>
-                Don't have an account? <Text style={styles.registerTextHighlight}>Register</Text>
-              </Text>
-            </TouchableOpacity>
           </View>
         </GlassCard>
       </ScrollView>
@@ -307,18 +296,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 10,
-  },
-  registerLink: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    marginTop: 4,
-  },
-  registerText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-  },
-  registerTextHighlight: {
-    color: '#2C82FF',
-    fontWeight: 'bold',
   },
 });
