@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    Image,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
-import { GlassCard } from './GlassCard';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { UserStatus } from '../services/WebSocketService';
+import { GlassCard } from './GlassCard';
 
 interface Chat {
   id: string;
@@ -138,48 +139,48 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const statusColor = getChatStatusColor(chat);
     const lastMessage = chat.lastMessage;
     
+    const otherParticipant = chat.participants?.find((p) => p.id !== currentUserId) as User | undefined;
+    const avatar = otherParticipant?.avatar || otherParticipant?.avatarUrl || null;
+
     return (
-      <TouchableOpacity
-        onPress={() => handleChatPress(chat)}
-        style={styles.chatItem}
-      >
+      <TouchableOpacity onPress={() => handleChatPress(chat)} style={styles.chatItem}>
         <GlassCard style={styles.chatCard}>
-          <View style={styles.chatContent}>
-            <View style={styles.chatHeader}>
-              <View style={styles.chatInfo}>
-                <View style={styles.nameContainer}>
-                  <Text style={styles.chatName}>{displayName}</Text>
-                  <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                </View>
-                {lastMessage && (
-                  <Text style={styles.lastMessageTime}>
-                    {formatLastMessageTime(lastMessage.createdAt)}
-                  </Text>
-                )}
-              </View>
+          <View style={styles.leftColumn}>
+            <View style={styles.avatarContainer}>
+              {avatar ? (
+                <Image source={{ uri: avatar }} style={styles.avatar} />
+              ) : (
+                <Image source={require('../assets/logo.png')} style={styles.avatar} />
+              )}
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             </View>
-            
-            {lastMessage && (
+          </View>
+
+          <View style={styles.chatContent}>
+            <View style={styles.chatHeaderRow}>
+              <Text style={styles.chatName} numberOfLines={1}>{displayName}</Text>
+              {lastMessage && (
+                <Text style={styles.lastMessageTime}>{formatLastMessageTime(lastMessage.createdAt)}</Text>
+              )}
+            </View>
+
+            {lastMessage ? (
               <View style={styles.lastMessageContainer}>
-                <Text style={styles.lastMessageSender}>
+                <Text style={styles.lastMessageSender} numberOfLines={1}>
                   {lastMessage.user.id === currentUserId ? 'You' : lastMessage.user.username}:
                 </Text>
                 <Text style={styles.lastMessageContent} numberOfLines={1}>
                   {lastMessage.content}
                 </Text>
               </View>
-            )}
-            
-            {!lastMessage && (
+            ) : (
               <Text style={styles.noMessages}>No messages yet</Text>
             )}
           </View>
-          
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color="rgba(255, 255, 255, 0.3)"
-          />
+
+          <View style={styles.rightColumn}>
+            <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.3)" />
+          </View>
         </GlassCard>
       </TouchableOpacity>
     );
@@ -239,12 +240,42 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   chatCard: {
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+  padding: 12,
+  flexDirection: 'row',
+  alignItems: 'center',
   },
   chatContent: {
     flex: 1,
+  },
+  leftColumn: {
+    width: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  chatHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  rightColumn: {
+    width: 36,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    marginLeft: 8,
   },
   chatHeader: {
     flexDirection: 'row',
