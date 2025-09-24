@@ -1,20 +1,19 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-  StatusBar,
-} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
+import React, { useState } from 'react';
+import {
+    ActivityIndicator,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
-import { NotificationService } from '../services/NotificationService';
 
 export const VerifyScreen: React.FC = () => {
   const { email } = useLocalSearchParams();
@@ -24,7 +23,7 @@ export const VerifyScreen: React.FC = () => {
   const handleVerify = async () => {
     const c = code.trim();
     if (!c) {
-      NotificationService.show('warning', 'Please enter code');
+      Alert.alert('Hiba', 'Kérlek add meg a kódot');
       return;
     }
 
@@ -39,21 +38,28 @@ export const VerifyScreen: React.FC = () => {
 
       console.log('✅ Verify response:', response);
 
-      if (response.success) {
+      if (response.success && response.data) {
         console.log('✅ Verification successful');
-        NotificationService.show('success', 'Verified');
-        router.replace('/' as any);
+        
+        const { token, user } = response.data;
+        
+        // Save token and user data
+        await StorageService.setAuthToken(token);
+        await StorageService.setObject('user_data', user);
+        
+        Alert.alert('Sikeres megerősítés!', 'A fiók megerősítése megtörtént!');
+        router.replace('/home' as any);
       } else {
         console.log('❌ Verification failed:', response.error);
-        NotificationService.show('error', response.error || 'Verify failed');
+        Alert.alert('Hiba', response.error || 'Megerősítés sikertelen');
       }
     } catch (error: any) {
       console.log('❌ Verification exception:', error);
       const msg = error.toString();
       if (msg.includes('Connection refused') || msg.includes('Network Error')) {
-        NotificationService.show('error', `Connection error: backend not running (${ApiService.baseUrl})`);
+        Alert.alert('Hiba', `Kapcsolódási hiba: szerver nem elérhető (${ApiService.baseUrl})`);
       } else {
-        NotificationService.show('error', `Error: ${error.message || error}`);
+        Alert.alert('Hiba', `Hiba: ${error.message || error}`);
       }
     } finally {
       setLoading(false);

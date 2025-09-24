@@ -1,21 +1,20 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-  StatusBar,
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import {
+    ActivityIndicator,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
-import { NotificationService } from '../services/NotificationService';
 
 export const RegisterScreen: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -31,11 +30,11 @@ export const RegisterScreen: React.FC = () => {
     const p2 = password2;
 
     if (!u || !e || !p || !p2) {
-      NotificationService.show('warning', 'All fields are required');
+      Alert.alert('Hiba', 'Minden mező kitöltése kötelező');
       return;
     }
     if (p !== p2) {
-      NotificationService.show('warning', 'Passwords do not match');
+      Alert.alert('Hiba', 'A jelszavak nem egyeznek');
       return;
     }
 
@@ -57,14 +56,14 @@ export const RegisterScreen: React.FC = () => {
 
         if (!verified) {
           console.log('📧 User needs verification, redirecting to verify screen');
-          NotificationService.show('info', 'Registration successful! Please check your email for verification.');
+          Alert.alert('Sikeres regisztráció!', 'Kérlek ellenőrizd az email-jeidet a megerősítés érdekében.');
           router.replace({
             pathname: '/verify' as any,
             params: { email: e },
           } as any);
         } else {
           console.log('✅ User already verified, registration complete');
-          NotificationService.show('success', 'Registration complete!');
+          Alert.alert('Sikeres regisztráció!', 'A regisztráció befejeződött!');
           router.replace({
             pathname: '/verify' as any,
             params: { email: e },
@@ -72,16 +71,16 @@ export const RegisterScreen: React.FC = () => {
         }
       } else {
         console.log('❌ Registration failed:', response.error);
-        const errorMessage = response.error || 'Registration failed';
-        NotificationService.show('error', errorMessage);
+        const errorMessage = response.error || 'Regisztrációs hiba történt';
+        Alert.alert('Hiba', errorMessage);
       }
     } catch (error: any) {
       console.log('❌ Registration exception:', error);
       const msg = error.toString();
       if (msg.includes('Connection refused') || msg.includes('Network Error')) {
-        NotificationService.show('error', `Connection error: backend not running (${ApiService.baseUrl})`);
+        Alert.alert('Hiba', `Kapcsolódási hiba: szerver nem elérhető (${ApiService.baseUrl})`);
       } else {
-        NotificationService.show('error', `Error: ${error.message || error}`);
+        Alert.alert('Hiba', `Hiba: ${error.message || error}`);
       }
     } finally {
       setLoading(false);
