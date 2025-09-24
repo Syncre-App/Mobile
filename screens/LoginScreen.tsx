@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import {
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
+import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 
 export const LoginScreen: React.FC = () => {
@@ -27,13 +27,13 @@ export const LoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      Alert.alert('Hiba', 'Kérlek töltsd ki az email és jelszó mezőket');
+      notificationService.show('error', 'Please fill in both email and password fields', 'Error');
       return;
     }
 
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!emailValid) {
-      Alert.alert('Hiba', 'Kérlek adj meg egy érvényes email címet');
+      notificationService.show('error', 'Please enter a valid email address', 'Error');
       return;
     }
 
@@ -48,14 +48,14 @@ export const LoginScreen: React.FC = () => {
         const { token, user } = response.data;
         await StorageService.setAuthToken(token);
         await StorageService.setObject('user_data', user);
-        Alert.alert('Sikeres bejelentkezés', `Üdv, ${user.username || user.name || email}!`);
+  notificationService.show('success', `Welcome, ${user.username || user.name || email}!`, 'Login successful');
         router.replace('/home' as any);
       } else {
-        Alert.alert('Hiba', response.error || 'Sikertelen bejelentkezés');
+  notificationService.show('error', response.error || 'Login failed', 'Error');
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      Alert.alert('Hiba', 'Hálózati hiba vagy szerver probléma');
+  notificationService.show('error', 'Network error or server issue', 'Error');
     } finally {
       setIsLoading(false);
     }

@@ -4,14 +4,14 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+import { notificationService } from '../services/NotificationService';
 
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
@@ -31,11 +31,11 @@ export const RegisterScreen: React.FC = () => {
     const p2 = password2;
 
     if (!u || !e || !p || !p2) {
-      Alert.alert('Hiba', 'Minden mező kitöltése kötelező');
+        notificationService.show('error', 'All fields are required', 'Error');
       return;
     }
     if (p !== p2) {
-      Alert.alert('Hiba', 'A jelszavak nem egyeznek');
+        notificationService.show('error', 'Passwords do not match', 'Error');
       return;
     }
 
@@ -57,14 +57,14 @@ export const RegisterScreen: React.FC = () => {
 
         if (!verified) {
           console.log('📧 User needs verification, redirecting to verify screen');
-          Alert.alert('Sikeres regisztráció!', 'Kérlek ellenőrizd az email-jeidet a megerősítés érdekében.');
+            notificationService.show('success', 'Please check your email for a verification code.', 'Registration successful');
           router.replace({
             pathname: '/verify' as any,
             params: { email: e },
           } as any);
         } else {
           console.log('✅ User already verified, registration complete');
-          Alert.alert('Sikeres regisztráció!', 'A regisztráció befejeződött!');
+            notificationService.show('success', 'Registration completed successfully!', 'Registration successful');
           router.replace({
             pathname: '/verify' as any,
             params: { email: e },
@@ -73,15 +73,15 @@ export const RegisterScreen: React.FC = () => {
       } else {
         console.log('❌ Registration failed:', response.error);
         const errorMessage = response.error || 'Regisztrációs hiba történt';
-        Alert.alert('Hiba', errorMessage);
+          notificationService.show('error', errorMessage || 'Registration failed', 'Error');
       }
     } catch (error: any) {
       console.log('❌ Registration exception:', error);
       const msg = error.toString();
       if (msg.includes('Connection refused') || msg.includes('Network Error')) {
-        Alert.alert('Hiba', `Kapcsolódási hiba: szerver nem elérhető (${ApiService.baseUrl})`);
+          notificationService.show('error', `Connection error: server not reachable (${ApiService.baseUrl})`, 'Error');
       } else {
-        Alert.alert('Hiba', `Hiba: ${error.message || error}`);
+          notificationService.show('error', `Error: ${error.message || error}`, 'Error');
       }
     } finally {
       setLoading(false);

@@ -3,20 +3,19 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
-
-import { StorageService } from '../services/StorageService';
 
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
+import { notificationService } from '../services/NotificationService';
+import { StorageService } from '../services/StorageService';
 
 export const VerifyScreen: React.FC = () => {
   const { email } = useLocalSearchParams();
@@ -26,7 +25,7 @@ export const VerifyScreen: React.FC = () => {
   const handleVerify = async () => {
     const c = code.trim();
     if (!c) {
-      Alert.alert('Hiba', 'Kérlek add meg a kódot');
+      notificationService.show('error', 'Please enter the verification code', 'Error');
       return;
     }
 
@@ -50,19 +49,19 @@ export const VerifyScreen: React.FC = () => {
         await StorageService.setAuthToken(token);
         await StorageService.setObject('user_data', user);
         
-        Alert.alert('Sikeres megerősítés!', 'A fiók megerősítése megtörtént!');
+  notificationService.show('success', 'Account verification successful!', 'Success');
         router.replace('/home' as any);
       } else {
         console.log('❌ Verification failed:', response.error);
-        Alert.alert('Hiba', response.error || 'Megerősítés sikertelen');
+  notificationService.show('error', response.error || 'Verification failed', 'Error');
       }
     } catch (error: any) {
       console.log('❌ Verification exception:', error);
       const msg = error.toString();
       if (msg.includes('Connection refused') || msg.includes('Network Error')) {
-        Alert.alert('Hiba', `Kapcsolódási hiba: szerver nem elérhető (${ApiService.baseUrl})`);
+  notificationService.show('error', `Connection error: server not reachable (${ApiService.baseUrl})`, 'Error');
       } else {
-        Alert.alert('Hiba', `Hiba: ${error.message || error}`);
+  notificationService.show('error', `Error: ${error.message || error}`, 'Error');
       }
     } finally {
       setLoading(false);
