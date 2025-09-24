@@ -39,7 +39,7 @@ export const SettingsScreen: React.FC = () => {
           text: 'Logout',
           onPress: async () => {
             await StorageService.removeAuthToken();
-            router.replace('/');
+            router.replace('/' as any);
           },
           style: 'destructive',
         },
@@ -198,7 +198,7 @@ export const SettingsScreen: React.FC = () => {
             'person',
             'Edit Profile',
             'Update your profile information',
-            () => router.push('/edit-profile')
+            () => router.push('/edit-profile' as any)
           )}
           
           {renderSettingItem(

@@ -1,4 +1,4 @@
-const BASE_URL = 'https://api.syncre.xyz/v1'; // Update with your backend URL
+const BASE_URL = 'https://api.syncre.xyz/v1';
 
 export interface ApiResponse<T = any> {
   success: boolean;

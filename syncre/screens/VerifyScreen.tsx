@@ -42,7 +42,7 @@ export const VerifyScreen: React.FC = () => {
       if (response.success) {
         console.log('✅ Verification successful');
         NotificationService.show('success', 'Verified');
-        router.replace('/');
+        router.replace('/' as any);
       } else {
         console.log('❌ Verification failed:', response.error);
         NotificationService.show('error', response.error || 'Verify failed');

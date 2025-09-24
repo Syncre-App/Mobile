@@ -130,10 +130,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   };
 
   const handleChatPress = (chat: Chat) => {
-    router.push({
-      pathname: '/chat/[id]',
-      params: { id: chat.id },
-    });
+    router.push('/chat/[id]' as any, { id: chat.id } as any);
   };
 
   const renderChatItem = ({ item: chat }: { item: Chat }) => {

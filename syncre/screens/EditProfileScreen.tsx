@@ -45,7 +45,7 @@ export const EditProfileScreen: React.FC = () => {
       const token = await StorageService.getAuthToken();
       
       if (!token) {
-        router.replace('/');
+        router.replace('/' as any);
         return;
       }
 
@@ -82,7 +82,7 @@ export const EditProfileScreen: React.FC = () => {
       const token = await StorageService.getAuthToken();
       
       if (!token) {
-        router.replace('/');
+        router.replace('/' as any);
         return;
       }
 
@@ -189,7 +189,6 @@ export const EditProfileScreen: React.FC = () => {
                 prefixIcon={
                   <Ionicons name="person" size={18} color="rgba(255, 255, 255, 0.7)" />
                 }
-                style={styles.inputField}
               />
             </View>
 
@@ -204,7 +203,6 @@ export const EditProfileScreen: React.FC = () => {
                 prefixIcon={
                   <Ionicons name="mail" size={18} color="rgba(255, 255, 255, 0.7)" />
                 }
-                style={styles.inputField}
               />
             </View>
 
@@ -217,7 +215,7 @@ export const EditProfileScreen: React.FC = () => {
                 prefixIcon={
                   <Ionicons name="document-text" size={18} color="rgba(255, 255, 255, 0.7)" />
                 }
-                style={[styles.inputField, styles.bioField]}
+                style={styles.bioField}
               />
             </View>
           </View>
@@ -305,9 +303,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
-  },
-  inputField: {
-    // No additional styles needed
   },
   bioField: {
     minHeight: 80,

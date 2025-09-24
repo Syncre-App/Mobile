@@ -59,16 +59,16 @@ export const RegisterScreen: React.FC = () => {
           console.log('📧 User needs verification, redirecting to verify screen');
           NotificationService.show('info', 'Registration successful! Please check your email for verification.');
           router.replace({
-            pathname: '/verify',
+            pathname: '/verify' as any,
             params: { email: e },
-          });
+          } as any);
         } else {
           console.log('✅ User already verified, registration complete');
           NotificationService.show('success', 'Registration complete!');
           router.replace({
-            pathname: '/verify',
+            pathname: '/verify' as any,
             params: { email: e },
-          });
+          } as any);
         }
       } else {
         console.log('❌ Registration failed:', response.error);
@@ -89,7 +89,7 @@ export const RegisterScreen: React.FC = () => {
   };
 
   const goToLogin = () => {
-    router.replace('/');
+    router.replace('/' as any);
   };
 
   return (

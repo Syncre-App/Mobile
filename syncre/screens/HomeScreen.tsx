@@ -80,7 +80,7 @@ export const HomeScreen: React.FC = () => {
       if (!token) {
         console.log('❌ No auth token found');
         setError('No auth token found. Please log in.');
-        router.replace('/');
+        router.replace('/' as any);
         return;
       }
 
@@ -97,7 +97,7 @@ export const HomeScreen: React.FC = () => {
         if (response.statusCode === 401) {
           // Token might be expired
           await StorageService.removeAuthToken();
-          router.replace('/');
+          router.replace('/' as any);
         }
       }
     } catch (error: any) {

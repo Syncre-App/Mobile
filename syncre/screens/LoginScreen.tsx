@@ -171,7 +171,7 @@ export const LoginScreen: React.FC = () => {
 
             {/* Register Link */}
             <TouchableOpacity
-              onPress={() => router.push('/register')}
+              onPress={() => router.push('/register' as any)}
               style={styles.registerLink}
             >
               <Text style={styles.registerText}>

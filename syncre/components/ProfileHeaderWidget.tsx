@@ -35,11 +35,11 @@ export const ProfileHeaderWidget: React.FC<ProfileHeaderWidgetProps> = ({
       [
         {
           text: 'Edit Profile',
-          onPress: () => router.push('/edit-profile'),
+          onPress: () => router.push('/edit-profile' as any),
         },
         {
           text: 'Settings',
-          onPress: () => router.push('/settings'),
+          onPress: () => router.push('/settings' as any),
         },
         {
           text: 'Logout',
@@ -67,7 +67,7 @@ export const ProfileHeaderWidget: React.FC<ProfileHeaderWidgetProps> = ({
           text: 'Logout',
           onPress: async () => {
             await StorageService.removeAuthToken();
-            router.replace('/');
+            router.replace('/' as any);
           },
           style: 'destructive',
         },
