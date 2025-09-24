@@ -87,6 +87,13 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     return otherParticipant?.username || 'Unknown User';
   };
 
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  };
+
   const getChatStatusColor = (chat: Chat): string => {
     if (!currentUserId) return 'rgba(255, 255, 255, 0.3)';
     
@@ -150,7 +157,9 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
               {avatar ? (
                 <Image source={{ uri: avatar }} style={styles.avatar} />
               ) : (
-                <Image source={require('../assets/logo.png')} style={styles.avatar} />
+                <View style={styles.initialsCircle}>
+                  <Text style={styles.initialsText}>{getInitials(displayName)}</Text>
+                </View>
               )}
               <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             </View>
@@ -172,6 +181,11 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
                 <Text style={styles.lastMessageContent} numberOfLines={1}>
                   {lastMessage.content}
                 </Text>
+                {chat.unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadText}>{String(chat.unreadCount)}</Text>
+                  </View>
+                )}
               </View>
             ) : (
               <Text style={styles.noMessages}>No messages yet</Text>
@@ -355,5 +369,37 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 16,
     marginTop: 16,
+  },
+  initialsCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initialsText: {
+    color: 'white',
+    fontWeight: '700',
+  },
+  unreadBadge: {
+    backgroundColor: '#ff4757',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    marginVertical: 6,
   },
 });
