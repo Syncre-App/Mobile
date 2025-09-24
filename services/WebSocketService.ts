@@ -16,8 +16,8 @@ export class WebSocketService {
   private userStatuses: UserStatus = {};
   private isConnected = false;
   private currentToken: string | null = null;
-  private reconnectInterval: NodeJS.Timeout | null = null;
-  private pingInterval: NodeJS.Timeout | null = null;
+  private reconnectInterval: number | null = null;
+  private pingInterval: number | null = null;
   private maxReconnectAttempts = 5;
   private reconnectAttempts = 0;
 

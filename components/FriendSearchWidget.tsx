@@ -1,20 +1,20 @@
-import React, { useState, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  FlatList,
-  Alert,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
+import { ApiService } from '../services/ApiService';
+import { NotificationService } from '../services/NotificationService';
+import { StorageService } from '../services/StorageService';
 import { GlassCard } from './GlassCard';
 import { TransparentField } from './TransparentField';
-import { ApiService } from '../services/ApiService';
-import { StorageService } from '../services/StorageService';
-import { NotificationService } from '../services/NotificationService';
 
 interface User {
   id: string;
@@ -34,7 +34,7 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<number | null>(null);
 
   const searchUsers = useCallback(async (query: string) => {
     if (!query.trim()) {
