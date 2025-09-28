@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { ProfileMenu } from '@/components/ProfileMenu';
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
 import { ApiService } from '../services/ApiService';
@@ -25,6 +25,8 @@ export const HomeScreen: React.FC = () => {
   const [chatsLoading, setChatsLoading] = useState(false);
   const [userStatuses, setUserStatuses] = useState<any>({});
   const [isValidatingToken, setIsValidatingToken] = useState(true);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
   
   useEffect(() => {
     validateTokenAndInit();
@@ -102,8 +104,10 @@ export const HomeScreen: React.FC = () => {
     try {
       const wsService = WebSocketService.getInstance();
       await wsService.connect();
+      setIsOnline(true);
     } catch (error) {
       console.error('Failed to connect WebSocket:', error);
+      setIsOnline(false);
     }
   };
 
@@ -111,22 +115,8 @@ export const HomeScreen: React.FC = () => {
     await initializeScreen();
   };
 
-  const handleSettingsPress = () => {
-    router.push('/settings' as any);
-  };
-
   const handleProfilePress = () => {
-    router.push('/edit-profile' as any);
-  };
-
-  const handleMoreOptionsPress = () => {
-    // For now, let's show available actions in console
-    // In a real app, this would show a menu with options like:
-    // - New Group Chat
-    // - Archived Chats
-    // - Settings
-    console.log('More options pressed - showing menu...');
-    // TODO: Implement options menu/modal
+    setShowProfileMenu(true);
   };
 
   const handleFriendAdded = () => {
@@ -153,11 +143,16 @@ export const HomeScreen: React.FC = () => {
         </View>
       ) : (
         <SafeAreaView style={styles.safeArea}>
-          {/* Simple header like Flutter app */}
+          {/* Simple header with profile */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Chats</Text>
-            <TouchableOpacity style={styles.moreButton} onPress={handleMoreOptionsPress}>
-              <Ionicons name="ellipsis-vertical" size={24} color="#ffffff" />
+            <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
+              <View style={styles.profileAvatar}>
+                <Text style={styles.profileAvatarText}>
+                  {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                </Text>
+              </View>
+              <View style={[styles.profileStatusDot, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />
             </TouchableOpacity>
           </View>
 
@@ -177,6 +172,14 @@ export const HomeScreen: React.FC = () => {
           </View>
         </SafeAreaView>
       )}
+      
+      {/* Profile Menu */}
+      <ProfileMenu
+        visible={showProfileMenu}
+        onClose={() => setShowProfileMenu(false)}
+        user={user}
+        isOnline={isOnline}
+      />
     </View>
   );
 };
@@ -270,6 +273,32 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  profileButton: {
+    position: 'relative',
+  },
+  profileAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAvatarText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  profileStatusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    borderWidth: 2,
+    borderColor: '#03040A',
   },
   chatSection: {
     flex: 1,

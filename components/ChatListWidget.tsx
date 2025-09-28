@@ -182,6 +182,19 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
   const renderChatItem = ({ item: chat }: { item: Chat }) => {
     const displayName = getChatDisplayName(chat);
+    
+    // Get the other user's ID for status check
+    const getOtherUserId = () => {
+      try {
+        const userIds = JSON.parse(chat.users);
+        return userIds.find((id: string) => id !== currentUserId);
+      } catch {
+        return null;
+      }
+    };
+    
+    const otherUserId = getOtherUserId();
+    const isUserOnline = otherUserId && userStatuses[otherUserId] === 'online';
 
     return (
       <TouchableOpacity 
@@ -194,6 +207,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             <View style={styles.initialsCircle}>
               <Text style={styles.initialsText}>{getInitials(displayName)}</Text>
             </View>
+            <View style={[styles.statusDot, { backgroundColor: isUserOnline ? '#4CAF50' : '#757575' }]} />
           </View>
 
           <View style={styles.chatContent}>
@@ -269,6 +283,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     marginRight: 16,
+    position: 'relative',
   },
   initialsCircle: {
     width: 48,
@@ -277,6 +292,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    borderWidth: 2,
+    borderColor: '#03040A',
   },
   initialsText: {
     color: 'white',

@@ -1,0 +1,229 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import {
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
+} from 'react-native';
+
+import { GlassCard } from './GlassCard';
+
+interface ProfileMenuProps {
+  visible: boolean;
+  onClose: () => void;
+  user: any;
+  isOnline: boolean;
+}
+
+export const ProfileMenu: React.FC<ProfileMenuProps> = ({
+  visible,
+  onClose,
+  user,
+  isOnline,
+}) => {
+  const router = useRouter();
+
+  const handleEditProfile = () => {
+    onClose();
+    router.push('/edit-profile' as any);
+  };
+
+  const handleSettings = () => {
+    onClose();
+    router.push('/settings' as any);
+  };
+
+  const handleLogout = async () => {
+    onClose();
+    // Clear storage and redirect to login
+    const { StorageService } = await import('../services/StorageService');
+    await StorageService.removeAuthToken();
+    await StorageService.removeItem('user_data');
+    router.replace('/');
+  };
+
+  const handleHelp = () => {
+    onClose();
+    // TODO: Implement help screen
+    console.log('Help & Support clicked');
+  };
+
+  const menuItems = [
+    {
+      icon: 'person-outline',
+      title: 'Edit Profile',
+      onPress: handleEditProfile,
+    },
+    {
+      icon: 'settings-outline',
+      title: 'Settings',
+      onPress: handleSettings,
+    },
+    {
+      icon: 'help-circle-outline',
+      title: 'Help & Support',
+      onPress: handleHelp,
+    },
+    {
+      icon: 'log-out-outline',
+      title: 'Logout',
+      onPress: handleLogout,
+      destructive: true,
+    },
+  ];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.overlay}>
+          <TouchableWithoutFeedback>
+            <View style={styles.menuContainer}>
+              <GlassCard style={styles.menu}>
+                {/* User Info Header */}
+                <View style={styles.userHeader}>
+                  <View style={styles.avatarContainer}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>
+                        {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusDot, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />
+                  </View>
+                  <View style={styles.userInfo}>
+                    <Text style={styles.userName}>{user?.username || 'User'}</Text>
+                    <View style={styles.statusContainer}>
+                      <View style={[styles.statusIndicator, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />
+                      <Text style={styles.statusText}>{isOnline ? 'Online' : 'Offline'}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Menu Items */}
+                <View style={styles.separator} />
+                {menuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.menuItem}
+                    onPress={item.onPress}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color={item.destructive ? '#FF6B6B' : 'rgba(255, 255, 255, 0.8)'}
+                    />
+                    <Text style={[styles.menuItemText, item.destructive && styles.destructiveText]}>
+                      {item.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </GlassCard>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 100,
+    paddingRight: 20,
+  },
+  menuContainer: {
+    minWidth: 250,
+  },
+  menu: {
+    padding: 0,
+    overflow: 'hidden',
+  },
+  userHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  statusDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    borderWidth: 2,
+    borderColor: '#03040A',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingHorizontal: 20,
+  },
+  menuItemText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    marginLeft: 12,
+  },
+  destructiveText: {
+    color: '#FF6B6B',
+  },
+});
