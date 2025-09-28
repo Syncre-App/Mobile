@@ -6,6 +6,7 @@ export interface WebSocketMessage {
   type: string;
   data?: any;
   timestamp?: number;
+  token?: string; // For auth messages
 }
 
 export class WebSocketService {
@@ -48,37 +49,13 @@ export class WebSocketService {
 
       this.currentToken = token;
       
-      // Try obtaining a short-lived websocket token from the API if the server supports it.
-      // This helps when the server requires a pre-auth handshake rather than query params.
-      let wsToken: string | null = null;
-      try {
-        // Try common endpoints for obtaining a ws token. If none exist, ApiService will return success = false
-        const { ApiService } = await import('./ApiService');
-        const tryEndpoints = ['/auth/ws', '/ws/token', '/auth/ws-token'];
-        for (const ep of tryEndpoints) {
-          try {
-            const res = await ApiService.post(ep, {}, this.currentToken || undefined);
-            if (res.success && res.data) {
-              wsToken = (res.data as any).token || (res.data as any).wsToken || (res.data as any).wstoken || null;
-              if (wsToken) break;
-            }
-          } catch (e) {
-            // ignore endpoint errors
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
-
-      // Build websocket URL. Prefer wsToken if obtained, else include the auth token as 'token' query param.
-      const wsUrl = wsToken
-        ? `wss://api.syncre.xyz/ws?wstoken=${encodeURIComponent(wsToken)}`
-        : `wss://api.syncre.xyz/ws?token=${encodeURIComponent(this.currentToken || '')}`;
+      // According to the WebSocket API documentation, connect first then authenticate with auth message
+      // Don't include token in URL - server expects auth message within 5 seconds
+      const wsUrl = `wss://api.syncre.xyz/ws`;
       console.log('🌐 WebSocket URL:', wsUrl);
 
       try {
-        const protocol = wsToken ? `wstoken:${wsToken}` : (this.currentToken ? `token:${this.currentToken}` : undefined);
-        this.ws = protocol ? new WebSocket(wsUrl, protocol) : new WebSocket(wsUrl);
+        this.ws = new WebSocket(wsUrl);
       } catch (err) {
         console.error('❌ WebSocket constructor failed:', err);
         throw err;
@@ -89,13 +66,17 @@ export class WebSocketService {
         this.isConnected = true;
         this.reconnectAttempts = 0;
         
-        // Authenticate
-        this.send({
-          type: 'auth',
-          data: { token: this.currentToken }
-        });
+        // Send authentication immediately as per API documentation
+        // Must authenticate within 5 seconds or connection will close with code 4001
+        if (this.currentToken) {
+          this.send({
+            type: 'auth',
+            token: this.currentToken  // Send as top-level property, not in data
+          });
+          console.log('🌐 Sent auth message with token');
+        }
         
-        // Start ping/pong
+        // Start ping/pong after auth
         this.startPingPong();
       };
 

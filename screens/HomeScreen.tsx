@@ -16,6 +16,7 @@ import { FriendSearchWidget } from '../components/FriendSearchWidget';
 import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+import { WebSocketService } from '../services/WebSocketService';
 
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
@@ -26,8 +27,8 @@ export const HomeScreen: React.FC = () => {
   
   useEffect(() => {
     initializeScreen();
-    // WebSocket disabled as requested
-    // connectWebSocket();
+    // Re-enable WebSocket with fixed Bearer authentication
+    connectWebSocket();
   }, []);
 
   const initializeScreen = async () => {
@@ -65,15 +66,14 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
-  // WebSocket disabled as requested
-  // const connectWebSocket = async () => {
-  //   try {
-  //     const wsService = WebSocketService.getInstance();
-  //     await wsService.connect();
-  //   } catch (error) {
-  //     console.error('Failed to connect WebSocket:', error);
-  //   }
-  // };
+  const connectWebSocket = async () => {
+    try {
+      const wsService = WebSocketService.getInstance();
+      await wsService.connect();
+    } catch (error) {
+      console.error('Failed to connect WebSocket:', error);
+    }
+  };
 
   const handleRefresh = async () => {
     await initializeScreen();
