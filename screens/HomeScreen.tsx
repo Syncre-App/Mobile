@@ -130,8 +130,6 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleProfilePress = () => {
-    console.log('🔍 Profile button pressed, user:', user);
-    console.log('🔍 showProfileMenu will be set to true');
     setShowProfileMenu(true);
   };
 
@@ -155,13 +153,13 @@ export const HomeScreen: React.FC = () => {
       {isValidatingToken ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2C82FF" />
-          <Text style={styles.loadingText}>Validating session...</Text>
+          <Text style={styles.loadingText}>Munkamenet ellenőrzése...</Text>
         </View>
       ) : (
         <SafeAreaView style={styles.safeArea}>
           {/* Simple header with profile */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Chats</Text>
+            <Text style={styles.headerTitle}>Üzenetek</Text>
             <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
               <View style={styles.profileAvatar}>
                 <Text style={styles.profileAvatarText}>

@@ -1,5 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Link, Stack } from 'expo-router';
 import React from 'react';
 import {
@@ -11,39 +9,28 @@ import {
     View,
 } from 'react-native';
 
-import { GlassCard } from '../components/GlassCard';
-
 export default function NotFoundScreen() {
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <StatusBar barStyle="light-content" />
       
       <SafeAreaView style={styles.safeArea}>
-        <Stack.Screen options={{ title: 'Page Not Found' }} />
+        <Stack.Screen options={{ title: 'Nem található', headerShown: true }} />
         
         <View style={styles.content}>
-          <GlassCard style={styles.card}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="alert-circle-outline" size={80} color="rgba(255, 255, 255, 0.6)" />
-            </View>
-            
-            <Text style={styles.title}>Oops!</Text>
-            <Text style={styles.subtitle}>Page Not Found</Text>
+          <View style={styles.card}>
+            <Text style={styles.title}>404</Text>
+            <Text style={styles.subtitle}>Az oldal nem található</Text>
             <Text style={styles.description}>
-              The page you're looking for doesn't exist or has been moved.
+              A keresett oldal nem létezik vagy át lett helyezve.
             </Text>
             
-            <Link href="/" asChild>
+            <Link href="/home" asChild>
               <TouchableOpacity style={styles.homeButton}>
-                <Ionicons name="home" size={20} color="#ffffff" />
-                <Text style={styles.homeButtonText}>Go to Home</Text>
+                <Text style={styles.homeButtonText}>Vissza a főoldalra</Text>
               </TouchableOpacity>
             </Link>
-          </GlassCard>
+          </View>
         </View>
       </SafeAreaView>
     </View>
@@ -65,22 +52,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     padding: 40,
+    borderRadius: 15,
     alignItems: 'center',
     maxWidth: 400,
     width: '100%',
-  },
-  iconContainer: {
-    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   title: {
-    fontSize: 32,
+    fontSize: 48,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#FF6B6B',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 16,
@@ -93,17 +81,15 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   homeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#2C82FF',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 25,
-    gap: 8,
   },
   homeButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
 });

@@ -1,21 +1,21 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-  StyleSheet,
-  StatusBar,
-  Alert,
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import {
+    Alert,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 import { GlassCard } from '../components/GlassCard';
-import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
+import { StorageService } from '../services/StorageService';
 
 export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -129,7 +129,7 @@ export const SettingsScreen: React.FC = () => {
         <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+  <Text style={styles.headerTitle}>Beállítások</Text>
         <View style={styles.headerButton} />
       </View>
 
@@ -196,7 +196,7 @@ export const SettingsScreen: React.FC = () => {
           
           {renderSettingItem(
             'person',
-            'Edit Profile',
+            'Profil szerkesztése',
             'Update your profile information',
             () => router.push('/edit-profile' as any)
           )}
@@ -204,7 +204,7 @@ export const SettingsScreen: React.FC = () => {
           {renderSettingItem(
             'lock-closed',
             'Privacy',
-            'Manage your privacy settings',
+            'Adatvédelmi beállítások kezelése',
             () => {
               Alert.alert('Privacy', 'Privacy settings will be available in future updates');
             }
@@ -245,7 +245,7 @@ export const SettingsScreen: React.FC = () => {
           
           {renderSettingItem(
             'help-circle',
-            'Help & Support',
+            'Súgó és támogatás',
             'Get help and contact support',
             () => {
               Alert.alert('Help & Support', 'Support will be available in future updates');
@@ -257,7 +257,7 @@ export const SettingsScreen: React.FC = () => {
         <GlassCard style={styles.section}>
           {renderSettingItem(
             'log-out',
-            'Logout',
+            'Kijelentkezés',
             'Sign out of your account',
             handleLogout
           )}

@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 import { ApiService } from '../services/ApiService';
@@ -53,17 +53,10 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 }) => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [userDetails, setUserDetails] = useState<{ [key: string]: User }>({});
 
   useEffect(() => {
     getCurrentUserId();
   }, []);
-
-  useEffect(() => {
-    if (chats.length > 0 && currentUserId) {
-      fetchUserDetails();
-    }
-  }, [chats, currentUserId]);
 
   const getCurrentUserId = async () => {
     try {
@@ -76,52 +69,6 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       }
     } catch (error) {
       console.log('❌ Error getting current user ID:', error);
-    }
-  };
-
-  const fetchUserDetails = async () => {
-    try {
-      const token = await StorageService.getAuthToken();
-      if (!token) return;
-
-      const userIds = new Set<string>();
-      
-      chats.forEach(chat => {
-        try {
-          const chatUserIds = JSON.parse(chat.users);
-          chatUserIds.forEach((id: string) => {
-            if (id !== currentUserId) {
-              userIds.add(id);
-            }
-          });
-        } catch (error) {
-          console.log('Error parsing chat users:', error);
-        }
-      });
-
-      const newUserDetails: { [key: string]: User } = { ...userDetails };
-      
-      for (const userId of userIds) {
-        if (!newUserDetails[userId]) {
-          try {
-            const response = await ApiService.get(`/user/${userId}`, token);
-            if (response.success && response.data) {
-              newUserDetails[userId] = response.data;
-            }
-          } catch (error) {
-            console.log(`Error fetching user ${userId}:`, error);
-            newUserDetails[userId] = {
-              id: userId,
-              username: `User ${userId}`,
-              email: '',
-            };
-          }
-        }
-      }
-
-      setUserDetails(newUserDetails);
-    } catch (error) {
-      console.log('❌ Error fetching user details:', error);
     }
   };
 
@@ -139,17 +86,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       const userIds = JSON.parse(chat.users);
       const otherUserId = userIds.find((id: string) => id !== currentUserId);
       
-      if (!otherUserId) return 'Unknown User';
-      
-      // Check if we have user details for this user
-      const user = userDetails[otherUserId];
-      if (user) {
-        // Return username if available, otherwise email, otherwise fallback
-        return user.username || user.email || `User ${otherUserId}`;
-      }
-      
-      // Fallback while loading
-      return `User ${otherUserId}`;
+      // For now, return the user ID. In a real app, you'd fetch user details
+      return `User ${otherUserId || 'Unknown'}`;
     } catch (error) {
       return 'Unknown User';
     }
@@ -157,19 +95,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
   const getInitials = (name?: string) => {
     if (!name) return 'U';
-    
-    // Handle "User 1234567890123456" format
-    if (name.startsWith('User ')) {
-      return 'U' + name.slice(-1); // U + last digit
-    }
-    
     const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) {
-      // Single word - take first 2 characters
-      return parts[0].slice(0, 2).toUpperCase();
-    }
-    
-    // Multiple words - take first letter of first two words
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[1][0]).toUpperCase();
   };
 
@@ -179,19 +106,6 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
   const renderChatItem = ({ item: chat }: { item: Chat }) => {
     const displayName = getChatDisplayName(chat);
-    
-    // Get the other user's ID for status check
-    const getOtherUserId = () => {
-      try {
-        const userIds = JSON.parse(chat.users);
-        return userIds.find((id: string) => id !== currentUserId);
-      } catch {
-        return null;
-      }
-    };
-    
-    const otherUserId = getOtherUserId();
-    const isUserOnline = otherUserId && userStatuses[otherUserId] === 'online';
 
     return (
       <TouchableOpacity 
@@ -204,7 +118,6 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             <View style={styles.initialsCircle}>
               <Text style={styles.initialsText}>{getInitials(displayName)}</Text>
             </View>
-            <View style={[styles.statusDot, { backgroundColor: isUserOnline ? '#4CAF50' : '#757575' }]} />
           </View>
 
           <View style={styles.chatContent}>
@@ -280,7 +193,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     marginRight: 16,
-    position: 'relative',
   },
   initialsCircle: {
     width: 48,
@@ -289,16 +201,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    borderWidth: 2,
-    borderColor: '#03040A',
   },
   initialsText: {
     color: 'white',

@@ -27,16 +27,22 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 }) => {
   const router = useRouter();
 
-  console.log('🔍 ProfileMenu render - visible:', visible, 'user:', user);
-
   const handleEditProfile = () => {
     onClose();
-    router.push('/edit-profile' as any);
+    try {
+      router.push('/edit-profile');
+    } catch (error) {
+      console.error('❌ ProfileMenu: Error navigating to edit-profile:', error);
+    }
   };
 
   const handleSettings = () => {
     onClose();
-    router.push('/settings' as any);
+    try {
+      router.push('/settings');
+    } catch (error) {
+      console.error('❌ ProfileMenu: Error navigating to settings:', error);
+    }
   };
 
   const handleLogout = async () => {
@@ -57,22 +63,22 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   const menuItems = [
     {
       icon: 'person-outline',
-      title: 'Edit Profile',
+  title: 'Profil szerkesztése',
       onPress: handleEditProfile,
     },
     {
       icon: 'settings-outline',
-      title: 'Settings',
+  title: 'Beállítások',
       onPress: handleSettings,
     },
     {
       icon: 'help-circle-outline',
-      title: 'Help & Support',
+  title: 'Súgó és támogatás',
       onPress: handleHelp,
     },
     {
       icon: 'log-out-outline',
-      title: 'Logout',
+  title: 'Kijelentkezés',
       onPress: handleLogout,
       destructive: true,
     },
@@ -84,10 +90,11 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      presentationStyle="overFullScreen"
     >
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
+          <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.menuContainer}>
               <GlassCard style={styles.menu}>
                 {/* User Info Header */}
