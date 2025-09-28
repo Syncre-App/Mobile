@@ -14,7 +14,6 @@ import {
 
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
-import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { WebSocketService } from '../services/WebSocketService';
@@ -120,6 +119,16 @@ export const HomeScreen: React.FC = () => {
     router.push('/edit-profile' as any);
   };
 
+  const handleMoreOptionsPress = () => {
+    // For now, let's show available actions in console
+    // In a real app, this would show a menu with options like:
+    // - New Group Chat
+    // - Archived Chats
+    // - Settings
+    console.log('More options pressed - showing menu...');
+    // TODO: Implement options menu/modal
+  };
+
   const handleFriendAdded = () => {
     // Refresh chat list when new friend is added
     handleRefresh();
@@ -144,41 +153,15 @@ export const HomeScreen: React.FC = () => {
         </View>
       ) : (
         <SafeAreaView style={styles.safeArea}>
-          {/* Header */}
+          {/* Simple header like Flutter app */}
           <View style={styles.header}>
-            <GlassCard style={styles.headerCard}>
-              <View style={styles.headerContent}>
-                <View style={styles.titleContainer}>
-                  <Text style={styles.appName}>Syncre</Text>
-                  <Text style={styles.subtitle}>Chat & Connect</Text>
-                </View>
-                <View style={styles.headerActions}>
-                  <TouchableOpacity
-                    style={styles.headerButton}
-                    onPress={handleProfilePress}
-                  >
-                    <Ionicons name="person" size={24} color="#ffffff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.headerButton}
-                    onPress={handleSettingsPress}
-                  >
-                    <Ionicons name="settings" size={24} color="#ffffff" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </GlassCard>
-          </View>
-
-          {/* Chat List Title */}
-          <View style={styles.titleSection}>
-            <Text style={styles.sectionTitle}>Chats</Text>
-            <TouchableOpacity style={styles.moreButton}>
+            <Text style={styles.headerTitle}>Chats</Text>
+            <TouchableOpacity style={styles.moreButton} onPress={handleMoreOptionsPress}>
               <Ionicons name="ellipsis-vertical" size={24} color="#ffffff" />
             </TouchableOpacity>
           </View>
 
-          {/* Chat List - Remove ScrollView to fix VirtualizedLists warning */}
+          {/* Chat List */}
           <View style={styles.chatSection}>
             <ChatListWidget 
               chats={chats}
@@ -189,7 +172,7 @@ export const HomeScreen: React.FC = () => {
           </View>
 
           {/* Friend Search - moved to bottom */}
-          <View style={styles.section}>
+          <View style={styles.bottomSection}>
             <FriendSearchWidget onFriendAdded={handleFriendAdded} />
           </View>
         </SafeAreaView>
@@ -220,9 +203,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   headerCard: {
     padding: 0,
@@ -273,10 +264,19 @@ const styles = StyleSheet.create({
   },
   moreButton: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   chatSection: {
     flex: 1,
-    paddingHorizontal: 4,
+  },
+  bottomSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   section: {
     paddingHorizontal: 20,
