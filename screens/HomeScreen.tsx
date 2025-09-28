@@ -3,27 +3,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    RefreshControl,
     SafeAreaView,
-    ScrollView,
     StatusBar,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
 import { GlassCard } from '../components/GlassCard';
-import { ProfileHeaderWidget } from '../components/ProfileHeaderWidget';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
-import { WebSocketService } from '../services/WebSocketService';
 
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
-  const [refreshing, setRefreshing] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [chats, setChats] = useState<any[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
@@ -31,7 +26,8 @@ export const HomeScreen: React.FC = () => {
   
   useEffect(() => {
     initializeScreen();
-    connectWebSocket();
+    // WebSocket disabled as requested
+    // connectWebSocket();
   }, []);
 
   const initializeScreen = async () => {
@@ -50,10 +46,12 @@ export const HomeScreen: React.FC = () => {
       const token = await StorageService.getAuthToken();
       console.log('loadChats: token=', !!token);
       if (token) {
-        const response = await ApiService.get('/chats', token);
+        // Fix API endpoint to match REST API documentation: /chat instead of /chats
+        const response = await ApiService.get('/chat', token);
         console.log('loadChats: response=', response);
-        if (response.success) {
-          setChats(response.data || []);
+        if (response.success && response.data) {
+          // API returns { chats: [...] } according to documentation
+          setChats(response.data.chats || []);
         } else {
           console.warn('loadChats: failed to fetch chats:', response.error);
         }
@@ -67,19 +65,18 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
-  const connectWebSocket = async () => {
-    try {
-      const wsService = WebSocketService.getInstance();
-      await wsService.connect();
-    } catch (error) {
-      console.error('Failed to connect WebSocket:', error);
-    }
-  };
+  // WebSocket disabled as requested
+  // const connectWebSocket = async () => {
+  //   try {
+  //     const wsService = WebSocketService.getInstance();
+  //     await wsService.connect();
+  //   } catch (error) {
+  //     console.error('Failed to connect WebSocket:', error);
+  //   }
+  // };
 
   const handleRefresh = async () => {
-    setRefreshing(true);
     await initializeScreen();
-    setRefreshing(false);
   };
 
   const handleSettingsPress = () => {
@@ -103,69 +100,59 @@ export const HomeScreen: React.FC = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={['#03040A', '#071026']}
         style={StyleSheet.absoluteFillObject}
       />
       
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView
-          style={styles.scrollView}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <GlassCard style={styles.headerCard}>
-              <View style={styles.headerContent}>
-                <View style={styles.titleContainer}>
-                  <Text style={styles.appName}>Syncre</Text>
-                  <Text style={styles.subtitle}>Chat & Connect</Text>
-                </View>
-                <View style={styles.headerActions}>
-                  <TouchableOpacity
-                    style={styles.headerButton}
-                    onPress={handleProfilePress}
-                  >
-                    <Ionicons name="person" size={24} color="#ffffff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.headerButton}
-                    onPress={handleSettingsPress}
-                  >
-                    <Ionicons name="settings" size={24} color="#ffffff" />
-                  </TouchableOpacity>
-                </View>
+        {/* Header */}
+        <View style={styles.header}>
+          <GlassCard style={styles.headerCard}>
+            <View style={styles.headerContent}>
+              <View style={styles.titleContainer}>
+                <Text style={styles.appName}>Syncre</Text>
+                <Text style={styles.subtitle}>Chat & Connect</Text>
               </View>
-            </GlassCard>
-          </View>
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  style={styles.headerButton}
+                  onPress={handleProfilePress}
+                >
+                  <Ionicons name="person" size={24} color="#ffffff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.headerButton}
+                  onPress={handleSettingsPress}
+                >
+                  <Ionicons name="settings" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </GlassCard>
+        </View>
 
-          {/* Profile Header */}
-          <View style={styles.section}>
-            {user && (
-              <ProfileHeaderWidget 
-                user={user}
-                userStatuses={userStatuses}
-              />
-            )}
-          </View>
+        {/* Chat List Title */}
+        <View style={styles.titleSection}>
+          <Text style={styles.sectionTitle}>Chats</Text>
+          <TouchableOpacity style={styles.moreButton}>
+            <Ionicons name="ellipsis-vertical" size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
 
-          {/* Friend Search */}
-          <View style={styles.section}>
-            <FriendSearchWidget onFriendAdded={handleFriendAdded} />
-          </View>
+        {/* Chat List - Remove ScrollView to fix VirtualizedLists warning */}
+        <View style={styles.chatSection}>
+          <ChatListWidget 
+            chats={chats}
+            isLoading={chatsLoading}
+            onRefresh={handleChatRefresh}
+            userStatuses={userStatuses}
+          />
+        </View>
 
-          {/* Chat List */}
-          <View style={styles.section}>
-            <ChatListWidget 
-              chats={chats}
-              isLoading={chatsLoading}
-              onRefresh={handleChatRefresh}
-              userStatuses={userStatuses}
-            />
-          </View>
-        </ScrollView>
+        {/* Friend Search - moved to bottom */}
+        <View style={styles.section}>
+          <FriendSearchWidget onFriendAdded={handleFriendAdded} />
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -174,7 +161,7 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#667eea',
+    backgroundColor: '#03040A', // Dark theme to match login
   },
   safeArea: {
     flex: 1,
@@ -221,6 +208,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  titleSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  moreButton: {
+    padding: 8,
+  },
+  chatSection: {
+    flex: 1,
+    paddingHorizontal: 4,
   },
   section: {
     paddingHorizontal: 20,

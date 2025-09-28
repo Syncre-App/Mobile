@@ -4,12 +4,11 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
-    Image,
     RefreshControl,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 import { ApiService } from '../services/ApiService';
@@ -18,15 +17,19 @@ import { UserStatus } from '../services/WebSocketService';
 import { GlassCard } from './GlassCard';
 
 interface Chat {
-  id: string;
-  participants: User[];
+  id: number;
+  users: string; // JSON string of user IDs
+  created_at: string;
+  updated_at: string;
+  // Additional properties that might be populated
+  participants?: User[];
   lastMessage?: {
     id: string;
     content: string;
-    createdAt: string;
-    user: User;
+    created_at: string;
+    sender_id: string;
   };
-  [key: string]: any;
+  unreadCount?: number;
 }
 
 interface User {
@@ -79,12 +82,16 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const getChatDisplayName = (chat: Chat): string => {
     if (!currentUserId) return 'Loading...';
     
-    // Find the other participant (not current user)
-    const otherParticipant = chat.participants?.find(
-      (participant) => participant.id !== currentUserId
-    );
-    
-    return otherParticipant?.username || 'Unknown User';
+    // Parse the users JSON string to get user IDs
+    try {
+      const userIds = JSON.parse(chat.users);
+      const otherUserId = userIds.find((id: string) => id !== currentUserId);
+      
+      // For now, return the user ID. In a real app, you'd fetch user details
+      return `User ${otherUserId || 'Unknown'}`;
+    } catch (error) {
+      return 'Unknown User';
+    }
   };
 
   const getInitials = (name?: string) => {
@@ -95,25 +102,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   };
 
   const getChatStatusColor = (chat: Chat): string => {
-    if (!currentUserId) return 'rgba(255, 255, 255, 0.3)';
-    
-    const otherParticipant = chat.participants?.find(
-      (participant) => participant.id !== currentUserId
-    );
-    
-    if (otherParticipant) {
-      const status = userStatuses[otherParticipant.id];
-      switch (status) {
-        case 'online':
-          return '#4CAF50';
-        case 'away':
-          return '#FFA726';
-        case 'offline':
-        default:
-          return 'rgba(255, 255, 255, 0.3)';
-      }
-    }
-    
+    // For now, return a default color since we don't have participant details
     return 'rgba(255, 255, 255, 0.3)';
   };
 
@@ -145,22 +134,15 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const displayName = getChatDisplayName(chat);
     const statusColor = getChatStatusColor(chat);
     const lastMessage = chat.lastMessage;
-    
-    const otherParticipant = chat.participants?.find((p) => p.id !== currentUserId) as User | undefined;
-    const avatar = otherParticipant?.avatar || otherParticipant?.avatarUrl || null;
 
     return (
       <TouchableOpacity onPress={() => handleChatPress(chat)} style={styles.chatItem}>
         <GlassCard style={styles.chatCard}>
           <View style={styles.leftColumn}>
             <View style={styles.avatarContainer}>
-              {avatar ? (
-                <Image source={{ uri: avatar }} style={styles.avatar} />
-              ) : (
-                <View style={styles.initialsCircle}>
-                  <Text style={styles.initialsText}>{getInitials(displayName)}</Text>
-                </View>
-              )}
+              <View style={styles.initialsCircle}>
+                <Text style={styles.initialsText}>{getInitials(displayName)}</Text>
+              </View>
               <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             </View>
           </View>
@@ -169,19 +151,19 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             <View style={styles.chatHeaderRow}>
               <Text style={styles.chatName} numberOfLines={1}>{displayName}</Text>
               {lastMessage && (
-                <Text style={styles.lastMessageTime}>{formatLastMessageTime(lastMessage.createdAt)}</Text>
+                <Text style={styles.lastMessageTime}>{formatLastMessageTime(lastMessage.created_at)}</Text>
               )}
             </View>
 
             {lastMessage ? (
               <View style={styles.lastMessageContainer}>
                 <Text style={styles.lastMessageSender} numberOfLines={1}>
-                  {lastMessage.user.id === currentUserId ? 'You' : lastMessage.user.username}:
+                  {lastMessage.sender_id === currentUserId ? 'You' : 'Friend'}:
                 </Text>
                 <Text style={styles.lastMessageContent} numberOfLines={1}>
                   {lastMessage.content}
                 </Text>
-                {chat.unreadCount > 0 && (
+                {chat.unreadCount && chat.unreadCount > 0 && (
                   <View style={styles.unreadBadge}>
                     <Text style={styles.unreadText}>{String(chat.unreadCount)}</Text>
                   </View>
@@ -220,25 +202,23 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   }
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={chats}
-        keyExtractor={(item) => item.id}
-        renderItem={renderChatItem}
-        ListEmptyComponent={renderEmptyState}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#2C82FF"
-            colors={['#2C82FF']}
-          />
-        }
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      />
-    </View>
+    <FlatList
+      data={chats}
+      keyExtractor={(item) => String(item.id)}
+      renderItem={renderChatItem}
+      ListEmptyComponent={renderEmptyState}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor="#2C82FF"
+          colors={['#2C82FF']}
+        />
+      }
+      contentContainerStyle={styles.listContainer}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    />
   );
 };
 
