@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     Alert,
@@ -18,12 +18,13 @@ import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 
 export const SettingsScreen: React.FC = () => {
+  const router = useRouter();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
   const [selectedLanguage, setSelectedLanguage] = useState('English');
 
   const handleBack = () => {
-    router.back();
+  router.back();
   };
 
   const handleLogout = () => {
@@ -198,7 +199,10 @@ export const SettingsScreen: React.FC = () => {
             'person',
             'Edit Profile',
             'Update your profile information',
-            () => router.push('/edit-profile' as any)
+            () => {
+              console.log('SettingsScreen: navigate to edit-profile');
+              router.push('/edit-profile' as any);
+            }
           )}
           
           {renderSettingItem(

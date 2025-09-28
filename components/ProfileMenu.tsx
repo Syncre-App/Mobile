@@ -26,9 +26,12 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   isOnline,
 }) => {
   const router = useRouter();
+  // Ref to ignore immediate overlay presses right after the modal opens
+  const openedAtRef = React.useRef<number | null>(null);
 
   const handleEditProfile = () => {
     onClose();
+  console.log('ProfileMenu: Edit Profile pressed');
     try {
       router.push('/edit-profile');
     } catch (error) {
@@ -38,6 +41,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
   const handleSettings = () => {
     onClose();
+  console.log('ProfileMenu: Settings pressed');
     try {
       router.push('/settings');
     } catch (error) {
@@ -47,6 +51,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
   const handleLogout = async () => {
     onClose();
+  console.log('ProfileMenu: Logout pressed');
     // Clear storage and redirect to login
     const { StorageService } = await import('../services/StorageService');
     await StorageService.removeAuthToken();
@@ -56,6 +61,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
   const handleHelp = () => {
     onClose();
+  console.log('ProfileMenu: Help pressed');
     // TODO: Implement help screen
     console.log('Help & Support clicked');
   };
@@ -84,6 +90,28 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
     },
   ];
 
+  React.useEffect(() => {
+    console.log('ProfileMenu: visible=', visible);
+    if (visible) {
+      // mark the time the modal opened; used to ignore the tap that opened it
+      openedAtRef.current = Date.now();
+      // clear after a short window
+      const t = setTimeout(() => {
+        openedAtRef.current = null;
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [visible]);
+
+  const handleOverlayPress = () => {
+    const now = Date.now();
+    if (openedAtRef.current && now - openedAtRef.current < 300) {
+      console.log('ProfileMenu: Ignoring overlay press (just opened)');
+      return;
+    }
+    onClose();
+  };
+
   return (
     <Modal
       visible={visible}
@@ -92,7 +120,13 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
+      {/* Full-screen debug banner to confirm Modal is rendering */}
+      {visible && (
+        <View style={styles.fullscreenDebug} pointerEvents="none">
+          <Text style={styles.fullscreenDebugText}>DEBUG MENU VISIBLE</Text>
+        </View>
+      )}
+  <Pressable style={styles.overlay} onPress={handleOverlayPress}>
         <View>
           <Pressable onPress={() => {}} style={styles.menuContainer}>
             <GlassCard style={styles.menu} intensity={20}>
@@ -150,18 +184,56 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 100,
-    paddingRight: 20,
+  backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  justifyContent: 'flex-start',
+  alignItems: 'flex-end',
+  paddingTop: 60,
+  paddingRight: 12,
   },
   menuContainer: {
     minWidth: 250,
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  debugText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 12,
+  },
+  debugBox: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    right: 8,
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#FF4D4F',
+    backgroundColor: 'rgba(255, 77, 79, 0.08)',
+    zIndex: 9999,
+    alignItems: 'center',
+  },
+  fullscreenDebug: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 50,
+    backgroundColor: 'rgba(255,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10000,
+  },
+  fullscreenDebugText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   menu: {
-    padding: 0,
-    overflow: 'hidden',
+  padding: 0,
+  overflow: 'hidden',
+  backgroundColor: 'transparent',
   },
   userHeader: {
     flexDirection: 'row',
