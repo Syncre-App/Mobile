@@ -130,6 +130,8 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleProfilePress = () => {
+    console.log('🔍 Profile button pressed, user:', user);
+    console.log('🔍 showProfileMenu will be set to true');
     setShowProfileMenu(true);
   };
 

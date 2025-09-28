@@ -86,7 +86,6 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
       const userIds = new Set<string>();
       
-      // Collect all unique user IDs from chats
       chats.forEach(chat => {
         try {
           const chatUserIds = JSON.parse(chat.users);
@@ -100,7 +99,6 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         }
       });
 
-      // Fetch user details for each unique user ID
       const newUserDetails: { [key: string]: User } = { ...userDetails };
       
       for (const userId of userIds) {
@@ -112,7 +110,6 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             }
           } catch (error) {
             console.log(`Error fetching user ${userId}:`, error);
-            // Create a fallback user object
             newUserDetails[userId] = {
               id: userId,
               username: `User ${userId}`,

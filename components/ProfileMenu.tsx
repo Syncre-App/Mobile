@@ -27,6 +27,8 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 }) => {
   const router = useRouter();
 
+  console.log('🔍 ProfileMenu render - visible:', visible, 'user:', user);
+
   const handleEditProfile = () => {
     onClose();
     router.push('/edit-profile' as any);
