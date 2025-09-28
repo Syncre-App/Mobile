@@ -129,7 +129,7 @@ export const SettingsScreen: React.FC = () => {
         <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-  <Text style={styles.headerTitle}>Beállítások</Text>
+  <Text style={styles.headerTitle}>Settings</Text>
         <View style={styles.headerButton} />
       </View>
 
@@ -196,7 +196,7 @@ export const SettingsScreen: React.FC = () => {
           
           {renderSettingItem(
             'person',
-            'Profil szerkesztése',
+            'Edit Profile',
             'Update your profile information',
             () => router.push('/edit-profile' as any)
           )}
@@ -204,7 +204,7 @@ export const SettingsScreen: React.FC = () => {
           {renderSettingItem(
             'lock-closed',
             'Privacy',
-            'Adatvédelmi beállítások kezelése',
+            'Manage your privacy settings',
             () => {
               Alert.alert('Privacy', 'Privacy settings will be available in future updates');
             }
@@ -245,7 +245,7 @@ export const SettingsScreen: React.FC = () => {
           
           {renderSettingItem(
             'help-circle',
-            'Súgó és támogatás',
+            'Help & Support',
             'Get help and contact support',
             () => {
               Alert.alert('Help & Support', 'Support will be available in future updates');
@@ -257,7 +257,7 @@ export const SettingsScreen: React.FC = () => {
         <GlassCard style={styles.section}>
           {renderSettingItem(
             'log-out',
-            'Kijelentkezés',
+            'Logout',
             'Sign out of your account',
             handleLogout
           )}

@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { GlassCard } from '../components/GlassCard';
 
 export default function NotFoundScreen() {
   return (
@@ -15,21 +16,23 @@ export default function NotFoundScreen() {
       <StatusBar barStyle="light-content" />
       
       <SafeAreaView style={styles.safeArea}>
-        <Stack.Screen options={{ title: 'Nem található', headerShown: true }} />
+        <Stack.Screen options={{ title: 'Nem található', headerShown: false }} />
         
         <View style={styles.content}>
-          <View style={styles.card}>
-            <Text style={styles.title}>404</Text>
-            <Text style={styles.subtitle}>Az oldal nem található</Text>
-            <Text style={styles.description}>
-              A keresett oldal nem létezik vagy át lett helyezve.
-            </Text>
-            
-            <Link href="/home" asChild>
-              <TouchableOpacity style={styles.homeButton}>
-                <Text style={styles.homeButtonText}>Vissza a főoldalra</Text>
-              </TouchableOpacity>
-            </Link>
+          <View style={styles.cardWrapper}>
+            <GlassCard style={styles.card} intensity={16}>
+              <Text style={styles.title}>404</Text>
+              <Text style={styles.subtitle}>Page not found</Text>
+              <Text style={styles.description}>
+                The requested page does not exist or has been moved.
+              </Text>
+
+              <Link href="/home" asChild>
+                <TouchableOpacity style={styles.homeButton}>
+                  <Text style={styles.homeButtonText}>Back to home</Text>
+                </TouchableOpacity>
+              </Link>
+            </GlassCard>
           </View>
         </View>
       </SafeAreaView>
@@ -60,6 +63,11 @@ const styles = StyleSheet.create({
     width: '100%',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  cardWrapper: {
+    width: '100%',
+    maxWidth: 420,
+    paddingHorizontal: 12,
   },
   title: {
     fontSize: 48,

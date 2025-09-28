@@ -136,7 +136,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="chatbubbles-outline" size={64} color="rgba(255, 255, 255, 0.3)" />
-  <Text style={styles.emptyStateTitle}>Még nincs üzenet</Text>
+  <Text style={styles.emptyStateTitle}>No chats yet</Text>
       <Text style={styles.emptyStateMessage}>
         Start by adding friends and begin conversations!
       </Text>
@@ -147,7 +147,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#2C82FF" />
-  <Text style={styles.loadingText}>Üzenetek betöltése...</Text>
+  <Text style={styles.loadingText}>Loading chats...</Text>
       </View>
     );
   }

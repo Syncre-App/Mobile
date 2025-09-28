@@ -158,7 +158,7 @@ export const EditProfileScreen: React.FC = () => {
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-  <Text style={styles.headerTitle}>Profil szerkesztése</Text>
+  <Text style={styles.headerTitle}>Edit Profile</Text>
         <TouchableOpacity 
           onPress={handleSave} 
           disabled={loading}

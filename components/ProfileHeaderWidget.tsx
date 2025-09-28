@@ -34,15 +34,15 @@ export const ProfileHeaderWidget: React.FC<ProfileHeaderWidgetProps> = ({
       'Select an option',
       [
         {
-          text: 'Profil szerkesztése',
+          text: 'Edit Profile',
           onPress: () => router.push('/edit-profile' as any),
         },
         {
-          text: 'Beállítások',
+          text: 'Settings',
           onPress: () => router.push('/settings' as any),
         },
         {
-          text: 'Kijelentkezés',
+          text: 'Logout',
           onPress: handleLogout,
           style: 'destructive',
         },

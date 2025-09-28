@@ -3,10 +3,10 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     Modal,
+    Pressable,
     StyleSheet,
     Text,
     TouchableOpacity,
-    TouchableWithoutFeedback,
     View,
 } from 'react-native';
 
@@ -63,22 +63,22 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   const menuItems = [
     {
       icon: 'person-outline',
-  title: 'Profil szerkesztése',
+      title: 'Edit Profile',
       onPress: handleEditProfile,
     },
     {
       icon: 'settings-outline',
-  title: 'Beállítások',
+      title: 'Settings',
       onPress: handleSettings,
     },
     {
       icon: 'help-circle-outline',
-  title: 'Súgó és támogatás',
+      title: 'Help & Support',
       onPress: handleHelp,
     },
     {
       icon: 'log-out-outline',
-  title: 'Kijelentkezés',
+      title: 'Logout',
       onPress: handleLogout,
       destructive: true,
     },
@@ -92,11 +92,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={styles.menuContainer}>
-              <GlassCard style={styles.menu}>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <View>
+          <Pressable onPress={() => {}} style={styles.menuContainer}>
+            <GlassCard style={styles.menu} intensity={20}>
                 {/* User Info Header */}
                 <View style={styles.userHeader}>
                   <View style={styles.avatarContainer}>
@@ -141,10 +140,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                   </TouchableOpacity>
                 ))}
               </GlassCard>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+            </Pressable>
+          </View>
+        </Pressable>
     </Modal>
   );
 };
