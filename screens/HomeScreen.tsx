@@ -11,9 +11,9 @@ import {
   View,
 } from 'react-native';
 
-import { ProfileMenu } from '@/components/ProfileMenu';
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
+import { ProfileMenu } from '../components/ProfileMenu';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { WebSocketService } from '../services/WebSocketService';
@@ -67,8 +67,22 @@ export const HomeScreen: React.FC = () => {
 
   const initializeScreen = async () => {
     try {
+      // First try to get user data from storage
       const userData = await StorageService.getObject('user_data');
       setUser(userData);
+      
+      // Also fetch current user data from API to ensure we have latest info
+      const token = await StorageService.getAuthToken();
+      if (token) {
+        const response = await ApiService.get('/user/me', token);
+        if (response.success && response.data) {
+          console.log('🔍 User data from API:', JSON.stringify(response.data, null, 2));
+          setUser(response.data);
+          // Update stored user data
+          await StorageService.setObject('user_data', response.data);
+        }
+      }
+      
       await loadChats();
     } catch (error) {
       console.error('Failed to load user data:', error);
@@ -149,7 +163,10 @@ export const HomeScreen: React.FC = () => {
             <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
               <View style={styles.profileAvatar}>
                 <Text style={styles.profileAvatarText}>
-                  {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                  {user?.username?.charAt(0)?.toUpperCase() || 
+                   user?.name?.charAt(0)?.toUpperCase() || 
+                   user?.email?.charAt(0)?.toUpperCase() || 
+                   'U'}
                 </Text>
               </View>
               <View style={[styles.profileStatusDot, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />

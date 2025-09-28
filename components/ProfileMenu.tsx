@@ -93,13 +93,18 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                   <View style={styles.avatarContainer}>
                     <View style={styles.avatar}>
                       <Text style={styles.avatarText}>
-                        {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                        {user?.username?.charAt(0)?.toUpperCase() || 
+                         user?.name?.charAt(0)?.toUpperCase() || 
+                         user?.email?.charAt(0)?.toUpperCase() || 
+                         'U'}
                       </Text>
                     </View>
                     <View style={[styles.statusDot, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />
                   </View>
                   <View style={styles.userInfo}>
-                    <Text style={styles.userName}>{user?.username || 'User'}</Text>
+                    <Text style={styles.userName}>
+                      {user?.username || user?.name || user?.email || 'User'}
+                    </Text>
                     <View style={styles.statusContainer}>
                       <View style={[styles.statusIndicator, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />
                       <Text style={styles.statusText}>{isOnline ? 'Online' : 'Offline'}</Text>
