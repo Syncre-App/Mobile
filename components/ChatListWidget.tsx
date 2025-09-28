@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 import { ApiService } from '../services/ApiService';
@@ -53,10 +53,17 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 }) => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [userDetails, setUserDetails] = useState<{ [key: string]: User }>({});
 
   useEffect(() => {
     getCurrentUserId();
   }, []);
+
+  useEffect(() => {
+    if (chats.length > 0 && currentUserId) {
+      fetchUserDetails();
+    }
+  }, [chats, currentUserId]);
 
   const getCurrentUserId = async () => {
     try {
@@ -69,6 +76,55 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       }
     } catch (error) {
       console.log('❌ Error getting current user ID:', error);
+    }
+  };
+
+  const fetchUserDetails = async () => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) return;
+
+      const userIds = new Set<string>();
+      
+      // Collect all unique user IDs from chats
+      chats.forEach(chat => {
+        try {
+          const chatUserIds = JSON.parse(chat.users);
+          chatUserIds.forEach((id: string) => {
+            if (id !== currentUserId) {
+              userIds.add(id);
+            }
+          });
+        } catch (error) {
+          console.log('Error parsing chat users:', error);
+        }
+      });
+
+      // Fetch user details for each unique user ID
+      const newUserDetails: { [key: string]: User } = { ...userDetails };
+      
+      for (const userId of userIds) {
+        if (!newUserDetails[userId]) {
+          try {
+            const response = await ApiService.get(`/user/${userId}`, token);
+            if (response.success && response.data) {
+              newUserDetails[userId] = response.data;
+            }
+          } catch (error) {
+            console.log(`Error fetching user ${userId}:`, error);
+            // Create a fallback user object
+            newUserDetails[userId] = {
+              id: userId,
+              username: `User ${userId}`,
+              email: '',
+            };
+          }
+        }
+      }
+
+      setUserDetails(newUserDetails);
+    } catch (error) {
+      console.log('❌ Error fetching user details:', error);
     }
   };
 
@@ -86,8 +142,17 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       const userIds = JSON.parse(chat.users);
       const otherUserId = userIds.find((id: string) => id !== currentUserId);
       
-      // For now, return the user ID. In a real app, you'd fetch user details
-      return `User ${otherUserId || 'Unknown'}`;
+      if (!otherUserId) return 'Unknown User';
+      
+      // Check if we have user details for this user
+      const user = userDetails[otherUserId];
+      if (user) {
+        // Return username if available, otherwise email, otherwise fallback
+        return user.username || user.email || `User ${otherUserId}`;
+      }
+      
+      // Fallback while loading
+      return `User ${otherUserId}`;
     } catch (error) {
       return 'Unknown User';
     }
@@ -95,8 +160,19 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
   const getInitials = (name?: string) => {
     if (!name) return 'U';
+    
+    // Handle "User 1234567890123456" format
+    if (name.startsWith('User ')) {
+      return 'U' + name.slice(-1); // U + last digit
+    }
+    
     const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    if (parts.length === 1) {
+      // Single word - take first 2 characters
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+    
+    // Multiple words - take first letter of first two words
     return (parts[0][0] + parts[1][0]).toUpperCase();
   };
 
