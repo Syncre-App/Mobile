@@ -3,12 +3,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    SafeAreaView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { ChatListWidget } from '../components/ChatListWidget';
@@ -24,12 +25,44 @@ export const HomeScreen: React.FC = () => {
   const [chats, setChats] = useState<any[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
   const [userStatuses, setUserStatuses] = useState<any>({});
+  const [isValidatingToken, setIsValidatingToken] = useState(true);
   
   useEffect(() => {
-    initializeScreen();
-    // Re-enable WebSocket with fixed Bearer authentication
-    connectWebSocket();
+    validateTokenAndInit();
   }, []);
+
+  const validateTokenAndInit = async () => {
+    try {
+      console.log('🔍 HomeScreen: Validating token...');
+      const token = await StorageService.getAuthToken();
+      
+      if (!token) {
+        console.log('❌ HomeScreen: No token found - redirect to login');
+        router.replace('/');
+        return;
+      }
+
+      // Test token validity
+      const response = await ApiService.get('/user/me', token);
+      
+      if (response.success) {
+        console.log('✅ HomeScreen: Token valid - initializing...');
+        setIsValidatingToken(false);
+        await initializeScreen();
+        connectWebSocket();
+      } else {
+        console.log('❌ HomeScreen: Token invalid - clearing and redirect to login');
+        await StorageService.removeAuthToken();
+        await StorageService.removeItem('user_data');
+        router.replace('/');
+      }
+    } catch (error) {
+      console.error('❌ HomeScreen: Token validation error:', error);
+      await StorageService.removeAuthToken();
+      await StorageService.removeItem('user_data');
+      router.replace('/');
+    }
+  };
 
   const initializeScreen = async () => {
     try {
@@ -104,56 +137,63 @@ export const HomeScreen: React.FC = () => {
         style={StyleSheet.absoluteFillObject}
       />
       
-      <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <GlassCard style={styles.headerCard}>
-            <View style={styles.headerContent}>
-              <View style={styles.titleContainer}>
-                <Text style={styles.appName}>Syncre</Text>
-                <Text style={styles.subtitle}>Chat & Connect</Text>
+      {isValidatingToken ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2C82FF" />
+          <Text style={styles.loadingText}>Validating session...</Text>
+        </View>
+      ) : (
+        <SafeAreaView style={styles.safeArea}>
+          {/* Header */}
+          <View style={styles.header}>
+            <GlassCard style={styles.headerCard}>
+              <View style={styles.headerContent}>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.appName}>Syncre</Text>
+                  <Text style={styles.subtitle}>Chat & Connect</Text>
+                </View>
+                <View style={styles.headerActions}>
+                  <TouchableOpacity
+                    style={styles.headerButton}
+                    onPress={handleProfilePress}
+                  >
+                    <Ionicons name="person" size={24} color="#ffffff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.headerButton}
+                    onPress={handleSettingsPress}
+                  >
+                    <Ionicons name="settings" size={24} color="#ffffff" />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.headerActions}>
-                <TouchableOpacity
-                  style={styles.headerButton}
-                  onPress={handleProfilePress}
-                >
-                  <Ionicons name="person" size={24} color="#ffffff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.headerButton}
-                  onPress={handleSettingsPress}
-                >
-                  <Ionicons name="settings" size={24} color="#ffffff" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </GlassCard>
-        </View>
+            </GlassCard>
+          </View>
 
-        {/* Chat List Title */}
-        <View style={styles.titleSection}>
-          <Text style={styles.sectionTitle}>Chats</Text>
-          <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="ellipsis-vertical" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
+          {/* Chat List Title */}
+          <View style={styles.titleSection}>
+            <Text style={styles.sectionTitle}>Chats</Text>
+            <TouchableOpacity style={styles.moreButton}>
+              <Ionicons name="ellipsis-vertical" size={24} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
 
-        {/* Chat List - Remove ScrollView to fix VirtualizedLists warning */}
-        <View style={styles.chatSection}>
-          <ChatListWidget 
-            chats={chats}
-            isLoading={chatsLoading}
-            onRefresh={handleChatRefresh}
-            userStatuses={userStatuses}
-          />
-        </View>
+          {/* Chat List - Remove ScrollView to fix VirtualizedLists warning */}
+          <View style={styles.chatSection}>
+            <ChatListWidget 
+              chats={chats}
+              isLoading={chatsLoading}
+              onRefresh={handleChatRefresh}
+              userStatuses={userStatuses}
+            />
+          </View>
 
-        {/* Friend Search - moved to bottom */}
-        <View style={styles.section}>
-          <FriendSearchWidget onFriendAdded={handleFriendAdded} />
-        </View>
-      </SafeAreaView>
+          {/* Friend Search - moved to bottom */}
+          <View style={styles.section}>
+            <FriendSearchWidget onFriendAdded={handleFriendAdded} />
+          </View>
+        </SafeAreaView>
+      )}
     </View>
   );
 };
@@ -168,6 +208,16 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#ffffff',
+    marginTop: 16,
+    fontSize: 16,
   },
   header: {
     paddingHorizontal: 20,
