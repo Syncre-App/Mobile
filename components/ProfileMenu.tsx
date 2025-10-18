@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import React from 'react';
 import {
     Modal,
@@ -29,26 +29,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   // Ref to ignore immediate overlay presses right after the modal opens
   const openedAtRef = React.useRef<number | null>(null);
 
-  const handleEditProfile = () => {
-    onClose();
-  console.log('ProfileMenu: Edit Profile pressed');
-    try {
-      router.push('/edit-profile');
-    } catch (error) {
-      console.error('❌ ProfileMenu: Error navigating to edit-profile:', error);
-    }
-  };
-
-  const handleSettings = () => {
-    onClose();
-  console.log('ProfileMenu: Settings pressed');
-    try {
-      router.push('/settings');
-    } catch (error) {
-      console.error('❌ ProfileMenu: Error navigating to settings:', error);
-    }
-  };
-
   const handleLogout = async () => {
     onClose();
   console.log('ProfileMenu: Logout pressed');
@@ -65,30 +45,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
     // TODO: Implement help screen
     console.log('Help & Support clicked');
   };
-
-  const menuItems = [
-    {
-      icon: 'person-outline',
-      title: 'Edit Profile',
-      onPress: handleEditProfile,
-    },
-    {
-      icon: 'settings-outline',
-      title: 'Settings',
-      onPress: handleSettings,
-    },
-    {
-      icon: 'help-circle-outline',
-      title: 'Help & Support',
-      onPress: handleHelp,
-    },
-    {
-      icon: 'log-out-outline',
-      title: 'Logout',
-      onPress: handleLogout,
-      destructive: true,
-    },
-  ];
 
   React.useEffect(() => {
     console.log('ProfileMenu: visible=', visible);
@@ -120,16 +76,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
     >
-      {/* Full-screen debug banner to confirm Modal is rendering */}
-      {visible && (
-        <View style={styles.fullscreenDebug} pointerEvents="none">
-          <Text style={styles.fullscreenDebugText}>DEBUG MENU VISIBLE</Text>
-        </View>
-      )}
-  <Pressable style={styles.overlay} onPress={handleOverlayPress}>
+      <Pressable style={styles.overlay} onPress={handleOverlayPress}>
         <View>
           <Pressable onPress={() => {}} style={styles.menuContainer}>
-            <GlassCard style={styles.menu} intensity={20}>
+            <View style={{backgroundColor: 'white', minWidth: 250}}>
                 {/* User Info Header */}
                 <View style={styles.userHeader}>
                   <View style={styles.avatarContainer}>
@@ -156,24 +106,65 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
                 {/* Menu Items */}
                 <View style={styles.separator} />
-                {menuItems.map((item, index) => (
+                <Link href="/edit-profile" asChild>
                   <TouchableOpacity
-                    key={index}
                     style={styles.menuItem}
-                    onPress={item.onPress}
                     activeOpacity={0.7}
                   >
                     <Ionicons
-                      name={item.icon as any}
+                      name={'person-outline'}
                       size={20}
-                      color={item.destructive ? '#FF6B6B' : 'rgba(255, 255, 255, 0.8)'}
+                      color={'rgba(255, 255, 255, 0.8)'}
                     />
-                    <Text style={[styles.menuItemText, item.destructive && styles.destructiveText]}>
-                      {item.title}
+                    <Text style={styles.menuItemText}>
+                      {'Edit Profile'}
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </GlassCard>
+                </Link>
+                <Link href="/settings" asChild>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={'settings-outline'}
+                      size={20}
+                      color={'rgba(255, 255, 255, 0.8)'}
+                    />
+                    <Text style={styles.menuItemText}>
+                      {'Settings'}
+                    </Text>
+                  </TouchableOpacity>
+                </Link>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleHelp}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={'help-circle-outline'}
+                    size={20}
+                    color={'rgba(255, 255, 255, 0.8)'}
+                  />
+                  <Text style={styles.menuItemText}>
+                    {'Help & Support'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleLogout}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={'log-out-outline'}
+                    size={20}
+                    color={'#FF6B6B'}
+                  />
+                  <Text style={[styles.menuItemText, styles.destructiveText]}>
+                    {'Logout'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </Pressable>
           </View>
         </Pressable>
