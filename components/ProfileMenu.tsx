@@ -26,8 +26,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   isOnline,
 }) => {
   const router = useRouter();
-  // Ref to ignore immediate overlay presses right after the modal opens
-  const openedAtRef = React.useRef<number | null>(null);
 
   const handleEditProfile = () => {
     onClose();
@@ -90,28 +88,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
     },
   ];
 
-  React.useEffect(() => {
-    console.log('ProfileMenu: visible=', visible);
-    if (visible) {
-      // mark the time the modal opened; used to ignore the tap that opened it
-      openedAtRef.current = Date.now();
-      // clear after a short window
-      const t = setTimeout(() => {
-        openedAtRef.current = null;
-      }, 300);
-      return () => clearTimeout(t);
-    }
-  }, [visible]);
-
-  const handleOverlayPress = () => {
-    const now = Date.now();
-    if (openedAtRef.current && now - openedAtRef.current < 300) {
-      console.log('ProfileMenu: Ignoring overlay press (just opened)');
-      return;
-    }
-    onClose();
-  };
-
   return (
     <Modal
       visible={visible}
@@ -126,7 +102,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
           <Text style={styles.fullscreenDebugText}>DEBUG MENU VISIBLE</Text>
         </View>
       )}
-  <Pressable style={styles.overlay} onPress={handleOverlayPress}>
+  <Pressable style={styles.overlay} onPress={onClose}>
         <View>
           <Pressable onPress={() => {}} style={styles.menuContainer}>
             <GlassCard style={styles.menu} intensity={20}>

@@ -130,12 +130,8 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleProfilePress = () => {
-    console.log('HomeScreen: profile button pressed -> opening profile menu (delayed)');
-    // Delay opening the modal briefly so the original tap doesn't propagate and immediately close it
-    setTimeout(() => {
-      console.log('HomeScreen: delayed open profile menu');
-      setShowProfileMenu(true);
-    }, 120);
+    console.log('HomeScreen: profile button pressed -> opening profile menu');
+    setShowProfileMenu(true);
   };
 
   const handleProfileClose = () => {
