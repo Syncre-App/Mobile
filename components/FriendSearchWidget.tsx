@@ -33,7 +33,6 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const searchTimeoutRef = useRef<number | null>(null);
 
   const searchUsers = useCallback(async (query: string) => {
@@ -118,12 +117,11 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
         // Clear search
         setSearchQuery('');
         setSearchResults([]);
-        setIsExpanded(false);
       } else {
         console.log('❌ Failed to add friend:', response.error);
         NotificationService.show('error', response.error || 'Failed to add friend');
       }
-    } catch (error: any) {
+    } catch (error: any) {      
       console.log('❌ Error adding friend:', error);
       NotificationService.show('error', 'Failed to add friend');
     }
@@ -146,15 +144,6 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
     );
   };
 
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
-    if (!isExpanded) {
-      // Clear search when collapsing
-      setSearchQuery('');
-      setSearchResults([]);
-    }
-  };
-
   const renderSearchResult = ({ item }: { item: User }) => (
     <TouchableOpacity
       style={styles.searchResultItem}
@@ -170,88 +159,52 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
 
   return (
     <View style={styles.container}>
-      <GlassCard style={styles.card}>
-        <TouchableOpacity
-          onPress={toggleExpanded}
-          style={styles.header}
-        >
-          <Ionicons name="search" size={20} color="rgba(255, 255, 255, 0.7)" />
-          <Text style={styles.headerText}>Find Friends</Text>
-          <Ionicons
-            name={isExpanded ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="rgba(255, 255, 255, 0.7)"
-          />
-        </TouchableOpacity>
+      <TransparentField
+        placeholder="Search users by username or email"
+        value={searchQuery}
+        onChangeText={handleSearchChange}
+        prefixIcon={
+          isSearching ? (
+            <ActivityIndicator size="small" color="rgba(255, 255, 255, 0.7)" />
+          ) : (
+            <Ionicons name="search" size={18} color="rgba(255, 255, 255, 0.7)" />
+          )
+        }
+        style={styles.searchInput}
+      />
 
-        {isExpanded && (
-          <View style={styles.searchContent}>
-            <TransparentField
-              placeholder="Search users by username or email"
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              prefixIcon={
-                isSearching ? (
-                  <ActivityIndicator size="small" color="rgba(255, 255, 255, 0.7)" />
-                ) : (
-                  <Ionicons name="search" size={18} color="rgba(255, 255, 255, 0.7)" />
-                )
-              }
-              style={styles.searchInput}
-            />
+      {searchResults.length > 0 && (
+        <FlatList
+          data={searchResults}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSearchResult}
+          style={styles.searchResults}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
+      )}
 
-            {searchResults.length > 0 && (
-              <FlatList
-                data={searchResults}
-                keyExtractor={(item) => item.id}
-                renderItem={renderSearchResult}
-                style={styles.searchResults}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              />
-            )}
-
-            {searchQuery.length > 0 && searchResults.length === 0 && !isSearching && (
-              <View style={styles.noResults}>
-                <Text style={styles.noResultsText}>No users found</Text>
-              </View>
-            )}
-          </View>
-        )}
-      </GlassCard>
+      {searchQuery.length > 0 && searchResults.length === 0 && !isSearching && (
+        <View style={styles.noResults}>
+          <Text style={styles.noResultsText}>No users found</Text>
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     marginBottom: 16,
-  },
-  card: {
-    width: '100%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  headerText: {
-    flex: 1,
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 12,
-  },
-  searchContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
   },
   searchInput: {
     marginBottom: 12,
+    paddingHorizontal: 16,
   },
   searchResults: {
     maxHeight: 200,
+    paddingHorizontal: 16,
   },
   searchResultItem: {
     flexDirection: 'row',

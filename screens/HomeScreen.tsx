@@ -187,6 +187,9 @@ export const HomeScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
+          {/* Friend Search */}
+          <FriendSearchWidget onFriendAdded={handleFriendAdded} />
+
           {/* Chat List */}
           <View style={styles.chatSection}>
             <ChatListWidget 
@@ -195,11 +198,6 @@ export const HomeScreen: React.FC = () => {
               onRefresh={handleChatRefresh}
               userStatuses={userStatuses}
             />
-          </View>
-
-          {/* Friend Search - moved to bottom */}
-          <View style={styles.bottomSection}>
-            <FriendSearchWidget onFriendAdded={handleFriendAdded} />
           </View>
         </SafeAreaView>
       )}
@@ -333,10 +331,6 @@ const styles = StyleSheet.create({
   },
   chatSection: {
     flex: 1,
-  },
-  bottomSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
   },
   section: {
     paddingHorizontal: 20,
