@@ -97,7 +97,6 @@ export const RegisterScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
-      {/* Background Gradient */}
       <LinearGradient
         colors={['#03040A', '#071026']}
         start={{ x: 0, y: 0 }}
@@ -206,7 +205,7 @@ export const RegisterScreen: React.FC = () => {
       </ScrollView>
     </SafeAreaView>
   );
-
+};
 const styles = StyleSheet.create({
   container: {
     flex: 1,

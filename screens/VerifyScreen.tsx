@@ -133,7 +133,7 @@ export const VerifyScreen: React.FC = () => {
       </ScrollView>
     </SafeAreaView>
   );
-
+};
 const styles = StyleSheet.create({
   container: {
     flex: 1,
