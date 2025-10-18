@@ -1,3 +1,5 @@
+import { UserCacheService } from './UserCacheService';
+
 const BASE_URL = 'https://api.syncre.xyz/v1';
 
 export interface ApiResponse<T = any> {
@@ -76,6 +78,16 @@ export class ApiService {
         responseData = { text };
       }
 
+      if (response.ok && responseData) {
+        if (responseData.users) {
+          UserCacheService.addUsers(responseData.users);
+        } else if (responseData.user) {
+          UserCacheService.addUser(responseData.user);
+        } else if (Array.isArray(responseData)) {
+          UserCacheService.addUsers(responseData);
+        }
+      }
+
       return {
         success: response.ok,
         data: response.ok ? responseData : undefined,
@@ -89,6 +101,23 @@ export class ApiService {
         statusCode: 0,
       };
     }
+  }
+
+  static async getUserById(userId: string, token: string): Promise<ApiResponse<any>> {
+    const cachedUser = UserCacheService.getUser(userId);
+    if (cachedUser) {
+      return {
+        success: true,
+        data: cachedUser,
+        statusCode: 200,
+      };
+    }
+
+    const response = await this.get(`/user/${userId}`, token);
+    if (response.success && response.data) {
+      UserCacheService.addUser(response.data);
+    }
+    return response;
   }
 
   static async put<T = any>(endpoint: string, data: any, token?: string): Promise<ApiResponse<T>> {

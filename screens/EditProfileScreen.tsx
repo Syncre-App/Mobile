@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
@@ -126,7 +127,7 @@ export const EditProfileScreen: React.FC = () => {
 
   if (initialLoading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <LinearGradient
           colors={['#03040A', '#071026']}
           start={{ x: 0, y: 0 }}
@@ -137,12 +138,12 @@ export const EditProfileScreen: React.FC = () => {
           <ActivityIndicator size="large" color="#2C82FF" />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Background Gradient */}
@@ -246,7 +247,7 @@ export const EditProfileScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -270,7 +271,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: (StatusBar.currentHeight || 0) + 12,
   },
   headerButton: {
     padding: 8,

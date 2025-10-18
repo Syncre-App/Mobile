@@ -25,7 +25,6 @@ export const HomeScreen: React.FC = () => {
   const [chatsLoading, setChatsLoading] = useState(false);
   const [userStatuses, setUserStatuses] = useState<any>({});
   const [isValidatingToken, setIsValidatingToken] = useState(true);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   
   useEffect(() => {
@@ -130,22 +129,8 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleProfilePress = () => {
-    console.log('HomeScreen: profile button pressed -> opening profile menu (delayed)');
-    // Delay opening the modal briefly so the original tap doesn't propagate and immediately close it
-    setTimeout(() => {
-      console.log('HomeScreen: delayed open profile menu');
-      setShowProfileMenu(true);
-    }, 120);
+    router.push('/profile');
   };
-
-  const handleProfileClose = () => {
-    console.log('HomeScreen: profile menu requested close');
-    setShowProfileMenu(false);
-  };
-
-  React.useEffect(() => {
-    console.log('HomeScreen: showProfileMenu =', showProfileMenu);
-  }, [showProfileMenu]);
 
   const handleFriendAdded = () => {
     // Refresh chat list when new friend is added
@@ -201,14 +186,6 @@ export const HomeScreen: React.FC = () => {
           </View>
         </SafeAreaView>
       )}
-      
-      {/* Profile Menu */}
-      <ProfileMenu
-        visible={showProfileMenu}
-        onClose={handleProfileClose}
-        user={user}
-        isOnline={isOnline}
-      />
     </View>
   );
 };

@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
@@ -78,7 +79,7 @@ export const VerifyScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Background Gradient */}
@@ -130,9 +131,8 @@ export const VerifyScreen: React.FC = () => {
           </View>
         </GlassCard>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
-};
 
 const styles = StyleSheet.create({
   container: {

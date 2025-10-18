@@ -104,7 +104,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       for (const userId of userIds) {
         if (!newUserDetails[userId]) {
           try {
-            const response = await ApiService.get(`/user/${userId}`, token);
+            const response = await ApiService.getUserById(userId, token);
             if (response.success && response.data) {
               newUserDetails[userId] = response.data;
             }
@@ -112,7 +112,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             console.log(`Error fetching user ${userId}:`, error);
             newUserDetails[userId] = {
               id: userId,
-              username: `User ${userId}`,
+              username: 'Loading...',
               email: '',
             };
           }
@@ -145,11 +145,11 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       const user = userDetails[otherUserId];
       if (user) {
         // Return username if available, otherwise email, otherwise fallback
-        return user.username || user.email || `User ${otherUserId}`;
+        return user.username || user.email || 'Loading...';
       }
       
       // Fallback while loading
-      return `User ${otherUserId}`;
+      return 'Loading...';
     } catch (error) {
       return 'Unknown User';
     }

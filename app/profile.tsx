@@ -1,13 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React from 'react';
 import {
     Alert,
     ScrollView,
     StatusBar,
     StyleSheet,
-    Switch,
     Text,
     TouchableOpacity,
     View,
@@ -15,17 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassCard } from '../components/GlassCard';
-import { NotificationService } from '../services/NotificationService';
-import { StorageService } from '../services/StorageService';
 
-export const SettingsScreen: React.FC = () => {
+export default function ProfileScreen() {
   const router = useRouter();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
 
   const handleBack = () => {
-  router.back();
+    router.back();
   };
 
   const handleLogout = () => {
@@ -40,39 +34,11 @@ export const SettingsScreen: React.FC = () => {
         {
           text: 'Logout',
           onPress: async () => {
+            const { StorageService } = await import('../services/StorageService');
             await StorageService.removeAuthToken();
             router.replace('/' as any);
           },
           style: 'destructive',
-        },
-      ]
-    );
-  };
-
-  const handleClearCache = () => {
-    Alert.alert(
-      'Clear Cache',
-      'This will clear all cached data. Are you sure?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Clear',
-          onPress: async () => {
-            try {
-              // Clear cache but keep auth token
-              const token = await StorageService.getAuthToken();
-              await StorageService.clear();
-              if (token) {
-                await StorageService.setAuthToken(token);
-              }
-              NotificationService.show('success', 'Cache cleared successfully');
-            } catch (error) {
-              NotificationService.show('error', 'Failed to clear cache');
-            }
-          },
         },
       ]
     );
@@ -131,7 +97,7 @@ export const SettingsScreen: React.FC = () => {
         <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-  <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>Profile</Text>
         <View style={styles.headerButton} />
       </View>
 
@@ -140,56 +106,6 @@ export const SettingsScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Notifications Section */}
-        <GlassCard style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Notifications</Text>
-          </View>
-          
-          {renderSettingItem(
-            'notifications',
-            'Push Notifications',
-            'Receive notifications for new messages',
-            undefined,
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#2C82FF' }}
-              thumbColor="white"
-            />
-          )}
-        </GlassCard>
-
-        {/* Appearance Section */}
-        <GlassCard style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Appearance</Text>
-          </View>
-          
-          {renderSettingItem(
-            'moon',
-            'Dark Mode',
-            'Currently enabled by default',
-            undefined,
-            <Switch
-              value={darkModeEnabled}
-              onValueChange={setDarkModeEnabled}
-              disabled={true} // Disabled for now
-              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#2C82FF' }}
-              thumbColor="white"
-            />
-          )}
-          
-          {renderSettingItem(
-            'language',
-            'Language',
-            selectedLanguage,
-            () => {
-              Alert.alert('Language', 'Multiple languages will be supported in future updates');
-            }
-          )}
-        </GlassCard>
-
         {/* Account Section */}
         <GlassCard style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -201,32 +117,17 @@ export const SettingsScreen: React.FC = () => {
             'Edit Profile',
             'Update your profile information',
             () => {
-              console.log('SettingsScreen: navigate to edit-profile');
               router.push('/edit-profile' as any);
             }
           )}
           
           {renderSettingItem(
-            'lock-closed',
-            'Privacy',
-            'Manage your privacy settings',
+            'settings',
+            'Settings',
+            'App settings',
             () => {
-              Alert.alert('Privacy', 'Privacy settings will be available in future updates');
+              router.push('/settings' as any);
             }
-          )}
-        </GlassCard>
-
-        {/* Storage Section */}
-        <GlassCard style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Storage</Text>
-          </View>
-          
-          {renderSettingItem(
-            'trash',
-            'Clear Cache',
-            'Clear cached data to free up space',
-            handleClearCache
           )}
         </GlassCard>
 

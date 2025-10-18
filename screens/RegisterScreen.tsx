@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { notificationService } from '../services/NotificationService';
 
 import { GlassCard } from '../components/GlassCard';
@@ -93,7 +94,7 @@ export const RegisterScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Background Gradient */}
@@ -203,9 +204,8 @@ export const RegisterScreen: React.FC = () => {
           </View>
         </GlassCard>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
-};
 
 const styles = StyleSheet.create({
   container: {
