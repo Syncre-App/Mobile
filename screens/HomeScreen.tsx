@@ -511,21 +511,17 @@ export const HomeScreen: React.FC = () => {
             </View>
           )}
 
-          {!isNotificationsVisible && (
-            <>
-              {/* Friend Search */}
-              <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
+          {/* Friend Search */}
+          <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
 
-              {/* Friend Requests */}
-              <FriendRequestsWidget
-                incoming={incomingRequests}
-                outgoing={outgoingRequests}
-                onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
-                onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
-                processingId={requestProcessingId}
-              />
-            </>
-          )}
+          {/* Friend Requests */}
+          <FriendRequestsWidget
+            incoming={incomingRequests}
+            outgoing={outgoingRequests}
+            onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
+            onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
+            processingId={requestProcessingId}
+          />
 
           {/* Chat List */}
           <View style={styles.chatSection}>
@@ -689,9 +685,14 @@ const styles = StyleSheet.create({
     borderColor: '#03040A',
   },
   notificationsOverlay: {
-    paddingHorizontal: 16,
-    marginTop: -8,
-    marginBottom: 12,
+    position: 'absolute',
+    top: 100,
+    right: 20,
+    alignSelf: 'flex-end',
+    paddingHorizontal: 0,
+    zIndex: 30,
+    minWidth: 260,
+    maxWidth: '85%',
   },
   notificationsCard: {
     marginHorizontal: 0,
