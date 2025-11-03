@@ -205,13 +205,20 @@ export const HomeScreen: React.FC = () => {
         console.log('🔔 Notifications response data:', response.data);
         console.log('🔔 Notifications fetched:', items);
         setNotifications(items);
-      } else {
-        console.warn('🔔 Failed to fetch notifications:', response.error);
-        console.log('🔔 Full response:', response);
-        if (response.statusCode === 404) {
-          setNotifications(buildFallbackNotifications());
-        }
+        return;
       }
+
+      const fallback = buildFallbackNotifications();
+
+      if (response.statusCode === 404 || response.statusCode === 401) {
+        console.log('🔔 Notifications endpoint returned', response.statusCode, '- using fallback list');
+        setNotifications(fallback);
+        return;
+      }
+
+      console.warn('🔔 Failed to fetch notifications:', response.error);
+      console.log('🔔 Full response:', response);
+      setNotifications(fallback);
     } catch (error) {
       console.error('Failed to load notifications:', error);
       setNotifications(buildFallbackNotifications());
