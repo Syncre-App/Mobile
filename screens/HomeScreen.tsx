@@ -180,6 +180,9 @@ export const HomeScreen: React.FC = () => {
         setNotifications(items);
       } else {
         console.warn('🔔 Failed to fetch notifications:', response.error);
+        if (response.statusCode === 404) {
+          setNotifications([]);
+        }
       }
     } catch (error) {
       console.error('Failed to load notifications:', error);
