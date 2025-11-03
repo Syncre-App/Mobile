@@ -1,12 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
-import { WebSocketService } from '../../services/WebSocketService';
+import { NotificationService } from '../../services/NotificationService';
+import { StorageService } from '../../services/StorageService';
+import { WebSocketMessage, WebSocketService } from '../../services/WebSocketService';
 import { UserCacheService } from '../../services/UserCacheService';
 
 interface Message {
@@ -15,148 +29,319 @@ interface Message {
   receiverId: string;
   content: string;
   timestamp: string;
+  isPlaceholder?: boolean;
 }
 
 interface MessageBubbleProps {
   item: Message;
   isMyMessage: boolean;
-  currentUserId: string;
+  isPlaceholder: boolean;
+  currentUserId: string | null;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ item, isMyMessage, currentUserId }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ item, isMyMessage, isPlaceholder, currentUserId }) => {
   const [senderUsername, setSenderUsername] = useState<string>('Loading...');
 
   useEffect(() => {
-    const fetchSenderUsername = async () => {
-      if (isMyMessage) {
-        setSenderUsername('You'); // Or current user's username
+    let isMounted = true;
+
+    const resolveSender = async () => {
+      if (isPlaceholder || isMyMessage) {
+        if (isMounted) {
+          setSenderUsername(isMyMessage ? 'You' : 'Placeholder');
+        }
         return;
       }
+
       try {
         const sender = await UserCacheService.getUser(item.senderId);
-        setSenderUsername(sender?.username || 'Unknown User');
+        if (isMounted) {
+          setSenderUsername(sender?.username || sender?.email || 'Unknown User');
+        }
       } catch (error) {
         console.error(`Error fetching sender username for ID: ${item.senderId}:`, error);
-        setSenderUsername('Unknown User');
+        if (isMounted) {
+          setSenderUsername('Unknown User');
+        }
       }
     };
-    fetchSenderUsername();
-  }, [item.senderId, isMyMessage, currentUserId]);
+
+    resolveSender();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [item.senderId, isMyMessage, isPlaceholder]);
+
+  const bubbleStyles = [
+    styles.messageBubble,
+    isPlaceholder ? styles.placeholderMessage : isMyMessage ? styles.myMessage : styles.theirMessage,
+  ];
 
   return (
-    <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage]}>
-      {!isMyMessage && senderUsername !== 'Loading...' && senderUsername !== 'Unknown User' && (
+    <View style={bubbleStyles}>
+      {!isPlaceholder && !isMyMessage && senderUsername && senderUsername !== 'Loading...' && (
         <Text style={styles.senderName}>{senderUsername}</Text>
       )}
-      <Text style={styles.messageContent}>{item.content}</Text>
-      <Text style={styles.messageTimestamp}>{new Date(item.timestamp).toLocaleTimeString()}</Text>
+
+      <Text style={[styles.messageContent, isPlaceholder && styles.placeholderContent]}>{item.content}</Text>
+
+      {!isPlaceholder && (
+        <Text style={styles.messageTimestamp}>{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+      )}
     </View>
   );
 };
 
-const ChatScreen = () => {
+const ChatScreen: React.FC = () => {
   const { id } = useLocalSearchParams();
-  const receiverId = Array.isArray(id) ? id[0] : id;
+  const chatId = useMemo(() => (Array.isArray(id) ? id[0] : id), [id]);
   const { user } = useAuth();
+
+  const flatListRef = useRef<FlatList<Message>>(null);
+  const receiverNameRef = useRef('Loading...');
+  const otherUserIdRef = useRef<string | null>(null);
+  const wsService = useMemo(() => WebSocketService.getInstance(), []);
+
+  const [receiverUsername, setReceiverUsername] = useState<string>('Loading...');
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [receiverUsername, setReceiverUsername] = useState<string>('Loading...');
-  const flatListRef = useRef<FlatList>(null);
+  const [isThreadLoading, setIsThreadLoading] = useState(true);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
-  useEffect(() => {
-    if (!user || !receiverId) {
-      console.warn('User or receiverId is missing.');
+  const generatePlaceholderMessages = useCallback(
+    (displayName: string, otherUserId?: string | null) => {
+      const friendlyName = displayName || 'your friend';
+      const now = Date.now();
+      return [
+        {
+          id: 'placeholder-1',
+          senderId: otherUserId || 'friend',
+          receiverId: String(user?.id ?? 'me'),
+          content: `👋 ${friendlyName} hasn't sent any messages yet, but this space is ready when they do.`,
+          timestamp: new Date(now - 60_000).toISOString(),
+          isPlaceholder: true,
+        },
+        {
+          id: 'placeholder-2',
+          senderId: String(user?.id ?? 'me'),
+          receiverId: otherUserId || 'friend',
+          content: `Start the conversation by sending a quick hello!`,
+          timestamp: new Date(now - 30_000).toISOString(),
+          isPlaceholder: true,
+        },
+      ] as Message[];
+    },
+    [user?.id]
+  );
+
+  const loadMessagesForChat = useCallback(
+    async (token: string, chatIdentifier: string, displayName: string, otherUserId?: string | null) => {
+      try {
+        const response = await ApiService.get(`/chat/${chatIdentifier}/messages`, token);
+        const rawMessages = response.success
+          ? Array.isArray(response.data?.messages)
+            ? response.data.messages
+            : Array.isArray(response.data)
+              ? response.data
+              : []
+          : [];
+
+        if (rawMessages.length === 0) {
+          setMessages(generatePlaceholderMessages(displayName, otherUserId));
+          return;
+        }
+
+        const normalisedMessages: Message[] = rawMessages.map((msg: any) => ({
+          id: String(msg.id ?? `${chatIdentifier}-${msg.created_at ?? Date.now()}`),
+          senderId: String(msg.sender_id ?? msg.senderId ?? ''),
+          receiverId: String(msg.receiver_id ?? msg.receiverId ?? otherUserId ?? ''),
+          content: msg.content ?? '',
+          timestamp: msg.created_at ?? msg.timestamp ?? new Date().toISOString(),
+        }));
+
+        setMessages(normalisedMessages);
+      } catch (error) {
+        console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
+        setMessages(generatePlaceholderMessages(displayName, otherUserId));
+      }
+    },
+    [generatePlaceholderMessages]
+  );
+
+  const loadChatDetails = useCallback(async () => {
+    if (!chatId || !user?.id) {
       return;
     }
 
-    const fetchReceiverUsername = async () => {
+    setIsThreadLoading(true);
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        throw new Error('Missing authentication token');
+      }
+
+      const chatResponse = await ApiService.get(`/chat/${chatId}`, token);
+      if (!chatResponse.success || !chatResponse.data?.chat) {
+        throw new Error('Chat not found');
+      }
+
+      const chatData = chatResponse.data.chat;
+
+      let participantIds: string[] = [];
       try {
-        const receiver = await UserCacheService.getUser(receiverId);
-        if (receiver) {
-          setReceiverUsername(receiver.username);
-        } else {
-          setReceiverUsername('Unknown User');
+        const parsed = JSON.parse(chatData.users ?? '[]');
+        participantIds = Array.isArray(parsed) ? parsed.map((pid: any) => pid?.toString?.() ?? String(pid)) : [];
+      } catch {
+        participantIds = [];
+      }
+
+      const currentUserId = user.id.toString();
+      const otherParticipantId =
+        participantIds.find((pid) => pid !== currentUserId) ?? (participantIds.length > 0 ? participantIds[0] : null);
+
+      otherUserIdRef.current = otherParticipantId || null;
+
+      let displayName = 'Friend';
+      if (otherParticipantId) {
+        const userResponse = await ApiService.getUserById(otherParticipantId, token);
+        if (userResponse.success && userResponse.data) {
+          const fetchedUser = userResponse.data;
+          displayName = fetchedUser.username || fetchedUser.email || displayName;
         }
-      } catch (error) {
-        console.error(`Error fetching receiver username for ID: ${receiverId}:`, error);
-        setReceiverUsername('Unknown User');
       }
-    };
 
-    fetchReceiverUsername();
+      receiverNameRef.current = displayName;
+      setReceiverUsername(displayName);
 
-    const fetchMessages = async () => {
-      try {
-        const fetchedMessages = await ApiService.get(`/chat/${receiverId}/messages`);
-        setMessages(fetchedMessages);
-      } catch (error) {
-        console.error(`Error fetching messages for chat with ID: ${receiverId}:`, error);
+      await loadMessagesForChat(token, chatId, displayName, otherParticipantId);
+    } catch (error) {
+      console.error(`Error loading chat ${chatId}:`, error);
+      const fallbackName = receiverNameRef.current === 'Loading...' ? 'your friend' : receiverNameRef.current;
+      setMessages(generatePlaceholderMessages(fallbackName, otherUserIdRef.current));
+    } finally {
+      setIsThreadLoading(false);
+    }
+  }, [chatId, user?.id, loadMessagesForChat, generatePlaceholderMessages]);
+
+  const handleIncomingMessage = useCallback(
+    (message: WebSocketMessage) => {
+      if (!message || message.type !== 'new_message') {
+        return;
       }
-    };
 
-    fetchMessages();
+      const payload: any = message;
+      const targetChatId = String(payload.chatId ?? payload.data?.chatId ?? '');
 
-    WebSocketService.connect();
-    WebSocketService.onMessage((message) => {
-      // Assuming message format is { senderId, receiverId, content, timestamp }
-      // Filter messages relevant to the current chat
-      if ((message.senderId === user.id && message.receiverId === receiverId) ||
-          (message.senderId === receiverId && message.receiverId === user.id)) {
-        setMessages((prevMessages) => [...prevMessages, {
-          id: message.id || Date.now().toString(), // Assign a temporary ID if not present
-          senderId: message.senderId,
-          receiverId: message.receiverId,
-          content: message.content,
-          timestamp: message.timestamp || new Date().toISOString(),
-        }]);
+      if (!chatId || targetChatId !== chatId) {
+        return;
       }
-    });
 
-    return () => {
-      WebSocketService.disconnect();
-    };
-  }, [user, receiverId]);
+      const newEntry: Message = {
+        id: String(payload.messageId ?? payload.id ?? Date.now()),
+        senderId: String(payload.senderId ?? ''),
+        receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+        content: payload.content ?? '',
+        timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
+      };
+
+      setMessages((prev) => {
+        const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
+        if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+          return withoutPlaceholders;
+        }
+        return [...withoutPlaceholders, newEntry];
+      });
+    },
+    [chatId]
+  );
 
   useEffect(() => {
-    // Scroll to the bottom when messages update
+    if (!user?.id || !chatId) {
+      return;
+    }
+    loadChatDetails();
+  }, [user?.id, chatId, loadChatDetails]);
+
+  useEffect(() => {
+    wsService.connect().catch((error) => console.error('Failed to ensure WebSocket connection for chat screen:', error));
+    const unsubscribe = wsService.addMessageListener(handleIncomingMessage);
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [wsService, handleIncomingMessage]);
+
+  useEffect(() => {
     if (messages.length > 0) {
       flatListRef.current?.scrollToEnd({ animated: true });
     }
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !user || !receiverId) return;
+  const handleSendMessage = useCallback(async () => {
+    if (!newMessage.trim() || !user?.id || !chatId) {
+      return;
+    }
 
-    const messageToSend = {
-      receiverId: receiverId as string,
-      content: newMessage.trim(),
+    const trimmedMessage = newMessage.trim();
+    const temporaryId = `temp-${Date.now()}`;
+
+    const optimisticMessage: Message = {
+      id: temporaryId,
+      senderId: String(user.id),
+      receiverId: String(otherUserIdRef.current ?? ''),
+      content: trimmedMessage,
+      timestamp: new Date().toISOString(),
     };
 
+    setMessages((prev) => {
+      const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
+      return [...withoutPlaceholders, optimisticMessage];
+    });
+    setNewMessage('');
+    setIsSendingMessage(true);
+
     try {
-      // Optimistically add message to UI
-      const tempMessage: Message = {
-        id: Date.now().toString(), // Temporary ID
-        senderId: user.id,
-        receiverId: receiverId as string,
-        content: newMessage.trim(),
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prevMessages) => [...prevMessages, tempMessage]);
-      setNewMessage('');
-
-      await ApiService.post('/chat/send', messageToSend);
-      // No need to update messages again if WebSocket handles it
+      wsService.send({
+        type: 'chat_message',
+        chatId,
+        content: trimmedMessage,
+      });
     } catch (error) {
-      console.error(`Error sending message to receiver ID: ${receiverId}, content: ${messageToSend.content}:`, error);
-      // Revert optimistic update or show error
-      setMessages((prevMessages) => prevMessages.filter(msg => msg.id !== tempMessage.id));
+      console.error(`Error sending message to chat ${chatId}:`, error);
+      NotificationService.show('error', 'Failed to send message. Please try again.');
+      setMessages((prev) => prev.filter((msg) => msg.id !== temporaryId));
+      setNewMessage(trimmedMessage);
+    } finally {
+      setIsSendingMessage(false);
     }
-  };
+  }, [chatId, newMessage, user?.id, wsService]);
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isMyMessage = item.senderId === user?.id;
-    return <MessageBubble item={item} isMyMessage={isMyMessage} currentUserId={user.id} />;
-  };
+  const renderMessage = useCallback(
+    ({ item }: { item: Message }) => {
+      const isPlaceholder = Boolean(item.isPlaceholder);
+      const isMyMessage = !isPlaceholder && user?.id != null && item.senderId === String(user.id);
+      return (
+        <MessageBubble
+          item={item}
+          isMyMessage={isMyMessage}
+          isPlaceholder={isPlaceholder}
+          currentUserId={user?.id ?? null}
+        />
+      );
+    },
+    [user?.id]
+  );
+
+  if (!chatId) {
+    return (
+      <SafeAreaView style={styles.fallbackContainer}>
+        <Text style={styles.fallbackText}>Unable to open this chat.</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -170,13 +355,12 @@ const ChatScreen = () => {
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button">
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{`Chat with ${receiverUsername}`}</Text>
-        <View style={styles.headerButton} /> {/* Placeholder for right button */}
+        <Text style={styles.headerTitle} numberOfLines={1}>{`Chat with ${receiverUsername}`}</Text>
+        <View style={styles.headerButton} />
       </View>
 
       <KeyboardAvoidingView
@@ -184,25 +368,43 @@ const ChatScreen = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={styles.messageList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        />
+        {isThreadLoading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color="#2C82FF" />
+            <Text style={styles.loadingStateText}>Loading conversation…</Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessage}
+            contentContainerStyle={styles.messageList}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          />
+        )}
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
             value={newMessage}
             onChangeText={setNewMessage}
-            placeholder="Type a message..."
+            placeholder="Type a message…"
             placeholderTextColor="rgba(255, 255, 255, 0.5)"
             multiline
+            editable={!isSendingMessage}
           />
-          <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
-            <Ionicons name="send" size={24} color="white" />
+          <TouchableOpacity
+            onPress={handleSendMessage}
+            style={[styles.sendButton, isSendingMessage && styles.sendButtonDisabled]}
+            disabled={isSendingMessage}
+            accessibilityRole="button"
+          >
+            {isSendingMessage ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Ionicons name="send" size={24} color="white" />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -214,90 +416,129 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  fallbackContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#03040A',
+  },
+  fallbackText: {
+    color: '#ffffff',
+    fontSize: 16,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'transparent', // Ensure header background is transparent to show gradient
+    backgroundColor: 'transparent',
   },
   headerButton: {
-    padding: 8,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
+    flex: 1,
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+    paddingHorizontal: 12,
   },
   keyboardAvoidingView: {
     flex: 1,
   },
   messageList: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexGrow: 1,
   },
   messageBubble: {
     maxWidth: '80%',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 8,
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 10,
   },
   myMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#007bff', // Changed to a more vibrant blue
-    borderBottomRightRadius: 2,
+    backgroundColor: '#2C82FF',
+    borderBottomRightRadius: 4,
   },
   theirMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#e0e0e0',
-    borderBottomLeftRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomLeftRadius: 4,
+  },
+  placeholderMessage: {
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   senderName: {
-    fontWeight: 'bold',
-    marginBottom: 2,
-    color: '#333',
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#ffffff',
   },
   messageContent: {
     fontSize: 16,
-    color: '#333',
+    color: '#ffffff',
+  },
+  placeholderContent: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontStyle: 'italic',
   },
   messageTimestamp: {
-    fontSize: 10,
-    color: '#666',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
     alignSelf: 'flex-end',
-    marginTop: 5,
+    marginTop: 6,
+  },
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingStateText: {
+    marginTop: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 15,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: 'transparent', // Ensure input background is transparent
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   textInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     fontSize: 16,
     color: 'white',
-    maxHeight: 100,
+    maxHeight: 120,
     marginRight: 10,
   },
   sendButton: {
     backgroundColor: '#0EA5FF',
     borderRadius: 20,
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    opacity: 0.6,
   },
 });
 
 export default ChatScreen;
+
