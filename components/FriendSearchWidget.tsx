@@ -67,8 +67,15 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
           users = [];
         }
         
+        const filtered = users.filter((candidate: any) => {
+          const availability = candidate?.friendship_status || candidate?.status;
+          const normalized = availability ? String(availability).toLowerCase() : 'available';
+          return normalized === 'available';
+        });
+        
         console.log('🔍 Found', users.length, 'users');
-        setSearchResults(users);
+        console.log('🔍 Filtered to', filtered.length, 'available users');
+        setSearchResults(filtered);
       } else {
         console.log('❌ Search failed:', response.error);
         setSearchResults([]);

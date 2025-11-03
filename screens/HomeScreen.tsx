@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -31,6 +31,8 @@ export const HomeScreen: React.FC = () => {
   const [isOnline, setIsOnline] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+  const incomingRequestsRef = useRef<any[]>([]);
+  const outgoingRequestsRef = useRef<any[]>([]);
   const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -148,18 +150,19 @@ export const HomeScreen: React.FC = () => {
         const incoming = Array.isArray(pending.incoming) ? pending.incoming : [];
         const outgoing = Array.isArray(pending.outgoing) ? pending.outgoing : [];
 
-        setIncomingRequests(
-          incoming.map((item: any) => ({
-            ...item,
-            id: item.id?.toString?.() ?? String(item.id),
-          }))
-        );
-        setOutgoingRequests(
-          outgoing.map((item: any) => ({
-            ...item,
-            id: item.id?.toString?.() ?? String(item.id),
-          }))
-        );
+        const normalizedIncoming = incoming.map((item: any) => ({
+          ...item,
+          id: item.id?.toString?.() ?? String(item.id),
+        }));
+        const normalizedOutgoing = outgoing.map((item: any) => ({
+          ...item,
+          id: item.id?.toString?.() ?? String(item.id),
+        }));
+
+        incomingRequestsRef.current = normalizedIncoming;
+        outgoingRequestsRef.current = normalizedOutgoing;
+        setIncomingRequests(normalizedIncoming);
+        setOutgoingRequests(normalizedOutgoing);
       }
     } catch (error) {
       console.error('Failed to load friend data:', error);
@@ -167,9 +170,32 @@ export const HomeScreen: React.FC = () => {
   }, []);
 
   const loadNotifications = useCallback(async () => {
+    const buildFallbackNotifications = () => {
+      const incoming = incomingRequestsRef.current.map((item: any) => ({
+        id: `incoming-${item.id}`,
+        type: 'friend_request',
+        title: `${item.username || 'Someone'} sent you a friend request`,
+        userid: item.id,
+        message: 'Tap to accept or decline this request.',
+        timestamp: new Date().toISOString(),
+      }));
+
+      const outgoing = outgoingRequestsRef.current.map((item: any) => ({
+        id: `outgoing-${item.id}`,
+        type: 'friend_request_outgoing',
+        title: `Pending request to ${item.username || 'user'}`,
+        userid: item.id,
+        message: 'Waiting for the other user to respond.',
+        timestamp: new Date().toISOString(),
+      }));
+
+      return [...incoming, ...outgoing];
+    };
+
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
+        setNotifications(buildFallbackNotifications());
         return;
       }
 
@@ -183,11 +209,12 @@ export const HomeScreen: React.FC = () => {
         console.warn('🔔 Failed to fetch notifications:', response.error);
         console.log('🔔 Full response:', response);
         if (response.statusCode === 404) {
-          setNotifications([]);
+          setNotifications(buildFallbackNotifications());
         }
       }
     } catch (error) {
       console.error('Failed to load notifications:', error);
+      setNotifications(buildFallbackNotifications());
     }
   }, []);
 
@@ -195,6 +222,7 @@ export const HomeScreen: React.FC = () => {
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
+        setNotifications((prev) => prev.map((notification: any) => ({ ...notification, read: true })));
         return;
       }
 
@@ -205,6 +233,7 @@ export const HomeScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to mark notifications as read:', error);
+      setNotifications((prev) => prev.map((notification: any) => ({ ...notification, read: true })));
     }
   }, []);
 
