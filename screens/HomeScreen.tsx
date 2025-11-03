@@ -328,12 +328,19 @@ export const HomeScreen: React.FC = () => {
     await Promise.all([loadChats(), loadFriendData(), loadNotifications()]);
   }, [loadChats, loadFriendData, loadNotifications]);
 
-  const handleNotificationsPress = useCallback(() => {
+  useEffect(() => {
     if (!isNotificationsVisible) {
-      markNotificationsAsRead();
+      return;
     }
+
+    loadNotifications().then(() => {
+      markNotificationsAsRead();
+    });
+  }, [isNotificationsVisible, loadNotifications, markNotificationsAsRead]);
+
+  const handleNotificationsPress = useCallback(() => {
     setIsNotificationsVisible((prev) => !prev);
-  }, [isNotificationsVisible, markNotificationsAsRead]);
+  }, []);
 
   const handleRealtimeMessage = useCallback((message: WebSocketMessage) => {
     if (!message || !message.type) {
@@ -451,7 +458,16 @@ export const HomeScreen: React.FC = () => {
           {isNotificationsVisible && (
             <View style={styles.notificationsOverlay}>
               <GlassCard width="100%" style={styles.notificationsCard}>
-                <Text style={styles.notificationsTitle}>Notifications</Text>
+                <View style={styles.notificationsHeader}>
+                  <Text style={styles.notificationsTitle}>Notifications</Text>
+                  <TouchableOpacity
+                    onPress={() => setIsNotificationsVisible(false)}
+                    style={styles.notificationCloseButton}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="close" size={18} color="#ffffff" />
+                  </TouchableOpacity>
+                </View>
                 {sortedNotifications.length === 0 ? (
                   <Text style={styles.notificationsEmpty}>You are all caught up</Text>
                 ) : (
@@ -467,19 +483,21 @@ export const HomeScreen: React.FC = () => {
                               {new Date(notification.timestamp).toLocaleString()}
                             </Text>
                           ) : null}
-                          <Text style={styles.notificationMessage}>{notification.message || ''}</Text>
+                          {notification.message ? (
+                            <Text style={styles.notificationMessage}>{notification.message}</Text>
+                          ) : null}
                         </View>
                         {isFriendRequest && relatedUserId ? (
                           <View style={styles.notificationActions}>
                             <TouchableOpacity
                               style={[styles.notificationActionButton, styles.notificationAccept]}
-                              onPress={() => handleRespondToRequest(relatedUserId, 'accept')}
+                              onPress={() => handleRespondToRequest(String(relatedUserId), 'accept')}
                             >
                               <Text style={styles.notificationActionText}>Accept</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={[styles.notificationActionButton, styles.notificationDecline]}
-                              onPress={() => handleRespondToRequest(relatedUserId, 'reject')}
+                              onPress={() => handleRespondToRequest(String(relatedUserId), 'reject')}
                             >
                               <Text style={[styles.notificationActionText, styles.notificationDeclineText]}>Decline</Text>
                             </TouchableOpacity>
@@ -493,17 +511,21 @@ export const HomeScreen: React.FC = () => {
             </View>
           )}
 
-          {/* Friend Search */}
-          <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
+          {!isNotificationsVisible && (
+            <>
+              {/* Friend Search */}
+              <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
 
-          {/* Friend Requests */}
-          <FriendRequestsWidget
-            incoming={incomingRequests}
-            outgoing={outgoingRequests}
-            onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
-            onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
-            processingId={requestProcessingId}
-          />
+              {/* Friend Requests */}
+              <FriendRequestsWidget
+                incoming={incomingRequests}
+                outgoing={outgoingRequests}
+                onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
+                onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
+                processingId={requestProcessingId}
+              />
+            </>
+          )}
 
           {/* Chat List */}
           <View style={styles.chatSection}>
@@ -668,10 +690,25 @@ const styles = StyleSheet.create({
   },
   notificationsOverlay: {
     paddingHorizontal: 16,
+    marginTop: -8,
     marginBottom: 12,
   },
   notificationsCard: {
     marginHorizontal: 0,
+  },
+  notificationsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  notificationCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   notificationsTitle: {
     color: '#ffffff',
