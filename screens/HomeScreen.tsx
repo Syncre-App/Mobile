@@ -176,10 +176,12 @@ export const HomeScreen: React.FC = () => {
       const response = await ApiService.get('/user/notifications', token);
       if (response.success && response.data) {
         const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
+        console.log('🔔 Notifications response data:', response.data);
         console.log('🔔 Notifications fetched:', items);
         setNotifications(items);
       } else {
         console.warn('🔔 Failed to fetch notifications:', response.error);
+        console.log('🔔 Full response:', response);
         if (response.statusCode === 404) {
           setNotifications([]);
         }
