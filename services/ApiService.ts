@@ -86,6 +86,23 @@ export class ApiService {
         } else if (Array.isArray(responseData)) {
           UserCacheService.addUsers(responseData);
         }
+
+        if (responseData.friends && Array.isArray(responseData.friends)) {
+          UserCacheService.addUsers(responseData.friends);
+        }
+
+        if (responseData.pending && typeof responseData.pending === 'object') {
+          const pendingUsers: any[] = [];
+          if (Array.isArray(responseData.pending.incoming)) {
+            pendingUsers.push(...responseData.pending.incoming);
+          }
+          if (Array.isArray(responseData.pending.outgoing)) {
+            pendingUsers.push(...responseData.pending.outgoing);
+          }
+          if (pendingUsers.length) {
+            UserCacheService.addUsers(pendingUsers);
+          }
+        }
       }
 
       return {

@@ -13,7 +13,6 @@ import {
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
-import { GlassCard } from './GlassCard';
 import { TransparentField } from './TransparentField';
 
 interface User {
@@ -24,11 +23,11 @@ interface User {
 }
 
 interface FriendSearchWidgetProps {
-  onFriendAdded: () => void;
+  onFriendUpdated: () => void;
 }
 
 export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
-  onFriendAdded,
+  onFriendUpdated,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -107,37 +106,46 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
         return;
       }
 
-      const response = await ApiService.post('/user/add-friend', { friendId: user.id }, token);
+      const response = await ApiService.post('/user/add', { friendId: user.id }, token);
       
       if (response.success) {
-        console.log('✅ Friend added successfully');
-        NotificationService.show('success', `${user.username} added as friend!`);
-        onFriendAdded();
+        const status = response.data?.status as string | undefined;
+        const message = response.data?.message as string | undefined;
+
+        console.log('✅ Friend request result:', status);
+
+        if (status === 'accepted') {
+          NotificationService.show('success', message || `${user.username} is now your friend`);
+        } else {
+          NotificationService.show('info', message || `Friend request sent to ${user.username}`);
+        }
+
+        onFriendUpdated();
         
         // Clear search
         setSearchQuery('');
         setSearchResults([]);
       } else {
         console.log('❌ Failed to add friend:', response.error);
-        NotificationService.show('error', response.error || 'Failed to add friend');
+        NotificationService.show('error', response.error || 'Failed to send friend request');
       }
     } catch (error: any) {      
       console.log('❌ Error adding friend:', error);
-      NotificationService.show('error', 'Failed to add friend');
+      NotificationService.show('error', 'Failed to send friend request');
     }
   };
 
   const confirmAddFriend = (user: User) => {
     Alert.alert(
-      'Add Friend',
-      `Do you want to add ${user.username} as a friend?`,
+      'Send Friend Request',
+      `Do you want to send a friend request to ${user.username}?`,
       [
         {
           text: 'Cancel',
           style: 'cancel',
         },
         {
-          text: 'Add',
+          text: 'Send',
           onPress: () => handleAddFriend(user),
         },
       ]

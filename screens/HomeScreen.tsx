@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 
 import { ChatListWidget } from '../components/ChatListWidget';
+import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
-import { ProfileMenu } from '../components/ProfileMenu';
 import { ApiService } from '../services/ApiService';
+import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { WebSocketService } from '../services/WebSocketService';
 
@@ -26,6 +27,10 @@ export const HomeScreen: React.FC = () => {
   const [userStatuses, setUserStatuses] = useState<any>({});
   const [isValidatingToken, setIsValidatingToken] = useState(true);
   const [isOnline, setIsOnline] = useState(false);
+  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+  const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
+  const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
   
   useEffect(() => {
     validateTokenAndInit();
@@ -83,6 +88,7 @@ export const HomeScreen: React.FC = () => {
       }
       
       await loadChats();
+      await loadFriendData();
     } catch (error) {
       console.error('Failed to load user data:', error);
     }
@@ -113,6 +119,37 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
+  const loadFriendData = async () => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        return;
+      }
+
+      const response = await ApiService.get('/user/friends', token);
+      if (response.success && response.data) {
+        const pending = response.data.pending || {};
+        const incoming = Array.isArray(pending.incoming) ? pending.incoming : [];
+        const outgoing = Array.isArray(pending.outgoing) ? pending.outgoing : [];
+
+        setIncomingRequests(
+          incoming.map((item: any) => ({
+            ...item,
+            id: item.id?.toString?.() ?? String(item.id),
+          }))
+        );
+        setOutgoingRequests(
+          outgoing.map((item: any) => ({
+            ...item,
+            id: item.id?.toString?.() ?? String(item.id),
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Failed to load friend data:', error);
+    }
+  };
+
   const connectWebSocket = async () => {
     try {
       const wsService = WebSocketService.getInstance();
@@ -132,13 +169,70 @@ export const HomeScreen: React.FC = () => {
     router.push('/profile');
   };
 
-  const handleFriendAdded = () => {
-    // Refresh chat list when new friend is added
-    handleRefresh();
+  const handleFriendStateChanged = async () => {
+    await Promise.all([loadFriendData(), loadChats()]);
   };
 
-  const handleChatRefresh = () => {
-    loadChats();
+  const handleRespondToRequest = async (friendId: string, action: 'accept' | 'reject') => {
+    try {
+      setRequestProcessingId(friendId);
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Missing authentication token');
+        return;
+      }
+
+      const response = await ApiService.post('/user/respond', { friendId, action }, token);
+      if (response.success) {
+        const message = response.data?.message;
+
+        if (action === 'accept') {
+          NotificationService.show('success', message || 'Friend request accepted');
+          await loadChats();
+        } else {
+          NotificationService.show('info', message || 'Friend request declined');
+        }
+
+        await loadFriendData();
+      } else {
+        NotificationService.show('error', response.error || 'Failed to update request');
+      }
+    } catch (error) {
+      console.error('Failed to respond to friend request:', error);
+      NotificationService.show('error', 'Failed to update request');
+    } finally {
+      setRequestProcessingId(null);
+    }
+  };
+
+  const handleRemoveFriend = async (friendId: string) => {
+    try {
+      setRemovingFriendId(friendId);
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Missing authentication token');
+        return;
+      }
+
+      const response = await ApiService.post('/user/remove', { friendId }, token);
+      if (response.success) {
+        const message = response.data?.message || 'Friend removed successfully';
+        NotificationService.show('success', message);
+        await loadFriendData();
+        await loadChats();
+      } else {
+        NotificationService.show('error', response.error || 'Failed to remove friend');
+      }
+    } catch (error) {
+      console.error('Failed to remove friend:', error);
+      NotificationService.show('error', 'Failed to remove friend');
+    } finally {
+      setRemovingFriendId(null);
+    }
+  };
+
+  const handleChatRefresh = async () => {
+    await Promise.all([loadChats(), loadFriendData()]);
   };
 
   return (
@@ -173,7 +267,16 @@ export const HomeScreen: React.FC = () => {
           </View>
 
           {/* Friend Search */}
-          <FriendSearchWidget onFriendAdded={handleFriendAdded} />
+          <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
+
+          {/* Friend Requests */}
+          <FriendRequestsWidget
+            incoming={incomingRequests}
+            outgoing={outgoingRequests}
+            onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
+            onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
+            processingId={requestProcessingId}
+          />
 
           {/* Chat List */}
           <View style={styles.chatSection}>
@@ -182,6 +285,8 @@ export const HomeScreen: React.FC = () => {
               isLoading={chatsLoading}
               onRefresh={handleChatRefresh}
               userStatuses={userStatuses}
+              onRemoveFriend={handleRemoveFriend}
+              removingFriendId={removingFriendId}
             />
           </View>
         </SafeAreaView>

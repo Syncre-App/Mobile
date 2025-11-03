@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -43,6 +44,8 @@ interface ChatListWidgetProps {
   isLoading: boolean;
   onRefresh: () => void;
   userStatuses: UserStatus;
+  onRemoveFriend: (friendId: string) => void;
+  removingFriendId?: string | null;
 }
 
 export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
@@ -50,6 +53,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   isLoading,
   onRefresh,
   userStatuses,
+  onRemoveFriend,
+  removingFriendId = null,
 }) => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -131,28 +136,30 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     setRefreshing(false);
   };
 
-  const getChatDisplayName = (chat: Chat): string => {
-    if (!currentUserId) return 'Loading...';
-    
-    // Parse the users JSON string to get user IDs
+  const getOtherUserId = (chat: Chat): string | null => {
+    if (!currentUserId) return null;
     try {
       const userIds = JSON.parse(chat.users);
       const otherUserId = userIds.find((id: string) => id !== currentUserId);
-      
-      if (!otherUserId) return 'Unknown User';
-      
-      // Check if we have user details for this user
-      const user = userDetails[otherUserId];
-      if (user) {
-        // Return username if available, otherwise email, otherwise fallback
-        return user.username || user.email || 'Loading...';
-      }
-      
-      // Fallback while loading
-      return 'Loading...';
+      return otherUserId || null;
     } catch (error) {
-      return 'Unknown User';
+      console.log('Error parsing chat users:', error);
+      return null;
     }
+  };
+
+  const getChatDisplayName = (chat: Chat): string => {
+    if (!currentUserId) return 'Loading...';
+    
+    const otherUserId = getOtherUserId(chat);
+    if (!otherUserId) return 'Unknown User';
+
+    const user = userDetails[otherUserId];
+    if (user) {
+      return user.username || user.email || 'Loading...';
+    }
+
+    return 'Loading...';
   };
 
   const getInitials = (name?: string) => {
@@ -177,27 +184,42 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     router.push('/chat/[id]' as any, { id: chat.id } as any);
   };
 
+  const handleChatLongPress = (chat: Chat) => {
+    const otherUserId = getOtherUserId(chat);
+    if (!otherUserId) return;
+
+    const displayName = getChatDisplayName(chat);
+
+    Alert.alert(
+      'Chat Options',
+      `Do you want to remove ${displayName} from your friends?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove Friend',
+          style: 'destructive',
+          onPress: () => onRemoveFriend(otherUserId),
+        },
+      ],
+    );
+  };
+
   const renderChatItem = ({ item: chat }: { item: Chat }) => {
     const displayName = getChatDisplayName(chat);
-    
-    // Get the other user's ID for status check
-    const getOtherUserId = () => {
-      try {
-        const userIds = JSON.parse(chat.users);
-        return userIds.find((id: string) => id !== currentUserId);
-      } catch {
-        return null;
-      }
-    };
-    
-    const otherUserId = getOtherUserId();
+    const otherUserId = getOtherUserId(chat);
     const isUserOnline = otherUserId && userStatuses[otherUserId] === 'online';
+    const isRemoving = removingFriendId === otherUserId;
 
     return (
       <TouchableOpacity 
-        onPress={() => handleChatPress(chat)} 
+        onPress={() => !isRemoving && handleChatPress(chat)} 
+        onLongPress={() => !isRemoving && handleChatLongPress(chat)}
         style={styles.chatItem}
         activeOpacity={0.6}
+        disabled={isRemoving}
       >
         <View style={styles.chatCard}>
           <View style={styles.avatarContainer}>
@@ -213,7 +235,11 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
           </View>
 
           <View style={styles.rightColumn}>
-            <Ionicons name="chevron-forward" size={16} color="rgba(255, 255, 255, 0.4)" />
+            {isRemoving ? (
+              <ActivityIndicator size="small" color="#FF6B6B" />
+            ) : (
+              <Ionicons name="chevron-forward" size={16} color="rgba(255, 255, 255, 0.4)" />
+            )}
           </View>
         </View>
       </TouchableOpacity>
