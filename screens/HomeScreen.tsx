@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -14,10 +15,11 @@ import {
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
+import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
-import { WebSocketService } from '../services/WebSocketService';
+import { WebSocketMessage, WebSocketService } from '../services/WebSocketService';
 
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
@@ -31,12 +33,25 @@ export const HomeScreen: React.FC = () => {
   const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
   const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
+  const unreadCount = useMemo(
+    () => notifications.filter((notification) => !notification.read).length,
+    [notifications]
+  );
+  const sortedNotifications = useMemo(() => {
+    return [...notifications].sort((a, b) => {
+      const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [notifications]);
   
   useEffect(() => {
     validateTokenAndInit();
-  }, []);
+  }, [validateTokenAndInit]);
 
-  const validateTokenAndInit = async () => {
+  const validateTokenAndInit = useCallback(async () => {
     try {
       console.log('🔍 HomeScreen: Validating token...');
       const token = await StorageService.getAuthToken();
@@ -67,9 +82,9 @@ export const HomeScreen: React.FC = () => {
       await StorageService.removeItem('user_data');
       router.replace('/');
     }
-  };
+  }, [connectWebSocket, initializeScreen, router]);
 
-  const initializeScreen = async () => {
+  const initializeScreen = useCallback(async () => {
     try {
       // First try to get user data from storage
       const userData = await StorageService.getObject('user_data');
@@ -89,12 +104,13 @@ export const HomeScreen: React.FC = () => {
       
       await loadChats();
       await loadFriendData();
+      await loadNotifications();
     } catch (error) {
       console.error('Failed to load user data:', error);
     }
-  };
+  }, [loadChats, loadFriendData, loadNotifications]);
 
-  const loadChats = async () => {
+  const loadChats = useCallback(async () => {
     setChatsLoading(true);
     try {
       const token = await StorageService.getAuthToken();
@@ -117,9 +133,9 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setChatsLoading(false);
     }
-  };
+  }, []);
 
-  const loadFriendData = async () => {
+  const loadFriendData = useCallback(async () => {
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
@@ -148,9 +164,43 @@ export const HomeScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to load friend data:', error);
     }
-  };
+  }, []);
 
-  const connectWebSocket = async () => {
+  const loadNotifications = useCallback(async () => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        return;
+      }
+
+      const response = await ApiService.get('/user/notifications', token);
+      if (response.success && response.data) {
+        const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
+        setNotifications(items);
+      }
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+    }
+  }, []);
+
+  const markNotificationsAsRead = useCallback(async () => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        return;
+      }
+
+      const response = await ApiService.post('/user/notifications/read', {}, token);
+      if (response.success && response.data) {
+        const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
+        setNotifications(items);
+      }
+    } catch (error) {
+      console.error('Failed to mark notifications as read:', error);
+    }
+  }, []);
+
+  const connectWebSocket = useCallback(async () => {
     try {
       const wsService = WebSocketService.getInstance();
       await wsService.connect();
@@ -159,21 +209,21 @@ export const HomeScreen: React.FC = () => {
       console.error('Failed to connect WebSocket:', error);
       setIsOnline(false);
     }
-  };
+  }, []);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     await initializeScreen();
-  };
+  }, [initializeScreen]);
 
   const handleProfilePress = () => {
     router.push('/profile');
   };
 
-  const handleFriendStateChanged = async () => {
-    await Promise.all([loadFriendData(), loadChats()]);
-  };
+  const handleFriendStateChanged = useCallback(async () => {
+    await Promise.all([loadFriendData(), loadChats(), loadNotifications()]);
+  }, [loadChats, loadFriendData, loadNotifications]);
 
-  const handleRespondToRequest = async (friendId: string, action: 'accept' | 'reject') => {
+  const handleRespondToRequest = useCallback(async (friendId: string, action: 'accept' | 'reject') => {
     try {
       setRequestProcessingId(friendId);
       const token = await StorageService.getAuthToken();
@@ -193,7 +243,7 @@ export const HomeScreen: React.FC = () => {
           NotificationService.show('info', message || 'Friend request declined');
         }
 
-        await loadFriendData();
+        await Promise.all([loadFriendData(), loadNotifications()]);
       } else {
         NotificationService.show('error', response.error || 'Failed to update request');
       }
@@ -203,9 +253,9 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setRequestProcessingId(null);
     }
-  };
+  }, [loadChats, loadFriendData, loadNotifications]);
 
-  const handleRemoveFriend = async (friendId: string) => {
+  const handleRemoveFriend = useCallback(async (friendId: string) => {
     try {
       setRemovingFriendId(friendId);
       const token = await StorageService.getAuthToken();
@@ -218,8 +268,7 @@ export const HomeScreen: React.FC = () => {
       if (response.success) {
         const message = response.data?.message || 'Friend removed successfully';
         NotificationService.show('success', message);
-        await loadFriendData();
-        await loadChats();
+        await Promise.all([loadFriendData(), loadChats(), loadNotifications()]);
       } else {
         NotificationService.show('error', response.error || 'Failed to remove friend');
       }
@@ -229,11 +278,81 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setRemovingFriendId(null);
     }
-  };
+  }, [loadChats, loadFriendData, loadNotifications]);
 
-  const handleChatRefresh = async () => {
-    await Promise.all([loadChats(), loadFriendData()]);
-  };
+  const handleChatRefresh = useCallback(async () => {
+    await Promise.all([loadChats(), loadFriendData(), loadNotifications()]);
+  }, [loadChats, loadFriendData, loadNotifications]);
+
+  const handleNotificationsPress = useCallback(() => {
+    if (!isNotificationsVisible) {
+      markNotificationsAsRead();
+    }
+    setIsNotificationsVisible((prev) => !prev);
+  }, [isNotificationsVisible, markNotificationsAsRead]);
+
+  const handleRealtimeMessage = useCallback((message: WebSocketMessage) => {
+    if (!message || !message.type) {
+      return;
+    }
+
+    const data = message.data || {};
+    const friendUser = data.friend || data.fromUser || data.toUser;
+    const friendName = friendUser?.username || 'User';
+
+    switch (message.type) {
+      case 'friend_request_received': {
+        NotificationService.show('info', `${friendName} sent you a friend request`);
+        NotificationService.showAlert('Friend Request', `${friendName} wants to connect with you.`, [
+          { text: 'Later', style: 'cancel' },
+          {
+            text: 'Decline',
+            style: 'destructive',
+            onPress: () => data.fromUser?.id && handleRespondToRequest(String(data.fromUser.id), 'reject'),
+          },
+          {
+            text: 'Accept',
+            onPress: () => data.fromUser?.id && handleRespondToRequest(String(data.fromUser.id), 'accept'),
+          },
+        ]);
+        handleFriendStateChanged();
+        break;
+      }
+      case 'friend_request_sent': {
+        NotificationService.show('info', `Friend request sent to ${friendName}`);
+        loadFriendData();
+        loadNotifications();
+        break;
+      }
+      case 'friend_request_accepted': {
+        NotificationService.show('success', `${friendName} accepted your friend request`);
+        handleFriendStateChanged();
+        break;
+      }
+      case 'friend_request_declined': {
+        NotificationService.show('warning', `${friendName} declined your friend request`);
+        handleFriendStateChanged();
+        break;
+      }
+      case 'friend_removed': {
+        NotificationService.show('info', `${friendName} removed you as a friend`);
+        handleFriendStateChanged();
+        break;
+      }
+      default:
+        break;
+    }
+  }, [handleFriendStateChanged, handleRespondToRequest, loadNotifications]);
+
+  useEffect(() => {
+    const wsService = WebSocketService.getInstance();
+    const unsubscribe = wsService.addMessageListener(handleRealtimeMessage);
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [handleRealtimeMessage]);
 
   return (
     <View style={styles.container}>
@@ -253,18 +372,82 @@ export const HomeScreen: React.FC = () => {
           {/* Simple header with profile */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Chats</Text>
-            <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
-              <View style={styles.profileAvatar}>
-                <Text style={styles.profileAvatarText}>
-                  {user?.username?.charAt(0)?.toUpperCase() || 
-                   user?.name?.charAt(0)?.toUpperCase() || 
-                   user?.email?.charAt(0)?.toUpperCase() || 
-                   'U'}
-                </Text>
-              </View>
-              <View style={[styles.profileStatusDot, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={handleNotificationsPress}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={isNotificationsVisible ? 'notifications' : 'notifications-outline'}
+                  size={22}
+                  color="#ffffff"
+                />
+                {unreadCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
+                <View style={styles.profileAvatar}>
+                  <Text style={styles.profileAvatarText}>
+                    {user?.username?.charAt(0)?.toUpperCase() || 
+                     user?.name?.charAt(0)?.toUpperCase() || 
+                     user?.email?.charAt(0)?.toUpperCase() || 
+                     'U'}
+                  </Text>
+                </View>
+                <View style={[styles.profileStatusDot, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />
+              </TouchableOpacity>
+            </View>
           </View>
+
+          {isNotificationsVisible && (
+            <View style={styles.notificationsOverlay}>
+              <GlassCard width="100%" style={styles.notificationsCard}>
+                <Text style={styles.notificationsTitle}>Notifications</Text>
+                {sortedNotifications.length === 0 ? (
+                  <Text style={styles.notificationsEmpty}>You are all caught up</Text>
+                ) : (
+                  sortedNotifications.map((notification) => {
+                    const isFriendRequest = notification.type === 'friend_request';
+                    const relatedUserId = notification.userid?.toString?.() || notification.userid;
+                    return (
+                      <View key={notification.id} style={styles.notificationItem}>
+                        <View style={styles.notificationTextBlock}>
+                          <Text style={styles.notificationItemTitle}>{notification.title || 'Notification'}</Text>
+                          {notification.timestamp ? (
+                            <Text style={styles.notificationTimestamp}>
+                              {new Date(notification.timestamp).toLocaleString()}
+                            </Text>
+                          ) : null}
+                          <Text style={styles.notificationMessage}>{notification.message || ''}</Text>
+                        </View>
+                        {isFriendRequest && relatedUserId ? (
+                          <View style={styles.notificationActions}>
+                            <TouchableOpacity
+                              style={[styles.notificationActionButton, styles.notificationAccept]}
+                              onPress={() => handleRespondToRequest(relatedUserId, 'accept')}
+                            >
+                              <Text style={styles.notificationActionText}>Accept</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.notificationActionButton, styles.notificationDecline]}
+                              onPress={() => handleRespondToRequest(relatedUserId, 'reject')}
+                            >
+                              <Text style={[styles.notificationActionText, styles.notificationDeclineText]}>Decline</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : null}
+                      </View>
+                    );
+                  })
+                )}
+              </GlassCard>
+            </View>
+          )}
 
           {/* Friend Search */}
           <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
@@ -323,6 +506,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 20,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   headerTitle: {
     fontSize: 32,
@@ -388,6 +576,29 @@ const styles = StyleSheet.create({
   profileButton: {
     position: 'relative',
   },
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FF6B6B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  notificationBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   profileAvatar: {
     width: 40,
     height: 40,
@@ -410,6 +621,73 @@ const styles = StyleSheet.create({
     right: -2,
     borderWidth: 2,
     borderColor: '#03040A',
+  },
+  notificationsOverlay: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  notificationsCard: {
+    marginHorizontal: 0,
+  },
+  notificationsTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  notificationsEmpty: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+  },
+  notificationItem: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  notificationTextBlock: {
+    marginBottom: 8,
+  },
+  notificationItemTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  notificationTimestamp: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  notificationMessage: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+  },
+  notificationActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  notificationActionButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationAccept: {
+    backgroundColor: '#2C82FF',
+  },
+  notificationDecline: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  notificationActionText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  notificationDeclineText: {
+    color: '#FF6B6B',
   },
   chatSection: {
     flex: 1,
