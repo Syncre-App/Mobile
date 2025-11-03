@@ -127,7 +127,12 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
         setSearchResults([]);
       } else {
         console.log('❌ Failed to add friend:', response.error);
-        NotificationService.show('error', response.error || 'Failed to send friend request');
+        if (response.statusCode === 409) {
+          NotificationService.show('info', response.error || 'Friend request already pending or you are already connected');
+          setSearchResults((prev) => prev.filter((item) => item.id !== user.id));
+        } else {
+          NotificationService.show('error', response.error || 'Failed to send friend request');
+        }
       }
     } catch (error: any) {      
       console.log('❌ Error adding friend:', error);
