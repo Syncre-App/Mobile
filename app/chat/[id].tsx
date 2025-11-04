@@ -20,6 +20,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
 import { NotificationService } from '../../services/NotificationService';
 import { StorageService } from '../../services/StorageService';
+import { CryptoService } from '../../services/CryptoService';
+import { DeviceService } from '../../services/DeviceService';
 import { WebSocketMessage, WebSocketService } from '../../services/WebSocketService';
 import { UserCacheService } from '../../services/UserCacheService';
 
@@ -101,6 +103,9 @@ const ChatScreen: React.FC = () => {
   const flatListRef = useRef<FlatList<Message>>(null);
   const receiverNameRef = useRef('Loading...');
   const otherUserIdRef = useRef<string | null>(null);
+  const participantIdsRef = useRef<string[]>([]);
+  const authTokenRef = useRef<string | null>(null);
+  const deviceIdRef = useRef<string | null>(null);
   const wsService = useMemo(() => WebSocketService.getInstance(), []);
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading...');
@@ -108,6 +113,7 @@ const ChatScreen: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
 
   const generatePlaceholderMessages = useCallback(
     (displayName: string, otherUserId?: string | null) => {
@@ -138,7 +144,9 @@ const ChatScreen: React.FC = () => {
   const loadMessagesForChat = useCallback(
     async (token: string, chatIdentifier: string, displayName: string, otherUserId?: string | null) => {
       try {
-        const response = await ApiService.get(`/chat/${chatIdentifier}/messages`, token);
+        const deviceIdentifier = deviceIdRef.current;
+        const query = deviceIdentifier ? `?deviceId=${encodeURIComponent(deviceIdentifier)}` : '';
+        const response = await ApiService.get(`/chat/${chatIdentifier}/messages${query}`, token);
         const rawMessages = response.success
           ? Array.isArray(response.data?.messages)
             ? response.data.messages
@@ -152,15 +160,32 @@ const ChatScreen: React.FC = () => {
           return;
         }
 
-        const normalisedMessages: Message[] = rawMessages.map((msg: any) => ({
-          id: String(msg.id ?? `${chatIdentifier}-${msg.created_at ?? Date.now()}`),
-          senderId: String(msg.sender_id ?? msg.senderId ?? ''),
-          receiverId: String(msg.receiver_id ?? msg.receiverId ?? otherUserId ?? ''),
-          content: msg.content ?? '',
-          timestamp: msg.created_at ?? msg.timestamp ?? new Date().toISOString(),
-        }));
+        const decryptedMessages: Message[] = [];
+        for (const msg of rawMessages) {
+          if (msg.isEncrypted && Array.isArray(msg.envelopes)) {
+            const decrypted = await CryptoService.decryptMessage(chatIdentifier, msg.envelopes);
+            if (!decrypted) {
+              continue;
+            }
+            decryptedMessages.push({
+              id: String(msg.id ?? `${chatIdentifier}-${msg.created_at ?? Date.now()}`),
+              senderId: String(msg.sender_id ?? msg.senderId ?? ''),
+              receiverId: String(otherUserId ?? ''),
+              content: decrypted,
+              timestamp: msg.created_at ?? msg.timestamp ?? new Date().toISOString(),
+            });
+          } else {
+            decryptedMessages.push({
+              id: String(msg.id ?? `${chatIdentifier}-${msg.created_at ?? Date.now()}`),
+              senderId: String(msg.sender_id ?? msg.senderId ?? ''),
+              receiverId: String(msg.receiver_id ?? msg.receiverId ?? otherUserId ?? ''),
+              content: msg.content ?? '',
+              timestamp: msg.created_at ?? msg.timestamp ?? new Date().toISOString(),
+            });
+          }
+        }
 
-        setMessages(normalisedMessages);
+        setMessages(decryptedMessages.length ? decryptedMessages : generatePlaceholderMessages(displayName, otherUserId));
       } catch (error) {
         console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
         setMessages(generatePlaceholderMessages(displayName, otherUserId));
@@ -180,6 +205,7 @@ const ChatScreen: React.FC = () => {
       if (!token) {
         throw new Error('Missing authentication token');
       }
+      authTokenRef.current = token;
 
       const chatResponse = await ApiService.get(`/chat/${chatId}`, token);
       if (!chatResponse.success || !chatResponse.data?.chat) {
@@ -195,6 +221,7 @@ const ChatScreen: React.FC = () => {
       } catch {
         participantIds = [];
       }
+      participantIdsRef.current = participantIds;
 
       const currentUserId = user.id.toString();
       const otherParticipantId =
@@ -214,6 +241,12 @@ const ChatScreen: React.FC = () => {
       receiverNameRef.current = displayName;
       setReceiverUsername(displayName);
 
+      try {
+        await CryptoService.ensureIdentity(token);
+      } catch (cryptoError) {
+        console.error('Failed to ensure E2EE identity before loading messages:', cryptoError);
+      }
+
       await loadMessagesForChat(token, chatId, displayName, otherParticipantId);
     } catch (error) {
       console.error(`Error loading chat ${chatId}:`, error);
@@ -225,15 +258,62 @@ const ChatScreen: React.FC = () => {
   }, [chatId, user?.id, loadMessagesForChat, generatePlaceholderMessages]);
 
   const handleIncomingMessage = useCallback(
-    (message: WebSocketMessage) => {
-      if (!message || message.type !== 'new_message') {
+    async (message: WebSocketMessage) => {
+      if (!chatId) {
         return;
       }
 
       const payload: any = message;
       const targetChatId = String(payload.chatId ?? payload.data?.chatId ?? '');
 
-      if (!chatId || targetChatId !== chatId) {
+      if (!targetChatId || targetChatId !== chatId) {
+        return;
+      }
+
+      if (message.type === 'message_envelope' || message.type === 'message_envelope_sent') {
+        const envelopes = Array.isArray(payload.envelopes) ? payload.envelopes : [];
+        if (!envelopes.length) {
+          return;
+        }
+
+        try {
+          const decrypted = await CryptoService.decryptMessage(targetChatId, envelopes);
+          if (!decrypted) {
+            return;
+          }
+
+          const newEntry: Message = {
+            id: String(payload.messageId ?? payload.id ?? Date.now()),
+            senderId: String(payload.senderId ?? ''),
+            receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+            content: decrypted,
+            timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
+          };
+
+          setMessages((prev) => {
+            const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
+            const deduped = withoutPlaceholders.filter((msg) => {
+              if (!user?.id) {
+                return true;
+              }
+              const isOptimisticMatch =
+                msg.id.startsWith('temp-') && msg.senderId === String(user.id) && msg.content === newEntry.content;
+              return !isOptimisticMatch;
+            });
+
+            if (deduped.some((msg) => msg.id === newEntry.id)) {
+              return deduped;
+            }
+
+            return [...deduped, newEntry];
+          });
+        } catch (error) {
+          console.error('Failed to decrypt incoming message envelope:', error);
+        }
+        return;
+      }
+
+      if (message.type !== 'new_message') {
         return;
       }
 
@@ -253,7 +333,7 @@ const ChatScreen: React.FC = () => {
         return [...withoutPlaceholders, newEntry];
       });
     },
-    [chatId]
+    [chatId, user?.id]
   );
 
   useEffect(() => {
@@ -264,8 +344,34 @@ const ChatScreen: React.FC = () => {
   }, [user?.id, chatId, loadChatDetails]);
 
   useEffect(() => {
+    let isMounted = true;
+    DeviceService.getOrCreateDeviceId()
+      .then((id) => {
+        if (!isMounted) {
+          return;
+        }
+        deviceIdRef.current = id;
+        setDeviceId(id);
+        if (chatId) {
+          wsService.joinChat(chatId, id);
+        }
+      })
+      .catch((error) => console.error('Failed to resolve device ID for chat join:', error));
+
+    return () => {
+      isMounted = false;
+      if (chatId) {
+        wsService.leaveChat(chatId);
+      }
+    };
+  }, [chatId, wsService]);
+
+  useEffect(() => {
     wsService.connect().catch((error) => console.error('Failed to ensure WebSocket connection for chat screen:', error));
-    const unsubscribe = wsService.addMessageListener(handleIncomingMessage);
+    const listener = (incoming: WebSocketMessage) => {
+      handleIncomingMessage(incoming);
+    };
+    const unsubscribe = wsService.addMessageListener(listener);
 
     return () => {
       if (unsubscribe) {
@@ -287,7 +393,6 @@ const ChatScreen: React.FC = () => {
 
     const trimmedMessage = newMessage.trim();
     const temporaryId = `temp-${Date.now()}`;
-
     const optimisticMessage: Message = {
       id: temporaryId,
       senderId: String(user.id),
@@ -304,13 +409,45 @@ const ChatScreen: React.FC = () => {
     setIsSendingMessage(true);
 
     try {
-      wsService.send({
-        type: 'chat_message',
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token for encrypted send');
+      }
+      authTokenRef.current = token;
+
+      const otherParticipants = participantIdsRef.current
+        .filter((participantId) => participantId !== String(user.id))
+        .filter(Boolean);
+
+      const recipientIds =
+        otherParticipants.length > 0
+          ? otherParticipants
+          : otherUserIdRef.current
+            ? [otherUserIdRef.current]
+            : [];
+
+      if (!recipientIds.length) {
+        throw new Error('No chat recipients available');
+      }
+
+      const encryptedPayload = await CryptoService.buildEncryptedPayload({
         chatId,
-        content: trimmedMessage,
+        message: trimmedMessage,
+        recipientUserIds: recipientIds,
+        token,
+        currentUserId: String(user.id),
+      });
+
+      wsService.send({
+        type: 'message_send',
+        chatId,
+        envelopes: encryptedPayload.envelopes,
+        senderDeviceId: encryptedPayload.senderDeviceId,
+        messageType: 'encrypted',
+        preview: encryptedPayload.preview,
       });
     } catch (error) {
-      console.error(`Error sending message to chat ${chatId}:`, error);
+      console.error(`Error sending encrypted message to chat ${chatId}:`, error);
       NotificationService.show('error', 'Failed to send message. Please try again.');
       setMessages((prev) => prev.filter((msg) => msg.id !== temporaryId));
       setNewMessage(trimmedMessage);
@@ -541,4 +678,3 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
-

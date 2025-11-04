@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+import { CryptoService } from '../services/CryptoService';
 
 export interface AuthUser {
   id: string;
@@ -43,6 +44,11 @@ export const useAuth = (): UseAuthResult => {
       if (response.success && response.data) {
         setUser(response.data);
         await StorageService.setObject('user_data', response.data);
+        try {
+          await CryptoService.ensureIdentity(token);
+        } catch (cryptoError) {
+          console.error('useAuth: failed to ensure identity keys', cryptoError);
+        }
       }
     } catch (error) {
       console.error('useAuth: failed to refresh user', error);
@@ -68,4 +74,3 @@ export const useAuth = (): UseAuthResult => {
     signOut,
   };
 };
-

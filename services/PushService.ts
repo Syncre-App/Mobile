@@ -5,8 +5,8 @@ import { Platform } from 'react-native';
 
 import { ApiService } from './ApiService';
 import { StorageService } from './StorageService';
+import { DeviceService } from './DeviceService';
 
-const DEVICE_ID_STORAGE_KEY = 'push_device_id';
 const LAST_REGISTERED_TOKEN_KEY = 'push_last_token';
 
 Notifications.setNotificationHandler({
@@ -18,17 +18,6 @@ Notifications.setNotificationHandler({
     shouldShowList: true,
   }),
 });
-
-const getOrCreateDeviceId = async (): Promise<string> => {
-  const existing = await StorageService.getItem(DEVICE_ID_STORAGE_KEY);
-  if (existing) {
-    return existing;
-  }
-
-  const randomId = `${Platform.OS}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  await StorageService.setItem(DEVICE_ID_STORAGE_KEY, randomId);
-  return randomId;
-};
 
 const getExpoProjectId = (): string | undefined => {
   return (
@@ -75,7 +64,7 @@ export const PushService = {
         return;
       }
 
-      const deviceId = await getOrCreateDeviceId();
+      const deviceId = await DeviceService.getOrCreateDeviceId();
 
       await ApiService.post(
         '/push/register',
@@ -100,7 +89,7 @@ export const PushService = {
         return;
       }
 
-      const deviceId = await StorageService.getItem(DEVICE_ID_STORAGE_KEY);
+      const deviceId = await DeviceService.getDeviceId();
       if (!deviceId) {
         return;
       }
