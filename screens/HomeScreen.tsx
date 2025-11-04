@@ -296,13 +296,22 @@ export const HomeScreen: React.FC = () => {
       UserCacheService.addUsers(incomingRequestsRef.current as any[]);
       UserCacheService.addUsers(outgoingRequestsRef.current as any[]);
 
-      return [...incoming, ...outgoing];
+      const generated = [...incoming, ...outgoing];
+      StorageService.setObject('notifications_cache', generated).catch(() => {});
+      return generated;
     };
 
     try {
       const token = await StorageService.getAuthToken();
+      const cachedNotifications = await StorageService.getObject<any[]>('notifications_cache');
+      if (cachedNotifications && cachedNotifications.length) {
+        setNotifications(cachedNotifications);
+      }
+
       if (!token) {
-        setNotifications(buildFallbackNotifications());
+        if (!cachedNotifications) {
+          setNotifications(buildFallbackNotifications());
+        }
         return;
       }
 
@@ -313,6 +322,7 @@ export const HomeScreen: React.FC = () => {
         console.log('🔔 Notifications fetched:', items);
         await ensureNotificationUsers(items, token);
         setNotifications(items);
+        await StorageService.setObject('notifications_cache', items);
         return;
       }
 
@@ -322,6 +332,7 @@ export const HomeScreen: React.FC = () => {
         console.log('🔔 Notifications endpoint returned', response.statusCode, '- using fallback list');
         await ensureNotificationUsers(fallback, token);
         setNotifications(fallback);
+        await StorageService.setObject('notifications_cache', fallback);
         return;
       }
 
@@ -329,12 +340,14 @@ export const HomeScreen: React.FC = () => {
       console.log('🔔 Full response:', response);
       await ensureNotificationUsers(fallback, token);
       setNotifications(fallback);
+      await StorageService.setObject('notifications_cache', fallback);
     } catch (error) {
       console.error('Failed to load notifications:', error);
       const fallback = buildFallbackNotifications();
       const token = await StorageService.getAuthToken();
       await ensureNotificationUsers(fallback, token);
       setNotifications(fallback);
+      await StorageService.setObject('notifications_cache', fallback);
     }
   }, [ensureNotificationUsers]);
 
@@ -360,6 +373,14 @@ export const HomeScreen: React.FC = () => {
             : notification
         )
       );
+      await StorageService.setObject(
+        'notifications_cache',
+        notifications.map((notification: any) =>
+          unread.find((item) => item.id === notification.id)
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
 
       let latestResponse: any = null;
       for (const item of unread) {
@@ -380,11 +401,16 @@ export const HomeScreen: React.FC = () => {
           : [];
         await ensureNotificationUsers(items, token);
         setNotifications(items);
+        await StorageService.setObject('notifications_cache', items);
       }
     } catch (error) {
       console.error('Failed to mark notifications as read:', error);
       setNotifications((prev) =>
         prev.map((notification: any) => ({ ...notification, read: true }))
+      );
+      await StorageService.setObject(
+        'notifications_cache',
+        notifications.map((notification: any) => ({ ...notification, read: true }))
       );
     }
   }, [notifications, ensureNotificationUsers]);
