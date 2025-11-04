@@ -14,11 +14,11 @@ import {
   TouchableWithoutFeedback,
   UIManager,
   View,
+  Modal,
 } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
@@ -108,6 +108,17 @@ const formatDetailedTime = (iso: string): string => {
   return `${dateFormatter.format(date)} • ${timeFormatter.format(date)}`;
 };
 
+const sendingAnimation = {
+  duration: 300,
+  create: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+    property: LayoutAnimation.Properties.opacity,
+  },
+  update: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+  },
+};
+
 const layoutNext = () => {
   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 };
@@ -160,7 +171,6 @@ const TypingIndicator: React.FC<{ label: string }> = ({ label }) => {
           />
         ))}
       </View>
-      <Text style={styles.typingText}>{label} is typing…</Text>
     </View>
   );
 };
@@ -170,7 +180,6 @@ interface MessageBubbleProps {
   isMine: boolean;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
-  showTimestamp: boolean;
   onToggleTimestamp: (messageId: string) => void;
 }
 
@@ -179,7 +188,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isMine,
   isFirstInGroup,
   isLastInGroup,
-  showTimestamp,
   onToggleTimestamp,
 }) => {
   const [senderUsername, setSenderUsername] = useState<string>('Loading…');
@@ -228,28 +236,21 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       ? 'Seen'
       : message.status === 'delivered'
         ? 'Delivered'
-        : message.status === 'sent'
-          ? 'Sent'
-          : 'Sending…'
+        : message.status === 'sending'
+          ? 'Sending...'
+          : 'Sent'
     : null;
 
   const containerStyle = [
     styles.messageRow,
     isMine ? styles.messageRowMine : styles.messageRowTheirs,
-    !isFirstInGroup && styles.messageRowStacked,
   ];
 
   const bubbleStyle = [
     styles.messageBubble,
     isMine ? styles.myBubble : styles.theirBubble,
-    isMine
-      ? isLastInGroup
-        ? styles.myBubbleLast
-        : styles.myBubbleStacked
-      : isLastInGroup
-        ? styles.theirBubbleLast
-        : styles.theirBubbleStacked,
     message.isPlaceholder && styles.placeholderBubble,
+    isMine && message.status === 'sending' && styles.sendingBubble,
   ];
 
   return (
@@ -259,21 +260,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         disabled={message.isPlaceholder}
       >
         <View style={bubbleStyle}>
-          {!isMine && isFirstInGroup && !message.isPlaceholder && (
-            <Text style={styles.senderLabel}>{senderUsername}</Text>
-          )}
-          <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
+          <Text style={[styles.messageText, isMine ? styles.myMessageText : styles.theirMessageText]}>
             {message.content}
           </Text>
-          {isMine && statusLabel && (
-            <Text style={styles.statusLabelText}>{statusLabel}</Text>
-          )}
         </View>
       </TouchableWithoutFeedback>
-      {showTimestamp && (
-        <View style={styles.timestampPill}>
-          <Text style={styles.timestampText}>{formatDetailedTime(message.timestamp)}</Text>
-        </View>
+      {isMine && statusLabel && (
+        <Text style={styles.statusLabelText}>{statusLabel}</Text>
       )}
     </Animated.View>
   );
@@ -413,6 +406,10 @@ const ChatScreen: React.FC = () => {
             isPlaceholder: false,
           };
 
+          if (baseMessage.senderId !== String(user?.id) && baseMessage.status !== 'seen') {
+            wsService.sendMessageSeen(chatIdentifier, baseMessage.id);
+          }
+
           if (msg.isEncrypted && Array.isArray(msg.envelopes)) {
             const decrypted = await CryptoService.decryptMessage(chatIdentifier, msg.envelopes);
             if (!decrypted) {
@@ -443,7 +440,7 @@ const ChatScreen: React.FC = () => {
         setMessagesAnimated(() => generatePlaceholderMessages(displayName));
       }
     },
-    [generatePlaceholderMessages, scrollToBottom, setMessagesAnimated, user?.id]
+    [generatePlaceholderMessages, scrollToBottom, setMessagesAnimated, user?.id, wsService]
   );
 
   const loadChatDetails = useCallback(async () => {
@@ -576,6 +573,15 @@ const ChatScreen: React.FC = () => {
         return;
       }
 
+      if (message.type === 'message_seen') {
+        setMessagesAnimated((prev) =>
+          prev.map((msg) =>
+            msg.id === payload.messageId ? { ...msg, status: 'seen' } : msg
+          )
+        );
+        return;
+      }
+
       if (message.type === 'message_envelope_sent') {
         applyAckToLatestMessage({
           messageId: payload.messageId ?? payload.id,
@@ -605,6 +611,10 @@ const ChatScreen: React.FC = () => {
             status: undefined,
           };
 
+          if (newEntry.senderId !== String(user?.id)) {
+            wsService.sendMessageSeen(chatId, newEntry.id);
+          }
+
           setIsRemoteTyping(false);
           setMessagesAnimated((prev) => {
             const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
@@ -632,6 +642,10 @@ const ChatScreen: React.FC = () => {
           status: undefined,
         };
 
+        if (newEntry.senderId !== String(user?.id)) {
+          wsService.sendMessageSeen(chatId, newEntry.id);
+        }
+
         setIsRemoteTyping(false);
         setMessagesAnimated((prev) => {
           const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
@@ -650,6 +664,7 @@ const ChatScreen: React.FC = () => {
       scrollToBottom,
       setMessagesAnimated,
       user?.id,
+      wsService,
     ]
   );
 
@@ -703,9 +718,10 @@ const ChatScreen: React.FC = () => {
       receiverId: String(otherUserIdRef.current ?? ''),
       content: trimmedMessage,
       timestamp: new Date().toISOString(),
-      status: 'sent',
+      status: 'sending',
     };
 
+    LayoutAnimation.configureNext(sendingAnimation);
     setMessagesAnimated((prev) => {
       const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
       return [...withoutPlaceholders, optimisticMessage];
@@ -822,9 +838,7 @@ const ChatScreen: React.FC = () => {
       if (item.kind === 'date') {
         return (
           <View style={styles.dateDivider}>
-            <View style={styles.dateDividerLine} />
             <Text style={styles.dateDividerText}>{item.label}</Text>
-            <View style={styles.dateDividerLine} />
           </View>
         );
       }
@@ -865,12 +879,11 @@ const ChatScreen: React.FC = () => {
           isMine={Boolean(isMine)}
           isFirstInGroup={isFirstInGroup}
           isLastInGroup={isLastInGroup}
-          showTimestamp={activeTimestampId === messageItem.id}
           onToggleTimestamp={toggleTimestamp}
         />
       );
     },
-    [activeTimestampId, decoratedData, toggleTimestamp, typingUserLabel, user?.id]
+    [decoratedData, toggleTimestamp, typingUserLabel, user?.id]
   );
 
   if (!chatId) {
@@ -881,21 +894,16 @@ const ChatScreen: React.FC = () => {
     );
   }
 
+  const activeMessage = messages.find((m) => m.id === activeTimestampId);
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="dark-content" />
       <Stack.Screen options={{ title: `Chat with ${receiverUsername}` }} />
-
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button">
-          <Ionicons name="arrow-back" size={24} color="white" />
+          <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{receiverUsername}</Text>
         <View style={styles.headerButton} />
@@ -903,12 +911,12 @@ const ChatScreen: React.FC = () => {
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {isThreadLoading ? (
           <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color="#2C82FF" />
+            <ActivityIndicator size="large" color="#007AFF" />
             <Text style={styles.loadingStateText}>Loading conversation…</Text>
           </View>
         ) : (
@@ -928,25 +936,41 @@ const ChatScreen: React.FC = () => {
             style={styles.textInput}
             value={newMessage}
             onChangeText={handleComposerChange}
-            placeholder="Message…"
-            placeholderTextColor="rgba(255, 255, 255, 0.45)"
+            placeholder="Message"
+            placeholderTextColor="#8A8A8E"
             multiline
             editable={!isSendingMessage}
           />
           <TouchableOpacity
             onPress={handleSendMessage}
             style={[styles.sendButton, isSendingMessage && styles.sendButtonDisabled]}
-            disabled={isSendingMessage}
+            disabled={isSendingMessage || !newMessage.trim()}
             accessibilityRole="button"
           >
             {isSendingMessage ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <Ionicons name="send" size={22} color="#ffffff" />
+              <Ionicons name="arrow-up-circle-fill" size={32} color={newMessage.trim() ? '#007AFF' : '#8A8A8E'} />
             )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      <Modal
+        transparent
+        visible={!!activeTimestampId}
+        onRequestClose={() => setActiveTimestampId(null)}
+        animationType="fade"
+      >
+        <TouchableWithoutFeedback onPress={() => setActiveTimestampId(null)}>
+          <View style={styles.modalOverlay}>
+            {activeMessage && (
+              <View style={styles.timestampModal}>
+                <Text style={styles.timestampText}>{formatDetailedTime(activeMessage.timestamp)}</Text>
+              </View>
+            )}
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -954,38 +978,38 @@ const ChatScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#ffffff',
   },
   fallbackContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#03040A',
+    backgroundColor: '#ffffff',
   },
   fallbackText: {
-    color: '#ffffff',
+    color: '#000000',
     fontSize: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: 'transparent',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+    backgroundColor: '#F8F8F8',
   },
   headerButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     flex: 1,
-    color: 'white',
-    fontSize: 20,
+    color: '#000000',
+    fontSize: 17,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -994,26 +1018,21 @@ const styles = StyleSheet.create({
   },
   messageList: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 4,
+    paddingBottom: 8,
   },
   loadingState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
   },
   loadingStateText: {
     marginTop: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#8A8A8E',
     fontSize: 15,
   },
   messageRow: {
-    marginBottom: 2,
-    maxWidth: '82%',
-  },
-  messageRowStacked: {
-    marginTop: 2,
+    marginVertical: 4,
+    maxWidth: '80%',
   },
   messageRowMine: {
     alignSelf: 'flex-end',
@@ -1024,157 +1043,129 @@ const styles = StyleSheet.create({
   messageBubble: {
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 22,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    borderRadius: 20,
+  },
+  sendingBubble: {
+    transform: [{ scale: 0.9 }],
+    opacity: 0.7,
   },
   myBubble: {
-    backgroundColor: '#1F86FF',
-    borderBottomRightRadius: 6,
-  },
-  myBubbleStacked: {
-    borderBottomRightRadius: 6,
-    borderTopRightRadius: 6,
-    marginTop: 2,
-  },
-  myBubbleLast: {
-    borderBottomRightRadius: 22,
+    backgroundColor: '#007AFF',
   },
   theirBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderBottomLeftRadius: 6,
-  },
-  theirBubbleStacked: {
-    borderBottomLeftRadius: 6,
-    borderTopLeftRadius: 6,
-    marginTop: 2,
-  },
-  theirBubbleLast: {
-    borderBottomLeftRadius: 22,
+    backgroundColor: '#E5E5EA',
   },
   placeholderBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-  },
-  senderLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.72)',
-    marginBottom: 4,
+    backgroundColor: '#F2F2F7',
   },
   messageText: {
-    fontSize: 16,
+    fontSize: 17,
+  },
+  myMessageText: {
     color: '#ffffff',
   },
+  theirMessageText: {
+    color: '#000000',
+  },
   placeholderText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#8A8A8E',
     fontStyle: 'italic',
   },
   statusLabelText: {
-    marginTop: 6,
+    marginTop: 4,
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: '#8A8A8E',
     textAlign: 'right',
-  },
-  timestampPill: {
-    alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(10, 15, 28, 0.85)',
-    borderRadius: 14,
-  },
-  timestampText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 16,
-    paddingBottom: 18,
-    paddingTop: 12,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    backgroundColor: 'rgba(4, 8, 18, 0.72)',
+    borderTopColor: '#E5E5EA',
+    backgroundColor: '#F8F8F8',
   },
   textInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: 'white',
-    maxHeight: 140,
-    marginRight: 12,
+    paddingVertical: 10,
+    fontSize: 17,
+    color: '#000000',
+    marginRight: 8,
   },
   sendButton: {
-    backgroundColor: '#0EA5FF',
-    borderRadius: 20,
-    width: 44,
-    height: 44,
+    height: 36,
+    width: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0EA5FF',
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
   },
   sendButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   dateDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
     alignSelf: 'center',
-    marginVertical: 14,
-    gap: 8,
-  },
-  dateDividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    marginVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
   },
   dateDividerText: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 13,
+    color: '#8A8A8E',
+    fontSize: 12,
     fontWeight: '500',
   },
   typingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    marginTop: 8,
-    marginBottom: 12,
-    gap: 10,
+    marginLeft: 16,
+    marginVertical: 4,
   },
   typingBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 18,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
     flexDirection: 'row',
-    gap: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 60,
+    height: 40,
   },
   typingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#8A8A8E',
+    marginHorizontal: 2,
   },
   typingText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#8A8A8E',
     fontSize: 13,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timestampModal: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 14,
+  },
+  timestampText: {
+    color: '#ffffff',
+    fontSize: 12,
     fontWeight: '500',
   },
 });

@@ -237,6 +237,13 @@ export class WebSocketService {
     this.send({ type: 'typing', chatId, isTyping });
   }
 
+  sendMessageSeen(chatId: string, messageId: string): void {
+    if (!chatId || !messageId) {
+      return;
+    }
+    this.send({ type: 'message_seen', chatId, messageId });
+  }
+
   // Message listeners
   addMessageListener(listener: (message: WebSocketMessage) => void): () => void {
     this.messageListeners.push(listener);
