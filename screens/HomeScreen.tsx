@@ -340,23 +340,54 @@ export const HomeScreen: React.FC = () => {
 
   const markNotificationsAsRead = useCallback(async () => {
     try {
-      const token = await StorageService.getAuthToken();
-      if (!token) {
-        setNotifications((prev) => prev.map((notification: any) => ({ ...notification, read: true })));
+      const unread = notifications.filter((notification: any) => !notification.read);
+      if (!unread.length) {
         return;
       }
 
-      const response = await ApiService.post('/user/notifications/read', {}, token);
-      if (response.success && response.data) {
-        const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        setNotifications((prev) =>
+          prev.map((notification: any) => ({ ...notification, read: true }))
+        );
+        return;
+      }
+
+      setNotifications((prev) =>
+        prev.map((notification: any) =>
+          unread.find((item) => item.id === notification.id)
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
+
+      let latestResponse: any = null;
+      for (const item of unread) {
+        const response = await ApiService.post(
+          '/user/notifications/read',
+          { notificationId: item.id },
+          token
+        );
+
+        if (response.success && response.data) {
+          latestResponse = response;
+        }
+      }
+
+      if (latestResponse?.success && latestResponse.data) {
+        const items = Array.isArray(latestResponse.data.notifications)
+          ? latestResponse.data.notifications
+          : [];
         await ensureNotificationUsers(items, token);
         setNotifications(items);
       }
     } catch (error) {
       console.error('Failed to mark notifications as read:', error);
-      setNotifications((prev) => prev.map((notification: any) => ({ ...notification, read: true })));
+      setNotifications((prev) =>
+        prev.map((notification: any) => ({ ...notification, read: true }))
+      );
     }
-  }, []);
+  }, [notifications, ensureNotificationUsers]);
 
   const connectWebSocket = useCallback(async () => {
     try {
