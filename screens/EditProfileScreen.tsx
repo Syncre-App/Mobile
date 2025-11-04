@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import { getInfoAsync } from 'expo-file-system/legacy';
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -79,7 +79,7 @@ export const EditProfileScreen: React.FC = () => {
   const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'] as ImagePicker.MediaType[],
         allowsEditing: true,
         quality: 0.9,
         aspect: [1, 1],
@@ -90,7 +90,7 @@ export const EditProfileScreen: React.FC = () => {
       }
 
       const asset = result.assets[0];
-      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+      const fileInfo = await getInfoAsync(asset.uri);
       if (fileInfo.exists && fileInfo.size && fileInfo.size > 5 * 1024 * 1024) {
         NotificationService.show('error', 'Image must be smaller than 5 MB');
         return;
