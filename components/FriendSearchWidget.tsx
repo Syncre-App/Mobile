@@ -18,7 +18,7 @@ import { TransparentField } from './TransparentField';
 interface User {
   id: string;
   username: string;
-  email: string;
+  profile_picture?: string | null;
   [key: string]: any;
 }
 
@@ -171,7 +171,7 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
     >
       <View style={styles.searchResultInfo}>
         <Text style={styles.searchResultUsername}>{item.username}</Text>
-        <Text style={styles.searchResultEmail}>{item.email}</Text>
+        <Text style={styles.searchResultMeta}>Tap to send a friend request</Text>
       </View>
       <Ionicons name="person-add" size={20} color="#2C82FF" />
     </TouchableOpacity>
@@ -243,9 +243,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  searchResultEmail: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 14,
+  searchResultMeta: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 13,
     marginTop: 2,
   },
   noResults: {
