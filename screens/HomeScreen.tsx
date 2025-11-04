@@ -344,14 +344,16 @@ export const HomeScreen: React.FC = () => {
   }, [loadChats, loadFriendData, loadNotifications]);
 
   useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  useEffect(() => {
     if (!isNotificationsVisible) {
       return;
     }
 
-    loadNotifications().then(() => {
-      markNotificationsAsRead();
-    });
-  }, [isNotificationsVisible, loadNotifications, markNotificationsAsRead]);
+    markNotificationsAsRead();
+  }, [isNotificationsVisible, markNotificationsAsRead]);
 
   const handleNotificationsPress = useCallback(() => {
     setIsNotificationsVisible((prev) => !prev);
