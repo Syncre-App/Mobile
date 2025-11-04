@@ -177,6 +177,16 @@ export class WebSocketService {
           this.notifyStatusListeners();
         }
         break;
+
+      case 'friend_status_change':
+        if (message.userId && message.status) {
+          this.userStatuses = {
+            ...this.userStatuses,
+            [message.userId]: message.status,
+          };
+          this.notifyStatusListeners();
+        }
+        break;
         
       case 'message':
         // Handle chat messages

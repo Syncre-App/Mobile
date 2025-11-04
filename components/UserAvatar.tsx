@@ -80,7 +80,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
               width: dotSize,
               height: dotSize,
               borderRadius: dotSize / 2,
-              marginRight: Math.max(6, Math.round(size * 0.18)),
+              marginRight: Math.max(4, Math.round(size * 0.12)),
             },
           ]}
         />
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderWidth: 2,
     borderColor: '#0B1630',
-    zIndex: 0,
+    zIndex: 2,
   },
   leadingPresence: {
     borderRadius: 999,

@@ -199,11 +199,15 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const renderChatItem = ({ item: chat }: { item: Chat }) => {
     const displayName = getChatDisplayName(chat);
     const otherUserId = getOtherUserId(chat);
-    const statusValue = otherUserId ? userStatuses[otherUserId] : undefined;
-    const isUserOnline = statusValue === 'online';
-    const statusLabel = statusValue
-      ? statusValue.charAt(0).toUpperCase() + statusValue.slice(1)
-      : 'Offline';
+    const cachedUser = otherUserId ? userDetails[otherUserId] : null;
+    const statusValueRaw =
+      otherUserId && userStatuses[otherUserId]
+        ? userStatuses[otherUserId]
+        : cachedUser?.status;
+    const normalizedStatus = statusValueRaw
+      ? String(statusValueRaw).toLowerCase()
+      : 'offline';
+    const isUserOnline = normalizedStatus === 'online';
     const isRemoving = removingFriendId === otherUserId;
 
     return (
@@ -220,19 +224,12 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             name={displayName}
             size={56}
             presence={isUserOnline ? 'online' : 'offline'}
+            presencePlacement="overlay"
             style={styles.avatarContainer}
           />
 
           <View style={styles.chatContent}>
             <Text style={styles.chatName} numberOfLines={1}>{displayName}</Text>
-            <Text
-              style={[
-                styles.chatStatus,
-                isUserOnline ? styles.chatStatusOnline : styles.chatStatusOffline,
-              ]}
-            >
-              {statusLabel}
-            </Text>
           </View>
 
           <View style={styles.rightColumn}>
@@ -314,16 +311,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 2,
-  },
-  chatStatus: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  chatStatusOnline: {
-    color: '#4CAF50',
-  },
-  chatStatusOffline: {
-    color: 'rgba(255, 255, 255, 0.5)',
   },
   rightColumn: {
     justifyContent: 'center',

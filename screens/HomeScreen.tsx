@@ -60,10 +60,10 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     const wsInstance = WebSocketService.getInstance();
     const applyStatuses = (statuses: UserStatus) => {
-      setUserStatuses({ ...statuses });
+      setUserStatuses((prev) => ({ ...prev, ...statuses }));
     };
 
-    setUserStatuses(wsInstance.getUserStatuses());
+    applyStatuses(wsInstance.getUserStatuses());
     const unsubscribe = wsInstance.addStatusListener(applyStatuses);
     wsInstance.refreshFriendsStatus();
 
@@ -245,6 +245,19 @@ export const HomeScreen: React.FC = () => {
 
         if (Array.isArray(response.data.friends)) {
           UserCacheService.addUsers(response.data.friends as any[]);
+          const friendStatuses = (response.data.friends as any[]).reduce(
+            (acc, friend) => {
+              if (friend?.id) {
+                const key = friend.id?.toString?.() ?? String(friend.id);
+                acc[key] = friend.status || 'offline';
+              }
+              return acc;
+            },
+            {} as Record<string, string>
+          );
+          if (Object.keys(friendStatuses).length) {
+            setUserStatuses((prev: UserStatus) => ({ ...prev, ...friendStatuses }));
+          }
         }
         UserCacheService.addUsers(normalizedIncoming as any[]);
         UserCacheService.addUsers(normalizedOutgoing as any[]);
