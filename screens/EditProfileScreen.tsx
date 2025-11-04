@@ -226,7 +226,7 @@ export const EditProfileScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <GlassCard style={styles.photoCard}>
+        <GlassCard width="100%" style={[styles.card, styles.photoCard]}>
           <TouchableOpacity style={styles.photoPicker} onPress={handlePickImage} activeOpacity={0.85}>
             {selectedImage ? (
               <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} />
@@ -245,7 +245,7 @@ export const EditProfileScreen: React.FC = () => {
           <Text style={styles.photoHint}>PNG or JPG, maximum 5 MB</Text>
         </GlassCard>
 
-        <GlassCard style={styles.infoCard}>
+        <GlassCard width="100%" style={[styles.card, styles.infoCard]}>
           <View style={[styles.infoRow, styles.infoRowFirst]}>
             <Text style={styles.infoLabel}>Username</Text>
             <Text style={styles.infoValue}>{username || '—'}</Text>
@@ -256,7 +256,7 @@ export const EditProfileScreen: React.FC = () => {
           </View>
         </GlassCard>
 
-        <GlassCard style={styles.bioCard}>
+        <GlassCard width="100%" style={[styles.card, styles.bioCard]}>
           <BlurView intensity={40} tint="dark" style={styles.bioBlur}>
             <Text style={styles.bioTitle}>Bio editing is coming soon</Text>
             <Text style={styles.bioSubtitle}>We’re working on this feature, stay tuned!</Text>
@@ -329,6 +329,11 @@ const styles = StyleSheet.create({
   scrollContainer: {
     padding: 16,
     paddingBottom: 32,
+  },
+  card: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 420,
   },
   photoCard: {
     marginBottom: 24,
