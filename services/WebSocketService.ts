@@ -7,6 +7,8 @@ export interface WebSocketMessage {
   data?: any;
   timestamp?: number;
   token?: string; // For auth messages
+  chatId?: string | number;
+  [key: string]: any;
 }
 
 export class WebSocketService {
@@ -226,6 +228,13 @@ export class WebSocketService {
     }
     this.joinedChats.delete(chatId);
     this.send({ type: 'chat_leave', chatId });
+  }
+
+  sendTyping(chatId: string, isTyping: boolean): void {
+    if (!chatId) {
+      return;
+    }
+    this.send({ type: 'typing', chatId, isTyping });
   }
 
   // Message listeners
