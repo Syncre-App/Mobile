@@ -31,7 +31,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
   const handleLogout = async () => {
     onClose();
-  console.log('ProfileMenu: Logout pressed');
     // Clear storage and redirect to login
     const { StorageService } = await import('../services/StorageService');
     await StorageService.removeAuthToken();
@@ -41,13 +40,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
   const handleHelp = () => {
     onClose();
-  console.log('ProfileMenu: Help pressed');
     // TODO: Implement help screen
-    console.log('Help & Support clicked');
   };
 
   React.useEffect(() => {
-    console.log('ProfileMenu: visible=', visible);
     if (visible) {
       // mark the time the modal opened; used to ignore the tap that opened it
       openedAtRef.current = Date.now();
@@ -62,7 +58,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   const handleOverlayPress = () => {
     const now = Date.now();
     if (openedAtRef.current && now - openedAtRef.current < 300) {
-      console.log('ProfileMenu: Ignoring overlay press (just opened)');
       return;
     }
     onClose();

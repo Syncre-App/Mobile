@@ -12,6 +12,7 @@ interface TransparentFieldProps {
   suffixIcon?: React.ReactNode;
   style?: ViewStyle;
   onSuffixPress?: () => void;
+  editable?: boolean;
 }
 
 export const TransparentField: React.FC<TransparentFieldProps> = ({
@@ -25,6 +26,7 @@ export const TransparentField: React.FC<TransparentFieldProps> = ({
   suffixIcon,
   style,
   onSuffixPress,
+  editable = true,
 }) => {
   return (
     <View style={[styles.container, style]}>
@@ -39,6 +41,8 @@ export const TransparentField: React.FC<TransparentFieldProps> = ({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         selectionColor="#2C82FF"
+        editable={editable}
+        selectTextOnFocus={editable}
       />
       {suffixIcon && (
         <TouchableOpacity onPress={onSuffixPress} style={styles.suffixIcon}>

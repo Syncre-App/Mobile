@@ -28,27 +28,6 @@ export const SettingsScreen: React.FC = () => {
   router.back();
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          onPress: async () => {
-            await StorageService.removeAuthToken();
-            router.replace('/' as any);
-          },
-          style: 'destructive',
-        },
-      ]
-    );
-  };
-
   const handleClearCache = () => {
     Alert.alert(
       'Clear Cache',
@@ -190,32 +169,6 @@ export const SettingsScreen: React.FC = () => {
           )}
         </GlassCard>
 
-        {/* Account Section */}
-        <GlassCard style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Account</Text>
-          </View>
-          
-          {renderSettingItem(
-            'person',
-            'Edit Profile',
-            'Update your profile information',
-            () => {
-              console.log('SettingsScreen: navigate to edit-profile');
-              router.push('/edit-profile' as any);
-            }
-          )}
-          
-          {renderSettingItem(
-            'lock-closed',
-            'Privacy',
-            'Manage your privacy settings',
-            () => {
-              Alert.alert('Privacy', 'Privacy settings will be available in future updates');
-            }
-          )}
-        </GlassCard>
-
         {/* Storage Section */}
         <GlassCard style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -230,43 +183,6 @@ export const SettingsScreen: React.FC = () => {
           )}
         </GlassCard>
 
-        {/* About Section */}
-        <GlassCard style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>About</Text>
-          </View>
-          
-          {renderSettingItem(
-            'information-circle',
-            'About Syncre',
-            'Version 1.0.0',
-            () => {
-              Alert.alert(
-                'About Syncre',
-                'Syncre is a modern chat application built with React Native and Expo.\n\nVersion: 1.0.0\nBuilt with ❤️ by the Syncre team'
-              );
-            }
-          )}
-          
-          {renderSettingItem(
-            'help-circle',
-            'Help & Support',
-            'Get help and contact support',
-            () => {
-              Alert.alert('Help & Support', 'Support will be available in future updates');
-            }
-          )}
-        </GlassCard>
-
-        {/* Logout Section */}
-        <GlassCard style={styles.section}>
-          {renderSettingItem(
-            'log-out',
-            'Logout',
-            'Sign out of your account',
-            handleLogout
-          )}
-        </GlassCard>
       </ScrollView>
     </SafeAreaView>
   );

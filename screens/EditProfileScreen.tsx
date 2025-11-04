@@ -1,10 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -15,16 +19,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassCard } from '../components/GlassCard';
-import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
+import { UserCacheService } from '../services/UserCacheService';
 
 interface User {
   id: string;
   username: string;
   email: string;
-  bio?: string;
+  profile_picture?: string | null;
   [key: string]: any;
 }
 
@@ -32,8 +36,9 @@ export const EditProfileScreen: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [bio, setBio] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<{ uri: string; mimeType: string; fileName?: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
@@ -57,7 +62,7 @@ export const EditProfileScreen: React.FC = () => {
         setUser(userData);
         setUsername(userData.username || '');
         setEmail(userData.email || '');
-        setBio(userData.bio || '');
+        setProfilePicture(userData.profile_picture || null);
       } else {
         NotificationService.show('error', response.error || 'Failed to load profile');
         router.back();
@@ -71,39 +76,91 @@ export const EditProfileScreen: React.FC = () => {
     }
   };
 
-  const handleSave = async () => {
-    if (!username.trim() || !email.trim()) {
-      NotificationService.show('warning', 'Username and email are required');
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.9,
+        aspect: [1, 1],
+      });
+
+      if (result.canceled || !result.assets || !result.assets.length) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+      if (fileInfo.exists && fileInfo.size && fileInfo.size > 5 * 1024 * 1024) {
+        NotificationService.show('error', 'Image must be smaller than 5 MB');
+        return;
+      }
+
+      setSelectedImage({
+        uri: asset.uri,
+        mimeType: asset.mimeType || 'image/jpeg',
+        fileName: asset.fileName,
+      });
+    } catch (error) {
+      console.error('Failed to pick image:', error);
+      NotificationService.show('error', 'Image picker failed');
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedImage) {
+      NotificationService.show('warning', 'Select a profile picture to upload');
       return;
     }
 
-    setLoading(true);
-
     try {
+      const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
+      if (!allowedMimeTypes.includes(selectedImage.mimeType)) {
+        NotificationService.show('error', 'Unsupported image format');
+        return;
+      }
+
+      setUploading(true);
       const token = await StorageService.getAuthToken();
-      
       if (!token) {
         router.replace('/' as any);
         return;
       }
 
-      const response = await ApiService.put('/user/profile', {
-        username: username.trim(),
-        email: email.trim(),
-        bio: bio.trim(),
-      }, token);
+      const formData = new FormData();
+      const extension = selectedImage.fileName?.split('.').pop()?.toLowerCase();
+      const safeExtension = extension && extension.length <= 4 ? extension : (selectedImage.mimeType === 'image/png' ? 'png' : 'jpg');
+      const fileName = selectedImage.fileName || `profile-${Date.now()}.${safeExtension}`;
 
-      if (response.success) {
-        NotificationService.show('success', 'Profile updated successfully!');
+      formData.append('profilePicture', {
+        uri: selectedImage.uri,
+        name: fileName,
+        type: selectedImage.mimeType || 'image/jpeg',
+      } as any);
+
+      const response = await ApiService.upload('/user/profile-picture', formData, token);
+
+      if (response.success && response.data?.profile_picture) {
+        const newUrl = response.data.profile_picture;
+        setProfilePicture(newUrl);
+        setSelectedImage(null);
+        if (user) {
+          const updatedUser = { ...user, profile_picture: newUrl };
+          setUser(updatedUser);
+          await StorageService.setObject('user_data', updatedUser);
+          UserCacheService.addUser({ ...updatedUser, id: updatedUser.id?.toString?.() || updatedUser.id } as any);
+        }
+        NotificationService.show('success', 'Profile picture updated!');
         router.back();
       } else {
-        NotificationService.show('error', response.error || 'Failed to update profile');
+        NotificationService.show('error', response.error || 'Failed to upload profile picture');
       }
-    } catch (error: any) {
-      console.log('❌ Error updating profile:', error);
-      NotificationService.show('error', 'Failed to update profile');
+    } catch (error) {
+      console.error('Failed to upload profile picture:', error);
+      NotificationService.show('error', 'Upload failed');
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -159,18 +216,8 @@ export const EditProfileScreen: React.FC = () => {
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-  <Text style={styles.headerTitle}>Edit Profile</Text>
-        <TouchableOpacity 
-          onPress={handleSave} 
-          disabled={loading}
-          style={styles.headerButton}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#2C82FF" />
-          ) : (
-            <Ionicons name="checkmark" size={24} color="#2C82FF" />
-          )}
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <View style={styles.headerButton} />
       </View>
 
       <ScrollView
@@ -179,54 +226,48 @@ export const EditProfileScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <GlassCard style={styles.formCard}>
-          <View style={styles.formContainer}>
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Username</Text>
-              <TransparentField
-                placeholder="Enter your username"
-                value={username}
-                onChangeText={setUsername}
-                prefixIcon={
-                  <Ionicons name="person" size={18} color="rgba(255, 255, 255, 0.7)" />
-                }
-              />
+        <GlassCard style={styles.photoCard}>
+          <TouchableOpacity style={styles.photoPicker} onPress={handlePickImage} activeOpacity={0.85}>
+            {selectedImage ? (
+              <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} />
+            ) : profilePicture ? (
+              <Image source={{ uri: profilePicture }} style={styles.profileImage} />
+            ) : (
+              <View style={styles.profilePlaceholder}>
+                <Ionicons name="person" size={36} color="rgba(255, 255, 255, 0.7)" />
+              </View>
+            )}
+            <View style={styles.cameraBadge}>
+              <Ionicons name="camera" size={16} color="#ffffff" />
+              <Text style={styles.cameraBadgeText}>Change photo</Text>
             </View>
+          </TouchableOpacity>
+          <Text style={styles.photoHint}>PNG or JPG, maximum 5 MB</Text>
+        </GlassCard>
 
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Email</Text>
-              <TransparentField
-                placeholder="Enter your email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                prefixIcon={
-                  <Ionicons name="mail" size={18} color="rgba(255, 255, 255, 0.7)" />
-                }
-              />
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Bio</Text>
-              <TransparentField
-                placeholder="Tell us about yourself..."
-                value={bio}
-                onChangeText={setBio}
-                prefixIcon={
-                  <Ionicons name="document-text" size={18} color="rgba(255, 255, 255, 0.7)" />
-                }
-                style={styles.bioField}
-              />
-            </View>
+        <GlassCard style={styles.infoCard}>
+          <View style={[styles.infoRow, styles.infoRowFirst]}>
+            <Text style={styles.infoLabel}>Username</Text>
+            <Text style={styles.infoValue}>{username || '—'}</Text>
           </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Email</Text>
+            <Text style={styles.infoValue}>{email || '—'}</Text>
+          </View>
+        </GlassCard>
+
+        <GlassCard style={styles.bioCard}>
+          <BlurView intensity={40} tint="dark" style={styles.bioBlur}>
+            <Text style={styles.bioTitle}>Bio editing is coming soon</Text>
+            <Text style={styles.bioSubtitle}>We’re working on this feature, stay tuned!</Text>
+          </BlurView>
         </GlassCard>
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            onPress={handleSave}
-            disabled={loading}
-            style={styles.saveButton}
+            onPress={handleUpload}
+            disabled={uploading || !selectedImage}
+            style={[styles.saveButton, (!selectedImage || uploading) && styles.saveButtonDisabled]}
           >
             <LinearGradient
               colors={['#2C82FF', '#0EA5FF']}
@@ -234,10 +275,10 @@ export const EditProfileScreen: React.FC = () => {
               end={{ x: 1, y: 0 }}
               style={styles.saveButtonGradient}
             >
-              {loading ? (
+              {uploading ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
-                <Text style={styles.saveButtonText}>SAVE CHANGES</Text>
+                <Text style={styles.saveButtonText}>UPLOAD PHOTO</Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
@@ -287,50 +328,133 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     padding: 16,
+    paddingBottom: 32,
   },
-  formCard: {
-    width: '100%',
+  photoCard: {
     marginBottom: 24,
-  },
-  formContainer: {
-    padding: 20,
-  },
-  fieldContainer: {
-    marginBottom: 20,
-  },
-  fieldLabel: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  bioField: {
-    minHeight: 80,
-  },
-  buttonContainer: {
+    paddingVertical: 24,
     alignItems: 'center',
+    gap: 16,
   },
-  saveButton: {
+  photoPicker: {
+    width: 144,
+    height: 144,
+    borderRadius: 72,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  profileImage: {
     width: '100%',
-    marginBottom: 12,
+    height: '100%',
+    resizeMode: 'cover',
   },
-  saveButtonGradient: {
-    paddingVertical: 16,
-    borderRadius: 24,
+  profilePlaceholder: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 10,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    alignItems: 'center',
+  },
+  cameraBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  photoHint: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  infoCard: {
+    marginBottom: 24,
+    overflow: 'hidden',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  infoRowFirst: {
+    borderTopWidth: 0,
+  },
+  infoLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+  },
+  infoValue: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bioCard: {
+    marginBottom: 32,
+    overflow: 'hidden',
+  },
+  bioBlur: {
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    gap: 6,
+  },
+  bioTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bioSubtitle: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 13,
+  },
+  buttonContainer: {
+    gap: 12,
+    marginTop: 12,
+    alignItems: 'stretch',
+  },
+  saveButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    alignSelf: 'stretch',
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
   saveButtonText: {
     color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontWeight: '600',
+    fontSize: 14,
+    letterSpacing: 1.1,
   },
   cancelButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    alignSelf: 'stretch',
   },
   cancelButtonText: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 16,
+    fontWeight: '600',
   },
 });

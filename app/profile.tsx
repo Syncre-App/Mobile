@@ -129,6 +129,15 @@ export default function ProfileScreen() {
               router.push('/settings' as any);
             }
           )}
+
+          {renderSettingItem(
+            'lock-closed',
+            'Privacy',
+            'Manage your privacy settings',
+            () => {
+              Alert.alert('Privacy', 'Privacy settings will be available in future updates');
+            }
+          )}
         </GlassCard>
 
         {/* About Section */}

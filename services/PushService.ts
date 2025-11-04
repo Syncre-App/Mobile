@@ -4,7 +4,6 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { ApiService } from './ApiService';
-import { NotificationService } from './NotificationService';
 import { StorageService } from './StorageService';
 
 const DEVICE_ID_STORAGE_KEY = 'push_device_id';

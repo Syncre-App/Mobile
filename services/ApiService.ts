@@ -201,4 +201,41 @@ export class ApiService {
       };
     }
   }
+
+  static async upload<T = any>(endpoint: string, formData: FormData, token?: string): Promise<ApiResponse<T>> {
+    try {
+      const headers: HeadersInit = {};
+
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      let responseData: any;
+      try {
+        responseData = await response.json();
+      } catch (error) {
+        const text = await response.text();
+        responseData = { text };
+      }
+
+      return {
+        success: response.ok,
+        data: response.ok ? responseData : undefined,
+        error: !response.ok ? (responseData?.message || responseData?.error || `Request failed with status ${response.status}`) : undefined,
+        statusCode: response.status,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Network error',
+        statusCode: 0,
+      };
+    }
+  }
 }
