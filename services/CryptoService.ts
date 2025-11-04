@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 import nacl from 'tweetnacl';
 import { XChaCha20Poly1305 } from '@stablelib/xchacha20poly1305';
-import { hkdf } from '@stablelib/hkdf';
+import { HKDF } from '@stablelib/hkdf';
 import { SHA256 } from '@stablelib/sha256';
 import { ApiService } from './ApiService';
 import { DeviceService } from './DeviceService';
@@ -84,7 +84,10 @@ const randomBytes = (length: number): Uint8Array => {
 const deriveSymmetricKey = (sharedSecret: Uint8Array, chatId: string, recipientDeviceId: string | null): Uint8Array => {
   const info = utf8ToBytes(`${KEY_INFO_CONTEXT}:${chatId}:${recipientDeviceId ?? 'default'}`);
   const salt = new Uint8Array(HKDF_KEY_LENGTH); // zero salt is acceptable for HKDF when info changes per message.
-  return hkdf(SHA256, sharedSecret, salt, info, HKDF_KEY_LENGTH);
+  const hkdf = new HKDF(SHA256, sharedSecret, salt, info);
+  const key = hkdf.expand(HKDF_KEY_LENGTH);
+  hkdf.clean();
+  return key;
 };
 
 const registrationKey = (deviceId: string, version: number): string =>
