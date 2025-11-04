@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -18,6 +19,7 @@ import { FriendSearchWidget } from '../components/FriendSearchWidget';
 import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
+import { PushService } from '../services/PushService';
 import { StorageService } from '../services/StorageService';
 import { WebSocketMessage, WebSocketService } from '../services/WebSocketService';
 
@@ -53,6 +55,18 @@ export const HomeScreen: React.FC = () => {
     validateTokenAndInit();
   }, [validateTokenAndInit]);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        PushService.registerForPushNotifications();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   const validateTokenAndInit = useCallback(async () => {
     try {
       console.log('🔍 HomeScreen: Validating token...');
@@ -72,6 +86,7 @@ export const HomeScreen: React.FC = () => {
         setIsValidatingToken(false);
         await initializeScreen();
         connectWebSocket();
+        PushService.registerForPushNotifications();
       } else {
         console.log('❌ HomeScreen: Token invalid - clearing and redirect to login');
         await StorageService.removeAuthToken();
@@ -342,6 +357,13 @@ export const HomeScreen: React.FC = () => {
     setIsNotificationsVisible((prev) => !prev);
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = PushService.addNotificationListeners(() => {
+      loadNotifications();
+    });
+    return unsubscribe;
+  }, [loadNotifications]);
+
   const handleRealtimeMessage = useCallback((message: WebSocketMessage) => {
     if (!message || !message.type) {
       return;
@@ -468,6 +490,13 @@ export const HomeScreen: React.FC = () => {
                     <Ionicons name="close" size={18} color="#ffffff" />
                   </TouchableOpacity>
                 </View>
+                <TouchableOpacity
+                  onPress={() => PushService.sendTestPush()}
+                  style={styles.notificationTestButton}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.notificationTestButtonText}>Send test push</Text>
+                </TouchableOpacity>
                 {sortedNotifications.length === 0 ? (
                   <Text style={styles.notificationsEmpty}>You are all caught up</Text>
                 ) : (
@@ -710,6 +739,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  notificationTestButton: {
+    marginBottom: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(44, 130, 255, 0.15)',
+  },
+  notificationTestButtonText: {
+    color: '#2C82FF',
+    fontWeight: '600',
+    fontSize: 13,
+    textTransform: 'uppercase',
   },
   notificationsTitle: {
     color: '#ffffff',
