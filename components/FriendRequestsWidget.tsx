@@ -9,11 +9,13 @@ import {
 } from 'react-native';
 
 import { GlassCard } from './GlassCard';
+import { UserAvatar } from './UserAvatar';
 
 interface FriendSummary {
   id: string;
   username: string;
   email?: string;
+  profile_picture?: string | null;
 }
 
 interface FriendRequestsWidgetProps {
@@ -39,6 +41,12 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
 
     return (
       <View key={request.id} style={styles.requestRow}>
+        <UserAvatar
+          uri={request.profile_picture}
+          name={request.username || request.email}
+          size={48}
+          style={styles.requestAvatar}
+        />
         <View style={styles.requestInfo}>
           <Text style={styles.requestName}>{request.username}</Text>
           {request.email ? (
@@ -71,6 +79,12 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
 
   const renderOutgoingRequest = (request: FriendSummary) => (
     <View key={request.id} style={styles.pendingRow}>
+      <UserAvatar
+        uri={request.profile_picture}
+        name={request.username || request.email}
+        size={44}
+        style={styles.requestAvatar}
+      />
       <View style={styles.requestInfo}>
         <Text style={styles.requestName}>{request.username}</Text>
         <Text style={styles.pendingText}>Awaiting approval</Text>
@@ -139,6 +153,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255, 255, 255, 0.06)',
   },
+  requestAvatar: {
+    marginRight: 12,
+  },
   requestInfo: {
     flex: 1,
   },
@@ -189,4 +206,3 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
   },
 });
-

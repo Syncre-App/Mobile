@@ -10,7 +10,7 @@ import {
     View,
 } from 'react-native';
 
-import { GlassCard } from './GlassCard';
+import { UserAvatar } from './UserAvatar';
 
 interface ProfileMenuProps {
   visible: boolean;
@@ -77,17 +77,13 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
             <View style={{backgroundColor: 'white', minWidth: 250}}>
                 {/* User Info Header */}
                 <View style={styles.userHeader}>
-                  <View style={styles.avatarContainer}>
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>
-                        {user?.username?.charAt(0)?.toUpperCase() || 
-                         user?.name?.charAt(0)?.toUpperCase() || 
-                         user?.email?.charAt(0)?.toUpperCase() || 
-                         'U'}
-                      </Text>
-                    </View>
-                    <View style={[styles.statusDot, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />
-                  </View>
+                  <UserAvatar
+                    uri={user?.profile_picture}
+                    name={user?.username || user?.name || user?.email}
+                    size={56}
+                    presence={isOnline ? 'online' : 'offline'}
+                    style={styles.avatarContainer}
+                  />
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>
                       {user?.username || user?.name || user?.email || 'User'}
@@ -229,31 +225,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  statusDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    borderWidth: 2,
-    borderColor: '#03040A',
+    marginRight: 16,
   },
   userInfo: {
     flex: 1,

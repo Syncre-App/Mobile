@@ -17,10 +17,12 @@ import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
 import { GlassCard } from '../components/GlassCard';
+import { UserAvatar } from '../components/UserAvatar';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { PushService } from '../services/PushService';
 import { StorageService } from '../services/StorageService';
+import { UserCacheService } from '../services/UserCacheService';
 import { WebSocketMessage, WebSocketService } from '../services/WebSocketService';
 
 export const HomeScreen: React.FC = () => {
@@ -466,15 +468,13 @@ export const HomeScreen: React.FC = () => {
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
-                <View style={styles.profileAvatar}>
-                  <Text style={styles.profileAvatarText}>
-                    {user?.username?.charAt(0)?.toUpperCase() || 
-                     user?.name?.charAt(0)?.toUpperCase() || 
-                     user?.email?.charAt(0)?.toUpperCase() || 
-                     'U'}
-                  </Text>
-                </View>
-                <View style={[styles.profileStatusDot, { backgroundColor: isOnline ? '#4CAF50' : '#757575' }]} />
+                <UserAvatar
+                  uri={user?.profile_picture}
+                  name={user?.username || user?.name || user?.email}
+                  size={42}
+                  presence={isOnline ? 'online' : 'offline'}
+                  style={styles.profileAvatar}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -498,35 +498,50 @@ export const HomeScreen: React.FC = () => {
                   sortedNotifications.map((notification) => {
                     const isFriendRequest = notification.type === 'friend_request';
                     const relatedUserId = notification.userid?.toString?.() || notification.userid;
+                    const relatedUser =
+                      relatedUserId ? UserCacheService.getUser(String(relatedUserId)) : null;
+
                     return (
                       <View key={notification.id} style={styles.notificationItem}>
-                        <View style={styles.notificationTextBlock}>
-                          <Text style={styles.notificationItemTitle}>{notification.title || 'Notification'}</Text>
-                          {notification.timestamp ? (
-                            <Text style={styles.notificationTimestamp}>
-                              {new Date(notification.timestamp).toLocaleString()}
+                        <UserAvatar
+                          uri={relatedUser?.profile_picture}
+                          name={relatedUser?.username || notification.title}
+                          size={44}
+                          style={styles.notificationAvatar}
+                        />
+                        <View style={styles.notificationBody}>
+                          <View style={styles.notificationTextBlock}>
+                            <Text style={styles.notificationItemTitle}>
+                              {notification.title || 'Notification'}
                             </Text>
-                          ) : null}
-                          {notification.message ? (
-                            <Text style={styles.notificationMessage}>{notification.message}</Text>
+                            {notification.timestamp ? (
+                              <Text style={styles.notificationTimestamp}>
+                                {new Date(notification.timestamp).toLocaleString()}
+                              </Text>
+                            ) : null}
+                            {notification.message ? (
+                              <Text style={styles.notificationMessage}>{notification.message}</Text>
+                            ) : null}
+                          </View>
+                          {isFriendRequest && relatedUserId ? (
+                            <View style={styles.notificationActions}>
+                              <TouchableOpacity
+                                style={[styles.notificationActionButton, styles.notificationAccept]}
+                                onPress={() => handleRespondToRequest(String(relatedUserId), 'accept')}
+                              >
+                                <Text style={styles.notificationActionText}>Accept</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.notificationActionButton, styles.notificationDecline]}
+                                onPress={() => handleRespondToRequest(String(relatedUserId), 'reject')}
+                              >
+                                <Text style={[styles.notificationActionText, styles.notificationDeclineText]}>
+                                  Decline
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
                           ) : null}
                         </View>
-                        {isFriendRequest && relatedUserId ? (
-                          <View style={styles.notificationActions}>
-                            <TouchableOpacity
-                              style={[styles.notificationActionButton, styles.notificationAccept]}
-                              onPress={() => handleRespondToRequest(String(relatedUserId), 'accept')}
-                            >
-                              <Text style={styles.notificationActionText}>Accept</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.notificationActionButton, styles.notificationDecline]}
-                              onPress={() => handleRespondToRequest(String(relatedUserId), 'reject')}
-                            >
-                              <Text style={[styles.notificationActionText, styles.notificationDeclineText]}>Decline</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ) : null}
                       </View>
                     );
                   })
@@ -661,6 +676,7 @@ const styles = StyleSheet.create({
   },
   profileButton: {
     position: 'relative',
+    padding: 2,
   },
   notificationButton: {
     position: 'relative',
@@ -686,27 +702,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   profileAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileAvatarText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  profileStatusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    borderWidth: 2,
-    borderColor: '#03040A',
+    shadowColor: '#000000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
   },
   notificationsOverlay: {
     position: 'absolute',
@@ -746,12 +745,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   notificationItem: {
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255, 255, 255, 0.06)',
   },
+  notificationAvatar: {
+    marginTop: 2,
+  },
+  notificationBody: {
+    flex: 1,
+  },
   notificationTextBlock: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   notificationItemTitle: {
     color: '#ffffff',
@@ -771,6 +779,7 @@ const styles = StyleSheet.create({
   notificationActions: {
     flexDirection: 'row',
     gap: 8,
+    marginTop: 4,
   },
   notificationActionButton: {
     flex: 1,

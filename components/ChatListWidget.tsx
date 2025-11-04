@@ -15,6 +15,7 @@ import {
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { UserStatus } from '../services/WebSocketService';
+import { UserAvatar } from './UserAvatar';
 
 interface Chat {
   id: number;
@@ -36,6 +37,7 @@ interface User {
   id: string;
   username: string;
   email: string;
+  profile_picture?: string | null;
   [key: string]: any;
 }
 
@@ -162,24 +164,6 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     return 'Loading...';
   };
 
-  const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    
-    // Handle "User 1234567890123456" format
-    if (name.startsWith('User ')) {
-      return 'U' + name.slice(-1); // U + last digit
-    }
-    
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) {
-      // Single word - take first 2 characters
-      return parts[0].slice(0, 2).toUpperCase();
-    }
-    
-    // Multiple words - take first letter of first two words
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  };
-
   const handleChatPress = (chat: Chat) => {
     router.push('/chat/[id]' as any, { id: chat.id } as any);
   };
@@ -222,12 +206,13 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         disabled={isRemoving}
       >
         <View style={styles.chatCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.initialsCircle}>
-              <Text style={styles.initialsText}>{getInitials(displayName)}</Text>
-            </View>
-            <View style={[styles.statusDot, { backgroundColor: isUserOnline ? '#4CAF50' : '#757575' }]} />
-          </View>
+          <UserAvatar
+            uri={otherUserId ? userDetails[otherUserId]?.profile_picture : undefined}
+            name={displayName}
+            size={56}
+            presence={isUserOnline ? 'online' : 'offline'}
+            style={styles.avatarContainer}
+          />
 
           <View style={styles.chatContent}>
             <Text style={styles.chatName} numberOfLines={1}>{displayName}</Text>
@@ -303,33 +288,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
   avatarContainer: {
-    width: 48,
-    height: 48,
     marginRight: 16,
-    position: 'relative',
-  },
-  initialsCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    borderWidth: 2,
-    borderColor: '#03040A',
-  },
-  initialsText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
   },
   chatContent: {
     flex: 1,
