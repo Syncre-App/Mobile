@@ -10,8 +10,9 @@ class UserCache {
   private cache: Map<string, User> = new Map();
 
   addUser(user: User) {
-    if (user && user.id) {
-      this.cache.set(user.id, user);
+    if (user && user.id !== undefined && user.id !== null) {
+      const id = user.id.toString();
+      this.cache.set(id, { ...user, id });
     }
   }
 
@@ -25,6 +26,10 @@ class UserCache {
         this.addUser(user);
       }
     }
+  }
+
+  getAllUsers(): User[] {
+    return Array.from(this.cache.values());
   }
 }
 

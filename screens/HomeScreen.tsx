@@ -54,8 +54,91 @@ export const HomeScreen: React.FC = () => {
   }, [notifications]);
 
   const persistNotifications = useCallback((list: any[]) => {
-    StorageService.setObject('notifications_cache', list).catch(() => {});
+    const minimized = list.map((notification: any) => ({
+      id: notification.id,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      userid: notification.userid?.toString?.() ?? notification.userid,
+      timestamp: notification.timestamp,
+      read: Boolean(notification.read),
+    }));
+    StorageService.setObject('notifications_cache', minimized).catch(() => {});
   }, []);
+
+  const persistUserProfiles = useCallback(() => {
+    const snapshot = UserCacheService.getAllUsers();
+    const record = snapshot.reduce((acc: Record<string, any>, user: any) => {
+      const id = user.id?.toString?.() ?? String(user.id);
+      acc[id] = {
+        id,
+        username: user.username || '',
+        email: user.email || '',
+        profile_picture: user.profile_picture || null,
+        status: user.status || null,
+      };
+      return acc;
+    }, {} as Record<string, any>);
+    StorageService.setObject('user_cache', record).catch(() => {});
+  }, []);
+
+  const cacheUsers = useCallback(
+    (users: any[], opts: { updateStatus?: boolean } = { updateStatus: true }) => {
+      if (!users?.length) return;
+      const normalized = users
+        .filter(Boolean)
+        .map((user) => ({
+          id: user.id?.toString?.() ?? String(user.id),
+          username: user.username || '',
+          email: user.email || '',
+          profile_picture: user.profile_picture || null,
+          status: user.status || null,
+        }));
+
+      UserCacheService.addUsers(normalized as any[]);
+
+      if (opts.updateStatus) {
+        setUserStatuses((prev: any) => {
+          const next = { ...prev };
+          normalized.forEach((user) => {
+            if (user.status) {
+              next[user.id] = user.status;
+            }
+          });
+          return next;
+        });
+      }
+
+      persistUserProfiles();
+    },
+    [persistUserProfiles]
+  );
+
+  useEffect(() => {
+    const hydrateUserCache = async () => {
+      const stored = await StorageService.getObject<Record<string, any>>('user_cache');
+      if (stored) {
+        const users = Object.values(stored).map((user: any) => ({
+          ...user,
+          id: user.id?.toString?.() ?? String(user.id),
+        }));
+        if (users.length) {
+          cacheUsers(users, { updateStatus: false });
+          setUserStatuses((prev: any) => {
+            const next = { ...prev };
+            users.forEach((user: any) => {
+              if (user.status) {
+                next[user.id] = user.status;
+              }
+            });
+            return next;
+          });
+        }
+      }
+    };
+
+    hydrateUserCache();
+  }, [cacheUsers]);
   
   useEffect(() => {
     validateTokenAndInit();
@@ -116,17 +199,14 @@ export const HomeScreen: React.FC = () => {
         try {
           const response = await ApiService.get(`/user/${userId}`, token);
           if (response.success && response.data) {
-            UserCacheService.addUser({
-              ...response.data,
-              id: response.data.id?.toString?.() ?? String(response.data.id),
-            });
+            cacheUsers([response.data]);
           }
         } catch (error) {
           console.warn('[notifications] Unable to hydrate user', userId, error);
         }
       })
     );
-  }, []);
+  }, [cacheUsers]);
 
   const validateTokenAndInit = useCallback(async () => {
     try {
@@ -168,27 +248,21 @@ export const HomeScreen: React.FC = () => {
       const userData = await StorageService.getObject('user_data');
       setUser(userData);
       if (userData?.id) {
-        UserCacheService.addUser({
-          ...userData,
-          id: userData.id?.toString?.() ?? String(userData.id),
-        });
+        cacheUsers([userData]);
       }
       
       // Also fetch current user data from API to ensure we have latest info
       const token = await StorageService.getAuthToken();
       if (token) {
-      const response = await ApiService.get('/user/me', token);
-      if (response.success && response.data) {
-        console.log('🔍 User data from API:', JSON.stringify(response.data, null, 2));
-        setUser(response.data);
-        // Update stored user data
-        await StorageService.setObject('user_data', response.data);
-        UserCacheService.addUser({
-          ...response.data,
-          id: response.data.id?.toString?.() ?? String(response.data.id),
-        });
-        WebSocketService.getInstance().refreshFriendsStatus();
-      }
+        const response = await ApiService.get('/user/me', token);
+        if (response.success && response.data) {
+          console.log('🔍 User data from API:', JSON.stringify(response.data, null, 2));
+          setUser(response.data);
+          // Update stored user data
+          await StorageService.setObject('user_data', response.data);
+          cacheUsers([response.data]);
+          WebSocketService.getInstance().refreshFriendsStatus();
+        }
       }
       
       await loadChats();
@@ -197,7 +271,7 @@ export const HomeScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to load user data:', error);
     }
-  }, [loadChats, loadFriendData, loadNotifications]);
+  }, [loadChats, loadFriendData, loadNotifications, cacheUsers]);
 
   const loadChats = useCallback(async () => {
     setChatsLoading(true);
@@ -248,23 +322,10 @@ export const HomeScreen: React.FC = () => {
         }));
 
         if (Array.isArray(response.data.friends)) {
-          UserCacheService.addUsers(response.data.friends as any[]);
-          const friendStatuses = (response.data.friends as any[]).reduce(
-            (acc, friend) => {
-              if (friend?.id) {
-                const key = friend.id?.toString?.() ?? String(friend.id);
-                acc[key] = friend.status || 'offline';
-              }
-              return acc;
-            },
-            {} as Record<string, string>
-          );
-          if (Object.keys(friendStatuses).length) {
-            setUserStatuses((prev: UserStatus) => ({ ...prev, ...friendStatuses }));
-          }
+          cacheUsers(response.data.friends as any[]);
         }
-        UserCacheService.addUsers(normalizedIncoming as any[]);
-        UserCacheService.addUsers(normalizedOutgoing as any[]);
+        cacheUsers(normalizedIncoming as any[], { updateStatus: false });
+        cacheUsers(normalizedOutgoing as any[], { updateStatus: false });
 
         incomingRequestsRef.current = normalizedIncoming;
         outgoingRequestsRef.current = normalizedOutgoing;
@@ -275,7 +336,7 @@ export const HomeScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to load friend data:', error);
     }
-  }, []);
+  }, [cacheUsers]);
 
   const loadNotifications = useCallback(async () => {
     const buildFallbackNotifications = () => {
@@ -297,8 +358,8 @@ export const HomeScreen: React.FC = () => {
         timestamp: new Date().toISOString(),
       }));
 
-      UserCacheService.addUsers(incomingRequestsRef.current as any[]);
-      UserCacheService.addUsers(outgoingRequestsRef.current as any[]);
+      cacheUsers(incomingRequestsRef.current as any[], { updateStatus: false });
+      cacheUsers(outgoingRequestsRef.current as any[], { updateStatus: false });
 
       const generated = [...incoming, ...outgoing];
       persistNotifications(generated);
@@ -344,7 +405,7 @@ export const HomeScreen: React.FC = () => {
       console.log('🔔 Full response:', response);
       await ensureNotificationUsers(fallback, token);
       setNotifications(fallback);
-      await StorageService.setObject('notifications_cache', fallback);
+      persistNotifications(fallback);
     } catch (error) {
       console.error('Failed to load notifications:', error);
       const fallback = buildFallbackNotifications();
@@ -353,7 +414,7 @@ export const HomeScreen: React.FC = () => {
       setNotifications(fallback);
       persistNotifications(fallback);
     }
-  }, [ensureNotificationUsers, persistNotifications]);
+  }, [ensureNotificationUsers, persistNotifications, cacheUsers]);
 
   const markNotificationAsRead = useCallback(
     async (notificationId: string) => {
@@ -398,9 +459,12 @@ export const HomeScreen: React.FC = () => {
 
       const token = await StorageService.getAuthToken();
       if (!token) {
-        setNotifications((prev) =>
-          prev.map((notification: any) => ({ ...notification, read: true }))
-        );
+        setNotifications((prev) => {
+          const removalIds = new Set(unread.map((item: any) => item.id));
+          const next = prev.filter((notification: any) => !removalIds.has(notification.id));
+          persistNotifications(next);
+          return next;
+        });
         return;
       }
 
