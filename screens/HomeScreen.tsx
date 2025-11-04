@@ -52,6 +52,10 @@ export const HomeScreen: React.FC = () => {
       return dateB - dateA;
     });
   }, [notifications]);
+
+  const persistNotifications = useCallback((list: any[]) => {
+    StorageService.setObject('notifications_cache', list).catch(() => {});
+  }, []);
   
   useEffect(() => {
     validateTokenAndInit();
@@ -297,7 +301,7 @@ export const HomeScreen: React.FC = () => {
       UserCacheService.addUsers(outgoingRequestsRef.current as any[]);
 
       const generated = [...incoming, ...outgoing];
-      StorageService.setObject('notifications_cache', generated).catch(() => {});
+      persistNotifications(generated);
       return generated;
     };
 
@@ -322,7 +326,7 @@ export const HomeScreen: React.FC = () => {
         console.log('🔔 Notifications fetched:', items);
         await ensureNotificationUsers(items, token);
         setNotifications(items);
-        await StorageService.setObject('notifications_cache', items);
+        persistNotifications(items);
         return;
       }
 
@@ -332,7 +336,7 @@ export const HomeScreen: React.FC = () => {
         console.log('🔔 Notifications endpoint returned', response.statusCode, '- using fallback list');
         await ensureNotificationUsers(fallback, token);
         setNotifications(fallback);
-        await StorageService.setObject('notifications_cache', fallback);
+        persistNotifications(fallback);
         return;
       }
 
@@ -347,9 +351,44 @@ export const HomeScreen: React.FC = () => {
       const token = await StorageService.getAuthToken();
       await ensureNotificationUsers(fallback, token);
       setNotifications(fallback);
-      await StorageService.setObject('notifications_cache', fallback);
+      persistNotifications(fallback);
     }
-  }, [ensureNotificationUsers]);
+  }, [ensureNotificationUsers, persistNotifications]);
+
+  const markNotificationAsRead = useCallback(
+    async (notificationId: string) => {
+      try {
+        setNotifications((prev) => {
+          const next = prev.map((notification: any) =>
+            notification.id === notificationId ? { ...notification, read: true } : notification
+          );
+          persistNotifications(next);
+          return next;
+        });
+
+        const token = await StorageService.getAuthToken();
+        if (!token) {
+          return;
+        }
+
+        const response = await ApiService.post(
+          '/user/notifications/read',
+          { notificationId },
+          token
+        );
+
+        if (response.success && response.data) {
+          const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
+          await ensureNotificationUsers(items, token);
+          setNotifications(items);
+          persistNotifications(items);
+        }
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+      }
+    },
+    [ensureNotificationUsers, persistNotifications]
+  );
 
   const markNotificationsAsRead = useCallback(async () => {
     try {
@@ -366,54 +405,16 @@ export const HomeScreen: React.FC = () => {
         return;
       }
 
-      setNotifications((prev) =>
-        prev.map((notification: any) =>
-          unread.find((item) => item.id === notification.id)
-            ? { ...notification, read: true }
-            : notification
-        )
-      );
-      await StorageService.setObject(
-        'notifications_cache',
-        notifications.map((notification: any) =>
-          unread.find((item) => item.id === notification.id)
-            ? { ...notification, read: true }
-            : notification
-        )
-      );
-
-      let latestResponse: any = null;
-      for (const item of unread) {
-        const response = await ApiService.post(
-          '/user/notifications/read',
-          { notificationId: item.id },
-          token
-        );
-
-        if (response.success && response.data) {
-          latestResponse = response;
-        }
-      }
-
-      if (latestResponse?.success && latestResponse.data) {
-        const items = Array.isArray(latestResponse.data.notifications)
-          ? latestResponse.data.notifications
-          : [];
-        await ensureNotificationUsers(items, token);
-        setNotifications(items);
-        await StorageService.setObject('notifications_cache', items);
-      }
+      await Promise.all(unread.map((item) => markNotificationAsRead(item.id)));
     } catch (error) {
       console.error('Failed to mark notifications as read:', error);
-      setNotifications((prev) =>
-        prev.map((notification: any) => ({ ...notification, read: true }))
-      );
-      await StorageService.setObject(
-        'notifications_cache',
-        notifications.map((notification: any) => ({ ...notification, read: true }))
-      );
+      setNotifications((prev) => {
+        const next = prev.map((notification: any) => ({ ...notification, read: true }));
+        persistNotifications(next);
+        return next;
+      });
     }
-  }, [notifications, ensureNotificationUsers]);
+  }, [notifications, markNotificationAsRead]);
 
   const connectWebSocket = useCallback(async () => {
     try {
@@ -658,7 +659,12 @@ export const HomeScreen: React.FC = () => {
                       relatedUserId ? UserCacheService.getUser(String(relatedUserId)) : null;
 
                     return (
-                      <View key={notification.id} style={styles.notificationItem}>
+                      <TouchableOpacity
+                        key={notification.id}
+                        style={styles.notificationItem}
+                        activeOpacity={0.85}
+                        onPress={() => markNotificationAsRead(notification.id)}
+                      >
                         <UserAvatar
                           uri={relatedUser?.profile_picture}
                           name={relatedUser?.username || notification.title}
@@ -683,13 +689,19 @@ export const HomeScreen: React.FC = () => {
                             <View style={styles.notificationActions}>
                               <TouchableOpacity
                                 style={[styles.notificationActionButton, styles.notificationAccept]}
-                                onPress={() => handleRespondToRequest(String(relatedUserId), 'accept')}
+                                onPress={async () => {
+                                  await markNotificationAsRead(notification.id);
+                                  handleRespondToRequest(String(relatedUserId), 'accept');
+                                }}
                               >
                                 <Text style={styles.notificationActionText}>Accept</Text>
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={[styles.notificationActionButton, styles.notificationDecline]}
-                                onPress={() => handleRespondToRequest(String(relatedUserId), 'reject')}
+                                onPress={async () => {
+                                  await markNotificationAsRead(notification.id);
+                                  handleRespondToRequest(String(relatedUserId), 'reject');
+                                }}
                               >
                                 <Text style={[styles.notificationActionText, styles.notificationDeclineText]}>
                                   Decline
@@ -698,7 +710,7 @@ export const HomeScreen: React.FC = () => {
                             </View>
                           ) : null}
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     );
                   })
                 )}
