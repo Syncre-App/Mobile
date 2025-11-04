@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -164,11 +165,27 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
     );
   };
 
+  const renderAvatar = (user: User) => {
+    if (user.profile_picture) {
+      return (
+        <Image
+          source={{ uri: user.profile_picture }}
+          style={styles.avatarImage}
+        />
+      );
+    }
+
+    const initials = user.username ? user.username.slice(0, 2).toUpperCase() : 'U';
+    return (
+      <View style={styles.avatarFallback}>
+        <Text style={styles.avatarFallbackText}>{initials}</Text>
+      </View>
+    );
+  };
+
   const renderSearchResult = ({ item }: { item: User }) => (
-    <TouchableOpacity
-      style={styles.searchResultItem}
-      onPress={() => confirmAddFriend(item)}
-    >
+    <TouchableOpacity style={styles.searchResultItem} onPress={() => confirmAddFriend(item)}>
+      <View style={styles.avatarContainer}>{renderAvatar(item)}</View>
       <View style={styles.searchResultInfo}>
         <Text style={styles.searchResultUsername}>{item.username}</Text>
         <Text style={styles.searchResultMeta}>Tap to send a friend request</Text>
@@ -234,6 +251,32 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginBottom: 8,
+    gap: 12,
+  },
+  avatarContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   searchResultInfo: {
     flex: 1,
