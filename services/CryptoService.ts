@@ -5,16 +5,12 @@ import nacl from 'tweetnacl';
 import { XChaCha20Poly1305 } from '@stablelib/xchacha20poly1305';
 import { hkdf } from '@stablelib/hkdf';
 import { SHA256 } from '@stablelib/sha256';
-
 import { ApiService } from './ApiService';
 import { DeviceService } from './DeviceService';
 import { StorageService } from './StorageService';
 
-// Ensure Buffer is available in React Native environments that do not polyfill it by default.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 if (typeof globalThis.Buffer === 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   globalThis.Buffer = Buffer;
 }
