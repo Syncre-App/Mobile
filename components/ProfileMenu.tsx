@@ -72,9 +72,8 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       presentationStyle="overFullScreen"
     >
       <Pressable style={styles.overlay} onPress={handleOverlayPress}>
-        <View>
-          <Pressable onPress={() => {}} style={styles.menuContainer}>
-            <View style={{backgroundColor: 'white', minWidth: 250}}>
+        <View style={styles.menuContainer}>
+          <Pressable onPress={() => {}} style={styles.menuPanel}>
                 {/* User Info Header */}
                 <View style={styles.userHeader}>
                   <UserAvatar
@@ -82,6 +81,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                     name={user?.username || user?.name || user?.email}
                     size={56}
                     presence={isOnline ? 'online' : 'offline'}
+                    presencePlacement="overlay"
                     style={styles.avatarContainer}
                   />
                   <View style={styles.userInfo}>
@@ -155,10 +155,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                     {'Logout'}
                   </Text>
                 </TouchableOpacity>
-              </View>
             </Pressable>
-          </View>
-        </Pressable>
+        </View>
+      </Pressable>
     </Modal>
   );
 };
@@ -173,9 +172,16 @@ const styles = StyleSheet.create({
   paddingRight: 12,
   },
   menuContainer: {
-    minWidth: 250,
     alignSelf: 'flex-end',
     marginTop: 8,
+  },
+  menuPanel: {
+    minWidth: 250,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(9, 18, 36, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   debugText: {
     color: '#FFFFFF',

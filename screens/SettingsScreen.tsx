@@ -62,12 +62,13 @@ export const SettingsScreen: React.FC = () => {
     title: string,
     subtitle?: string,
     onPress?: () => void,
-    rightComponent?: React.ReactNode
+    rightComponent?: React.ReactNode,
+    hasTopBorder: boolean = true,
   ) => (
     <TouchableOpacity
       onPress={onPress}
       disabled={!onPress}
-      style={styles.settingItem}
+      style={[styles.settingItem, !hasTopBorder && styles.settingItemFirst]}
     >
       <View style={styles.settingLeft}>
         <Ionicons name={icon as any} size={24} color="rgba(255, 255, 255, 0.7)" />
@@ -120,7 +121,7 @@ export const SettingsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Notifications Section */}
-        <GlassCard style={styles.section}>
+        <GlassCard width="100%" style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Notifications</Text>
           </View>
@@ -135,12 +136,13 @@ export const SettingsScreen: React.FC = () => {
               onValueChange={setNotificationsEnabled}
               trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#2C82FF' }}
               thumbColor="white"
-            />
+            />,
+            false
           )}
         </GlassCard>
 
         {/* Appearance Section */}
-        <GlassCard style={styles.section}>
+        <GlassCard width="100%" style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Appearance</Text>
           </View>
@@ -156,7 +158,8 @@ export const SettingsScreen: React.FC = () => {
               disabled={true} // Disabled for now
               trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#2C82FF' }}
               thumbColor="white"
-            />
+            />,
+            false
           )}
           
           {renderSettingItem(
@@ -170,7 +173,7 @@ export const SettingsScreen: React.FC = () => {
         </GlassCard>
 
         {/* Storage Section */}
-        <GlassCard style={styles.section}>
+        <GlassCard width="100%" style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Storage</Text>
           </View>
@@ -179,7 +182,9 @@ export const SettingsScreen: React.FC = () => {
             'trash',
             'Clear Cache',
             'Clear cached data to free up space',
-            handleClearCache
+            handleClearCache,
+            undefined,
+            false
           )}
         </GlassCard>
 
@@ -219,6 +224,7 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 16,
     overflow: 'hidden',
+    alignSelf: 'stretch',
   },
   sectionHeader: {
     paddingHorizontal: 20,
@@ -237,6 +243,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  settingItemFirst: {
+    borderTopWidth: 0,
   },
   settingLeft: {
     flexDirection: 'row',

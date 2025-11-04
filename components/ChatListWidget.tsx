@@ -14,6 +14,7 @@ import {
 
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+import { UserCacheService } from '../services/UserCacheService';
 import { UserStatus } from '../services/WebSocketService';
 import { UserAvatar } from './UserAvatar';
 
@@ -114,6 +115,10 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             const response = await ApiService.getUserById(userId, token);
             if (response.success && response.data) {
               newUserDetails[userId] = response.data;
+              UserCacheService.addUser({
+                ...response.data,
+                id: response.data.id?.toString?.() ?? String(response.data.id),
+              });
             }
           } catch (error) {
             console.log(`Error fetching user ${userId}:`, error);
@@ -194,7 +199,11 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const renderChatItem = ({ item: chat }: { item: Chat }) => {
     const displayName = getChatDisplayName(chat);
     const otherUserId = getOtherUserId(chat);
-    const isUserOnline = otherUserId && userStatuses[otherUserId] === 'online';
+    const statusValue = otherUserId ? userStatuses[otherUserId] : undefined;
+    const isUserOnline = statusValue === 'online';
+    const statusLabel = statusValue
+      ? statusValue.charAt(0).toUpperCase() + statusValue.slice(1)
+      : 'Offline';
     const isRemoving = removingFriendId === otherUserId;
 
     return (
@@ -216,7 +225,14 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
           <View style={styles.chatContent}>
             <Text style={styles.chatName} numberOfLines={1}>{displayName}</Text>
-            <Text style={styles.noMessages}>No messages yet</Text>
+            <Text
+              style={[
+                styles.chatStatus,
+                isUserOnline ? styles.chatStatusOnline : styles.chatStatusOffline,
+              ]}
+            >
+              {statusLabel}
+            </Text>
           </View>
 
           <View style={styles.rightColumn}>
@@ -299,9 +315,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 2,
   },
-  noMessages: {
+  chatStatus: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  chatStatusOnline: {
+    color: '#4CAF50',
+  },
+  chatStatusOffline: {
     color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 14,
   },
   rightColumn: {
     justifyContent: 'center',

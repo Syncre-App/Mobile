@@ -13,6 +13,7 @@ import {
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
+import { UserCacheService } from '../services/UserCacheService';
 import { TransparentField } from './TransparentField';
 import { UserAvatar } from './UserAvatar';
 
@@ -76,6 +77,12 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
         
         console.log('🔍 Found', users.length, 'users');
         console.log('🔍 Filtered to', filtered.length, 'available users');
+        UserCacheService.addUsers(
+          filtered.map((candidate: any) => ({
+            ...candidate,
+            id: candidate.id?.toString?.() ?? String(candidate.id),
+          }))
+        );
         setSearchResults(filtered);
       } else {
         console.log('❌ Search failed:', response.error);

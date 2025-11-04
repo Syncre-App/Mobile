@@ -23,7 +23,7 @@ import { NotificationService } from '../services/NotificationService';
 import { PushService } from '../services/PushService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
-import { WebSocketMessage, WebSocketService } from '../services/WebSocketService';
+import { UserStatus, WebSocketMessage, WebSocketService } from '../services/WebSocketService';
 
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
@@ -58,15 +58,70 @@ export const HomeScreen: React.FC = () => {
   }, [validateTokenAndInit]);
 
   useEffect(() => {
+    const wsInstance = WebSocketService.getInstance();
+    const applyStatuses = (statuses: UserStatus) => {
+      setUserStatuses({ ...statuses });
+    };
+
+    setUserStatuses(wsInstance.getUserStatuses());
+    const unsubscribe = wsInstance.addStatusListener(applyStatuses);
+    wsInstance.refreshFriendsStatus();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         PushService.registerForPushNotifications();
+        WebSocketService.getInstance().refreshFriendsStatus();
       }
     });
 
     return () => {
       subscription.remove();
     };
+  }, [ensureNotificationUsers]);
+
+  const ensureNotificationUsers = useCallback(async (items: any[], token?: string | null) => {
+    if (!Array.isArray(items) || items.length === 0) return;
+
+    const missingIds = new Set<string>();
+
+    items.forEach((notification) => {
+      const relatedId = notification?.userid?.toString?.() ?? notification?.userid;
+      if (relatedId) {
+        const normalized = String(relatedId);
+        const cached = UserCacheService.getUser(normalized);
+        if (!cached) {
+          missingIds.add(normalized);
+        }
+      }
+    });
+
+    if (!missingIds.size || !token) {
+      return;
+    }
+
+    await Promise.allSettled(
+      Array.from(missingIds).map(async (userId) => {
+        try {
+          const response = await ApiService.get(`/user/${userId}`, token);
+          if (response.success && response.data) {
+            UserCacheService.addUser({
+              ...response.data,
+              id: response.data.id?.toString?.() ?? String(response.data.id),
+            });
+          }
+        } catch (error) {
+          console.warn('[notifications] Unable to hydrate user', userId, error);
+        }
+      })
+    );
   }, []);
 
   const validateTokenAndInit = useCallback(async () => {
@@ -108,17 +163,28 @@ export const HomeScreen: React.FC = () => {
       // First try to get user data from storage
       const userData = await StorageService.getObject('user_data');
       setUser(userData);
+      if (userData?.id) {
+        UserCacheService.addUser({
+          ...userData,
+          id: userData.id?.toString?.() ?? String(userData.id),
+        });
+      }
       
       // Also fetch current user data from API to ensure we have latest info
       const token = await StorageService.getAuthToken();
       if (token) {
-        const response = await ApiService.get('/user/me', token);
-        if (response.success && response.data) {
-          console.log('🔍 User data from API:', JSON.stringify(response.data, null, 2));
-          setUser(response.data);
-          // Update stored user data
-          await StorageService.setObject('user_data', response.data);
-        }
+      const response = await ApiService.get('/user/me', token);
+      if (response.success && response.data) {
+        console.log('🔍 User data from API:', JSON.stringify(response.data, null, 2));
+        setUser(response.data);
+        // Update stored user data
+        await StorageService.setObject('user_data', response.data);
+        UserCacheService.addUser({
+          ...response.data,
+          id: response.data.id?.toString?.() ?? String(response.data.id),
+        });
+        WebSocketService.getInstance().refreshFriendsStatus();
+      }
       }
       
       await loadChats();
@@ -144,6 +210,7 @@ export const HomeScreen: React.FC = () => {
         } else {
           console.warn('loadChats: failed to fetch chats:', response.error);
         }
+        WebSocketService.getInstance().refreshFriendsStatus();
       } else {
         console.warn('loadChats: no auth token, skipping chats fetch');
       }
@@ -176,10 +243,17 @@ export const HomeScreen: React.FC = () => {
           id: item.id?.toString?.() ?? String(item.id),
         }));
 
+        if (Array.isArray(response.data.friends)) {
+          UserCacheService.addUsers(response.data.friends as any[]);
+        }
+        UserCacheService.addUsers(normalizedIncoming as any[]);
+        UserCacheService.addUsers(normalizedOutgoing as any[]);
+
         incomingRequestsRef.current = normalizedIncoming;
         outgoingRequestsRef.current = normalizedOutgoing;
         setIncomingRequests(normalizedIncoming);
         setOutgoingRequests(normalizedOutgoing);
+        WebSocketService.getInstance().refreshFriendsStatus();
       }
     } catch (error) {
       console.error('Failed to load friend data:', error);
@@ -206,6 +280,9 @@ export const HomeScreen: React.FC = () => {
         timestamp: new Date().toISOString(),
       }));
 
+      UserCacheService.addUsers(incomingRequestsRef.current as any[]);
+      UserCacheService.addUsers(outgoingRequestsRef.current as any[]);
+
       return [...incoming, ...outgoing];
     };
 
@@ -221,26 +298,32 @@ export const HomeScreen: React.FC = () => {
         const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
         console.log('🔔 Notifications response data:', response.data);
         console.log('🔔 Notifications fetched:', items);
+        await ensureNotificationUsers(items, token);
         setNotifications(items);
         return;
       }
 
       const fallback = buildFallbackNotifications();
 
-      if (response.statusCode === 404 || response.statusCode === 401) {
+  if (response.statusCode === 404 || response.statusCode === 401) {
         console.log('🔔 Notifications endpoint returned', response.statusCode, '- using fallback list');
+        await ensureNotificationUsers(fallback, token);
         setNotifications(fallback);
         return;
       }
 
       console.warn('🔔 Failed to fetch notifications:', response.error);
       console.log('🔔 Full response:', response);
+      await ensureNotificationUsers(fallback, token);
       setNotifications(fallback);
     } catch (error) {
       console.error('Failed to load notifications:', error);
-      setNotifications(buildFallbackNotifications());
+      const fallback = buildFallbackNotifications();
+      const token = await StorageService.getAuthToken();
+      await ensureNotificationUsers(fallback, token);
+      setNotifications(fallback);
     }
-  }, []);
+  }, [ensureNotificationUsers]);
 
   const markNotificationsAsRead = useCallback(async () => {
     try {
@@ -253,6 +336,7 @@ export const HomeScreen: React.FC = () => {
       const response = await ApiService.post('/user/notifications/read', {}, token);
       if (response.success && response.data) {
         const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
+        await ensureNotificationUsers(items, token);
         setNotifications(items);
       }
     } catch (error) {
@@ -282,6 +366,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleFriendStateChanged = useCallback(async () => {
     await Promise.all([loadFriendData(), loadChats(), loadNotifications()]);
+    WebSocketService.getInstance().refreshFriendsStatus();
   }, [loadChats, loadFriendData, loadNotifications]);
 
   const handleRespondToRequest = useCallback(async (friendId: string, action: 'accept' | 'reject') => {
@@ -473,6 +558,7 @@ export const HomeScreen: React.FC = () => {
                   name={user?.username || user?.name || user?.email}
                   size={42}
                   presence={isOnline ? 'online' : 'offline'}
+                  presencePlacement="overlay"
                   style={styles.profileAvatar}
                 />
               </TouchableOpacity>
@@ -644,6 +730,7 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: 10,
+    alignItems: 'center',
   },
   headerButton: {
     width: 44,
@@ -677,12 +764,16 @@ const styles = StyleSheet.create({
   profileButton: {
     position: 'relative',
     padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   notificationButton: {
     position: 'relative',
     padding: 8,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   notificationBadge: {
     position: 'absolute',

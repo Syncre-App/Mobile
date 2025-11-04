@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 type Presence = 'online' | 'offline' | 'busy' | 'away' | null | undefined;
+type PresencePlacement = 'overlay' | 'left';
 
 interface UserAvatarProps {
   uri?: string | null;
@@ -16,6 +17,7 @@ interface UserAvatarProps {
   style?: ViewStyle;
   presence?: Presence;
   presenceColor?: string;
+  presencePlacement?: PresencePlacement;
 }
 
 const getPresenceColor = (presence: Presence, override?: string) => {
@@ -59,50 +61,86 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   style,
   presence,
   presenceColor,
+  presencePlacement = 'overlay',
 }) => {
   const initials = useMemo(() => getInitials(name), [name]);
   const statusColor = getPresenceColor(presence, presenceColor);
   const showPresence = Boolean(presence);
   const dotSize = Math.max(8, Math.round(size * 0.28));
+  const offset = Math.max(2, Math.round(size * 0.12));
 
   return (
-    <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }, style]}>
-      {uri ? (
-        <Image
-          source={{ uri }}
-          style={{ width: size, height: size, borderRadius: size / 2 }}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={[styles.placeholder, { borderRadius: size / 2 }]}>
-          <Text style={[styles.initials, { fontSize: Math.max(12, size * 0.35) }]}>{initials}</Text>
-        </View>
-      )}
-
-      {showPresence && (
+    <View style={[styles.wrapper, style]}>
+      {showPresence && presencePlacement === 'left' ? (
         <View
           style={[
-            styles.presenceDot,
+            styles.leadingPresence,
             {
               backgroundColor: statusColor,
               width: dotSize,
               height: dotSize,
               borderRadius: dotSize / 2,
-              right: Math.max(2, dotSize * 0.1),
-              bottom: Math.max(2, dotSize * 0.1),
+              marginRight: Math.max(6, Math.round(size * 0.18)),
             },
           ]}
         />
-      )}
+      ) : null}
+
+      <View style={[styles.avatarFrame, { width: size, height: size }]}>
+        <View style={[styles.imageWrap, { borderRadius: size / 2 }]}>
+        {uri ? (
+          <Image
+            source={{ uri }}
+            style={styles.image}
+            resizeMode="cover"
+          />
+        ) : (
+            <View style={[styles.placeholder, { borderRadius: size / 2 }]}>
+              <Text style={[styles.initials, { fontSize: Math.max(12, size * 0.35) }]}>{initials}</Text>
+            </View>
+          )}
+        </View>
+
+        {showPresence && presencePlacement === 'overlay' ? (
+          <View
+            style={[
+              styles.overlayPresence,
+              {
+                backgroundColor: statusColor,
+                width: dotSize,
+                height: dotSize,
+                borderRadius: dotSize / 2,
+                right: -offset / 2,
+                bottom: -offset / 2,
+              },
+            ]}
+          />
+        ) : null}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarFrame: {
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageWrap: {
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    zIndex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
   },
   placeholder: {
     flex: 1,
@@ -114,10 +152,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  presenceDot: {
+  overlayPresence: {
     position: 'absolute',
+    borderWidth: 2,
+    borderColor: '#0B1630',
+    zIndex: 0,
+  },
+  leadingPresence: {
+    borderRadius: 999,
     borderWidth: 2,
     borderColor: '#0B1630',
   },
 });
-

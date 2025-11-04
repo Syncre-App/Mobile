@@ -152,7 +152,18 @@ export const EditProfileScreen: React.FC = () => {
           UserCacheService.addUser({ ...updatedUser, id: updatedUser.id?.toString?.() || updatedUser.id } as any);
         }
         NotificationService.show('success', 'Profile picture updated!');
-        router.back();
+        Alert.alert(
+          'Profile Updated',
+          'Your new profile photo is live.',
+          [
+            {
+              text: 'Awesome!',
+              onPress: () => router.back(),
+            },
+          ],
+          { cancelable: false }
+        );
+        return;
       } else {
         NotificationService.show('error', response.error || 'Failed to upload profile picture');
       }
