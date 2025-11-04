@@ -8,6 +8,10 @@
     "scheme": "syncre",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "notification": {
+      "icon": "./assets/logo.png",
+      "color": "#2C82FF"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "xyz.syncre.app",
