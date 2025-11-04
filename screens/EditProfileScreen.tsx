@@ -243,6 +243,8 @@ export const EditProfileScreen: React.FC = () => {
               style={styles.photoPicker}
               onPress={handlePickImage}
               activeOpacity={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Change profile picture"
             >
               {selectedImage ? (
                 <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} />
@@ -250,7 +252,7 @@ export const EditProfileScreen: React.FC = () => {
                 <Image source={{ uri: profilePicture }} style={styles.profileImage} />
               ) : (
                 <View style={styles.profilePlaceholder}>
-                  <Ionicons name="person" size={42} />
+                  <Ionicons name="person" size={42} color="rgba(255, 255, 255, 0.7)" />
                 </View>
               )}
             </TouchableOpacity>
@@ -360,19 +362,25 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     alignItems: 'center',
     gap: 16,
-    paddingVertical: 24,
+    paddingVertical: 28,
   },
   photoPickerWrapper: {
     position: 'relative',
   },
   photoPicker: {
-    width: 144,
-    height: 144,
-    borderRadius: 72,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    backgroundColor: '#0D1528',
+    backgroundColor: 'rgba(12, 18, 36, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
   },
   profileImage: {
     width: '100%',
@@ -384,23 +392,24 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(6, 11, 23, 0.55)',
   },
   editBadge: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(17, 25, 40, 0.9)',
+    bottom: 10,
+    right: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(20, 30, 50, 0.95)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
   },
   photoHint: {
     color: 'rgba(255, 255, 255, 0.6)',
