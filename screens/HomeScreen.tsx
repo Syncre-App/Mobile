@@ -359,9 +359,7 @@ export const HomeScreen: React.FC = () => {
     async (notificationId: string) => {
       try {
         setNotifications((prev) => {
-          const next = prev.map((notification: any) =>
-            notification.id === notificationId ? { ...notification, read: true } : notification
-          );
+          const next = prev.filter((notification: any) => notification.id !== notificationId);
           persistNotifications(next);
           return next;
         });
@@ -380,8 +378,9 @@ export const HomeScreen: React.FC = () => {
         if (response.success && response.data) {
           const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
           await ensureNotificationUsers(items, token);
-          setNotifications(items);
-          persistNotifications(items);
+          const filtered = items.filter((notification: any) => notification.id !== notificationId);
+          setNotifications(filtered);
+          persistNotifications(filtered);
         }
       } catch (error) {
         console.error('Failed to mark notification as read:', error);
@@ -408,11 +407,6 @@ export const HomeScreen: React.FC = () => {
       await Promise.all(unread.map((item) => markNotificationAsRead(item.id)));
     } catch (error) {
       console.error('Failed to mark notifications as read:', error);
-      setNotifications((prev) => {
-        const next = prev.map((notification: any) => ({ ...notification, read: true }));
-        persistNotifications(next);
-        return next;
-      });
     }
   }, [notifications, markNotificationAsRead]);
 
