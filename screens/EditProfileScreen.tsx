@@ -238,22 +238,32 @@ export const EditProfileScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <GlassCard width="100%" style={[styles.card, styles.photoCard]}>
-          <TouchableOpacity style={styles.photoPicker} onPress={handlePickImage} activeOpacity={0.85}>
-            {selectedImage ? (
-              <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} />
-            ) : profilePicture ? (
-              <Image source={{ uri: profilePicture }} style={styles.profileImage} />
-            ) : (
-              <View style={styles.profilePlaceholder}>
-                <Ionicons name="person" size={36} color="rgba(255, 255, 255, 0.7)" />
-              </View>
-            )}
-            <View style={styles.cameraBadge}>
-              <Ionicons name="camera" size={16} color="#ffffff" />
-              <Text style={styles.cameraBadgeText}>Change photo</Text>
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.photoHint}>PNG or JPG, maximum 5 MB</Text>
+          <View style={styles.photoPickerWrapper}>
+            <TouchableOpacity
+              style={styles.photoPicker}
+              onPress={handlePickImage}
+              activeOpacity={0.9}
+            >
+              {selectedImage ? (
+                <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} />
+              ) : profilePicture ? (
+                <Image source={{ uri: profilePicture }} style={styles.profileImage} />
+              ) : (
+                <View style={styles.profilePlaceholder}>
+                  <Ionicons name="person" size={42} />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.editBadge}
+              onPress={handlePickImage}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="pencil" size={16} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.photoHint}>PNG or JPG · max 5 MB</Text>
         </GlassCard>
 
         <GlassCard width="100%" style={[styles.card, styles.infoCard]}>
@@ -348,18 +358,21 @@ const styles = StyleSheet.create({
   },
   photoCard: {
     marginBottom: 24,
-    paddingVertical: 24,
     alignItems: 'center',
     gap: 16,
+    paddingVertical: 24,
+  },
+  photoPickerWrapper: {
+    position: 'relative',
   },
   photoPicker: {
     width: 144,
     height: 144,
     borderRadius: 72,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    backgroundColor: '#0D1528',
   },
   profileImage: {
     width: '100%',
@@ -372,22 +385,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cameraBadge: {
+  editBadge: {
     position: 'absolute',
-    bottom: 10,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    bottom: 6,
+    right: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(17, 25, 40, 0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
-  },
-  cameraBadgeText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   photoHint: {
     color: 'rgba(255, 255, 255, 0.6)',
