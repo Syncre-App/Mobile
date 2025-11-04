@@ -21,6 +21,7 @@ export class WebSocketService {
   private pingInterval: number | null = null;
   private maxReconnectAttempts = 5;
   private reconnectAttempts = 0;
+  private joinedChats: Map<string, string | undefined> = new Map();
 
   static getInstance(): WebSocketService {
     if (!WebSocketService.instance) {
@@ -207,6 +208,24 @@ export class WebSocketService {
     } else {
       console.warn('⚠️ Cannot send message: WebSocket not connected');
     }
+  }
+
+  joinChat(chatId: string, deviceId?: string): void {
+    if (!chatId) return;
+    if (this.joinedChats.has(chatId)) {
+      return;
+    }
+    this.joinedChats.set(chatId, deviceId);
+    this.send({ type: 'chat_join', chatId, deviceId });
+  }
+
+  leaveChat(chatId: string): void {
+    if (!chatId) return;
+    if (!this.joinedChats.has(chatId)) {
+      return;
+    }
+    this.joinedChats.delete(chatId);
+    this.send({ type: 'chat_leave', chatId });
   }
 
   // Message listeners
