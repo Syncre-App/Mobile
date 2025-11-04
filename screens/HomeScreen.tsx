@@ -492,13 +492,6 @@ export const HomeScreen: React.FC = () => {
                     <Ionicons name="close" size={18} color="#ffffff" />
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() => PushService.sendTestPush()}
-                  style={styles.notificationTestButton}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.notificationTestButtonText}>Send test push</Text>
-                </TouchableOpacity>
                 {sortedNotifications.length === 0 ? (
                   <Text style={styles.notificationsEmpty}>You are all caught up</Text>
                 ) : (
@@ -741,20 +734,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  notificationTestButton: {
-    marginBottom: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(44, 130, 255, 0.15)',
-  },
-  notificationTestButtonText: {
-    color: '#2C82FF',
-    fontWeight: '600',
-    fontSize: 13,
-    textTransform: 'uppercase',
   },
   notificationsTitle: {
     color: '#ffffff',

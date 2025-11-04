@@ -120,33 +120,4 @@ export const PushService = {
 
     return () => subs.forEach((sub) => sub.remove());
   },
-
-  async sendTestPush() {
-    try {
-      const authToken = await StorageService.getAuthToken();
-      if (!authToken) {
-        NotificationService.show('error', 'You must be logged in to send a test push.');
-        return;
-      }
-
-      const response = await ApiService.post(
-        '/push/send-test',
-        {
-          title: 'Syncre Test',
-          body: 'Push notifications are configured correctly.',
-          data: { type: 'test' },
-        },
-        authToken
-      );
-
-      if (response.success) {
-        NotificationService.show('success', 'Test push sent!');
-      } else {
-        NotificationService.show('error', response.error || 'Failed to send test push');
-      }
-    } catch (error) {
-      console.error('Failed to send test push:', error);
-      NotificationService.show('error', 'Failed to send test push');
-    }
-  },
 };
