@@ -1,23 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  FlatList,
-  KeyboardAvoidingView,
-  LayoutAnimation,
-  InteractionManager,
-  Platform,
-  RefreshControl,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  UIManager,
-  View,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-} from 'react-native';
+import { ActivityIndicator, Animated, FlatList, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Platform, RefreshControl, StatusBar, StyleSheet, Text, TextInput, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,39 +68,17 @@ const formatDateLabel = (date: Date): string => {
   return new Intl.DateTimeFormat(undefined, options).format(date);
 };
 
-const formatStatusLabel = (status: MessageStatus, timestamp: string) => {
-  const label = status === 'sending'
-    ? 'Sending…'
-    : status.charAt(0).toUpperCase() + status.slice(1);
 
-  if (status === 'sending') {
-    return label;
-  }
 
-  const date = parseDate(timestamp);
+const formatTimestamp = (date: Date): string => {
   const timeFormatter = new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
   });
 
-  const today = startOfDay(new Date());
-  const target = startOfDay(date);
-  const diffDays = Math.round((today.getTime() - target.getTime()) / 86_400_000);
-
-  const timePart = timeFormatter.format(date);
-
-  if (diffDays === 0) {
-    return `${label} • ${timePart}`;
-  }
-
-  const dateFormatter = new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: today.getFullYear() === date.getFullYear() ? undefined : 'numeric',
-  });
-
-  return `${label} • ${dateFormatter.format(date)} ${timePart}`;
+  return timeFormatter.format(date);
 };
+
 
 const layoutNext = () => {
   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -183,6 +143,7 @@ interface MessageBubbleProps {
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
   showStatus: boolean;
+  showTimestamp: boolean;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -191,9 +152,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isFirstInGroup,
   isLastInGroup,
   showStatus,
+  showTimestamp,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const statusAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -202,14 +163,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
-
-  useEffect(() => {
-    Animated.timing(statusAnim, {
-      toValue: showStatus ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [showStatus, statusAnim]);
 
   const containerStyle = [
     styles.messageRow,
@@ -232,41 +185,29 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const statusText =
     showStatus && message.status
-      ? formatStatusLabel(message.status, message.timestamp)
+      ? formatStatusLabel(message.status)
       : null;
 
   return (
-    <Animated.View style={[containerStyle, { opacity: fadeAnim }]}>
-      <View style={bubbleStyle}>
-        <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
-          {message.content}
-        </Text>
-      </View>
-      {statusText && (
-        <Animated.View style={[
-          styles.statusPill, 
-          {
-            opacity: statusAnim,
-            transform: [
-              { 
-                scale: statusAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.9, 1],
-                })
-              },
-              {
-                translateY: statusAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [10, 0],
-                })
-              }
-            ]
-          }
-        ]}>
-          <Text style={styles.statusText}>{statusText}</Text>
-        </Animated.View>
+    <>
+      {showTimestamp && (
+        <View style={styles.timestampContainer}>
+          <Text style={styles.timestampText}>
+            {formatTimestamp(parseDate(message.timestamp))}
+          </Text>
+        </View>
       )}
-    </Animated.View>
+      <Animated.View style={[containerStyle, { opacity: fadeAnim }]}>
+        <View style={bubbleStyle}>
+          <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
+            {message.content}
+          </Text>
+        </View>
+        {statusText && (
+          <Text style={styles.statusText}>{statusText}</Text>
+        )}
+      </Animated.View>
+    </>
   );
 };
 
@@ -303,7 +244,8 @@ const ChatScreen: React.FC = () => {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
-  const [statusVisibleFor, setStatusVisibleFor] = useState<string | null>(null);
+  const [timestampVisibleFor, setTimestampVisibleFor] = useState<string | null>(null);
+
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -339,21 +281,7 @@ const ChatScreen: React.FC = () => {
       return items;
     }
 
-    let lastDateKey: string | null = null;
-
     messages.forEach((message) => {
-      const date = parseDate(message.timestamp);
-      const dateKey = startOfDay(date).toISOString();
-
-      if (dateKey !== lastDateKey) {
-        items.push({
-          kind: 'date',
-          id: `date-${dateKey}`,
-          label: formatDateLabel(date),
-        });
-        lastDateKey = dateKey;
-      }
-
       items.push({ kind: 'message', id: message.id, message });
     });
 
@@ -405,6 +333,8 @@ const ChatScreen: React.FC = () => {
           const decrypted = await CryptoService.decryptMessage(String(chatId), raw.envelopes);
           if (decrypted) {
             content = decrypted;
+          } else {
+            console.warn(`Decryption failed for historical message ${raw.id}.`);
           }
         } else {
           content = raw.content ?? '';
@@ -420,7 +350,7 @@ const ChatScreen: React.FC = () => {
             status = 'seen';
           } else if (raw.deliveredAt) {
             status = 'delivered';
-          } else {
+          } else if (raw.id) {
             status = 'sent';
           }
         }
@@ -487,31 +417,24 @@ const ChatScreen: React.FC = () => {
       }
 
       setMessagesAnimated((prev) => {
-        let targetFound = false;
-        const next = prev.map((msg, index) => {
+        const next = prev.map((msg) => {
           if (msg.senderId !== currentUserId || msg.isPlaceholder) {
             return msg;
           }
 
           if (messageId) {
             if (msg.id === String(messageId)) {
-              targetFound = true;
               return { ...msg, status, timestamp: timestamp ?? msg.timestamp };
             }
-            return { ...msg, status: undefined };
+            return msg;
           }
 
-          if (index === prev.length - 1) {
-            targetFound = true;
+          if (msg.status !== 'seen') {
             return { ...msg, status, timestamp: timestamp ?? msg.timestamp };
           }
 
-          return { ...msg, status: undefined };
+          return msg;
         });
-
-        if (messageId && !targetFound) {
-          return prev;
-        }
 
         return next;
       });
@@ -547,12 +470,7 @@ const ChatScreen: React.FC = () => {
           return prev;
         }
 
-        return next.map((msg) => {
-          if (msg.senderId === currentUserId && msg.id !== messageId) {
-            return { ...msg, status: undefined };
-          }
-          return msg;
-        });
+        return next;
       });
     },
     [currentUserId, setMessagesAnimated]
@@ -805,10 +723,7 @@ const ChatScreen: React.FC = () => {
     };
 
     setMessagesAnimated((prev) => {
-      const cleared = prev.map((msg) =>
-        msg.senderId === currentUserId ? { ...msg, status: undefined } : msg
-      );
-      const withoutPlaceholders = cleared.filter((msg) => !msg.isPlaceholder);
+      const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
       return [...withoutPlaceholders, optimisticMessage];
     });
     InteractionManager.runAfterInteractions(() => {
@@ -908,6 +823,7 @@ const ChatScreen: React.FC = () => {
           return;
         }
         case 'typing': {
+          console.log('typing event received', payload);
           const fromUser = payload.userId ? String(payload.userId) : payload.senderId ? String(payload.senderId) : '';
           if (fromUser && fromUser !== currentUserId) {
             setTypingUserLabel(payload.username || receiverNameRef.current || 'Someone');
@@ -930,6 +846,7 @@ const ChatScreen: React.FC = () => {
           try {
             const decrypted = await CryptoService.decryptMessage(targetChatId, envelopes);
             if (!decrypted) {
+              console.warn('Decryption failed for incoming message envelope.');
               return;
             }
 
@@ -1073,9 +990,12 @@ const ChatScreen: React.FC = () => {
 
   useEffect(() => {
     if (initialLoadCompleteRef.current && messages.length > 0) {
-      setTimeout(() => scrollToBottom(), 100);
+      // Only auto-scroll if the user is near the bottom or if it's the first message
+      if (isNearBottomRef.current || messages.length === 1) {
+        scrollToBottom();
+      }
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, scrollToBottom, isNearBottomRef]);
 
   useEffect(() => {
     if (!user?.id || !chatId) {
@@ -1158,16 +1078,6 @@ const ChatScreen: React.FC = () => {
 
   const renderChatItem = useCallback(
     ({ item, index }: { item: ChatListItem; index: number }) => {
-      if (item.kind === 'date') {
-        return (
-          <View style={styles.dateDivider}>
-            <View style={styles.dateDividerLine} />
-            <Text style={styles.dateDividerText}>{item.label}</Text>
-            <View style={styles.dateDividerLine} />
-          </View>
-        );
-      }
-
       if (item.kind === 'typing') {
         return <TypingIndicator label={typingUserLabel} />;
       }
@@ -1199,22 +1109,37 @@ const ChatScreen: React.FC = () => {
       const isLastInGroup =
         !nextMessage || nextMessage.senderId !== messageItem.senderId || nextMessage.isPlaceholder;
 
-      const shouldShowStatus = statusVisibleFor === messageItem.id && isMine && Boolean(messageItem.status);
+      const shouldShowStatus = lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
+      const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
+
+      const date = parseDate(messageItem.timestamp);
+      const previousDate = previousMessage ? parseDate(previousMessage.timestamp) : null;
+      const showDate = !previousDate || startOfDay(date).getTime() !== startOfDay(previousDate).getTime();
 
       return (
-        <TouchableOpacity onPress={() => setStatusVisibleFor(prev => prev === messageItem.id ? null : messageItem.id)} activeOpacity={0.8}>
-          <MessageBubble
-            key={messageItem.id}
-            message={messageItem}
-            isMine={isMine}
-            isFirstInGroup={isFirstInGroup}
-            isLastInGroup={isLastInGroup}
-            showStatus={shouldShowStatus}
-          />
-        </TouchableOpacity>
+        <>
+          {showDate && (
+            <View style={styles.dateDivider}>
+              <View style={styles.dateDividerLine} />
+              <Text style={styles.dateDividerText}>{formatDateLabel(date)}</Text>
+              <View style={styles.dateDividerLine} />
+            </View>
+          )}
+          <Pressable onPress={() => setTimestampVisibleFor(prev => prev === messageItem.id ? null : messageItem.id)}>
+            <MessageBubble
+              key={messageItem.id}
+              message={messageItem}
+              isMine={isMine}
+              isFirstInGroup={isFirstInGroup}
+              isLastInGroup={isLastInGroup}
+              showStatus={shouldShowStatus}
+              showTimestamp={shouldShowTimestamp}
+            />
+          </Pressable>
+        </>
       );
     },
-    [currentUserId, decoratedData, lastOutgoingMessageId, statusVisibleFor, typingUserLabel]
+    [currentUserId, decoratedData, lastOutgoingMessageId, timestampVisibleFor, typingUserLabel]
   );
 
   const listHeader = useMemo(
@@ -1245,9 +1170,9 @@ const ChatScreen: React.FC = () => {
       <View style={styles.backgroundOverlay} />
 
       <View style={styles.header} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button">
+        <Pressable onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button">
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {receiverUsername}
         </Text>
@@ -1327,16 +1252,7 @@ const ChatScreen: React.FC = () => {
                       viewabilityConfig={viewabilityConfigRef.current}
 
 
-                      maintainVisibleContentPosition={{
 
-
-                        minIndexForVisible: 0,
-
-
-                        autoscrollToTopThreshold: 80,
-
-
-                      }}
 
 
                       refreshControl={
@@ -1372,7 +1288,7 @@ const ChatScreen: React.FC = () => {
                     {showScrollToBottomButton && (
 
 
-                      <TouchableOpacity
+                      <Pressable
 
 
                         style={styles.scrollToBottomButton}
@@ -1390,7 +1306,7 @@ const ChatScreen: React.FC = () => {
                         <Ionicons name="arrow-down" size={24} color="#FFFFFF" />
 
 
-                      </TouchableOpacity>
+                      </Pressable>
 
 
                     )}
@@ -1435,13 +1351,13 @@ const ChatScreen: React.FC = () => {
                   />
 
 
-                  <TouchableOpacity
+                  <Pressable
 
 
                     onPress={handleSendMessage}
 
 
-                    style={[
+                    style={({ pressed }) => [
 
 
                       styles.sendButton,
@@ -1451,6 +1367,9 @@ const ChatScreen: React.FC = () => {
 
 
                       isSendingMessage && styles.sendButtonDisabled,
+
+
+                      pressed && styles.sendButtonPressed,
 
 
                     ]}
@@ -1480,7 +1399,7 @@ const ChatScreen: React.FC = () => {
                     )}
 
 
-                  </TouchableOpacity>
+                  </Pressable>
 
 
                 </View>
@@ -1623,18 +1542,20 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.65)',
     fontStyle: 'italic',
   },
-  statusPill: {
-    alignSelf: 'flex-end',
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(18, 34, 58, 0.85)',
-  },
+
   statusText: {
-    color: '#B6CAFF',
+    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
-    fontWeight: '500',
+    alignSelf: 'flex-end',
+    marginTop: 2,
+  },
+  timestampContainer: {
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  timestampText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 12,
   },
   dateDivider: {
     flexDirection: 'row',
@@ -1720,6 +1641,9 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.6,
+  },
+  sendButtonPressed: {
+    opacity: 0.8,
   },
   scrollToBottomButton: {
     position: 'absolute',

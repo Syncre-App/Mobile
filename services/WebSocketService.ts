@@ -24,6 +24,8 @@ export class WebSocketService {
   private maxReconnectAttempts = 5;
   private reconnectAttempts = 0;
   private joinedChats: Map<string, string | undefined> = new Map();
+  private typingListeners: Map<string, ((payload: { userId: string }) => void)[]> = new Map();
+  private stopTypingListeners: Map<string, ((payload: { userId: string }) => void)[]> = new Map();
 
   static getInstance(): WebSocketService {
     if (!WebSocketService.instance) {
@@ -194,6 +196,13 @@ export class WebSocketService {
       case 'message':
         // Handle chat messages
         break;
+
+      case 'typing':
+        this.handleTyping(message);
+        break;
+      case 'stop-typing':
+        this.handleStopTyping(message);
+        break;
         
       default:
         console.log('🌐 Received WebSocket message:', message);
@@ -230,18 +239,56 @@ export class WebSocketService {
     this.send({ type: 'chat_leave', chatId });
   }
 
-  sendTyping(chatId: string, isTyping: boolean): void {
-    if (!chatId) {
-      return;
+  private handleTyping(message: WebSocketMessage) {
+    const { chatId, userId } = message;
+    if (chatId) {
+      const chatIdStr = chatId.toString();
+      if (this.typingListeners.has(chatIdStr)) {
+        this.typingListeners.get(chatIdStr)?.forEach(listener => listener({ userId }));
+      }
     }
-    this.send({ type: 'typing', chatId, isTyping });
   }
 
-  sendMessageSeen(chatId: string, messageId: string): void {
-    if (!chatId || !messageId) {
-      return;
+  private handleStopTyping(message: WebSocketMessage) {
+    const { chatId, userId } = message;
+    if (chatId) {
+      const chatIdStr = chatId.toString();
+      if (this.stopTypingListeners.has(chatIdStr)) {
+        this.stopTypingListeners.get(chatIdStr)?.forEach(listener => listener({ userId }));
+      }
     }
-    this.send({ type: 'message_seen', chatId, messageId });
+  }
+
+  public onTyping(chatId: string, callback: (payload: { userId: string }) => void): () => void {
+    if (!this.typingListeners.has(chatId)) {
+      this.typingListeners.set(chatId, []);
+    }
+    this.typingListeners.get(chatId)?.push(callback);
+
+    return () => {
+      const listeners = this.typingListeners.get(chatId)?.filter(l => l !== callback);
+      this.typingListeners.set(chatId, listeners || []);
+    };
+  }
+
+  public onStopTyping(chatId: string, callback: (payload: { userId: string }) => void): () => void {
+    if (!this.stopTypingListeners.has(chatId)) {
+      this.stopTypingListeners.set(chatId, []);
+    }
+    this.stopTypingListeners.get(chatId)?.push(callback);
+
+    return () => {
+      const listeners = this.stopTypingListeners.get(chatId)?.filter(l => l !== callback);
+      this.stopTypingListeners.set(chatId, listeners || []);
+    };
+  }
+
+  public sendTyping(chatId: string) {
+    this.send({ type: 'typing', chatId });
+  }
+
+  public sendStopTyping(chatId: string) {
+    this.send({ type: 'stop-typing', chatId });
   }
 
   // Message listeners
