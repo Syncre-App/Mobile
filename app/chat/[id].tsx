@@ -5,13 +5,13 @@ import {
   FlatList,
   KeyboardAvoidingView,
   LayoutAnimation,
+  InteractionManager,
   Platform,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   UIManager,
   View,
   NativeSyntheticEvent,
@@ -20,6 +20,8 @@ import {
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+
+import { TapGestureHandler } from 'react-native-gesture-handler';
 
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
@@ -260,6 +262,7 @@ const ChatScreen: React.FC = () => {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const remoteTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadCompleteRef = useRef(false);
+  const tapGestureRef = useRef(null);
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -560,7 +563,9 @@ const ChatScreen: React.FC = () => {
         setHasMore(response.data?.hasMore ?? false);
         nextCursorRef.current = response.data?.nextCursor || (cleaned.length ? cleaned[0].timestamp : null);
         initialLoadCompleteRef.current = true;
-        scrollToBottom();
+        InteractionManager.runAfterInteractions(() => {
+          scrollToBottom();
+        });
       } catch (error) {
         console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
         setMessagesAnimated(() => generatePlaceholderMessages(displayName));
@@ -745,7 +750,9 @@ const ChatScreen: React.FC = () => {
       const withoutPlaceholders = cleared.filter((msg) => !msg.isPlaceholder);
       return [...withoutPlaceholders, optimisticMessage];
     });
-    scrollToBottom();
+    InteractionManager.runAfterInteractions(() => {
+      scrollToBottom();
+    });
     setNewMessage('');
     setIsSendingMessage(true);
     ensureTypingStopped();
@@ -1009,12 +1016,6 @@ const ChatScreen: React.FC = () => {
   }, [ensureTypingStopped, handleIncomingMessage, wsService]);
 
   useEffect(() => {
-    if (messages.length > 0 && !isLoadingMore) {
-      scrollToBottom();
-    }
-  }, [messages, scrollToBottom, isLoadingMore]);
-
-  useEffect(() => {
     if (!messages.length || !currentUserId) {
       return;
     }
@@ -1040,7 +1041,12 @@ const ChatScreen: React.FC = () => {
     const index = decoratedData.findIndex((item) => item.id === targetId);
     if (index >= 0) {
       requestAnimationFrame(() => {
-        flatListRef.current?.scrollToIndex({ index, animated: false });
+        try {
+          flatListRef.current?.scrollToIndex({ index, animated: false });
+        } catch (error) {
+          const fallbackOffset = index * 60; // approximate row height
+          flatListRef.current?.scrollToOffset({ offset: fallbackOffset, animated: false });
+        }
         pendingScrollIdRef.current = null;
       });
     } else {
@@ -1158,8 +1164,14 @@ const ChatScreen: React.FC = () => {
             <Text style={styles.loadingStateText}>Loading conversation…</Text>
           </View>
         ) : (
-          <TouchableWithoutFeedback onPress={toggleStatusVisibility} accessible={false}>
-            <View style={styles.messagesWrapper}>
+          <TapGestureHandler
+            ref={tapGestureRef}
+            onActivated={toggleStatusVisibility}
+            maxDeltaX={12}
+            maxDeltaY={12}
+            numberOfTaps={1}
+          >
+            <Animated.View style={styles.messagesWrapper}>
               <FlatList
                 ref={flatListRef}
                 data={decoratedData}
@@ -1172,9 +1184,22 @@ const ChatScreen: React.FC = () => {
                 scrollEventThrottle={16}
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfigRef.current}
+                maintainVisibleContentPosition={{
+                  minIndexForVisible: 0,
+                  autoscrollToTopThreshold: 80,
+                }}
+                onContentSizeChange={() => {
+                  if (!initialLoadCompleteRef.current) {
+                    return;
+                  }
+                  if (pendingScrollIdRef.current || isLoadingMore) {
+                    return;
+                  }
+                  InteractionManager.runAfterInteractions(() => scrollToBottom());
+                }}
               />
-            </View>
-          </TouchableWithoutFeedback>
+            </Animated.View>
+          </TapGestureHandler>
         )}
 
         <View style={styles.inputContainer}>
