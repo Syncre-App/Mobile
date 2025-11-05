@@ -97,7 +97,7 @@ const layoutNext = () => {
   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 };
 
-const TypingIndicator: React.FC<{ label: string }> = ({ label }) => {
+const TypingIndicator: React.FC = () => {
   const dots = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
@@ -145,7 +145,6 @@ const TypingIndicator: React.FC<{ label: string }> = ({ label }) => {
           />
         ))}
       </View>
-      <Text style={styles.typingText}>{`${label} is typing…`}</Text>
     </View>
   );
 };
@@ -820,6 +819,7 @@ const ChatScreen: React.FC = () => {
     }
 
     const typingHandler = (data: { userId: string; username: string }) => {
+      console.log('ChatScreen typing handler triggered for user:', data.userId);
       if (data.userId !== currentUserId) {
         setTypingUserLabel(data.username || receiverNameRef.current || 'Someone');
         setIsRemoteTyping(true);
@@ -829,10 +829,17 @@ const ChatScreen: React.FC = () => {
         remoteTypingTimeoutRef.current = setTimeout(() => {
           setIsRemoteTyping(false);
         }, 2500); // Keep indicator for 2.5s
+        // If the user is already near the bottom, scroll so the typing indicator becomes visible
+        if (isNearBottomRef.current) {
+          InteractionManager.runAfterInteractions(() => {
+            scrollToBottom();
+          });
+        }
       }
     };
 
     const stopTypingHandler = (data: { userId: string }) => {
+      console.log('ChatScreen stop-typing handler triggered for user:', data.userId);
       if (data.userId !== currentUserId) {
         if (remoteTypingTimeoutRef.current) {
           clearTimeout(remoteTypingTimeoutRef.current);
@@ -852,6 +859,18 @@ const ChatScreen: React.FC = () => {
       }
     };
   }, [chatId, wsService, currentUserId]);
+
+  useEffect(() => {
+    // Debug: log when decorated list or typing state changes so we can confirm the typing item is present
+    try {
+      console.log('decoratedData updated - isRemoteTyping:', isRemoteTyping, 'items:', decoratedData.length);
+      // print a compact summary of the last few items to avoid enormous logs
+      const tail = decoratedData.slice(-6).map((it) => ({ kind: it.kind, id: it.id }));
+      console.log('decoratedData tail:', tail);
+    } catch (e) {
+      // ignore logging errors
+    }
+  }, [decoratedData, isRemoteTyping]);
 
   const handleIncomingMessage = useCallback(
     async (message: WebSocketMessage) => {
@@ -907,7 +926,6 @@ const ChatScreen: React.FC = () => {
               timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
             };
 
-            setIsRemoteTyping(false);
             setMessagesAnimated((prev) => {
               const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
               const exists = withoutPlaceholders.some((msg) => msg.id === newEntry.id);
@@ -931,7 +949,6 @@ const ChatScreen: React.FC = () => {
             timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
           };
 
-          setIsRemoteTyping(false);
           setMessagesAnimated((prev) => {
             const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
             if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
@@ -1128,7 +1145,7 @@ const ChatScreen: React.FC = () => {
   const renderChatItem = useCallback(
     ({ item, index }: { item: ChatListItem; index: number }) => {
       if (item.kind === 'typing') {
-        return <TypingIndicator label={typingUserLabel} />;
+        return <TypingIndicator />;
       }
 
       if (item.kind === 'date') {
@@ -1269,6 +1286,9 @@ const ChatScreen: React.FC = () => {
 
 
                       data={decoratedData}
+
+
+                      extraData={isRemoteTyping}
 
 
                       keyExtractor={(item) => item.id}

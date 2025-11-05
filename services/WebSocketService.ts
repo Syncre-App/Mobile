@@ -241,6 +241,7 @@ export class WebSocketService {
   }
 
   private handleTyping(message: WebSocketMessage) {
+    console.log('Received typing event:', message);
     const { chatId, userId, username } = message;
     if (chatId) {
       const chatIdStr = chatId.toString();
@@ -251,6 +252,7 @@ export class WebSocketService {
   }
 
   private handleStopTyping(message: WebSocketMessage) {
+    console.log('Received stop-typing event:', message);
     const { chatId, userId } = message;
     if (chatId) {
       const chatIdStr = chatId.toString();
