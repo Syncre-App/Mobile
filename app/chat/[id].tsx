@@ -7,6 +7,7 @@ import {
   LayoutAnimation,
   InteractionManager,
   Platform,
+  RefreshControl,
   StatusBar,
   StyleSheet,
   Text,
@@ -263,6 +264,7 @@ const ChatScreen: React.FC = () => {
   const remoteTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadCompleteRef = useRef(false);
   const tapGestureRef = useRef(null);
+  const isNearTopRef = useRef(false);
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -274,6 +276,7 @@ const ChatScreen: React.FC = () => {
   const [showStatus, setShowStatus] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const currentUserId = user?.id ? String(user.id) : null;
 
@@ -650,58 +653,78 @@ const ChatScreen: React.FC = () => {
     setMessagesAnimated,
   ]);
 
-  const loadEarlier = useCallback(async () => {
-    if (!chatId || isLoadingMore || !hasMore) {
-      return;
-    }
-    const token = authTokenRef.current ?? (await StorageService.getAuthToken());
-    if (!token) {
-      return;
-    }
-    authTokenRef.current = token;
-    const cursor = nextCursorRef.current || (messages.length ? messages[0].timestamp : null);
-    if (!cursor) {
-      return;
-    }
-
-    setIsLoadingMore(true);
-    pendingScrollIdRef.current = topVisibleIdRef.current;
-
-    try {
-      const params = new URLSearchParams();
-      params.set('limit', '20');
-      params.set('before', cursor);
-      if (deviceIdRef.current) {
-        params.set('deviceId', deviceIdRef.current);
+  const loadEarlier = useCallback(
+    async (options: { viaRefresh?: boolean } = {}) => {
+      const { viaRefresh = false } = options;
+      if (!chatId || isLoadingMore || !hasMore) {
+        if (viaRefresh) {
+          setIsRefreshing(false);
+        }
+        return;
       }
-
-      const response = await ApiService.get(`/chat/${chatId}/messages?${params.toString()}`, token);
-      const rawMessages = response.success && Array.isArray(response.data?.messages) ? response.data.messages : [];
-      if (!rawMessages.length) {
-        setHasMore(false);
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        if (viaRefresh) {
+          setIsRefreshing(false);
+        }
+        return;
+      }
+      authTokenRef.current = token;
+      const cursor = nextCursorRef.current || (messages.length ? messages[0].timestamp : null);
+      if (!cursor) {
+        if (viaRefresh) {
+          setIsRefreshing(false);
+        }
         return;
       }
 
-      const transformed = await transformMessages(rawMessages, otherUserIdRef.current);
-      const cleaned = transformed.filter(Boolean);
+      setIsLoadingMore(true);
+      if (viaRefresh) {
+        setIsRefreshing(true);
+      }
+      pendingScrollIdRef.current = topVisibleIdRef.current;
 
-      setMessagesAnimated((prev) => {
-        const existingIds = new Set(prev.map((msg) => msg.id));
-        const filtered = cleaned.filter((msg) => !existingIds.has(msg.id));
-        if (!filtered.length) {
-          return prev;
+      try {
+        const params = new URLSearchParams();
+        params.set('limit', '20');
+        params.set('before', cursor);
+        if (deviceIdRef.current) {
+          params.set('deviceId', deviceIdRef.current);
         }
-        return [...filtered, ...prev];
-      });
 
-      setHasMore(response.data?.hasMore ?? false);
-      nextCursorRef.current = response.data?.nextCursor || (cleaned.length ? cleaned[0].timestamp : cursor);
-    } catch (error) {
-      console.error('Failed to load earlier messages:', error);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [chatId, hasMore, isLoadingMore, messages, setMessagesAnimated, transformMessages]);
+        const response = await ApiService.get(`/chat/${chatId}/messages?${params.toString()}`, token);
+        const rawMessages = response.success && Array.isArray(response.data?.messages) ? response.data.messages : [];
+        if (!rawMessages.length) {
+          setHasMore(false);
+          return;
+        }
+
+        const transformed = await transformMessages(rawMessages, otherUserIdRef.current);
+        const cleaned = transformed.filter(Boolean);
+
+        setMessagesAnimated((prev) => {
+          const existingIds = new Set(prev.map((msg) => msg.id));
+          const filtered = cleaned.filter((msg) => !existingIds.has(msg.id));
+          if (!filtered.length) {
+            return prev;
+          }
+          return [...filtered, ...prev];
+        });
+
+        setHasMore(response.data?.hasMore ?? false);
+        nextCursorRef.current = response.data?.nextCursor || (cleaned.length ? cleaned[0].timestamp : cursor);
+      } catch (error) {
+        console.error('Failed to load earlier messages:', error);
+      } finally {
+        setIsLoadingMore(false);
+        if (viaRefresh) {
+          setIsRefreshing(false);
+        }
+        isNearTopRef.current = false;
+      }
+    },
+    [chatId, hasMore, isLoadingMore, messages, setMessagesAnimated, transformMessages]
+  );
 
   const handleComposerChange = useCallback(
     (value: string) => {
@@ -929,20 +952,45 @@ const ChatScreen: React.FC = () => {
     ]
   );
 
+  const handleRefresh = useCallback(() => {
+    if (!hasMore || isLoadingMore || isRefreshing) {
+      setIsRefreshing(false);
+      return;
+    }
+    setIsRefreshing(true);
+    loadEarlier({ viaRefresh: true }).catch((error) => {
+      console.error('Failed to refresh earlier messages:', error);
+      setIsRefreshing(false);
+      isNearTopRef.current = false;
+    });
+  }, [hasMore, isLoadingMore, isRefreshing, loadEarlier]);
+
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (!initialLoadCompleteRef.current || isLoadingMore || !hasMore) {
+      if (!initialLoadCompleteRef.current) {
         return;
       }
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      if (contentSize.height <= layoutMeasurement.height + 40) {
+      const hasScrollableContent = contentSize.height > layoutMeasurement.height + 40;
+      if (!hasScrollableContent) {
+        isNearTopRef.current = false;
         return;
       }
-      if (contentOffset.y <= 24) {
-        loadEarlier();
+      const nearTop = contentOffset.y <= 18;
+
+      if (nearTop && !isNearTopRef.current) {
+        isNearTopRef.current = true;
+        if (!isLoadingMore && !isRefreshing && hasMore) {
+          loadEarlier().catch((err) => {
+            console.error('Failed to load earlier messages (scroll):', err);
+            isNearTopRef.current = false;
+          });
+        }
+      } else if (!nearTop) {
+        isNearTopRef.current = false;
       }
     },
-    [hasMore, isLoadingMore, loadEarlier]
+    [hasMore, isLoadingMore, isRefreshing, loadEarlier]
   );
 
   const toggleStatusVisibility = useCallback(() => {
@@ -1188,6 +1236,15 @@ const ChatScreen: React.FC = () => {
                   minIndexForVisible: 0,
                   autoscrollToTopThreshold: 80,
                 }}
+                refreshControl={
+                  <RefreshControl
+                    tintColor="#2C82FF"
+                    titleColor="#2C82FF"
+                    progressViewOffset={80}
+                    refreshing={isRefreshing}
+                    onRefresh={handleRefresh}
+                  />
+                }
                 onContentSizeChange={() => {
                   if (!initialLoadCompleteRef.current) {
                     return;
