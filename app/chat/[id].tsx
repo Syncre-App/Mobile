@@ -193,6 +193,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   showStatus,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const statusAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -201,6 +202,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
+
+  useEffect(() => {
+    Animated.timing(statusAnim, {
+      toValue: showStatus ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [showStatus, statusAnim]);
 
   const containerStyle = [
     styles.messageRow,
@@ -234,9 +243,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         </Text>
       </View>
       {statusText && (
-        <View style={styles.statusPill}>
+        <Animated.View style={[styles.statusPill, { opacity: statusAnim }]}>
           <Text style={styles.statusText}>{statusText}</Text>
-        </View>
+        </Animated.View>
       )}
     </Animated.View>
   );
@@ -263,6 +272,7 @@ const ChatScreen: React.FC = () => {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const remoteTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadCompleteRef = useRef(false);
+  const initialScrollDoneRef = useRef(false);
   const tapGestureRef = useRef(null);
   const isNearTopRef = useRef(false);
   const isNearBottomRef = useRef(true);
@@ -274,7 +284,7 @@ const ChatScreen: React.FC = () => {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
-  const [showStatus, setShowStatus] = useState(false);
+  const [statusVisibleFor, setStatusVisibleFor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -299,7 +309,7 @@ const ChatScreen: React.FC = () => {
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
+      flatListRef.current?.scrollToEnd({ animated: false });
     });
   }, []);
 
@@ -1015,12 +1025,7 @@ const ChatScreen: React.FC = () => {
     [hasMore, isLoadingMore, isRefreshing, loadEarlier, showScrollToBottomButton]
   );
 
-  const toggleStatusVisibility = useCallback(() => {
-    if (!lastOutgoingMessageId) {
-      return;
-    }
-    setShowStatus((prev) => !prev);
-  }, [lastOutgoingMessageId]);
+
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<{ index?: number; item: ChatListItem }> }) => {
@@ -1167,21 +1172,22 @@ const ChatScreen: React.FC = () => {
       const isLastInGroup =
         !nextMessage || nextMessage.senderId !== messageItem.senderId || nextMessage.isPlaceholder;
 
-      const shouldShowStatus =
-        showStatus && lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
+      const shouldShowStatus = statusVisibleFor === messageItem.id && isMine && Boolean(messageItem.status);
 
       return (
-        <MessageBubble
-          key={messageItem.id}
-          message={messageItem}
-          isMine={isMine}
-          isFirstInGroup={isFirstInGroup}
-          isLastInGroup={isLastInGroup}
-          showStatus={shouldShowStatus}
-        />
+        <TouchableOpacity onPress={() => setStatusVisibleFor(prev => prev === messageItem.id ? null : messageItem.id)} activeOpacity={0.8}>
+          <MessageBubble
+            key={messageItem.id}
+            message={messageItem}
+            isMine={isMine}
+            isFirstInGroup={isFirstInGroup}
+            isLastInGroup={isLastInGroup}
+            showStatus={shouldShowStatus}
+          />
+        </TouchableOpacity>
       );
     },
-    [currentUserId, decoratedData, lastOutgoingMessageId, showStatus, typingUserLabel]
+    [currentUserId, decoratedData, lastOutgoingMessageId, statusVisibleFor, typingUserLabel]
   );
 
   const listHeader = useMemo(
@@ -1224,7 +1230,6 @@ const ChatScreen: React.FC = () => {
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 98 : 0}
       >
         {isThreadLoading ? (
           <View style={styles.loadingState}>
@@ -1232,51 +1237,49 @@ const ChatScreen: React.FC = () => {
             <Text style={styles.loadingStateText}>Loading conversation…</Text>
           </View>
         ) : (
-          <TapGestureHandler
-            ref={tapGestureRef}
-            onActivated={toggleStatusVisibility}
-            maxDeltaX={12}
-            maxDeltaY={12}
-            numberOfTaps={1}
-          >
-                        <Animated.View style={styles.messagesWrapper}>
-                          <FlatList
-                            ref={flatListRef}
-                            data={decoratedData}
-                            keyExtractor={(item) => item.id}
-                            renderItem={renderChatItem}
-                            contentContainerStyle={styles.messageList}
-                            ListHeaderComponent={listHeader}
-                            keyboardShouldPersistTaps="handled"
-                            onScroll={handleScroll}
-                            scrollEventThrottle={16}
-                            onViewableItemsChanged={onViewableItemsChanged}
-                            viewabilityConfig={viewabilityConfigRef.current}
-                            maintainVisibleContentPosition={{
-                              minIndexForVisible: 0,
-                              autoscrollToTopThreshold: 80,
-                            }}
-                            refreshControl={
-                              <RefreshControl
-                                tintColor="#2C82FF"
-                                titleColor="#2C82FF"
-                                progressViewOffset={80}
-                                refreshing={isRefreshing}
-                                onRefresh={handleRefresh}
-                              />
-                            }
-                          />
-                          {showScrollToBottomButton && (
-                            <TouchableOpacity
-                              style={styles.scrollToBottomButton}
-                              onPress={scrollToBottom}
-                              accessibilityRole="button"
-                            >
-                              <Ionicons name="arrow-down" size={24} color="#FFFFFF" />
-                            </TouchableOpacity>
-                          )}
-                        </Animated.View>
-          </TapGestureHandler>
+          <Animated.View style={styles.messagesWrapper}>
+            <FlatList
+              ref={flatListRef}
+              data={decoratedData}
+              keyExtractor={(item) => item.id}
+              renderItem={renderChatItem}
+              contentContainerStyle={styles.messageList}
+              ListHeaderComponent={listHeader}
+              keyboardShouldPersistTaps="handled"
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfigRef.current}
+              maintainVisibleContentPosition={{
+                minIndexForVisible: 0,
+                autoscrollToTopThreshold: 80,
+              }}
+              refreshControl={
+                <RefreshControl
+                  tintColor="#2C82FF"
+                  titleColor="#2C82FF"
+                  progressViewOffset={80}
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                />
+              }
+              onContentSizeChange={() => {
+                if (initialLoadCompleteRef.current && !initialScrollDoneRef.current) {
+                  scrollToBottom();
+                  initialScrollDoneRef.current = true;
+                }
+              }}
+            />
+            {showScrollToBottomButton && (
+              <TouchableOpacity
+                style={styles.scrollToBottomButton}
+                onPress={scrollToBottom}
+                accessibilityRole="button"
+              >
+                <Ionicons name="arrow-down" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+          </Animated.View>
         )}
 
         <View style={styles.inputContainer}>
@@ -1503,7 +1506,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 16,
-    paddingBottom: 16,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
