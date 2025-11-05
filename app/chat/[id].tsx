@@ -704,7 +704,7 @@ const ChatScreen: React.FC = () => {
 
       if (!typingStateRef.current.isTyping) {
         typingStateRef.current.isTyping = true;
-        wsService.sendTyping(chatId, true);
+        wsService.sendTyping(chatId);
       }
 
       if (typingTimeoutRef.current) {
@@ -713,7 +713,7 @@ const ChatScreen: React.FC = () => {
 
       typingTimeoutRef.current = setTimeout(() => {
         typingStateRef.current.isTyping = false;
-        wsService.sendTyping(chatId, false);
+        wsService.sendStopTyping(chatId);
       }, 1500);
     },
     [chatId, wsService]
