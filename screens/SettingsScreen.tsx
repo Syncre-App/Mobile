@@ -111,7 +111,12 @@ export const SettingsScreen: React.FC = () => {
         <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-  <Text style={styles.headerTitle}>Settings</Text>
+
+        {/* Absolutely centered title so it aligns with centered cards */}
+        <View style={styles.headerCentered} pointerEvents="none">
+          <Text style={styles.headerTitle}>Settings</Text>
+        </View>
+
         <View style={styles.headerButton} />
       </View>
 
@@ -203,6 +208,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    position: 'relative',
   },
   headerButton: {
     padding: 8,
@@ -218,13 +224,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    padding: 16,
+    paddingTop: 16,
     paddingBottom: 32,
+    alignItems: 'center',
   },
   section: {
     marginBottom: 16,
     overflow: 'hidden',
-    alignSelf: 'stretch',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 420,
   },
   sectionHeader: {
     paddingHorizontal: 20,
@@ -268,5 +277,14 @@ const styles = StyleSheet.create({
   },
   settingRight: {
     marginLeft: 16,
+  },
+  headerCentered: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
