@@ -308,6 +308,7 @@ const ChatScreen: React.FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showScrollToBottomButton, setShowScrollToBottomButton] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   const currentUserId = user?.id ? String(user.id) : null;
 
@@ -1243,7 +1244,7 @@ const ChatScreen: React.FC = () => {
 
       <View style={styles.backgroundOverlay} />
 
-      <View style={styles.header}>
+      <View style={styles.header} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button">
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -1253,82 +1254,240 @@ const ChatScreen: React.FC = () => {
         <View style={styles.headerButtonPlaceholder} />
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {isThreadLoading ? (
-          <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color="#2C82FF" />
-            <Text style={styles.loadingStateText}>Loading conversation…</Text>
-          </View>
-        ) : (
-          <Animated.View style={styles.messagesWrapper}>
-            <FlatList
-              ref={flatListRef}
-              data={decoratedData}
-              keyExtractor={(item) => item.id}
-              renderItem={renderChatItem}
-              contentContainerStyle={styles.messageList}
-              ListHeaderComponent={listHeader}
-              keyboardShouldPersistTaps="handled"
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-              onViewableItemsChanged={onViewableItemsChanged}
-              viewabilityConfig={viewabilityConfigRef.current}
-              maintainVisibleContentPosition={{
-                minIndexForVisible: 0,
-                autoscrollToTopThreshold: 80,
-              }}
-              refreshControl={
-                <RefreshControl
-                  tintColor="#2C82FF"
-                  titleColor="#2C82FF"
-                  progressViewOffset={80}
-                  refreshing={isRefreshing}
-                                      onRefresh={handleRefresh}
-                                    />
-                                  }            />
-            {showScrollToBottomButton && (
-              <TouchableOpacity
-                style={styles.scrollToBottomButton}
-                onPress={scrollToBottom}
-                accessibilityRole="button"
-              >
-                <Ionicons name="arrow-down" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-          </Animated.View>
-        )}
 
-        <View style={[styles.inputContainer, { paddingBottom: insets.bottom }]}>
-          <TextInput
-            style={styles.textInput}
-            value={newMessage}
-            onChangeText={handleComposerChange}
-            placeholder="Message…"
-            placeholderTextColor="rgba(255, 255, 255, 0.45)"
-            multiline
-            editable={!isSendingMessage}
-          />
-          <TouchableOpacity
-            onPress={handleSendMessage}
-            style={[
-              styles.sendButton,
-              !isComposerEmpty && styles.sendButtonActive,
-              isSendingMessage && styles.sendButtonDisabled,
-            ]}
-            disabled={isComposerEmpty || isSendingMessage}
-            accessibilityRole="button"
-          >
-            {isSendingMessage ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <Ionicons name="paper-plane" size={20} color="#ffffff" />
-            )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+                    <KeyboardAvoidingView
+
+
+                      style={{ flex: 1 }}
+
+
+                      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+
+
+                      keyboardVerticalOffset={0}
+
+
+                    >
+
+
+                {isThreadLoading ? (
+
+
+                  <View style={styles.loadingState}>
+
+
+                    <ActivityIndicator size="large" color="#2C82FF" />
+
+
+                    <Text style={styles.loadingStateText}>Loading conversation…</Text>
+
+
+                  </View>
+
+
+                ) : (
+
+
+                  <Animated.View style={styles.messagesWrapper}>
+
+
+                    <FlatList
+
+
+                      ref={flatListRef}
+
+
+                      data={decoratedData}
+
+
+                      keyExtractor={(item) => item.id}
+
+
+                      renderItem={renderChatItem}
+
+
+                      contentContainerStyle={styles.messageList}
+
+
+                      ListHeaderComponent={listHeader}
+
+
+                      keyboardShouldPersistTaps="handled"
+
+
+                      onScroll={handleScroll}
+
+
+                      scrollEventThrottle={16}
+
+
+                      onViewableItemsChanged={onViewableItemsChanged}
+
+
+                      viewabilityConfig={viewabilityConfigRef.current}
+
+
+                      maintainVisibleContentPosition={{
+
+
+                        minIndexForVisible: 0,
+
+
+                        autoscrollToTopThreshold: 80,
+
+
+                      }}
+
+
+                      refreshControl={
+
+
+                        <RefreshControl
+
+
+                          tintColor="#2C82FF"
+
+
+                          titleColor="#2C82FF"
+
+
+                          progressViewOffset={80}
+
+
+                          refreshing={isRefreshing}
+
+
+                          onRefresh={handleRefresh}
+
+
+                        />
+
+
+                      }
+
+
+                    />
+
+
+                    {showScrollToBottomButton && (
+
+
+                      <TouchableOpacity
+
+
+                        style={styles.scrollToBottomButton}
+
+
+                        onPress={scrollToBottom}
+
+
+                        accessibilityRole="button"
+
+
+                      >
+
+
+                        <Ionicons name="arrow-down" size={24} color="#FFFFFF" />
+
+
+                      </TouchableOpacity>
+
+
+                    )}
+
+
+                  </Animated.View>
+
+
+                )}
+
+
+        
+
+
+                <View style={[styles.inputContainer, { paddingBottom: insets.bottom }]}>
+
+
+                  <TextInput
+
+
+                    style={styles.textInput}
+
+
+                    value={newMessage}
+
+
+                    onChangeText={handleComposerChange}
+
+
+                    placeholder="Message…"
+
+
+                    placeholderTextColor="rgba(255, 255, 255, 0.45)"
+
+
+                    multiline
+
+
+                    editable={!isSendingMessage}
+
+
+                  />
+
+
+                  <TouchableOpacity
+
+
+                    onPress={handleSendMessage}
+
+
+                    style={[
+
+
+                      styles.sendButton,
+
+
+                      !isComposerEmpty && styles.sendButtonActive,
+
+
+                      isSendingMessage && styles.sendButtonDisabled,
+
+
+                    ]}
+
+
+                    disabled={isComposerEmpty || isSendingMessage}
+
+
+                    accessibilityRole="button"
+
+
+                  >
+
+
+                    {isSendingMessage ? (
+
+
+                      <ActivityIndicator size="small" color="#ffffff" />
+
+
+                    ) : (
+
+
+                      <Ionicons name="paper-plane" size={20} color="#ffffff" />
+
+
+                    )}
+
+
+                  </TouchableOpacity>
+
+
+                </View>
+
+
+              </KeyboardAvoidingView>
+
     </SafeAreaView>
   );
 };
