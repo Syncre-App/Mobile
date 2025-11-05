@@ -19,7 +19,7 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { TapGestureHandler } from 'react-native-gesture-handler';
@@ -243,7 +243,26 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         </Text>
       </View>
       {statusText && (
-        <Animated.View style={[styles.statusPill, { opacity: statusAnim }]}>
+        <Animated.View style={[
+          styles.statusPill, 
+          {
+            opacity: statusAnim,
+            transform: [
+              { 
+                scale: statusAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.9, 1],
+                })
+              },
+              {
+                translateY: statusAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [10, 0],
+                })
+              }
+            ]
+          }
+        ]}>
           <Text style={styles.statusText}>{statusText}</Text>
         </Animated.View>
       )}
@@ -255,6 +274,7 @@ const ChatScreen: React.FC = () => {
   const { id } = useLocalSearchParams();
   const chatId = useMemo(() => (Array.isArray(id) ? id[0] : id), [id]);
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const wsService = useMemo(() => WebSocketService.getInstance(), []);
   const flatListRef = useRef<FlatList<ChatListItem>>(null);
@@ -272,7 +292,6 @@ const ChatScreen: React.FC = () => {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const remoteTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadCompleteRef = useRef(false);
-  const initialScrollDoneRef = useRef(false);
   const tapGestureRef = useRef(null);
   const isNearTopRef = useRef(false);
   const isNearBottomRef = useRef(true);
@@ -1052,9 +1071,16 @@ const ChatScreen: React.FC = () => {
   });
 
   useEffect(() => {
+    if (initialLoadCompleteRef.current && messages.length > 0) {
+      setTimeout(() => scrollToBottom(), 100);
+    }
+  }, [messages, scrollToBottom]);
+
+  useEffect(() => {
     if (!user?.id || !chatId) {
       return;
     }
+    initialLoadCompleteRef.current = false;
     loadChatDetails();
   }, [user?.id, chatId, loadChatDetails]);
 
@@ -1260,16 +1286,9 @@ const ChatScreen: React.FC = () => {
                   titleColor="#2C82FF"
                   progressViewOffset={80}
                   refreshing={isRefreshing}
-                  onRefresh={handleRefresh}
-                />
-              }
-              onContentSizeChange={() => {
-                if (initialLoadCompleteRef.current && !initialScrollDoneRef.current) {
-                  scrollToBottom();
-                  initialScrollDoneRef.current = true;
-                }
-              }}
-            />
+                                      onRefresh={handleRefresh}
+                                    />
+                                  }            />
             {showScrollToBottomButton && (
               <TouchableOpacity
                 style={styles.scrollToBottomButton}
@@ -1282,7 +1301,7 @@ const ChatScreen: React.FC = () => {
           </Animated.View>
         )}
 
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { paddingBottom: insets.bottom }]}>
           <TextInput
             style={styles.textInput}
             value={newMessage}
