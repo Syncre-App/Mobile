@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "build": "eas build"
+    "build": "eas build && eas submit --platform ios"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
