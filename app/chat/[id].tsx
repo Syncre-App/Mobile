@@ -243,8 +243,8 @@ const ChatScreen: React.FC = () => {
   const pendingScrollIdRef = useRef<string | null>(null);
   const lastSeenMessageIdRef = useRef<string | null>(null);
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const remoteTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const remoteTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadCompleteRef = useRef(false);
   const tapGestureRef = useRef(null);
   const isNearTopRef = useRef(false);
@@ -294,7 +294,17 @@ const ChatScreen: React.FC = () => {
       return items;
     }
 
+    let lastDate: Date | null = null;
     messages.forEach((message) => {
+      const messageDate = parseDate(message.timestamp);
+      if (!lastDate || startOfDay(messageDate).getTime() !== startOfDay(lastDate).getTime()) {
+        lastDate = messageDate;
+        items.push({
+          kind: 'date',
+          id: `date-${messageDate.toISOString()}`,
+          label: formatDateLabel(messageDate),
+        });
+      }
       items.push({ kind: 'message', id: message.id, message });
     });
 
@@ -419,7 +429,7 @@ const ChatScreen: React.FC = () => {
     }
     if (typingStateRef.current.isTyping) {
       typingStateRef.current.isTyping = false;
-      wsService.sendTyping(chatId, false);
+      wsService.sendStopTyping(chatId);
     }
   }, [chatId, wsService]);
 
@@ -702,7 +712,7 @@ const ChatScreen: React.FC = () => {
         return;
       }
 
-      if (!typingStateRef.current.isTyping) {
+      if (value.length > 0 && !typingStateRef.current.isTyping) {
         typingStateRef.current.isTyping = true;
         wsService.sendTyping(chatId);
       }
@@ -712,8 +722,10 @@ const ChatScreen: React.FC = () => {
       }
 
       typingTimeoutRef.current = setTimeout(() => {
-        typingStateRef.current.isTyping = false;
-        wsService.sendStopTyping(chatId);
+        if (typingStateRef.current.isTyping) {
+          typingStateRef.current.isTyping = false;
+          wsService.sendStopTyping(chatId);
+        }
       }, 1500);
     },
     [chatId, wsService]
@@ -802,6 +814,45 @@ const ChatScreen: React.FC = () => {
     wsService,
   ]);
 
+  useEffect(() => {
+    if (!chatId || !wsService) {
+      return;
+    }
+
+    const typingHandler = (data: { userId: string; username: string }) => {
+      if (data.userId !== currentUserId) {
+        setTypingUserLabel(data.username || receiverNameRef.current || 'Someone');
+        setIsRemoteTyping(true);
+        if (remoteTypingTimeoutRef.current) {
+          clearTimeout(remoteTypingTimeoutRef.current);
+        }
+        remoteTypingTimeoutRef.current = setTimeout(() => {
+          setIsRemoteTyping(false);
+        }, 2500); // Keep indicator for 2.5s
+      }
+    };
+
+    const stopTypingHandler = (data: { userId: string }) => {
+      if (data.userId !== currentUserId) {
+        if (remoteTypingTimeoutRef.current) {
+          clearTimeout(remoteTypingTimeoutRef.current);
+        }
+        setIsRemoteTyping(false);
+      }
+    };
+
+    const unsubscribeTyping = wsService.onTyping(chatId, typingHandler);
+    const unsubscribeStopTyping = wsService.onStopTyping(chatId, stopTypingHandler);
+
+    return () => {
+      unsubscribeTyping();
+      unsubscribeStopTyping();
+      if (remoteTypingTimeoutRef.current) {
+        clearTimeout(remoteTypingTimeoutRef.current);
+      }
+    };
+  }, [chatId, wsService, currentUserId]);
+
   const handleIncomingMessage = useCallback(
     async (message: WebSocketMessage) => {
       if (!chatId) {
@@ -833,21 +884,6 @@ const ChatScreen: React.FC = () => {
             messageId: payload.messageId ?? payload.id,
             createdAt: payload.created_at ?? payload.timestamp,
           });
-          return;
-        }
-        case 'typing': {
-          console.log('typing event received', payload);
-          const fromUser = payload.userId ? String(payload.userId) : payload.senderId ? String(payload.senderId) : '';
-          if (fromUser && fromUser !== currentUserId) {
-            setTypingUserLabel(payload.username || receiverNameRef.current || 'Someone');
-            setIsRemoteTyping(Boolean(payload.isTyping));
-            if (remoteTypingTimeoutRef.current) {
-              clearTimeout(remoteTypingTimeoutRef.current);
-            }
-            if (payload.isTyping) {
-              remoteTypingTimeoutRef.current = setTimeout(() => setIsRemoteTyping(false), 2500);
-            }
-          }
           return;
         }
         case 'message_envelope': {
@@ -978,7 +1014,7 @@ const ChatScreen: React.FC = () => {
 
 
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ index?: number; item: ChatListItem }> }) => {
+    ({ viewableItems }: { viewableItems: Array<{ index: number | null; item: ChatListItem }> }) => {
       if (!viewableItems.length) {
         return;
       }
@@ -1095,6 +1131,16 @@ const ChatScreen: React.FC = () => {
         return <TypingIndicator label={typingUserLabel} />;
       }
 
+      if (item.kind === 'date') {
+        return (
+          <View style={styles.dateDivider}>
+            <View style={styles.dateDividerLine} />
+            <Text style={styles.dateDividerText}>{item.label}</Text>
+            <View style={styles.dateDividerLine} />
+          </View>
+        );
+      }
+
       const messageItem = item.message;
       const previousMessage = (() => {
         for (let i = index - 1; i >= 0; i -= 1) {
@@ -1118,26 +1164,14 @@ const ChatScreen: React.FC = () => {
 
       const isMine = Boolean(currentUserId && messageItem.senderId === currentUserId);
       const isFirstInGroup =
-        !previousMessage || previousMessage.senderId !== messageItem.senderId || previousMessage.isPlaceholder;
+        !previousMessage || previousMessage.senderId !== messageItem.senderId || !!previousMessage.isPlaceholder;
       const isLastInGroup =
-        !nextMessage || nextMessage.senderId !== messageItem.senderId || nextMessage.isPlaceholder;
+        !nextMessage || nextMessage.senderId !== messageItem.senderId || !!nextMessage.isPlaceholder;
 
       const shouldShowStatus = lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
       const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
 
-      const date = parseDate(messageItem.timestamp);
-      const previousDate = previousMessage ? parseDate(previousMessage.timestamp) : null;
-      const showDate = !previousDate || startOfDay(date).getTime() !== startOfDay(previousDate).getTime();
-
       return (
-        <>
-          {showDate && (
-            <View style={styles.dateDivider}>
-              <View style={styles.dateDividerLine} />
-              <Text style={styles.dateDividerText}>{formatDateLabel(date)}</Text>
-              <View style={styles.dateDividerLine} />
-            </View>
-          )}
           <Pressable onPress={() => setTimestampVisibleFor(prev => prev === messageItem.id ? null : messageItem.id)}>
             <MessageBubble
               key={messageItem.id}
@@ -1149,7 +1183,6 @@ const ChatScreen: React.FC = () => {
               showTimestamp={shouldShowTimestamp}
             />
           </Pressable>
-        </>
       );
     },
     [currentUserId, decoratedData, lastOutgoingMessageId, timestampVisibleFor, typingUserLabel]

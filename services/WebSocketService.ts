@@ -24,7 +24,7 @@ export class WebSocketService {
   private maxReconnectAttempts = 5;
   private reconnectAttempts = 0;
   private joinedChats: Map<string, string | undefined> = new Map();
-  private typingListeners: Map<string, ((payload: { userId: string }) => void)[]> = new Map();
+  private typingListeners: Map<string, ((payload: { userId: string; username: string }) => void)[]> = new Map();
   private stopTypingListeners: Map<string, ((payload: { userId: string }) => void)[]> = new Map();
 
   static getInstance(): WebSocketService {
@@ -164,6 +164,10 @@ export class WebSocketService {
   }
 
   private handleMessage(message: WebSocketMessage): void {
+    if (message.type !== 'typing' && message.type !== 'stop-typing') {
+      this.messageListeners.forEach(listener => listener(message));
+    }
+
     switch (message.type) {
       case 'pong':
         // Pong received, connection is alive
@@ -192,10 +196,6 @@ export class WebSocketService {
           this.notifyStatusListeners();
         }
         break;
-        
-      case 'message':
-        // Handle chat messages
-        break;
 
       case 'typing':
         this.handleTyping(message);
@@ -205,7 +205,8 @@ export class WebSocketService {
         break;
         
       default:
-        console.log('🌐 Received WebSocket message:', message);
+        // The default case is now primarily for events that are just passed to listeners.
+        // console.log('🌐 Received WebSocket message:', message);
     }
   }
 
@@ -240,11 +241,11 @@ export class WebSocketService {
   }
 
   private handleTyping(message: WebSocketMessage) {
-    const { chatId, userId } = message;
+    const { chatId, userId, username } = message;
     if (chatId) {
       const chatIdStr = chatId.toString();
       if (this.typingListeners.has(chatIdStr)) {
-        this.typingListeners.get(chatIdStr)?.forEach(listener => listener({ userId }));
+        this.typingListeners.get(chatIdStr)?.forEach(listener => listener({ userId, username }));
       }
     }
   }
@@ -259,7 +260,7 @@ export class WebSocketService {
     }
   }
 
-  public onTyping(chatId: string, callback: (payload: { userId: string }) => void): () => void {
+  public onTyping(chatId: string, callback: (payload: { userId: string; username: string }) => void): () => void {
     if (!this.typingListeners.has(chatId)) {
       this.typingListeners.set(chatId, []);
     }
