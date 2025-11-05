@@ -265,6 +265,7 @@ const ChatScreen: React.FC = () => {
   const initialLoadCompleteRef = useRef(false);
   const tapGestureRef = useRef(null);
   const isNearTopRef = useRef(false);
+  const isNearBottomRef = useRef(true);
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -277,8 +278,16 @@ const ChatScreen: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showScrollToBottomButton, setShowScrollToBottomButton] = useState(false);
 
   const currentUserId = user?.id ? String(user.id) : null;
+
+  const setMessagesWithoutAnimation = useCallback(
+    (updater: (prev: Message[]) => Message[]) => {
+      setMessages((prev) => updater(prev));
+    },
+    []
+  );
 
   const setMessagesAnimated = useCallback(
     (updater: (prev: Message[]) => Message[]) => {
@@ -564,7 +573,7 @@ const ChatScreen: React.FC = () => {
         setMessagesAnimated(() => cleaned);
         lastSeenMessageIdRef.current = null;
         setHasMore(response.data?.hasMore ?? false);
-        nextCursorRef.current = response.data?.nextCursor || (cleaned.length ? cleaned[0].timestamp : null);
+        nextCursorRef.current = response.data?.nextCursor || null;
         initialLoadCompleteRef.current = true;
         InteractionManager.runAfterInteractions(() => {
           scrollToBottom();
@@ -670,8 +679,7 @@ const ChatScreen: React.FC = () => {
         return;
       }
       authTokenRef.current = token;
-      const cursor = nextCursorRef.current || (messages.length ? messages[0].timestamp : null);
-      if (!cursor) {
+      if (!nextCursorRef.current) {
         if (viaRefresh) {
           setIsRefreshing(false);
         }
@@ -687,7 +695,7 @@ const ChatScreen: React.FC = () => {
       try {
         const params = new URLSearchParams();
         params.set('limit', '20');
-        params.set('before', cursor);
+        params.set('before', nextCursorRef.current);
         if (deviceIdRef.current) {
           params.set('deviceId', deviceIdRef.current);
         }
@@ -702,7 +710,7 @@ const ChatScreen: React.FC = () => {
         const transformed = await transformMessages(rawMessages, otherUserIdRef.current);
         const cleaned = transformed.filter(Boolean);
 
-        setMessagesAnimated((prev) => {
+        setMessagesWithoutAnimation((prev) => {
           const existingIds = new Set(prev.map((msg) => msg.id));
           const filtered = cleaned.filter((msg) => !existingIds.has(msg.id));
           if (!filtered.length) {
@@ -712,7 +720,7 @@ const ChatScreen: React.FC = () => {
         });
 
         setHasMore(response.data?.hasMore ?? false);
-        nextCursorRef.current = response.data?.nextCursor || (cleaned.length ? cleaned[0].timestamp : cursor);
+        nextCursorRef.current = response.data?.nextCursor || null;
       } catch (error) {
         console.error('Failed to load earlier messages:', error);
       } finally {
@@ -989,8 +997,22 @@ const ChatScreen: React.FC = () => {
       } else if (!nearTop) {
         isNearTopRef.current = false;
       }
+
+      const nearBottom = contentSize.height - layoutMeasurement.height - contentOffset.y <= 20;
+
+      if (nearBottom && !isNearBottomRef.current) {
+        isNearBottomRef.current = true;
+        if (showScrollToBottomButton) {
+          setShowScrollToBottomButton(false);
+        }
+      } else if (!nearBottom && isNearBottomRef.current) {
+        isNearBottomRef.current = false;
+        if (!showScrollToBottomButton) {
+          setShowScrollToBottomButton(true);
+        }
+      }
     },
-    [hasMore, isLoadingMore, isRefreshing, loadEarlier]
+    [hasMore, isLoadingMore, isRefreshing, loadEarlier, showScrollToBottomButton]
   );
 
   const toggleStatusVisibility = useCallback(() => {
@@ -1165,9 +1187,7 @@ const ChatScreen: React.FC = () => {
   const listHeader = useMemo(
     () =>
       isLoadingMore ? (
-        <View style={styles.loadMoreSpinner}>
-          <ActivityIndicator size="small" color="#2C82FF" />
-        </View>
+        <View style={styles.loadMoreSpinner} />
       ) : (
         <View style={styles.loadMoreSpacer} />
       ),
@@ -1219,43 +1239,43 @@ const ChatScreen: React.FC = () => {
             maxDeltaY={12}
             numberOfTaps={1}
           >
-            <Animated.View style={styles.messagesWrapper}>
-              <FlatList
-                ref={flatListRef}
-                data={decoratedData}
-                keyExtractor={(item) => item.id}
-                renderItem={renderChatItem}
-                contentContainerStyle={styles.messageList}
-                ListHeaderComponent={listHeader}
-                keyboardShouldPersistTaps="handled"
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-                onViewableItemsChanged={onViewableItemsChanged}
-                viewabilityConfig={viewabilityConfigRef.current}
-                maintainVisibleContentPosition={{
-                  minIndexForVisible: 0,
-                  autoscrollToTopThreshold: 80,
-                }}
-                refreshControl={
-                  <RefreshControl
-                    tintColor="#2C82FF"
-                    titleColor="#2C82FF"
-                    progressViewOffset={80}
-                    refreshing={isRefreshing}
-                    onRefresh={handleRefresh}
-                  />
-                }
-                onContentSizeChange={() => {
-                  if (!initialLoadCompleteRef.current) {
-                    return;
-                  }
-                  if (pendingScrollIdRef.current || isLoadingMore) {
-                    return;
-                  }
-                  InteractionManager.runAfterInteractions(() => scrollToBottom());
-                }}
-              />
-            </Animated.View>
+                        <Animated.View style={styles.messagesWrapper}>
+                          <FlatList
+                            ref={flatListRef}
+                            data={decoratedData}
+                            keyExtractor={(item) => item.id}
+                            renderItem={renderChatItem}
+                            contentContainerStyle={styles.messageList}
+                            ListHeaderComponent={listHeader}
+                            keyboardShouldPersistTaps="handled"
+                            onScroll={handleScroll}
+                            scrollEventThrottle={16}
+                            onViewableItemsChanged={onViewableItemsChanged}
+                            viewabilityConfig={viewabilityConfigRef.current}
+                            maintainVisibleContentPosition={{
+                              minIndexForVisible: 0,
+                              autoscrollToTopThreshold: 80,
+                            }}
+                            refreshControl={
+                              <RefreshControl
+                                tintColor="#2C82FF"
+                                titleColor="#2C82FF"
+                                progressViewOffset={80}
+                                refreshing={isRefreshing}
+                                onRefresh={handleRefresh}
+                              />
+                            }
+                          />
+                          {showScrollToBottomButton && (
+                            <TouchableOpacity
+                              style={styles.scrollToBottomButton}
+                              onPress={scrollToBottom}
+                              accessibilityRole="button"
+                            >
+                              <Ionicons name="arrow-down" size={24} color="#FFFFFF" />
+                            </TouchableOpacity>
+                          )}
+                        </Animated.View>
           </TapGestureHandler>
         )}
 
@@ -1520,6 +1540,17 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.6,
+  },
+  scrollToBottomButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
