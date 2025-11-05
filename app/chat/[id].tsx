@@ -68,7 +68,20 @@ const formatDateLabel = (date: Date): string => {
   return new Intl.DateTimeFormat(undefined, options).format(date);
 };
 
-
+const formatStatusLabel = (status: MessageStatus): string => {
+  switch (status) {
+    case 'sending':
+      return 'Sending...';
+    case 'sent':
+      return 'Sent';
+    case 'delivered':
+      return 'Delivered';
+    case 'seen':
+      return 'Seen';
+    default:
+      return '';
+  }
+};
 
 const formatTimestamp = (date: Date): string => {
   const timeFormatter = new Intl.DateTimeFormat(undefined, {
