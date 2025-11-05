@@ -14,7 +14,8 @@ import {
   TouchableWithoutFeedback,
   UIManager,
   View,
-  Modal,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,8 +42,8 @@ interface Message {
   receiverId: string;
   content: string;
   timestamp: string;
-  isPlaceholder?: boolean;
   status?: MessageStatus;
+  isPlaceholder?: boolean;
 }
 
 type ChatListItem =
@@ -82,21 +83,29 @@ const formatDateLabel = (date: Date): string => {
   return new Intl.DateTimeFormat(undefined, options).format(date);
 };
 
-const formatDetailedTime = (iso: string): string => {
-  const date = parseDate(iso);
-  const today = startOfDay(new Date());
-  const target = startOfDay(date);
-  const diffDays = Math.round((today.getTime() - target.getTime()) / 86_400_000);
+const formatStatusLabel = (status: MessageStatus, timestamp: string) => {
+  const label = status === 'sending'
+    ? 'Sending…'
+    : status.charAt(0).toUpperCase() + status.slice(1);
+
+  if (status === 'sending') {
+    return label;
+  }
+
+  const date = parseDate(timestamp);
   const timeFormatter = new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
   });
 
+  const today = startOfDay(new Date());
+  const target = startOfDay(date);
+  const diffDays = Math.round((today.getTime() - target.getTime()) / 86_400_000);
+
+  const timePart = timeFormatter.format(date);
+
   if (diffDays === 0) {
-    return `Today • ${timeFormatter.format(date)}`;
-  }
-  if (diffDays === 1) {
-    return `Yesterday • ${timeFormatter.format(date)}`;
+    return `${label} • ${timePart}`;
   }
 
   const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -105,18 +114,7 @@ const formatDetailedTime = (iso: string): string => {
     year: today.getFullYear() === date.getFullYear() ? undefined : 'numeric',
   });
 
-  return `${dateFormatter.format(date)} • ${timeFormatter.format(date)}`;
-};
-
-const sendingAnimation = {
-  duration: 300,
-  create: {
-    type: LayoutAnimation.Types.easeInEaseOut,
-    property: LayoutAnimation.Properties.opacity,
-  },
-  update: {
-    type: LayoutAnimation.Types.easeInEaseOut,
-  },
+  return `${label} • ${dateFormatter.format(date)} ${timePart}`;
 };
 
 const layoutNext = () => {
@@ -148,15 +146,15 @@ const TypingIndicator: React.FC<{ label: string }> = ({ label }) => {
     <View style={styles.typingRow}>
       <View style={styles.typingBubble}>
         {dots.map((value, index) => (
+          // eslint-disable-next-line react/no-array-index-key
           <Animated.View
-            // eslint-disable-next-line react/no-array-index-key
             key={index}
             style={[
               styles.typingDot,
               {
                 opacity: value.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0.3, 1],
+                  outputRange: [0.35, 1],
                 }),
                 transform: [
                   {
@@ -171,6 +169,7 @@ const TypingIndicator: React.FC<{ label: string }> = ({ label }) => {
           />
         ))}
       </View>
+      <Text style={styles.typingText}>{`${label} is typing…`}</Text>
     </View>
   );
 };
@@ -180,7 +179,7 @@ interface MessageBubbleProps {
   isMine: boolean;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
-  onToggleTimestamp: (messageId: string) => void;
+  showStatus: boolean;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -188,9 +187,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isMine,
   isFirstInGroup,
   isLastInGroup,
-  onToggleTimestamp,
+  showStatus,
 }) => {
-  const [senderUsername, setSenderUsername] = useState<string>('Loading…');
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -201,72 +199,41 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     }).start();
   }, [fadeAnim]);
 
-  useEffect(() => {
-    let mounted = true;
-    if (isMine || message.isPlaceholder) {
-      setSenderUsername('You');
-      return () => {
-        mounted = false;
-      };
-    }
-
-    const fetchUsername = async () => {
-      try {
-        const user = await UserCacheService.getUser(message.senderId);
-        if (mounted) {
-          setSenderUsername(user?.username || user?.email || 'Unknown user');
-        }
-      } catch (error) {
-        console.error(`Error resolving sender ${message.senderId}:`, error);
-        if (mounted) {
-          setSenderUsername('Unknown user');
-        }
-      }
-    };
-
-    fetchUsername();
-
-    return () => {
-      mounted = false;
-    };
-  }, [message.senderId, isMine, message.isPlaceholder]);
-
-  const statusLabel: string | null = isMine
-    ? message.status === 'seen'
-      ? 'Seen'
-      : message.status === 'delivered'
-        ? 'Delivered'
-        : message.status === 'sending'
-          ? 'Sending...'
-          : 'Sent'
-    : null;
-
   const containerStyle = [
     styles.messageRow,
     isMine ? styles.messageRowMine : styles.messageRowTheirs,
+    !isFirstInGroup && styles.messageRowStacked,
   ];
 
   const bubbleStyle = [
     styles.messageBubble,
     isMine ? styles.myBubble : styles.theirBubble,
+    isMine
+      ? isLastInGroup
+        ? styles.myBubbleLast
+        : styles.myBubbleStacked
+      : isLastInGroup
+        ? styles.theirBubbleLast
+        : styles.theirBubbleStacked,
     message.isPlaceholder && styles.placeholderBubble,
-    isMine && message.status === 'sending' && styles.sendingBubble,
   ];
+
+  const statusText =
+    showStatus && message.status
+      ? formatStatusLabel(message.status, message.timestamp)
+      : null;
 
   return (
     <Animated.View style={[containerStyle, { opacity: fadeAnim }]}>
-      <TouchableWithoutFeedback
-        onPress={() => !message.isPlaceholder && onToggleTimestamp(message.id)}
-        disabled={message.isPlaceholder}
-      >
-        <View style={bubbleStyle}>
-          <Text style={[styles.messageText, isMine ? styles.myMessageText : styles.theirMessageText]}>
-            {message.content}
-          </Text>
+      <View style={bubbleStyle}>
+        <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
+          {message.content}
+        </Text>
+      </View>
+      {statusText && (
+        <View style={styles.statusPill}>
+          <Text style={styles.statusText}>{statusText}</Text>
         </View>
-      </TouchableWithoutFeedback>
-      {isMine && statusLabel && (
-        <Text style={styles.statusLabelText}>{statusLabel}</Text>
       )}
     </Animated.View>
   );
@@ -285,19 +252,27 @@ const ChatScreen: React.FC = () => {
   const participantIdsRef = useRef<string[]>([]);
   const authTokenRef = useRef<string | null>(null);
   const deviceIdRef = useRef<string | null>(null);
-
+  const nextCursorRef = useRef<string | null>(null);
+  const topVisibleIdRef = useRef<string | null>(null);
+  const pendingScrollIdRef = useRef<string | null>(null);
+  const lastSeenMessageIdRef = useRef<string | null>(null);
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const remoteTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initialLoadCompleteRef = useRef(false);
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [activeTimestampId, setActiveTimestampId] = useState<string | null>(null);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
+  const [showStatus, setShowStatus] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const currentUserId = user?.id ? String(user.id) : null;
 
   const setMessagesAnimated = useCallback(
     (updater: (prev: Message[]) => Message[]) => {
@@ -307,38 +282,18 @@ const ChatScreen: React.FC = () => {
     []
   );
 
-  const generatePlaceholderMessages = useCallback(
-    (displayName: string) => {
-      const friendlyName = displayName || 'your friend';
-      const now = Date.now();
-      return [
-        {
-          id: 'placeholder-1',
-          senderId: 'friend',
-          receiverId: String(user?.id ?? 'me'),
-          content: `👋 ${friendlyName} hasn't sent any messages yet, but this space is ready when they do.`,
-          timestamp: new Date(now - 60_000).toISOString(),
-          isPlaceholder: true,
-        },
-        {
-          id: 'placeholder-2',
-          senderId: String(user?.id ?? 'me'),
-          receiverId: 'friend',
-          content: `Start the conversation with a quick hello!`,
-          timestamp: new Date(now - 30_000).toISOString(),
-          isPlaceholder: true,
-        },
-      ] as Message[];
-    },
-    [user?.id]
-  );
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
 
   const decoratedData = useMemo<ChatListItem[]>(() => {
+    const items: ChatListItem[] = [];
     if (!messages.length && !isRemoteTyping) {
-      return [];
+      return items;
     }
 
-    const items: ChatListItem[] = [];
     let lastDateKey: string | null = null;
 
     messages.forEach((message) => {
@@ -354,11 +309,7 @@ const ChatScreen: React.FC = () => {
         lastDateKey = dateKey;
       }
 
-      items.push({
-        kind: 'message',
-        id: message.id,
-        message,
-      });
+      items.push({ kind: 'message', id: message.id, message });
     });
 
     if (isRemoteTyping) {
@@ -368,83 +319,262 @@ const ChatScreen: React.FC = () => {
     return items;
   }, [messages, isRemoteTyping]);
 
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    });
-  }, []);
+  const lastOutgoingMessageId = useMemo(() => {
+    if (!currentUserId) {
+      return null;
+    }
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      if (!message.isPlaceholder && message.senderId === currentUserId) {
+        return message.id;
+      }
+    }
+    return null;
+  }, [messages, currentUserId]);
+
+  const transformMessages = useCallback(
+    async (rawMessages: any[], otherUserId: string | null) => {
+      const results: Message[] = [];
+      const ownerId = currentUserId;
+
+      for (const raw of rawMessages) {
+        const idValue = raw.id ?? `${chatId}-${raw.createdAt ?? raw.created_at ?? Date.now()}`;
+        const senderId = raw.senderId ?? raw.sender_id;
+        if (!senderId) {
+          continue;
+        }
+
+        const receiverId =
+          raw.receiverId ??
+          raw.receiver_id ??
+          otherUserId ??
+          (participantIdsRef.current.find((pid) => pid !== String(senderId)) ?? '');
+
+        const timestamp = raw.createdAt ?? raw.created_at ?? new Date().toISOString();
+
+        let content: string | null = null;
+        if (raw.isEncrypted && Array.isArray(raw.envelopes)) {
+          if (!chatId) {
+            continue;
+          }
+          const decrypted = await CryptoService.decryptMessage(String(chatId), raw.envelopes);
+          if (decrypted) {
+            content = decrypted;
+          }
+        } else {
+          content = raw.content ?? '';
+        }
+
+        if (content == null) {
+          continue;
+        }
+
+        let status: MessageStatus | undefined;
+        if (ownerId && String(senderId) === ownerId) {
+          if (raw.seenAt) {
+            status = 'seen';
+          } else if (raw.deliveredAt) {
+            status = 'delivered';
+          } else {
+            status = 'sent';
+          }
+        }
+
+        results.push({
+          id: String(idValue),
+          senderId: String(senderId),
+          receiverId: String(receiverId),
+          content,
+          timestamp: String(timestamp),
+          status,
+        });
+      }
+
+      return results;
+    },
+    [chatId, currentUserId]
+  );
+
+  const generatePlaceholderMessages = useCallback(
+    (displayName: string) => {
+      const friendlyName = displayName || 'your friend';
+      const now = Date.now();
+      return [
+        {
+          id: 'placeholder-1',
+          senderId: 'friend',
+          receiverId: String(currentUserId ?? 'me'),
+          content: `👋 ${friendlyName} hasn't sent any messages yet, but this space is ready when they do.`,
+          timestamp: new Date(now - 60_000).toISOString(),
+          isPlaceholder: true,
+        },
+        {
+          id: 'placeholder-2',
+          senderId: String(currentUserId ?? 'me'),
+          receiverId: 'friend',
+          content: 'Start the conversation with a quick hello!',
+          timestamp: new Date(now - 30_000).toISOString(),
+          isPlaceholder: true,
+        },
+      ] as Message[];
+    },
+    [currentUserId]
+  );
+
+  const ensureTypingStopped = useCallback(() => {
+    if (!chatId) {
+      return;
+    }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (typingStateRef.current.isTyping) {
+      typingStateRef.current.isTyping = false;
+      wsService.sendTyping(chatId, false);
+    }
+  }, [chatId, wsService]);
+
+  const updateOutgoingStatus = useCallback(
+    (status: MessageStatus, messageId?: string, timestamp?: string | null) => {
+      if (!currentUserId) {
+        return;
+      }
+
+      setMessagesAnimated((prev) => {
+        let targetFound = false;
+        const next = prev.map((msg, index) => {
+          if (msg.senderId !== currentUserId || msg.isPlaceholder) {
+            return msg;
+          }
+
+          if (messageId) {
+            if (msg.id === String(messageId)) {
+              targetFound = true;
+              return { ...msg, status, timestamp: timestamp ?? msg.timestamp };
+            }
+            return { ...msg, status: undefined };
+          }
+
+          if (index === prev.length - 1) {
+            targetFound = true;
+            return { ...msg, status, timestamp: timestamp ?? msg.timestamp };
+          }
+
+          return { ...msg, status: undefined };
+        });
+
+        if (messageId && !targetFound) {
+          return prev;
+        }
+
+        return next;
+      });
+    },
+    [currentUserId, setMessagesAnimated]
+  );
+
+  const applyAckToLatestMessage = useCallback(
+    (incoming: { messageId?: string | number; createdAt?: string }) => {
+      if (!currentUserId || !incoming?.messageId) {
+        return;
+      }
+      const messageId = String(incoming.messageId);
+
+      setMessagesAnimated((prev) => {
+        const next = [...prev];
+        let updated = false;
+        for (let i = next.length - 1; i >= 0; i -= 1) {
+          const message = next[i];
+          if (message.senderId === currentUserId && !message.isPlaceholder) {
+            next[i] = {
+              ...message,
+              id: messageId,
+              status: 'sent',
+              timestamp: incoming.createdAt ?? message.timestamp,
+            };
+            updated = true;
+            break;
+          }
+        }
+
+        if (!updated) {
+          return prev;
+        }
+
+        return next.map((msg) => {
+          if (msg.senderId === currentUserId && msg.id !== messageId) {
+            return { ...msg, status: undefined };
+          }
+          return msg;
+        });
+      });
+    },
+    [currentUserId, setMessagesAnimated]
+  );
+
+  const sendSeenReceipt = useCallback(
+    (messageId: string) => {
+      if (!chatId || !messageId) {
+        return;
+      }
+      if (lastSeenMessageIdRef.current === messageId) {
+        return;
+      }
+      wsService.send({
+        type: 'message_seen',
+        chatId,
+        messageId,
+      });
+      lastSeenMessageIdRef.current = messageId;
+    },
+    [chatId, wsService]
+  );
 
   const loadMessagesForChat = useCallback(
     async (token: string, chatIdentifier: string, displayName: string, otherUserId?: string | null) => {
       try {
         const deviceIdentifier = deviceIdRef.current;
-        const query = deviceIdentifier ? `?deviceId=${encodeURIComponent(deviceIdentifier)}` : '';
-        const response = await ApiService.get(`/chat/${chatIdentifier}/messages${query}`, token);
+        const params = new URLSearchParams();
+        params.set('limit', '20');
+        if (deviceIdentifier) {
+          params.set('deviceId', deviceIdentifier);
+        }
 
-        const rawMessages = response.success
-          ? Array.isArray(response.data?.messages)
-            ? response.data.messages
-            : Array.isArray(response.data)
-              ? response.data
-              : []
-          : [];
+        const response = await ApiService.get(`/chat/${chatIdentifier}/messages?${params.toString()}`, token);
+        const rawMessages = response.success && Array.isArray(response.data?.messages) ? response.data.messages : [];
 
         if (!rawMessages.length) {
           setMessagesAnimated(() => generatePlaceholderMessages(displayName));
+          setHasMore(false);
+          nextCursorRef.current = null;
+          initialLoadCompleteRef.current = true;
           return;
         }
 
-        const normalisedMessages: Message[] = [];
+        const transformed = await transformMessages(rawMessages, otherUserId ?? null);
+        const cleaned = transformed.filter(Boolean);
 
-        for (const msg of rawMessages) {
-          const baseMessage = {
-            id: String(msg.id ?? `${chatIdentifier}-${msg.created_at ?? Date.now()}`),
-            senderId: String(msg.sender_id ?? msg.senderId ?? ''),
-            receiverId: String(msg.receiver_id ?? msg.receiverId ?? otherUserId ?? ''),
-            timestamp: msg.created_at ?? msg.timestamp ?? new Date().toISOString(),
-            status: undefined as MessageStatus | undefined,
-            isPlaceholder: false,
-          };
-
-          if (baseMessage.senderId !== String(user?.id) && baseMessage.status !== 'seen') {
-            wsService.sendMessageSeen(chatIdentifier, baseMessage.id);
-          }
-
-          if (msg.isEncrypted && Array.isArray(msg.envelopes)) {
-            const decrypted = await CryptoService.decryptMessage(chatIdentifier, msg.envelopes);
-            if (!decrypted) {
-              continue;
-            }
-
-            normalisedMessages.push({
-              ...baseMessage,
-              content: decrypted,
-              status:
-                baseMessage.senderId === String(user?.id) ? 'delivered' : undefined,
-            });
-          } else {
-            normalisedMessages.push({
-              ...baseMessage,
-              content: msg.content ?? '',
-              status:
-                baseMessage.senderId === String(user?.id) ? 'delivered' : undefined,
-            });
-          }
-        }
-
-        setMessagesAnimated(() => normalisedMessages);
-        setActiveTimestampId(null);
+        setMessagesAnimated(() => cleaned);
+        lastSeenMessageIdRef.current = null;
+        setHasMore(response.data?.hasMore ?? false);
+        nextCursorRef.current = response.data?.nextCursor || (cleaned.length ? cleaned[0].timestamp : null);
+        initialLoadCompleteRef.current = true;
         scrollToBottom();
       } catch (error) {
         console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
         setMessagesAnimated(() => generatePlaceholderMessages(displayName));
+        setHasMore(false);
+        nextCursorRef.current = null;
+        lastSeenMessageIdRef.current = null;
+        initialLoadCompleteRef.current = true;
       }
     },
-    [generatePlaceholderMessages, scrollToBottom, setMessagesAnimated, user?.id, wsService]
+    [generatePlaceholderMessages, scrollToBottom, setMessagesAnimated, transformMessages]
   );
 
   const loadChatDetails = useCallback(async () => {
-    if (!chatId || !user?.id) {
+    if (!chatId || !currentUserId) {
       return;
     }
 
@@ -462,7 +592,6 @@ const ChatScreen: React.FC = () => {
       }
 
       const chatData = chatResponse.data.chat;
-
       let participantIds: string[] = [];
       try {
         const parsed = JSON.parse(chatData.users ?? '[]');
@@ -472,7 +601,6 @@ const ChatScreen: React.FC = () => {
       }
       participantIdsRef.current = participantIds;
 
-      const currentUserId = user.id.toString();
       const otherParticipantId =
         participantIds.find((pid) => pid !== currentUserId) ?? (participantIds.length > 0 ? participantIds[0] : null);
 
@@ -502,185 +630,73 @@ const ChatScreen: React.FC = () => {
       console.error(`Error loading chat ${chatId}:`, error);
       const fallbackName = receiverNameRef.current === 'Loading…' ? 'your friend' : receiverNameRef.current;
       setMessagesAnimated(() => generatePlaceholderMessages(fallbackName));
+      setHasMore(false);
+      nextCursorRef.current = null;
+      lastSeenMessageIdRef.current = null;
+      initialLoadCompleteRef.current = true;
     } finally {
       setIsThreadLoading(false);
     }
   }, [
     chatId,
-    user?.id,
-    loadMessagesForChat,
+    currentUserId,
     generatePlaceholderMessages,
+    loadMessagesForChat,
     setMessagesAnimated,
   ]);
 
-  const toggleTimestamp = useCallback((messageId: string) => {
-    setActiveTimestampId((prev) => (prev === messageId ? null : messageId));
-  }, []);
-
-  const applyAckToLatestMessage = useCallback(
-    (incoming: { messageId?: string | number; createdAt?: string }) => {
-      const currentUserId = user?.id ? String(user.id) : null;
-      if (!currentUserId) {
-        return;
-      }
-
-      setMessagesAnimated((prev) => {
-        const next = [...prev];
-        for (let i = next.length - 1; i >= 0; i -= 1) {
-          const msg = next[i];
-          if (msg.senderId === currentUserId && msg.status && msg.status !== 'delivered' && !msg.isPlaceholder) {
-            next[i] = {
-              ...msg,
-              id: incoming.messageId ? String(incoming.messageId) : msg.id,
-              status: 'delivered',
-              timestamp: incoming.createdAt ?? msg.timestamp,
-            };
-            break;
-          }
-        }
-        return next;
-      });
-    },
-    [setMessagesAnimated, user?.id]
-  );
-
-  const handleIncomingMessage = useCallback(
-    async (message: WebSocketMessage) => {
-      if (!chatId) {
-        return;
-      }
-
-      const payload: any = message;
-      const targetChatId = String(payload.chatId ?? payload.data?.chatId ?? '');
-
-      if (message.type === 'typing') {
-        const incomingChatId = String(payload.chatId ?? '');
-        const fromUser = payload.userId ? String(payload.userId) : payload.senderId ? String(payload.senderId) : '';
-        if (incomingChatId === chatId && fromUser && fromUser !== String(user?.id)) {
-          setTypingUserLabel(payload.username || receiverNameRef.current || 'Someone');
-          setIsRemoteTyping(Boolean(payload.isTyping));
-          if (remoteTypingTimeoutRef.current) {
-            clearTimeout(remoteTypingTimeoutRef.current);
-          }
-          if (payload.isTyping) {
-            remoteTypingTimeoutRef.current = setTimeout(() => setIsRemoteTyping(false), 2500);
-          }
-        }
-        return;
-      }
-
-      if (!targetChatId || targetChatId !== chatId) {
-        return;
-      }
-
-      if (message.type === 'message_seen') {
-        setMessagesAnimated((prev) =>
-          prev.map((msg) =>
-            msg.id === payload.messageId ? { ...msg, status: 'seen' } : msg
-          )
-        );
-        return;
-      }
-
-      if (message.type === 'message_envelope_sent') {
-        applyAckToLatestMessage({
-          messageId: payload.messageId ?? payload.id,
-          createdAt: payload.created_at ?? payload.timestamp,
-        });
-        return;
-      }
-
-      if (message.type === 'message_envelope') {
-        const envelopes = Array.isArray(payload.envelopes) ? payload.envelopes : [];
-        if (!envelopes.length) {
-          return;
-        }
-
-        try {
-          const decrypted = await CryptoService.decryptMessage(targetChatId, envelopes);
-          if (!decrypted) {
-            return;
-          }
-
-          const newEntry: Message = {
-            id: String(payload.messageId ?? payload.id ?? Date.now()),
-            senderId: String(payload.senderId ?? ''),
-            receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-            content: decrypted,
-            timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
-            status: undefined,
-          };
-
-          if (newEntry.senderId !== String(user?.id)) {
-            wsService.sendMessageSeen(chatId, newEntry.id);
-          }
-
-          setIsRemoteTyping(false);
-          setMessagesAnimated((prev) => {
-            const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
-            const exists = withoutPlaceholders.some((msg) => msg.id === newEntry.id);
-            if (exists) {
-              return withoutPlaceholders;
-            }
-            return [...withoutPlaceholders, newEntry];
-          });
-          setActiveTimestampId(null);
-          scrollToBottom();
-        } catch (error) {
-          console.error('Failed to decrypt incoming message envelope:', error);
-        }
-        return;
-      }
-
-      if (message.type === 'new_message') {
-        const newEntry: Message = {
-          id: String(payload.messageId ?? payload.id ?? Date.now()),
-          senderId: String(payload.senderId ?? ''),
-          receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-          content: payload.content ?? '',
-          timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
-          status: undefined,
-        };
-
-        if (newEntry.senderId !== String(user?.id)) {
-          wsService.sendMessageSeen(chatId, newEntry.id);
-        }
-
-        setIsRemoteTyping(false);
-        setMessagesAnimated((prev) => {
-          const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
-          if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
-            return withoutPlaceholders;
-          }
-          return [...withoutPlaceholders, newEntry];
-        });
-        setActiveTimestampId(null);
-        scrollToBottom();
-      }
-    },
-    [
-      applyAckToLatestMessage,
-      chatId,
-      scrollToBottom,
-      setMessagesAnimated,
-      user?.id,
-      wsService,
-    ]
-  );
-
-  const ensureTypingStopped = useCallback(() => {
-    if (!chatId) {
+  const loadEarlier = useCallback(async () => {
+    if (!chatId || isLoadingMore || !hasMore) {
       return;
     }
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = null;
+    const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+    if (!token) {
+      return;
     }
-    if (typingStateRef.current.isTyping) {
-      typingStateRef.current.isTyping = false;
-      wsService.sendTyping(chatId, false);
+    authTokenRef.current = token;
+    const cursor = nextCursorRef.current || (messages.length ? messages[0].timestamp : null);
+    if (!cursor) {
+      return;
     }
-  }, [chatId, wsService]);
+
+    setIsLoadingMore(true);
+    pendingScrollIdRef.current = topVisibleIdRef.current;
+
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', '20');
+      params.set('before', cursor);
+      if (deviceIdRef.current) {
+        params.set('deviceId', deviceIdRef.current);
+      }
+
+      const response = await ApiService.get(`/chat/${chatId}/messages?${params.toString()}`, token);
+      const rawMessages = response.success && Array.isArray(response.data?.messages) ? response.data.messages : [];
+      if (!rawMessages.length) {
+        setHasMore(false);
+        return;
+      }
+
+      const transformed = await transformMessages(rawMessages, otherUserIdRef.current);
+      const cleaned = transformed.filter(Boolean);
+
+      setMessagesAnimated((prev) => {
+        const existingIds = new Set(prev.map((msg) => msg.id));
+        const filtered = cleaned.filter((msg) => !existingIds.has(msg.id));
+        if (!filtered.length) {
+          return prev;
+        }
+        return [...filtered, ...prev];
+      });
+
+      setHasMore(response.data?.hasMore ?? false);
+      nextCursorRef.current = response.data?.nextCursor || (cleaned.length ? cleaned[0].timestamp : cursor);
+    } catch (error) {
+      console.error('Failed to load earlier messages:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [chatId, hasMore, isLoadingMore, messages, setMessagesAnimated, transformMessages]);
 
   const handleComposerChange = useCallback(
     (value: string) => {
@@ -697,6 +713,7 @@ const ChatScreen: React.FC = () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
+
       typingTimeoutRef.current = setTimeout(() => {
         typingStateRef.current.isTyping = false;
         wsService.sendTyping(chatId, false);
@@ -706,7 +723,7 @@ const ChatScreen: React.FC = () => {
   );
 
   const handleSendMessage = useCallback(async () => {
-    if (!newMessage.trim() || !user?.id || !chatId) {
+    if (!newMessage.trim() || !currentUserId || !chatId) {
       return;
     }
 
@@ -714,20 +731,21 @@ const ChatScreen: React.FC = () => {
     const temporaryId = `temp-${Date.now()}`;
     const optimisticMessage: Message = {
       id: temporaryId,
-      senderId: String(user.id),
+      senderId: currentUserId,
       receiverId: String(otherUserIdRef.current ?? ''),
       content: trimmedMessage,
       timestamp: new Date().toISOString(),
       status: 'sending',
     };
 
-    LayoutAnimation.configureNext(sendingAnimation);
     setMessagesAnimated((prev) => {
-      const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
+      const cleared = prev.map((msg) =>
+        msg.senderId === currentUserId ? { ...msg, status: undefined } : msg
+      );
+      const withoutPlaceholders = cleared.filter((msg) => !msg.isPlaceholder);
       return [...withoutPlaceholders, optimisticMessage];
     });
     scrollToBottom();
-    setActiveTimestampId(null);
     setNewMessage('');
     setIsSendingMessage(true);
     ensureTypingStopped();
@@ -740,7 +758,7 @@ const ChatScreen: React.FC = () => {
       authTokenRef.current = token;
 
       const otherParticipants = participantIdsRef.current
-        .filter((participantId) => participantId !== String(user.id))
+        .filter((participantId) => participantId !== currentUserId)
         .filter(Boolean);
 
       const recipientIds =
@@ -759,7 +777,7 @@ const ChatScreen: React.FC = () => {
         message: trimmedMessage,
         recipientUserIds: recipientIds,
         token,
-        currentUserId: String(user.id),
+        currentUserId,
       });
 
       wsService.send({
@@ -767,7 +785,7 @@ const ChatScreen: React.FC = () => {
         chatId,
         envelopes: encryptedPayload.envelopes,
         senderDeviceId: encryptedPayload.senderDeviceId,
-        messageType: 'encrypted',
+        messageType: 'e2ee',
         preview: encryptedPayload.preview,
       });
     } catch (error) {
@@ -779,14 +797,177 @@ const ChatScreen: React.FC = () => {
       setIsSendingMessage(false);
     }
   }, [
-    newMessage,
-    user?.id,
     chatId,
+    currentUserId,
     ensureTypingStopped,
+    newMessage,
     scrollToBottom,
     setMessagesAnimated,
     wsService,
   ]);
+
+  const handleIncomingMessage = useCallback(
+    async (message: WebSocketMessage) => {
+      if (!chatId) {
+        return;
+      }
+
+      const payload: any = message;
+      const targetChatId = String(payload.chatId ?? payload.data?.chatId ?? '');
+      if (targetChatId && targetChatId !== chatId) {
+        return;
+      }
+
+      switch (message.type) {
+        case 'message_status': {
+          const status = payload.status as MessageStatus | undefined;
+          if (!status) {
+            return;
+          }
+          const statusTimestamp = payload.timestamp || payload.deliveredAt || payload.seenAt || null;
+          updateOutgoingStatus(
+            status,
+            payload.messageId ? String(payload.messageId) : undefined,
+            statusTimestamp
+          );
+          return;
+        }
+        case 'message_envelope_sent': {
+          applyAckToLatestMessage({
+            messageId: payload.messageId ?? payload.id,
+            createdAt: payload.created_at ?? payload.timestamp,
+          });
+          return;
+        }
+        case 'typing': {
+          const fromUser = payload.userId ? String(payload.userId) : payload.senderId ? String(payload.senderId) : '';
+          if (fromUser && fromUser !== currentUserId) {
+            setTypingUserLabel(payload.username || receiverNameRef.current || 'Someone');
+            setIsRemoteTyping(Boolean(payload.isTyping));
+            if (remoteTypingTimeoutRef.current) {
+              clearTimeout(remoteTypingTimeoutRef.current);
+            }
+            if (payload.isTyping) {
+              remoteTypingTimeoutRef.current = setTimeout(() => setIsRemoteTyping(false), 2500);
+            }
+          }
+          return;
+        }
+        case 'message_envelope': {
+          const envelopes = Array.isArray(payload.envelopes) ? payload.envelopes : [];
+          if (!envelopes.length) {
+            return;
+          }
+
+          try {
+            const decrypted = await CryptoService.decryptMessage(targetChatId, envelopes);
+            if (!decrypted) {
+              return;
+            }
+
+            const newEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              content: decrypted,
+              timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
+            };
+
+            setIsRemoteTyping(false);
+            setMessagesAnimated((prev) => {
+              const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
+              const exists = withoutPlaceholders.some((msg) => msg.id === newEntry.id);
+              if (exists) {
+                return withoutPlaceholders;
+              }
+              return [...withoutPlaceholders, newEntry];
+            });
+            scrollToBottom();
+          } catch (error) {
+            console.error('Failed to decrypt incoming message envelope:', error);
+          }
+          return;
+        }
+        case 'new_message': {
+          const newEntry: Message = {
+            id: String(payload.messageId ?? payload.id ?? Date.now()),
+            senderId: String(payload.senderId ?? ''),
+            receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+            content: payload.content ?? '',
+            timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
+          };
+
+          setIsRemoteTyping(false);
+          setMessagesAnimated((prev) => {
+            const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
+            if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+              return withoutPlaceholders;
+            }
+            return [...withoutPlaceholders, newEntry];
+          });
+          scrollToBottom();
+          return;
+        }
+        default:
+          break;
+      }
+    },
+    [
+      applyAckToLatestMessage,
+      chatId,
+      currentUserId,
+      scrollToBottom,
+      setMessagesAnimated,
+      updateOutgoingStatus,
+    ]
+  );
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!initialLoadCompleteRef.current || isLoadingMore || !hasMore) {
+        return;
+      }
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      if (contentSize.height <= layoutMeasurement.height + 40) {
+        return;
+      }
+      if (contentOffset.y <= 24) {
+        loadEarlier();
+      }
+    },
+    [hasMore, isLoadingMore, loadEarlier]
+  );
+
+  const toggleStatusVisibility = useCallback(() => {
+    if (!lastOutgoingMessageId) {
+      return;
+    }
+    setShowStatus((prev) => !prev);
+  }, [lastOutgoingMessageId]);
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ index?: number; item: ChatListItem }> }) => {
+      if (!viewableItems.length) {
+        return;
+      }
+      const earliest = viewableItems.reduce((previous, current) => {
+        if (previous.index == null) {
+          return current;
+        }
+        if (current.index == null) {
+          return previous;
+        }
+        return current.index < previous.index ? current : previous;
+      });
+      if (earliest?.item?.id) {
+        topVisibleIdRef.current = earliest.item.id;
+      }
+    }
+  ).current;
+
+  const viewabilityConfigRef = useRef({
+    itemVisiblePercentThreshold: 60,
+  });
 
   useEffect(() => {
     if (!user?.id || !chatId) {
@@ -825,20 +1006,56 @@ const ChatScreen: React.FC = () => {
         clearTimeout(remoteTypingTimeoutRef.current);
       }
     };
-  }, [wsService, handleIncomingMessage, ensureTypingStopped]);
+  }, [ensureTypingStopped, handleIncomingMessage, wsService]);
 
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && !isLoadingMore) {
       scrollToBottom();
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, scrollToBottom, isLoadingMore]);
+
+  useEffect(() => {
+    if (!messages.length || !currentUserId) {
+      return;
+    }
+
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      if (message.isPlaceholder) {
+        continue;
+      }
+
+      if (message.senderId !== currentUserId) {
+        sendSeenReceipt(message.id);
+        break;
+      }
+    }
+  }, [messages, currentUserId, sendSeenReceipt]);
+
+  useEffect(() => {
+    if (!pendingScrollIdRef.current) {
+      return;
+    }
+    const targetId = pendingScrollIdRef.current;
+    const index = decoratedData.findIndex((item) => item.id === targetId);
+    if (index >= 0) {
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToIndex({ index, animated: false });
+        pendingScrollIdRef.current = null;
+      });
+    } else {
+      pendingScrollIdRef.current = null;
+    }
+  }, [decoratedData]);
 
   const renderChatItem = useCallback(
     ({ item, index }: { item: ChatListItem; index: number }) => {
       if (item.kind === 'date') {
         return (
           <View style={styles.dateDivider}>
+            <View style={styles.dateDividerLine} />
             <Text style={styles.dateDividerText}>{item.label}</Text>
+            <View style={styles.dateDividerLine} />
           </View>
         );
       }
@@ -850,8 +1067,9 @@ const ChatScreen: React.FC = () => {
       const messageItem = item.message;
       const previousMessage = (() => {
         for (let i = index - 1; i >= 0; i -= 1) {
-          if (decoratedData[i]?.kind === 'message') {
-            return decoratedData[i].message;
+          const prevItem = decoratedData[i];
+          if (prevItem?.kind === 'message') {
+            return prevItem.message;
           }
         }
         return null;
@@ -859,31 +1077,47 @@ const ChatScreen: React.FC = () => {
 
       const nextMessage = (() => {
         for (let i = index + 1; i < decoratedData.length; i += 1) {
-          if (decoratedData[i]?.kind === 'message') {
-            return decoratedData[i].message;
+          const nextItem = decoratedData[i];
+          if (nextItem?.kind === 'message') {
+            return nextItem.message;
           }
         }
         return null;
       })();
 
-      const isMine = user?.id != null && messageItem.senderId === String(user.id);
+      const isMine = Boolean(currentUserId && messageItem.senderId === currentUserId);
       const isFirstInGroup =
         !previousMessage || previousMessage.senderId !== messageItem.senderId || previousMessage.isPlaceholder;
       const isLastInGroup =
         !nextMessage || nextMessage.senderId !== messageItem.senderId || nextMessage.isPlaceholder;
 
+      const shouldShowStatus =
+        showStatus && lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
+
       return (
         <MessageBubble
           key={messageItem.id}
           message={messageItem}
-          isMine={Boolean(isMine)}
+          isMine={isMine}
           isFirstInGroup={isFirstInGroup}
           isLastInGroup={isLastInGroup}
-          onToggleTimestamp={toggleTimestamp}
+          showStatus={shouldShowStatus}
         />
       );
     },
-    [decoratedData, toggleTimestamp, typingUserLabel, user?.id]
+    [currentUserId, decoratedData, lastOutgoingMessageId, showStatus, typingUserLabel]
+  );
+
+  const listHeader = useMemo(
+    () =>
+      isLoadingMore ? (
+        <View style={styles.loadMoreSpinner}>
+          <ActivityIndicator size="small" color="#2C82FF" />
+        </View>
+      ) : (
+        <View style={styles.loadMoreSpacer} />
+      ),
+    [isLoadingMore]
   );
 
   if (!chatId) {
@@ -894,41 +1128,53 @@ const ChatScreen: React.FC = () => {
     );
   }
 
-  const activeMessage = messages.find((m) => m.id === activeTimestampId);
+  const isComposerEmpty = newMessage.trim().length === 0;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      <Stack.Screen options={{ title: `Chat with ${receiverUsername}` }} />
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <Stack.Screen options={{ title: receiverUsername }} />
+
+      <View style={styles.backgroundOverlay} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button">
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{receiverUsername}</Text>
-        <View style={styles.headerButton} />
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {receiverUsername}
+        </Text>
+        <View style={styles.headerButtonPlaceholder} />
       </View>
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 98 : 0}
       >
         {isThreadLoading ? (
           <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color="#2C82FF" />
             <Text style={styles.loadingStateText}>Loading conversation…</Text>
           </View>
         ) : (
-          <FlatList
-            ref={flatListRef}
-            data={decoratedData}
-            keyExtractor={(item) => item.id}
-            renderItem={renderChatItem}
-            contentContainerStyle={styles.messageList}
-            keyboardShouldPersistTaps="handled"
-            onContentSizeChange={scrollToBottom}
-          />
+          <TouchableWithoutFeedback onPress={toggleStatusVisibility} accessible={false}>
+            <View style={styles.messagesWrapper}>
+              <FlatList
+                ref={flatListRef}
+                data={decoratedData}
+                keyExtractor={(item) => item.id}
+                renderItem={renderChatItem}
+                contentContainerStyle={styles.messageList}
+                ListHeaderComponent={listHeader}
+                keyboardShouldPersistTaps="handled"
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfigRef.current}
+              />
+            </View>
+          </TouchableWithoutFeedback>
         )}
 
         <View style={styles.inputContainer}>
@@ -936,41 +1182,29 @@ const ChatScreen: React.FC = () => {
             style={styles.textInput}
             value={newMessage}
             onChangeText={handleComposerChange}
-            placeholder="Message"
-            placeholderTextColor="#8A8A8E"
+            placeholder="Message…"
+            placeholderTextColor="rgba(255, 255, 255, 0.45)"
             multiline
             editable={!isSendingMessage}
           />
           <TouchableOpacity
             onPress={handleSendMessage}
-            style={[styles.sendButton, isSendingMessage && styles.sendButtonDisabled]}
-            disabled={isSendingMessage || !newMessage.trim()}
+            style={[
+              styles.sendButton,
+              !isComposerEmpty && styles.sendButtonActive,
+              isSendingMessage && styles.sendButtonDisabled,
+            ]}
+            disabled={isComposerEmpty || isSendingMessage}
             accessibilityRole="button"
           >
             {isSendingMessage ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <Ionicons name="arrow-up-circle-fill" size={32} color={newMessage.trim() ? '#007AFF' : '#8A8A8E'} />
+              <Ionicons name="paper-plane" size={20} color="#ffffff" />
             )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-      <Modal
-        transparent
-        visible={!!activeTimestampId}
-        onRequestClose={() => setActiveTimestampId(null)}
-        animationType="fade"
-      >
-        <TouchableWithoutFeedback onPress={() => setActiveTimestampId(null)}>
-          <View style={styles.modalOverlay}>
-            {activeMessage && (
-              <View style={styles.timestampModal}>
-                <Text style={styles.timestampText}>{formatDetailedTime(activeMessage.timestamp)}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -978,61 +1212,85 @@ const ChatScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#04070F',
+  },
+  backgroundOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(3, 4, 10, 0.95)',
   },
   fallbackContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#03040A',
   },
   fallbackText: {
-    color: '#000000',
+    color: '#ffffff',
     fontSize: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-    backgroundColor: '#F8F8F8',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 12 : 8,
+    paddingBottom: 12,
   },
   headerButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerButtonPlaceholder: {
+    width: 44,
+    height: 44,
+  },
   headerTitle: {
     flex: 1,
-    color: '#000000',
-    fontSize: 17,
-    fontWeight: '600',
     textAlign: 'center',
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   keyboardAvoidingView: {
     flex: 1,
-  },
-  messageList: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
   },
   loadingState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 40,
   },
   loadingStateText: {
     marginTop: 12,
-    color: '#8A8A8E',
+    color: 'rgba(255, 255, 255, 0.72)',
     fontSize: 15,
   },
+  messagesWrapper: {
+    flex: 1,
+  },
+  messageList: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  loadMoreSpinner: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  loadMoreSpacer: {
+    height: 12,
+  },
   messageRow: {
-    marginVertical: 4,
-    maxWidth: '80%',
+    marginBottom: 2,
+    maxWidth: '82%',
+  },
+  messageRowStacked: {
+    marginTop: 2,
   },
   messageRowMine: {
     alignSelf: 'flex-end',
@@ -1042,131 +1300,144 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
     paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-  },
-  sendingBubble: {
-    transform: [{ scale: 0.9 }],
-    opacity: 0.7,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
   },
   myBubble: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#1E84FF',
+  },
+  myBubbleStacked: {
+    borderBottomRightRadius: 10,
+  },
+  myBubbleLast: {
+    borderBottomRightRadius: 22,
   },
   theirBubble: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  theirBubbleStacked: {
+    borderBottomLeftRadius: 10,
+  },
+  theirBubbleLast: {
+    borderBottomLeftRadius: 22,
   },
   placeholderBubble: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   messageText: {
-    fontSize: 17,
-  },
-  myMessageText: {
+    fontSize: 16,
     color: '#ffffff',
-  },
-  theirMessageText: {
-    color: '#000000',
+    lineHeight: 22,
   },
   placeholderText: {
-    color: '#8A8A8E',
+    color: 'rgba(255, 255, 255, 0.65)',
     fontStyle: 'italic',
   },
-  statusLabelText: {
-    marginTop: 4,
-    fontSize: 11,
-    color: '#8A8A8E',
-    textAlign: 'right',
+  statusPill: {
+    alignSelf: 'flex-end',
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(18, 34, 58, 0.85)',
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
-    backgroundColor: '#F8F8F8',
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 17,
-    color: '#000000',
-    marginRight: 8,
-  },
-  sendButton: {
-    height: 36,
-    width: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
+  statusText: {
+    color: '#B6CAFF',
+    fontSize: 12,
+    fontWeight: '500',
   },
   dateDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'center',
-    marginVertical: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
+    marginVertical: 14,
+    gap: 8,
+  },
+  dateDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   dateDividerText: {
-    color: '#8A8A8E',
-    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 13,
     fontWeight: '500',
   },
   typingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    marginLeft: 16,
-    marginVertical: 4,
+    marginTop: 10,
+    marginBottom: 14,
+    gap: 10,
   },
   typingBubble: {
-    backgroundColor: '#E5E5EA',
-    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 60,
-    height: 40,
+    gap: 6,
   },
   typingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#8A8A8E',
-    marginHorizontal: 2,
+    backgroundColor: '#ffffff',
   },
   typingText: {
-    color: '#8A8A8E',
+    color: 'rgba(255, 255, 255, 0.65)',
     fontSize: 13,
     fontWeight: '500',
-    marginLeft: 8,
   },
-  modalOverlay: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(4, 9, 19, 0.85)',
+  },
+  textInput: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#FFFFFF',
+    maxHeight: 140,
+    marginRight: 12,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
-  timestampModal: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 14,
+  sendButtonActive: {
+    backgroundColor: '#1E84FF',
+    shadowColor: '#1E84FF',
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
   },
-  timestampText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '500',
+  sendButtonDisabled: {
+    opacity: 0.6,
   },
 });
 
