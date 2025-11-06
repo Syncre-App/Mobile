@@ -1,0 +1,498 @@
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import { getInfoAsync } from 'expo-file-system/legacy';
+import { BlurView } from 'expo-blur';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { GlassCard } from '../components/GlassCard';
+import { ApiService } from '../services/ApiService';
+import { NotificationService } from '../services/NotificationService';
+import { StorageService } from '../services/StorageService';
+import { UserCacheService } from '../services/UserCacheService';
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  profile_picture?: string | null;
+  [key: string]: any;
+}
+
+export const EditProfileScreen: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<{ uri: string; mimeType: string; fileName?: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      setInitialLoading(true);
+      const token = await StorageService.getAuthToken();
+      
+      if (!token) {
+        router.replace('/' as any);
+        return;
+      }
+
+      const response = await ApiService.get('/user/me', token);
+      
+      if (response.success && response.data) {
+        const userData = response.data;
+        setUser(userData);
+        setUsername(userData.username || '');
+        setEmail(userData.email || '');
+        setProfilePicture(userData.profile_picture || null);
+      } else {
+        NotificationService.show('error', response.error || 'Failed to load profile');
+        router.back();
+      }
+    } catch (error: any) {
+      console.log('❌ Error loading user profile:', error);
+      NotificationService.show('error', 'Failed to load profile');
+      router.back();
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'] as ImagePicker.MediaType[],
+        allowsEditing: true,
+        quality: 0.9,
+        aspect: [1, 1],
+      });
+
+      if (result.canceled || !result.assets || !result.assets.length) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const fileInfo = await getInfoAsync(asset.uri);
+      if (fileInfo.exists && fileInfo.size && fileInfo.size > 5 * 1024 * 1024) {
+        NotificationService.show('error', 'Image must be smaller than 5 MB');
+        return;
+      }
+
+      setSelectedImage({
+        uri: asset.uri,
+        mimeType: asset.mimeType || 'image/jpeg',
+        fileName: asset.fileName,
+      });
+    } catch (error) {
+      console.error('Failed to pick image:', error);
+      NotificationService.show('error', 'Image picker failed');
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedImage) {
+      NotificationService.show('warning', 'Select a profile picture to upload');
+      return;
+    }
+
+    try {
+      const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
+      if (!allowedMimeTypes.includes(selectedImage.mimeType)) {
+        NotificationService.show('error', 'Unsupported image format');
+        return;
+      }
+
+      setUploading(true);
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        router.replace('/' as any);
+        return;
+      }
+
+      const formData = new FormData();
+      const extension = selectedImage.fileName?.split('.').pop()?.toLowerCase();
+      const safeExtension = extension && extension.length <= 4 ? extension : (selectedImage.mimeType === 'image/png' ? 'png' : 'jpg');
+      const fileName = selectedImage.fileName || `profile-${Date.now()}.${safeExtension}`;
+
+      formData.append('profilePicture', {
+        uri: selectedImage.uri,
+        name: fileName,
+        type: selectedImage.mimeType || 'image/jpeg',
+      } as any);
+
+      const response = await ApiService.upload('/user/profile-picture', formData, token);
+
+      if (response.success && response.data?.profile_picture) {
+        const newUrl = response.data.profile_picture;
+        setProfilePicture(newUrl);
+        setSelectedImage(null);
+        if (user) {
+          const updatedUser = { ...user, profile_picture: newUrl };
+          setUser(updatedUser);
+          await StorageService.setObject('user_data', updatedUser);
+          UserCacheService.addUser({ ...updatedUser, id: updatedUser.id?.toString?.() || updatedUser.id } as any);
+        }
+        NotificationService.show('success', 'Profile picture updated!');
+        Alert.alert(
+          'Profile Updated',
+          'Your new profile photo is live.',
+          [
+            {
+              text: 'Awesome!',
+              onPress: () => router.back(),
+            },
+          ],
+          { cancelable: false }
+        );
+        return;
+      } else {
+        NotificationService.show('error', response.error || 'Failed to upload profile picture');
+      }
+    } catch (error) {
+      console.error('Failed to upload profile picture:', error);
+      NotificationService.show('error', 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    Alert.alert(
+      'Cancel Changes',
+      'Are you sure you want to cancel? Your changes will be lost.',
+      [
+        {
+          text: 'Keep Editing',
+          style: 'cancel',
+        },
+        {
+          text: 'Cancel',
+          onPress: () => router.back(),
+          style: 'destructive',
+        },
+      ]
+    );
+  };
+
+  if (initialLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient
+          colors={['#03040A', '#071026']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2C82FF" />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      
+      {/* Background Gradient */}
+      <LinearGradient
+        colors={['#03040A', '#071026']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
+          <Ionicons name="arrow-back" size={24} color="white" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <View style={styles.headerButton} />
+      </View>
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <GlassCard width="100%" style={[styles.card, styles.photoCard]}>
+          <View style={styles.photoPickerWrapper}>
+            <TouchableOpacity
+              style={styles.photoPicker}
+              onPress={handlePickImage}
+              activeOpacity={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Change profile picture"
+            >
+              {selectedImage ? (
+                <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} />
+              ) : profilePicture ? (
+                <Image source={{ uri: profilePicture }} style={styles.profileImage} />
+              ) : (
+                <View style={styles.profilePlaceholder}>
+                  <Ionicons name="person" size={42} color="rgba(255, 255, 255, 0.7)" />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.editBadge}
+              onPress={handlePickImage}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="pencil" size={16} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.photoHint}>PNG or JPG · max 5 MB</Text>
+        </GlassCard>
+
+        <GlassCard width="100%" style={[styles.card, styles.infoCard]}>
+          <View style={[styles.infoRow, styles.infoRowFirst]}>
+            <Text style={styles.infoLabel}>Username</Text>
+            <Text style={styles.infoValue}>{username || '—'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Email</Text>
+            <Text style={styles.infoValue}>{email || '—'}</Text>
+          </View>
+        </GlassCard>
+
+        <GlassCard width="100%" style={[styles.card, styles.bioCard]}>
+          <BlurView intensity={40} tint="dark" style={styles.bioBlur}>
+            <Text style={styles.bioTitle}>Bio editing is coming soon</Text>
+            <Text style={styles.bioSubtitle}>We’re working on this feature, stay tuned!</Text>
+          </BlurView>
+        </GlassCard>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            onPress={handleUpload}
+            disabled={uploading || !selectedImage}
+            style={[styles.saveButton, (!selectedImage || uploading) && styles.saveButtonDisabled]}
+          >
+            <LinearGradient
+              colors={['#2C82FF', '#0EA5FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.saveButtonGradient}
+            >
+              {uploading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text style={styles.saveButtonText}>UPLOAD PHOTO</Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 16,
+    marginTop: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  headerTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  content: {
+    flex: 1,
+  },
+  scrollContainer: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  card: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 420,
+  },
+  photoCard: {
+    marginBottom: 24,
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 28,
+  },
+  photoPickerWrapper: {
+    position: 'relative',
+  },
+  photoPicker: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    backgroundColor: 'rgba(12, 18, 36, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  profilePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(6, 11, 23, 0.55)',
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(20, 30, 50, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+  },
+  photoHint: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  infoCard: {
+    marginBottom: 24,
+    overflow: 'hidden',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  infoRowFirst: {
+    borderTopWidth: 0,
+  },
+  infoLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+  },
+  infoValue: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bioCard: {
+    marginBottom: 32,
+    overflow: 'hidden',
+  },
+  bioBlur: {
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    gap: 6,
+  },
+  bioTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bioSubtitle: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 13,
+  },
+  buttonContainer: {
+    gap: 12,
+    marginTop: 12,
+    alignItems: 'stretch',
+  },
+  saveButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    alignSelf: 'stretch',
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+    letterSpacing: 1.1,
+  },
+  cancelButton: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  cancelButtonText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
+  },
+});

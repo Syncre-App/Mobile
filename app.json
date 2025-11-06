@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "syncre",
+    "slug": "syncre",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/logo.png",
+    "scheme": "syncre",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "notification": {
+      "icon": "./assets/logo.png",
+      "color": "#2C82FF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "xyz.syncre.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#667eea",
+        "foregroundImage": "./assets/logo.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.devbeni.syncre"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#667eea",
+          "dark": {
+            "backgroundColor": "#03040A"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "03d65be8-49f1-404d-ac7a-aa795be2f915"
+      }
+    },
+    "owner": "devbeni"
+  }
+}
