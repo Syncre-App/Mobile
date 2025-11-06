@@ -216,19 +216,19 @@ export const HomeScreen: React.FC = () => {
   const loadNotifications = useCallback(async () => {
     const buildFallbackNotifications = () => {
       const incoming = incomingRequestsRef.current.map((item: any) => ({
-        id: `incoming-${item.id}`,
+        id: `incoming-${item?.id}`,
         type: 'friend_request',
         title: `${item.username || 'Someone'} sent you a friend request`,
-        userid: item.id,
+        userid: item?.id,
         message: 'Tap to accept or decline this request.',
         timestamp: new Date().toISOString(),
       }));
 
       const outgoing = outgoingRequestsRef.current.map((item: any) => ({
-        id: `outgoing-${item.id}`,
+        id: `outgoing-${item?.id}`,
         type: 'friend_request_outgoing',
         title: `Pending request to ${item.username || 'user'}`,
-        userid: item.id,
+        userid: item?.id,
         message: 'Waiting for the other user to respond.',
         timestamp: new Date().toISOString(),
       }));
