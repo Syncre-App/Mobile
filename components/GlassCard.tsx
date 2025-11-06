@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, DimensionValue } from 'react-native';
+import { View, StyleSheet, ViewStyle, DimensionValue, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
 interface GlassCardProps {
   children: React.ReactNode;
   width?: DimensionValue;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   intensity?: number;
 }
 

@@ -114,66 +114,6 @@ export const HomeScreen: React.FC = () => {
     [persistUserProfiles]
   );
 
-  useEffect(() => {
-    const hydrateUserCache = async () => {
-      const stored = await StorageService.getObject<Record<string, any>>('user_cache');
-      if (stored) {
-        const users = Object.values(stored).map((user: any) => ({
-          ...user,
-          id: user.id?.toString?.() ?? String(user.id),
-        }));
-        if (users.length) {
-          cacheUsers(users, { updateStatus: false });
-          setUserStatuses((prev: any) => {
-            const next = { ...prev };
-            users.forEach((user: any) => {
-              if (user.status) {
-                next[user.id] = user.status;
-              }
-            });
-            return next;
-          });
-        }
-      }
-    };
-
-    hydrateUserCache();
-  }, [cacheUsers]);
-  
-  useEffect(() => {
-    validateTokenAndInit();
-  }, [validateTokenAndInit]);
-
-  useEffect(() => {
-    const wsInstance = WebSocketService.getInstance();
-    const applyStatuses = (statuses: UserStatus) => {
-      setUserStatuses((prev) => ({ ...prev, ...statuses }));
-    };
-
-    applyStatuses(wsInstance.getUserStatuses());
-    const unsubscribe = wsInstance.addStatusListener(applyStatuses);
-    wsInstance.refreshFriendsStatus();
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        PushService.registerForPushNotifications();
-        WebSocketService.getInstance().refreshFriendsStatus();
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [ensureNotificationUsers]);
-
   const ensureNotificationUsers = useCallback(async (items: any[], token?: string | null) => {
     if (!Array.isArray(items) || items.length === 0) return;
 
@@ -207,71 +147,6 @@ export const HomeScreen: React.FC = () => {
       })
     );
   }, [cacheUsers]);
-
-  const validateTokenAndInit = useCallback(async () => {
-    try {
-      console.log('🔍 HomeScreen: Validating token...');
-      const token = await StorageService.getAuthToken();
-      
-      if (!token) {
-        console.log('❌ HomeScreen: No token found - redirect to login');
-        router.replace('/');
-        return;
-      }
-
-      // Test token validity
-      const response = await ApiService.get('/user/me', token);
-      
-      if (response.success) {
-        console.log('✅ HomeScreen: Token valid - initializing...');
-        setIsValidatingToken(false);
-        await initializeScreen();
-        connectWebSocket();
-        PushService.registerForPushNotifications();
-      } else {
-        console.log('❌ HomeScreen: Token invalid - clearing and redirect to login');
-        await StorageService.removeAuthToken();
-        await StorageService.removeItem('user_data');
-        router.replace('/');
-      }
-    } catch (error) {
-      console.error('❌ HomeScreen: Token validation error:', error);
-      await StorageService.removeAuthToken();
-      await StorageService.removeItem('user_data');
-      router.replace('/');
-    }
-  }, [connectWebSocket, initializeScreen, router]);
-
-  const initializeScreen = useCallback(async () => {
-    try {
-      // First try to get user data from storage
-      const userData = await StorageService.getObject('user_data');
-      setUser(userData);
-      if (userData?.id) {
-        cacheUsers([userData]);
-      }
-      
-      // Also fetch current user data from API to ensure we have latest info
-      const token = await StorageService.getAuthToken();
-      if (token) {
-        const response = await ApiService.get('/user/me', token);
-        if (response.success && response.data) {
-          console.log('🔍 User data from API:', JSON.stringify(response.data, null, 2));
-          setUser(response.data);
-          // Update stored user data
-          await StorageService.setObject('user_data', response.data);
-          cacheUsers([response.data]);
-          WebSocketService.getInstance().refreshFriendsStatus();
-        }
-      }
-      
-      await loadChats();
-      await loadFriendData();
-      await loadNotifications();
-    } catch (error) {
-      console.error('Failed to load user data:', error);
-    }
-  }, [loadChats, loadFriendData, loadNotifications, cacheUsers]);
 
   const loadChats = useCallback(async () => {
     setChatsLoading(true);
@@ -391,9 +266,8 @@ export const HomeScreen: React.FC = () => {
         return;
       }
 
-      const fallback = buildFallbackNotifications();
-
-  if (response.statusCode === 404 || response.statusCode === 401) {
+      if (response.statusCode === 404 || response.statusCode === 401) {
+        const fallback = buildFallbackNotifications();
         console.log('🔔 Notifications endpoint returned', response.statusCode, '- using fallback list');
         await ensureNotificationUsers(fallback, token);
         setNotifications(fallback);
@@ -403,6 +277,7 @@ export const HomeScreen: React.FC = () => {
 
       console.warn('🔔 Failed to fetch notifications:', response.error);
       console.log('🔔 Full response:', response);
+      const fallback = buildFallbackNotifications();
       await ensureNotificationUsers(fallback, token);
       setNotifications(fallback);
       persistNotifications(fallback);
@@ -416,10 +291,146 @@ export const HomeScreen: React.FC = () => {
     }
   }, [ensureNotificationUsers, persistNotifications, cacheUsers]);
 
+  const initializeScreen = useCallback(async () => {
+    try {
+      // First try to get user data from storage
+      const userData = await StorageService.getObject('user_data');
+      setUser(userData);
+      if (userData && userData.id) {
+        cacheUsers([userData]);
+      }
+      
+      // Also fetch current user data from API to ensure we have latest info
+      const token = await StorageService.getAuthToken();
+      if (token) {
+        const response = await ApiService.get('/user/me', token);
+        if (response.success && response.data) {
+          console.log('🔍 User data from API:', JSON.stringify(response.data, null, 2));
+          setUser(response.data);
+          // Update stored user data
+          await StorageService.setObject('user_data', response.data);
+          cacheUsers([response.data]);
+          WebSocketService.getInstance().refreshFriendsStatus();
+        }
+      }
+      
+      await loadChats();
+      await loadFriendData();
+      await loadNotifications();
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+    }
+  }, [loadChats, loadFriendData, loadNotifications, cacheUsers]);
+
+  const connectWebSocket = useCallback(async () => {
+    try {
+      const wsService = WebSocketService.getInstance();
+      await wsService.connect();
+      setIsOnline(true);
+    } catch (error) {
+      console.error('Failed to connect WebSocket:', error);
+      setIsOnline(false);
+    }
+  }, []);
+
+  const validateTokenAndInit = useCallback(async () => {
+    try {
+      console.log('🔍 HomeScreen: Validating token...');
+      const token = await StorageService.getAuthToken();
+      
+      if (!token) {
+        console.log('❌ HomeScreen: No token found - redirect to login');
+        router.replace('/');
+        return;
+      }
+
+      // Test token validity
+      const response = await ApiService.get('/user/me', token);
+      
+      if (response.success) {
+        console.log('✅ HomeScreen: Token valid - initializing...');
+        setIsValidatingToken(false);
+        await initializeScreen();
+        connectWebSocket();
+        PushService.registerForPushNotifications();
+      } else {
+        console.log('❌ HomeScreen: Token invalid - clearing and redirect to login');
+        await StorageService.removeAuthToken();
+        await StorageService.removeItem('user_data');
+        router.replace('/');
+      }
+    } catch (error) {
+      console.error('❌ HomeScreen: Token validation error:', error);
+      await StorageService.removeAuthToken();
+      await StorageService.removeItem('user_data');
+      router.replace('/');
+    }
+  }, [connectWebSocket, initializeScreen, router]);
+
+  useEffect(() => {
+    const hydrateUserCache = async () => {
+      const stored = await StorageService.getObject<Record<string, any>>('user_cache');
+      if (stored) {
+        const users = Object.values(stored).map((user: any) => ({
+          ...user,
+          id: user.id?.toString?.() ?? String(user.id),
+        }));
+        if (users.length) {
+          cacheUsers(users, { updateStatus: false });
+          setUserStatuses((prev: any) => {
+            const next = { ...prev };
+            users.forEach((user: any) => {
+              if (user.status) {
+                next[user.id] = user.status;
+              }
+            });
+            return next;
+          });
+        }
+      }
+    };
+
+    hydrateUserCache();
+  }, [cacheUsers]);
+  
+  useEffect(() => {
+    validateTokenAndInit();
+  }, [validateTokenAndInit]);
+
+  useEffect(() => {
+    const wsInstance = WebSocketService.getInstance();
+    const applyStatuses = (statuses: UserStatus) => {
+      setUserStatuses((prev: any) => ({ ...prev, ...statuses }));
+    };
+
+    applyStatuses(wsInstance.getUserStatuses());
+    const unsubscribe = wsInstance.addStatusListener(applyStatuses);
+    wsInstance.refreshFriendsStatus();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        PushService.registerForPushNotifications();
+        WebSocketService.getInstance().refreshFriendsStatus();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [ensureNotificationUsers]);
+
   const markNotificationAsRead = useCallback(
     async (notificationId: string) => {
       try {
-        setNotifications((prev) => {
+        setNotifications((prev: any) => {
           const next = prev.filter((notification: any) => notification.id !== notificationId);
           persistNotifications(next);
           return next;
@@ -459,7 +470,7 @@ export const HomeScreen: React.FC = () => {
 
       const token = await StorageService.getAuthToken();
       if (!token) {
-        setNotifications((prev) => {
+        setNotifications((prev: any) => {
           const removalIds = new Set(unread.map((item: any) => item.id));
           const next = prev.filter((notification: any) => !removalIds.has(notification.id));
           persistNotifications(next);
@@ -473,17 +484,6 @@ export const HomeScreen: React.FC = () => {
       console.error('Failed to mark notifications as read:', error);
     }
   }, [notifications, markNotificationAsRead]);
-
-  const connectWebSocket = useCallback(async () => {
-    try {
-      const wsService = WebSocketService.getInstance();
-      await wsService.connect();
-      setIsOnline(true);
-    } catch (error) {
-      console.error('Failed to connect WebSocket:', error);
-      setIsOnline(false);
-    }
-  }, []);
 
   const handleRefresh = useCallback(async () => {
     await initializeScreen();
@@ -867,11 +867,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     opacity: 0.8,
   },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
+
   headerButton: {
     width: 44,
     height: 44,

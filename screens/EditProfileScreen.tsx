@@ -99,7 +99,7 @@ export const EditProfileScreen: React.FC = () => {
       setSelectedImage({
         uri: asset.uri,
         mimeType: asset.mimeType || 'image/jpeg',
-        fileName: asset.fileName,
+        fileName: asset.fileName ?? undefined,
       });
     } catch (error) {
       console.error('Failed to pick image:', error);
