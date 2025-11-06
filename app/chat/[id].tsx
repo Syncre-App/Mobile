@@ -1227,7 +1227,7 @@ const ChatScreen: React.FC = () => {
   const isComposerEmpty = newMessage.trim().length === 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <LinearGradient
         colors={['#03040A', '#071026']}
@@ -1255,7 +1255,7 @@ const ChatScreen: React.FC = () => {
                       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 
 
-                      keyboardVerticalOffset={0}
+                      keyboardVerticalOffset={headerHeight}
 
 
                     >
@@ -1542,7 +1542,7 @@ const styles = StyleSheet.create({
   messageList: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 12,
+    paddingBottom: 4,
   },
   loadMoreSpinner: {
     paddingVertical: 12,
@@ -1671,12 +1671,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    backgroundColor: 'rgba(4, 9, 19, 0.85)',
+    borderTopColor: 'transparent',
+    backgroundColor: 'transparent',
   },
   textInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -1684,6 +1684,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     maxHeight: 140,
     marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   sendButton: {
     width: 44,
