@@ -3,6 +3,7 @@ import { ActivityIndicator, Animated, FlatList, KeyboardAvoidingView, LayoutAnim
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { TapGestureHandler } from 'react-native-gesture-handler';
 
@@ -1228,9 +1229,11 @@ const ChatScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <LinearGradient
+        colors={['#03040A', '#071026']}
+        style={StyleSheet.absoluteFillObject}
+      />
       <Stack.Screen options={{ title: receiverUsername }} />
-
-      <View style={styles.backgroundOverlay} />
 
       <View style={styles.header} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
         <Pressable onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button">
@@ -1480,11 +1483,6 @@ const ChatScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#04070F',
-  },
-  backgroundOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(3, 4, 10, 0.95)',
   },
   fallbackContainer: {
     flex: 1,
