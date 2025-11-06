@@ -293,8 +293,7 @@ export const HomeScreen: React.FC = () => {
 
   const initializeScreen = useCallback(async () => {
     try {
-      // First try to get user data from storage
-      const userData = await StorageService.getObject('user_data');
+      const userData: any = await StorageService.getObject('user_data');
       setUser(userData);
       if (userData && userData.id) {
         cacheUsers([userData]);
