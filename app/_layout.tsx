@@ -1,8 +1,40 @@
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useEffect, useState } from 'react';
+import { ApiService } from '../services/ApiService';
+import Constants from 'expo-constants';
 
 export default function RootLayout() {
+  const [maintenance, setMaintenance] = useState(true);
+
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      if (Constants.expoConfig?.extra?.maintenance) {
+        setMaintenance(true);
+        router.replace('/maintenance');
+        return;
+      }
+
+      try {
+        const apiStatus = await ApiService.get('/health');
+        if (!apiStatus.success) {
+          setMaintenance(true);
+          router.replace('/maintenance');
+          return;
+        }
+        setMaintenance(false);
+        router.replace('/home');
+      } catch (error) {
+        setMaintenance(true);
+        router.replace('/maintenance');
+        return;
+      }
+    };
+
+    checkMaintenance();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#03040A' }}>
       <StatusBar style="light" backgroundColor="#03040A" />

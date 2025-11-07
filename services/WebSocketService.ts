@@ -26,6 +26,15 @@ export class WebSocketService {
   private joinedChats: Map<string, string | undefined> = new Map();
   private typingListeners: Map<string, ((payload: { userId: string; username: string }) => void)[]> = new Map();
   private stopTypingListeners: Map<string, ((payload: { userId: string }) => void)[]> = new Map();
+  private connectionStatusListeners: ((isConnected: boolean) => void)[] = [];
+
+  public get socket(): WebSocket | null {
+    return this.ws;
+  }
+
+  public get connected(): boolean {
+    return this.isConnected;
+  }
 
   static getInstance(): WebSocketService {
     if (!WebSocketService.instance) {
@@ -70,6 +79,7 @@ export class WebSocketService {
         console.log('🌐 WebSocket connected');
         this.isConnected = true;
         this.reconnectAttempts = 0;
+        this.notifyConnectionStatusListeners(true);
         
         // Send authentication immediately as per API documentation
         // Must authenticate within 5 seconds or connection will close with code 4001
@@ -101,6 +111,7 @@ export class WebSocketService {
         console.log('🌐 WebSocket disconnected');
         this.isConnected = false;
         this.cleanup();
+        this.notifyConnectionStatusListeners(false);
         
         // Attempt to reconnect
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -111,6 +122,7 @@ export class WebSocketService {
       this.ws.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
         this.isConnected = false;
+        this.notifyConnectionStatusListeners(false);
       };
 
     } catch (error) {
@@ -331,7 +343,22 @@ export class WebSocketService {
       type: 'request_friends_status'
     });
   }
+
+  addConnectionStatusListener(listener: (isConnected: boolean) => void): () => void {
+    this.connectionStatusListeners.push(listener);
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.connectionStatusListeners.indexOf(listener);
+      if (index > -1) {
+        this.connectionStatusListeners.splice(index, 1);
+      }
+    };
+  }
+
+  private notifyConnectionStatusListeners(isConnected: boolean): void {
+    this.connectionStatusListeners.forEach(listener => listener(isConnected));
+  }
 }
 
-// Export singleton instance
 export const webSocketService = WebSocketService.getInstance();
