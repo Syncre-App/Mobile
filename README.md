@@ -1,50 +1,84 @@
-# Welcome to your Expo app 👋
+# Syncre Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Syncre is a secure, cross-platform mobile communication application built with React Native and Expo. It focuses on privacy and security through end-to-end encryption for all communications.
 
-## Get started
+## ✨ Features
 
-1. Install dependencies
+- **Secure Messaging:** End-to-end encrypted one-on-one conversations.
+- **User Authentication:** Secure user registration, login, and profile management.
+- **Friend System:** Users can search for others, send friend requests, and manage their friend list.
+- **Real-time Communication:** Utilizes WebSockets for instant message delivery.
+- **Push Notifications:** Stay updated with new messages and friend requests even when the app is closed.
+- **Cross-Platform:** Runs on iOS, Android, and Web from a single codebase.
 
-   ```bash
-   npm install
-   ```
+## 🚀 Technologies Used
 
-2. Start the app
+- **Framework:** [React Native](https://reactnative.dev/) with [Expo](https://expo.dev/)
+- **Routing:** [Expo Router](https://docs.expo.dev/router/introduction/) for file-based navigation.
+- **UI Components:** [NextUI](https://nextui.org/) for the user interface.
+- **State Management & Data:** React Context and custom hooks.
+- **Encryption:**
+  - `@stablelib/hkdf`
+  - `@stablelib/sha256`
+  - `@stablelib/xchacha20poly1305`
+  - `expo-crypto`
+  - `tweetnacl`
+- **Storage:** `AsyncStorage` and `Expo Secure Store` for persistent and secure data storage.
+- **Real-time:** WebSockets
+- **Linting:** ESLint
+- **Typing:** TypeScript
 
-   ```bash
-   npx expo start
-   ```
+## 🏁 Getting Started
 
-In the output, you'll find options to open the app in a
+### Prerequisites
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Node.js (LTS version recommended)
+- npm or pnpm
+- Expo Go app on your mobile device for development, or Android Studio/Xcode for emulators.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Installation
 
-## Get a fresh project
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd Mobile
+    ```
 
-When you're ready, run:
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    # or
+    pnpm install
+    ```
 
-```bash
-npm run reset-project
+## 📜 Available Scripts
+
+-   **`npm start`**: Starts the development server with Expo.
+-   **`npm run android`**: Runs the app on a connected Android device or emulator.
+-   **`npm run ios`**: Runs the app on an iOS simulator or connected device.
+-   **`npm run web`**: Runs the app in a web browser.
+-   **`npm run lint`**: Lints the codebase using ESLint.
+-   **`npm run build`**: Creates a production build for iOS using EAS Build and submits it.
+-   **`npm run real-build`**: Creates release builds for both iOS and Android.
+
+## 📁 Project Structure
+
+```
+.
+├── app/                # Expo Router routes (screens)
+│   ├── chat/           # Dynamic route for individual chats
+│   ├── _layout.tsx     # Main layout
+│   ├── index.tsx       # Login/entry screen
+│   └── ...             # Other screens (profile, settings, etc.)
+├── assets/             # Static assets (images, fonts)
+├── components/         # Reusable UI components
+├── context/            # React context providers
+├── hooks/              # Custom React hooks
+├── services/           # Core services (API, Crypto, WebSocket, etc.)
+├── screens/            # (Potentially legacy) Screen components
+└── ...                 # Config files, etc.
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 📄 License
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+This project is licensed under the [MIT License](LICENSE).
