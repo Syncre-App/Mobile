@@ -81,4 +81,4 @@ Syncre is a secure, cross-platform mobile communication application built with R
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [GNU GENERAL PUBLIC LICENSE](LICENSE).
