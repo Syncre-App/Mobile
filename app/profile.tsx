@@ -14,9 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassCard } from '../components/GlassCard';
+import { UpdateService } from '../services/UpdateService';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
     router.back();
@@ -149,11 +151,11 @@ export default function ProfileScreen() {
           {renderSettingItem(
             'information-circle',
             'About Syncre',
-            'Version 1.0.0',
+            `Version ${appVersion}`,
             () => {
               Alert.alert(
                 'About Syncre',
-                'Syncre is a modern chat application built with React Native and Expo.\n\nVersion: 1.0.0\nBuilt with ❤️ by the Syncre team'
+                `Syncre is a modern chat application built with React Native and Expo.\n\nVersion: ${appVersion}\nBuilt with ❤️ by the Syncre team`
               );
             }
           )}

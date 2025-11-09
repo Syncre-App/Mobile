@@ -1,4 +1,7 @@
 import Constants from 'expo-constants';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const appConfigJson = require('../app.json');
+const resolvedAppConfig = appConfigJson?.expo ? appConfigJson : appConfigJson?.default || {};
 
 export interface ReleaseInfo {
   version: string;
@@ -34,9 +37,15 @@ const compareVersions = (current: string, latest: string): number => {
 
 export const UpdateService = {
   getCurrentVersion(): string {
+    const staticVersion =
+      (resolvedAppConfig as any)?.expo?.version ||
+      (resolvedAppConfig as any)?.version ||
+      (Constants.expoConfig?.extra as any)?.appVersion ||
+      null;
+
     return (
-      Constants.expoConfig?.version ||
-      (Constants as any).manifest?.version ||
+      (Constants.expoConfig?.version as string | undefined) ||
+      staticVersion ||
       '0.0.0'
     );
   },
