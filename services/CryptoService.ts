@@ -160,15 +160,31 @@ async function getRecipientPublicKey(userId: string, token: string): Promise<str
     return cached.key;
   }
 
-  const response = await ApiService.get(`/keys/identity/public/${userId}`, token);
-  if (!response.success || !response.data?.publicKey) {
-    throw new Error(response.error || 'Missing recipient identity key');
+  const identityResponse = await ApiService.get(`/keys/identity/public/${userId}`, token);
+  if (identityResponse.success && identityResponse.data?.publicKey) {
+    const entry = {
+      key: identityResponse.data.publicKey,
+      version: identityResponse.data.version || 1,
+    };
+    recipientPublicKeyCache.set(userId, entry);
+    return entry.key;
   }
 
-  const entry = {
-    key: response.data.publicKey,
-    version: response.data.version || 1,
-  };
+  if (identityResponse.statusCode !== 404) {
+    throw new Error(identityResponse.error || 'Missing recipient identity key');
+  }
+
+  const legacyResponse = await ApiService.get(`/keys/${userId}`, token);
+  if (!legacyResponse.success || !Array.isArray(legacyResponse.data?.devices) || !legacyResponse.data.devices.length) {
+    throw new Error(legacyResponse.error || 'Missing recipient identity key');
+  }
+
+  const fallbackKey = legacyResponse.data.devices[0]?.identityKey;
+  if (!fallbackKey) {
+    throw new Error('Missing recipient identity key');
+  }
+
+  const entry = { key: fallbackKey, version: 1 };
   recipientPublicKeyCache.set(userId, entry);
   return entry.key;
 }
