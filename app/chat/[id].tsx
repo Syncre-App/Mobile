@@ -242,6 +242,7 @@ const ChatScreen: React.FC = () => {
   const topVisibleIdRef = useRef<string | null>(null);
   const pendingScrollIdRef = useRef<string | null>(null);
   const lastSeenMessageIdRef = useRef<string | null>(null);
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
   const markSeenInFlightRef = useRef(false);
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -515,7 +516,7 @@ const ChatScreen: React.FC = () => {
       authTokenRef.current = token;
 
       const response = await ApiService.post(`/chat/${chatId}/seen`, {}, token);
-      if (response.success) {
+      if (response.success || /already\s+read/i.test(response.error ?? '')) {
         DeviceEventEmitter.emit('unread:refresh');
       } else if (response.error) {
         console.warn(`[chat/${chatId}] Failed to sync seen state:`, response.error);
@@ -541,6 +542,7 @@ const ChatScreen: React.FC = () => {
         messageId,
       });
       lastSeenMessageIdRef.current = messageId;
+      seenMessageIdsRef.current.add(messageId);
       markChatAsSeen();
     },
     [chatId, markChatAsSeen, wsService]
@@ -596,6 +598,7 @@ const ChatScreen: React.FC = () => {
     }
 
     setIsThreadLoading(true);
+    seenMessageIdsRef.current = new Set();
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
@@ -1133,13 +1136,12 @@ const ChatScreen: React.FC = () => {
 
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const message = messages[i];
-      if (message.isPlaceholder) {
+      if (message.isPlaceholder || message.senderId === currentUserId) {
         continue;
       }
 
-      if (message.senderId !== currentUserId) {
+      if (!seenMessageIdsRef.current.has(message.id)) {
         sendSeenReceipt(message.id);
-        break;
       }
     }
   }, [messages, currentUserId, sendSeenReceipt]);
