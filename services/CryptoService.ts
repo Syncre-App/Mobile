@@ -5,7 +5,7 @@ import nacl from 'tweetnacl';
 import { XChaCha20Poly1305 } from '@stablelib/xchacha20poly1305';
 import { HKDF } from '@stablelib/hkdf';
 import { SHA256 } from '@stablelib/sha256';
-import { pbkdf2 } from '@stablelib/pbkdf2';
+import { deriveKey as pbkdf2DeriveKey } from '@stablelib/pbkdf2';
 import { ApiService } from './ApiService';
 import { DeviceService } from './DeviceService';
 
@@ -130,7 +130,7 @@ async function ensureIdentityAvailable(): Promise<IdentityKeyPair> {
 
 async function derivePassphraseKey(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
   const passwordBytes = utf8ToBytes(password);
-  return pbkdf2(passwordBytes, salt, iterations, 32, SHA256);
+  return pbkdf2DeriveKey(SHA256, passwordBytes, salt, iterations, 32);
 }
 
 const recipientPublicKeyCache = new Map<string, { key: string; version: number }>();
