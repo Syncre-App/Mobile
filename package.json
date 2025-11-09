@@ -20,6 +20,7 @@
     "@react-navigation/elements": "^2.6.5",
     "@react-navigation/native": "^7.1.18",
     "@stablelib/hkdf": "^2.0.1",
+    "@stablelib/pbkdf2": "^2.0.1",
     "@stablelib/sha256": "^2.0.1",
     "@stablelib/xchacha20poly1305": "^2.0.1",
     "base64-js": "^1.5.1",

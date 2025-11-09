@@ -17,6 +17,7 @@ import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
+import { CryptoService } from '../services/CryptoService';
 
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -64,6 +65,15 @@ export const LoginScreen: React.FC = () => {
           await StorageService.setObject('user_data', user);
         } else {
           console.warn('Login: server returned no user object');
+        }
+
+        if (token) {
+          try {
+            await CryptoService.bootstrapIdentity({ password, token });
+          } catch (identityError) {
+            console.error('Failed to bootstrap identity keys:', identityError);
+            notificationService.show('error', 'Unable to initialize secure messaging keys', 'Encryption error');
+          }
         }
 
         notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');

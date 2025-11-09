@@ -5,9 +5,9 @@ import nacl from 'tweetnacl';
 import { XChaCha20Poly1305 } from '@stablelib/xchacha20poly1305';
 import { HKDF } from '@stablelib/hkdf';
 import { SHA256 } from '@stablelib/sha256';
+import { pbkdf2 } from '@stablelib/pbkdf2';
 import { ApiService } from './ApiService';
 import { DeviceService } from './DeviceService';
-import { StorageService } from './StorageService';
 
 // @ts-ignore
 if (typeof globalThis.Buffer === 'undefined') {
@@ -18,17 +18,8 @@ if (typeof globalThis.Buffer === 'undefined') {
 const IDENTITY_PRIVATE_KEY_KEY = 'e2ee_identity_private_v1';
 const IDENTITY_PUBLIC_KEY_KEY = 'e2ee_identity_public_v1';
 const IDENTITY_VERSION_KEY = 'e2ee_identity_version';
-const KEY_REGISTRATION_FLAG_PREFIX = 'e2ee_registration:';
 const KEY_INFO_CONTEXT = 'syncre-chat-v1';
 const HKDF_KEY_LENGTH = 32;
-const MESSAGE_PREVIEW_LENGTH = 120;
-
-export interface DeviceKeyRecord {
-  deviceId: string;
-  identityKey: string;
-  keyVersion: number;
-  lastSeen?: string | null;
-}
 
 export interface EnvelopeEntry {
   recipientId: string;
@@ -43,7 +34,6 @@ export interface EnvelopeEntry {
 
 export interface EncryptedPayload {
   envelopes: EnvelopeEntry[];
-  preview: string | null;
   senderDeviceId: string;
 }
 
@@ -81,17 +71,14 @@ const randomBytes = (length: number): Uint8Array => {
   }
 };
 
-const deriveSymmetricKey = (sharedSecret: Uint8Array, chatId: string, recipientDeviceId: string | null): Uint8Array => {
-  const info = utf8ToBytes(`${KEY_INFO_CONTEXT}:${chatId}:${recipientDeviceId ?? 'default'}`);
-  const salt = new Uint8Array(HKDF_KEY_LENGTH); // zero salt is acceptable for HKDF when info changes per message.
+const deriveSymmetricKey = (sharedSecret: Uint8Array, chatId: string): Uint8Array => {
+  const info = utf8ToBytes(`${KEY_INFO_CONTEXT}:${chatId}`);
+  const salt = new Uint8Array(HKDF_KEY_LENGTH);
   const hkdf = new HKDF(SHA256, sharedSecret, salt, info);
   const key = hkdf.expand(HKDF_KEY_LENGTH);
   hkdf.clean();
   return key;
 };
-
-const registrationKey = (deviceId: string, version: number): string =>
-  `${KEY_REGISTRATION_FLAG_PREFIX}${deviceId}:v${version}`;
 
 async function readSecureItem(key: string): Promise<string | null> {
   try {
@@ -111,7 +98,7 @@ async function writeSecureItem(key: string, value: string): Promise<void> {
   }
 }
 
-async function ensureIdentityKeyPair(): Promise<IdentityKeyPair> {
+async function getLocalIdentity(): Promise<IdentityKeyPair | null> {
   const existingPrivate = await readSecureItem(IDENTITY_PRIVATE_KEY_KEY);
   const existingPublic = await readSecureItem(IDENTITY_PUBLIC_KEY_KEY);
   const versionStr = (await readSecureItem(IDENTITY_VERSION_KEY)) || '1';
@@ -124,104 +111,189 @@ async function ensureIdentityKeyPair(): Promise<IdentityKeyPair> {
       keyVersion: version,
     };
   }
+  return null;
+}
 
-  const secretKey = randomBytes(32);
-  const keyPair = nacl.box.keyPair.fromSecretKey(secretKey);
-  const privateKey = toBase64(secretKey);
-  const publicKey = toBase64(keyPair.publicKey);
+async function persistLocalIdentity(identity: IdentityKeyPair): Promise<void> {
+  await writeSecureItem(IDENTITY_PRIVATE_KEY_KEY, identity.privateKey);
+  await writeSecureItem(IDENTITY_PUBLIC_KEY_KEY, identity.publicKey);
+  await writeSecureItem(IDENTITY_VERSION_KEY, String(identity.keyVersion));
+}
 
-  await writeSecureItem(IDENTITY_PRIVATE_KEY_KEY, privateKey);
-  await writeSecureItem(IDENTITY_PUBLIC_KEY_KEY, publicKey);
-  await writeSecureItem(IDENTITY_VERSION_KEY, String(version));
+async function ensureIdentityAvailable(): Promise<IdentityKeyPair> {
+  const identity = await getLocalIdentity();
+  if (!identity) {
+    throw new Error('Identity key not initialized');
+  }
+  return identity;
+}
 
+async function derivePassphraseKey(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
+  const passwordBytes = utf8ToBytes(password);
+  return pbkdf2(passwordBytes, salt, iterations, 32, SHA256);
+}
+
+const recipientPublicKeyCache = new Map<string, { key: string; version: number }>();
+
+async function encryptPrivateKey(secretKey: Uint8Array, passphraseKey: Uint8Array) {
+  const cipher = new XChaCha20Poly1305(passphraseKey);
+  const nonce = randomBytes(24);
+  const encrypted = cipher.seal(nonce, secretKey);
   return {
-    privateKey,
-    publicKey,
-    keyVersion: version,
+    encryptedPrivateKey: toBase64(encrypted),
+    nonce: toBase64(nonce),
   };
 }
 
-async function ensureKeyRegistration(token: string): Promise<void> {
-  const identity = await ensureIdentityKeyPair();
-  const deviceId = await DeviceService.getOrCreateDeviceId();
-
-  const registrationMarker = registrationKey(deviceId, identity.keyVersion);
-  const alreadyRegistered = await StorageService.getItem(registrationMarker);
-  if (alreadyRegistered === '1') {
-    return;
+async function decryptPrivateKey(encryptedBase64: string, nonceBase64: string, passphraseKey: Uint8Array) {
+  const cipher = new XChaCha20Poly1305(passphraseKey);
+  const decrypted = cipher.open(fromBase64(nonceBase64), fromBase64(encryptedBase64));
+  if (!decrypted) {
+    throw new Error('Failed to decrypt identity key');
   }
-
-  const response = await ApiService.post(
-    '/keys/register',
-    {
-      deviceId,
-      identityKey: identity.publicKey,
-      keyVersion: identity.keyVersion,
-    },
-    token
-  );
-
-  if (!response.success) {
-    throw new Error(response.error || 'Failed to register device key');
-  }
-
-  await StorageService.setItem(registrationMarker, '1');
+  return decrypted;
 }
 
-async function fetchRemoteDevices(targetUserId: string, token: string): Promise<DeviceKeyRecord[]> {
-  const cacheKey = `e2ee_devices:${targetUserId}`;
-  const cachedData = (await StorageService.getObject<DeviceKeyRecord[]>(cacheKey)) ?? null;
-
-  const response = await ApiService.get(`/keys/${targetUserId}`, token);
-  if (!response.success || !response.data) {
-    if (cachedData) {
-      return cachedData;
-    }
-    throw new Error(response.error || 'Failed to fetch device keys');
+async function getRecipientPublicKey(userId: string, token: string): Promise<string> {
+  const cached = recipientPublicKeyCache.get(userId);
+  if (cached) {
+    return cached.key;
   }
 
-  const devices = Array.isArray(response.data.devices) ? response.data.devices : [];
-  await StorageService.setObject(cacheKey, devices);
-  return devices;
+  const response = await ApiService.get(`/keys/identity/public/${userId}`, token);
+  if (!response.success || !response.data?.publicKey) {
+    throw new Error(response.error || 'Missing recipient identity key');
+  }
+
+  const entry = {
+    key: response.data.publicKey,
+    version: response.data.version || 1,
+  };
+  recipientPublicKeyCache.set(userId, entry);
+  return entry.key;
+}
+
+interface BootstrapParams {
+  password: string;
+  token: string;
 }
 
 async function getSenderIdentity(): Promise<{
   identity: IdentityKeyPair;
   privateKeyBytes: Uint8Array;
-  publicKeyBytes: Uint8Array;
 }> {
-  const identity = await ensureIdentityKeyPair();
+  const identity = await ensureIdentityAvailable();
   const privateKeyBytes = fromBase64(identity.privateKey);
-  const publicKeyBytes = fromBase64(identity.publicKey);
   return {
     identity,
     privateKeyBytes,
-    publicKeyBytes,
   };
 }
 
-const buildPreview = (message: string): string | null => {
-  if (!message) {
-    return null;
-  }
-  if (message.length <= MESSAGE_PREVIEW_LENGTH) {
-    return message;
-  }
-  return `${message.slice(0, MESSAGE_PREVIEW_LENGTH - 1)}…`;
-};
+async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<void> {
+  const localIdentity = await getLocalIdentity();
+  if (localIdentity) {
+    // Ensure the server has a copy; if not, upload.
+    const check = await ApiService.get('/keys/identity', token);
+    if (check.success) {
+      return;
+    }
+    if (check.statusCode !== 404) {
+      throw new Error(check.error || 'Unable to verify identity key');
+    }
 
-async function encryptForDevice(options: {
+    // Server missing copy; upload encrypted version using supplied password.
+    const saltBytes = randomBytes(16);
+    const iterations = 200000;
+    const passphraseKey = await derivePassphraseKey(password, saltBytes, iterations);
+    const secretKeyBytes = fromBase64(localIdentity.privateKey);
+    const { encryptedPrivateKey, nonce } = await encryptPrivateKey(secretKeyBytes, passphraseKey);
+    await ApiService.post(
+      '/keys/identity',
+      {
+        publicKey: localIdentity.publicKey,
+        encryptedPrivateKey,
+        nonce,
+        salt: toBase64(saltBytes),
+        iterations,
+        version: localIdentity.keyVersion || 1,
+      },
+      token
+    );
+    return;
+  }
+
+  const existing = await ApiService.get('/keys/identity', token);
+  if (existing.success && existing.data) {
+    const saltBase64 = existing.data.salt;
+    const nonceBase64 = existing.data.nonce;
+    if (!saltBase64 || !nonceBase64) {
+      throw new Error('Incomplete identity key payload');
+    }
+    const saltBytes = fromBase64(saltBase64);
+    const iterations = existing.data.iterations || 150000;
+    const passphraseKey = await derivePassphraseKey(password, saltBytes, iterations);
+    const privateKeyBytes = await decryptPrivateKey(existing.data.encryptedPrivateKey, nonceBase64, passphraseKey);
+    const privateKey = toBase64(privateKeyBytes);
+    const identity: IdentityKeyPair = {
+      privateKey,
+      publicKey: existing.data.publicKey,
+      keyVersion: existing.data.version || 1,
+    };
+    await persistLocalIdentity(identity);
+    return;
+  }
+
+  if (existing.statusCode && existing.statusCode !== 404) {
+    throw new Error(existing.error || 'Failed to fetch identity key');
+  }
+
+  // No identity exists anywhere; create a fresh pair, encrypt, and upload.
+  const secretKey = randomBytes(32);
+  const keyPair = nacl.box.keyPair.fromSecretKey(secretKey);
+  const saltBytes = randomBytes(16);
+  const iterations = 200000;
+  const passphraseKey = await derivePassphraseKey(password, saltBytes, iterations);
+  const { encryptedPrivateKey, nonce } = await encryptPrivateKey(secretKey, passphraseKey);
+
+  await ApiService.post(
+    '/keys/identity',
+    {
+      publicKey: toBase64(keyPair.publicKey),
+      encryptedPrivateKey,
+      nonce,
+      salt: toBase64(saltBytes),
+      iterations,
+      version: 1,
+    },
+    token
+  );
+
+  await persistLocalIdentity({
+    privateKey: toBase64(secretKey),
+    publicKey: toBase64(keyPair.publicKey),
+    keyVersion: 1,
+  });
+}
+
+async function encryptForRecipient({
+  chatId,
+  message,
+  recipientUserId,
+  recipientPublicKey,
+  privateKeyBytes,
+  senderPublicKey,
+}: {
   chatId: string;
   message: string;
   recipientUserId: string;
-  device: DeviceKeyRecord;
+  recipientPublicKey: string;
   privateKeyBytes: Uint8Array;
   senderPublicKey: string;
 }): Promise<EnvelopeEntry> {
-  const { chatId, message, recipientUserId, device, privateKeyBytes, senderPublicKey } = options;
-  const recipientKeyBytes = fromBase64(device.identityKey);
+  const recipientKeyBytes = fromBase64(recipientPublicKey);
   const sharedSecret = nacl.box.before(recipientKeyBytes, privateKeyBytes);
-  const symmetricKey = deriveSymmetricKey(sharedSecret, chatId, device.deviceId);
+  const symmetricKey = deriveSymmetricKey(sharedSecret, chatId);
   const cipher = new XChaCha20Poly1305(symmetricKey);
 
   const nonce = randomBytes(24);
@@ -229,10 +301,10 @@ async function encryptForDevice(options: {
 
   return {
     recipientId: recipientUserId,
-    recipientDevice: device.deviceId,
+    recipientDevice: null,
     payload: toBase64(payload),
     nonce: toBase64(nonce),
-    keyVersion: device.keyVersion ?? 1,
+    keyVersion: 1,
     alg: 'xchacha20poly1305',
     senderIdentityKey: senderPublicKey,
     version: 1,
@@ -250,10 +322,11 @@ async function decryptEnvelope(options: {
   }
 
   const senderKeyBytes = fromBase64(envelope.senderIdentityKey);
-  const { privateKeyBytes } = await getSenderIdentity();
+  const identity = await ensureIdentityAvailable();
+  const privateKeyBytes = fromBase64(identity.privateKey);
 
   const sharedSecret = nacl.box.before(senderKeyBytes, privateKeyBytes);
-  const symmetricKey = deriveSymmetricKey(sharedSecret, chatId, envelope.recipientDevice || null);
+  const symmetricKey = deriveSymmetricKey(sharedSecret, chatId);
   const cipher = new XChaCha20Poly1305(symmetricKey);
 
   try {
@@ -271,24 +344,22 @@ async function decryptEnvelope(options: {
 }
 
 export const CryptoService = {
-  async ensureIdentity(token: string): Promise<string> {
-    await ensureKeyRegistration(token);
-    const identity = await ensureIdentityKeyPair();
+  bootstrapIdentity,
+
+  async ensureIdentity(): Promise<string> {
+    const identity = await ensureIdentityAvailable();
     return identity.publicKey;
   },
 
   async getIdentityInfo(): Promise<IdentityKeyPair> {
-    return ensureIdentityKeyPair();
+    return ensureIdentityAvailable();
   },
 
   async resetIdentity(): Promise<void> {
     await SecureStore.deleteItemAsync(IDENTITY_PRIVATE_KEY_KEY);
     await SecureStore.deleteItemAsync(IDENTITY_PUBLIC_KEY_KEY);
     await SecureStore.deleteItemAsync(IDENTITY_VERSION_KEY);
-  },
-
-  async getDeviceKeys(userId: string, token: string): Promise<DeviceKeyRecord[]> {
-    return fetchRemoteDevices(userId, token);
+    recipientPublicKeyCache.clear();
   },
 
   async buildEncryptedPayload(params: {
@@ -303,60 +374,29 @@ export const CryptoService = {
       throw new Error('No recipients provided for encrypted payload');
     }
 
-    const { identity, privateKeyBytes, publicKeyBytes } = await getSenderIdentity();
-    await ensureKeyRegistration(token);
-
+    const { identity, privateKeyBytes } = await getSenderIdentity();
     const senderDeviceId = await DeviceService.getOrCreateDeviceId();
-    const allRecipients = new Map<string, DeviceKeyRecord[]>();
-
-    for (const userId of recipientUserIds) {
-      const devices = await fetchRemoteDevices(userId, token);
-      if (!devices.length) {
-        console.warn(`[CryptoService] No device keys for user ${userId}`);
-      }
-      allRecipients.set(userId, devices);
-    }
-
-    // Include the sender's own devices so other clients stay in sync.
-    let senderDevices: DeviceKeyRecord[] = [];
-    try {
-      senderDevices = await fetchRemoteDevices(currentUserId, token);
-    } catch (error) {
-      console.warn('[CryptoService] Unable to fetch sender devices, using current device only', error);
-    }
-
-    const senderPublicKey = toBase64(publicKeyBytes);
-    if (!senderDevices.length) {
-      senderDevices = [
-        {
-          deviceId: senderDeviceId,
-          identityKey: senderPublicKey,
-          keyVersion: identity.keyVersion,
-        },
-      ];
-    }
-    allRecipients.set(currentUserId, senderDevices);
+    const uniqueRecipients = new Set(recipientUserIds.map((id) => id.toString()));
+    uniqueRecipients.add(currentUserId);
 
     const envelopes: EnvelopeEntry[] = [];
-
-    for (const [userId, devices] of allRecipients) {
-      for (const device of devices) {
-        envelopes.push(
-          await encryptForDevice({
-            chatId,
-            message,
-            recipientUserId: userId,
-            device,
-            privateKeyBytes,
-            senderPublicKey,
-          })
-        );
-      }
+    for (const userId of uniqueRecipients) {
+      const publicKey =
+        userId === currentUserId ? identity.publicKey : await getRecipientPublicKey(userId, token);
+      envelopes.push(
+        await encryptForRecipient({
+          chatId,
+          message,
+          recipientUserId: userId,
+          recipientPublicKey: publicKey,
+          privateKeyBytes,
+          senderPublicKey: identity.publicKey,
+        })
+      );
     }
 
     return {
       envelopes,
-      preview: buildPreview(message),
       senderDeviceId,
     };
   },

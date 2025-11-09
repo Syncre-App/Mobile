@@ -607,12 +607,6 @@ const ChatScreen: React.FC = () => {
       setReceiverUsername(displayName);
       setTypingUserLabel(displayName);
 
-      try {
-        await CryptoService.ensureIdentity(token);
-      } catch (cryptoError) {
-        console.error('Failed to ensure E2EE identity before loading messages:', cryptoError);
-      }
-
       await loadMessagesForChat(token, chatId, displayName, otherParticipantId);
     } catch (error) {
       console.error(`Error loading chat ${chatId}:`, error);
@@ -794,7 +788,6 @@ const ChatScreen: React.FC = () => {
         envelopes: encryptedPayload.envelopes,
         senderDeviceId: encryptedPayload.senderDeviceId,
         messageType: 'e2ee',
-        preview: encryptedPayload.preview,
       });
     } catch (error) {
       console.error(`Error sending encrypted message to chat ${chatId}:`, error);

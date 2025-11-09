@@ -45,7 +45,7 @@ export const useAuth = (): UseAuthResult => {
         setUser(response.data);
         await StorageService.setObject('user_data', response.data);
         try {
-          await CryptoService.ensureIdentity(token);
+          await CryptoService.ensureIdentity();
         } catch (cryptoError) {
           console.error('useAuth: failed to ensure identity keys', cryptoError);
         }
