@@ -206,36 +206,39 @@ async function getSenderIdentity(): Promise<{
   };
 }
 
+async function uploadIdentityBundle({
+  identity,
+  password,
+  token,
+}: {
+  identity: IdentityKeyPair;
+  password: string;
+  token: string;
+}): Promise<void> {
+  const saltBytes = randomBytes(16);
+  const iterations = 200000;
+  const passphraseKey = await derivePassphraseKey(password, saltBytes, iterations);
+  const secretKeyBytes = fromBase64(identity.privateKey);
+  const { encryptedPrivateKey, nonce } = await encryptPrivateKey(secretKeyBytes, passphraseKey);
+
+  await ApiService.post(
+    '/keys/identity',
+    {
+      publicKey: identity.publicKey,
+      encryptedPrivateKey,
+      nonce,
+      salt: toBase64(saltBytes),
+      iterations,
+      version: identity.keyVersion || 1,
+    },
+    token
+  );
+}
+
 async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<void> {
   const localIdentity = await getLocalIdentity();
   if (localIdentity) {
-    // Ensure the server has a copy; if not, upload.
-    const check = await ApiService.get('/keys/identity', token);
-    if (check.success) {
-      return;
-    }
-    if (check.statusCode !== 404) {
-      throw new Error(check.error || 'Unable to verify identity key');
-    }
-
-    // Server missing copy; upload encrypted version using supplied password.
-    const saltBytes = randomBytes(16);
-    const iterations = 200000;
-    const passphraseKey = await derivePassphraseKey(password, saltBytes, iterations);
-    const secretKeyBytes = fromBase64(localIdentity.privateKey);
-    const { encryptedPrivateKey, nonce } = await encryptPrivateKey(secretKeyBytes, passphraseKey);
-    await ApiService.post(
-      '/keys/identity',
-      {
-        publicKey: localIdentity.publicKey,
-        encryptedPrivateKey,
-        nonce,
-        salt: toBase64(saltBytes),
-        iterations,
-        version: localIdentity.keyVersion || 1,
-      },
-      token
-    );
+    await uploadIdentityBundle({ identity: localIdentity, password, token });
     return;
   }
 
@@ -257,6 +260,7 @@ async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<
       keyVersion: existing.data.version || 1,
     };
     await persistLocalIdentity(identity);
+    await uploadIdentityBundle({ identity, password, token });
     return;
   }
 
@@ -267,29 +271,14 @@ async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<
   // No identity exists anywhere; create a fresh pair, encrypt, and upload.
   const secretKey = randomBytes(32);
   const keyPair = nacl.box.keyPair.fromSecretKey(secretKey);
-  const saltBytes = randomBytes(16);
-  const iterations = 200000;
-  const passphraseKey = await derivePassphraseKey(password, saltBytes, iterations);
-  const { encryptedPrivateKey, nonce } = await encryptPrivateKey(secretKey, passphraseKey);
-
-  await ApiService.post(
-    '/keys/identity',
-    {
-      publicKey: toBase64(keyPair.publicKey),
-      encryptedPrivateKey,
-      nonce,
-      salt: toBase64(saltBytes),
-      iterations,
-      version: 1,
-    },
-    token
-  );
-
-  await persistLocalIdentity({
+  const freshIdentity: IdentityKeyPair = {
     privateKey: toBase64(secretKey),
     publicKey: toBase64(keyPair.publicKey),
     keyVersion: 1,
-  });
+  };
+
+  await persistLocalIdentity(freshIdentity);
+  await uploadIdentityBundle({ identity: freshIdentity, password, token });
 }
 
 async function encryptForRecipient({
