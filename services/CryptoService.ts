@@ -206,6 +206,23 @@ async function getSenderIdentity(): Promise<{
   };
 }
 
+async function registerDeviceIdentity(identity: IdentityKeyPair, token: string): Promise<void> {
+  try {
+    const deviceId = await DeviceService.getOrCreateDeviceId();
+    await ApiService.post(
+      '/keys/register',
+      {
+        deviceId,
+        identityKey: identity.publicKey,
+        keyVersion: identity.keyVersion || 1,
+      },
+      token
+    );
+  } catch (error) {
+    console.warn('[CryptoService] Failed to register device identity:', error);
+  }
+}
+
 async function uploadIdentityBundle({
   identity,
   password,
@@ -233,6 +250,7 @@ async function uploadIdentityBundle({
     },
     token
   );
+  await registerDeviceIdentity(identity, token);
 }
 
 async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<void> {
