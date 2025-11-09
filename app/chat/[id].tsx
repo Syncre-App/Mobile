@@ -242,6 +242,7 @@ const ChatScreen: React.FC = () => {
   const topVisibleIdRef = useRef<string | null>(null);
   const pendingScrollIdRef = useRef<string | null>(null);
   const lastSeenMessageIdRef = useRef<string | null>(null);
+  const markSeenInFlightRef = useRef(false);
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const remoteTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -499,6 +500,33 @@ const ChatScreen: React.FC = () => {
     [currentUserId, setMessagesAnimated]
   );
 
+  const markChatAsSeen = useCallback(async () => {
+    if (!chatId || markSeenInFlightRef.current) {
+      return;
+    }
+
+    markSeenInFlightRef.current = true;
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        return;
+      }
+      authTokenRef.current = token;
+
+      const response = await ApiService.post(`/chat/${chatId}/seen`, {}, token);
+      if (response.success) {
+        DeviceEventEmitter.emit('unread:refresh');
+      } else if (response.error) {
+        console.warn(`[chat/${chatId}] Failed to sync seen state:`, response.error);
+      }
+    } catch (error) {
+      console.error(`Failed to mark chat ${chatId} as seen:`, error);
+    } finally {
+      markSeenInFlightRef.current = false;
+    }
+  }, [chatId]);
+
   const sendSeenReceipt = useCallback(
     (messageId: string) => {
       if (!chatId || !messageId) {
@@ -513,9 +541,9 @@ const ChatScreen: React.FC = () => {
         messageId,
       });
       lastSeenMessageIdRef.current = messageId;
-      DeviceEventEmitter.emit('unread:refresh');
+      markChatAsSeen();
     },
-    [chatId, wsService]
+    [chatId, markChatAsSeen, wsService]
   );
 
   const loadMessagesForChat = useCallback(
@@ -1219,6 +1247,10 @@ const ChatScreen: React.FC = () => {
   }
 
   const isComposerEmpty = newMessage.trim().length === 0;
+  const keyboardOffset = useMemo(
+    () => (Platform.OS === 'ios' ? headerHeight + insets.top : headerHeight),
+    [headerHeight, insets.top]
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -1241,17 +1273,9 @@ const ChatScreen: React.FC = () => {
 
 
                     <KeyboardAvoidingView
-
-
-                      style={{ flex: 1 }}
-
-
+                      style={styles.keyboardAvoidingView}
                       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-
-
-                      keyboardVerticalOffset={headerHeight}
-
-
+                      keyboardVerticalOffset={keyboardOffset}
                     >
 
 

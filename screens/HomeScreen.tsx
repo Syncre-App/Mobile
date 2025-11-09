@@ -70,6 +70,20 @@ export const HomeScreen: React.FC = () => {
     StorageService.setObject('notifications_cache', minimized).catch(() => {});
   }, []);
 
+  const removeNotificationLocally = useCallback(
+    (notificationId: string) => {
+      if (!notificationId) {
+        return;
+      }
+      setNotifications((prev: any[]) => {
+        const next = prev.filter((notification) => notification.id !== notificationId);
+        persistNotifications(next);
+        return next;
+      });
+    },
+    [persistNotifications]
+  );
+
   const loadUnreadSummary = useCallback(async () => {
     try {
       const token = await StorageService.getAuthToken();
@@ -483,13 +497,13 @@ export const HomeScreen: React.FC = () => {
 
   const markNotificationAsRead = useCallback(
     async (notificationId: string) => {
-      try {
-        setNotifications((prev: any) => {
-          const next = prev.filter((notification: any) => notification.id !== notificationId);
-          persistNotifications(next);
-          return next;
-        });
+      if (!notificationId) {
+        return;
+      }
 
+      removeNotificationLocally(notificationId);
+
+      try {
         const token = await StorageService.getAuthToken();
         if (!token) {
           return;
@@ -504,40 +518,15 @@ export const HomeScreen: React.FC = () => {
         if (response.success && response.data) {
           const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
           await ensureNotificationUsers(items, token);
-          const filtered = items.filter((notification: any) => notification.id !== notificationId);
-          setNotifications(filtered);
-          persistNotifications(filtered);
+          setNotifications(items);
+          persistNotifications(items);
         }
       } catch (error) {
         console.error('Failed to mark notification as read:', error);
       }
     },
-    [ensureNotificationUsers, persistNotifications]
+    [ensureNotificationUsers, persistNotifications, removeNotificationLocally]
   );
-
-  const markNotificationsAsRead = useCallback(async () => {
-    try {
-      const unread = notifications.filter((notification: any) => !notification.read);
-      if (!unread.length) {
-        return;
-      }
-
-      const token = await StorageService.getAuthToken();
-      if (!token) {
-        setNotifications((prev: any) => {
-          const removalIds = new Set(unread.map((item: any) => item.id));
-          const next = prev.filter((notification: any) => !removalIds.has(notification.id));
-          persistNotifications(next);
-          return next;
-        });
-        return;
-      }
-
-      await Promise.all(unread.map((item) => markNotificationAsRead(item.id)));
-    } catch (error) {
-      console.error('Failed to mark notifications as read:', error);
-    }
-  }, [notifications, markNotificationAsRead]);
 
   const handleRefresh = useCallback(async () => {
     await initializeScreen();
@@ -552,7 +541,7 @@ export const HomeScreen: React.FC = () => {
     WebSocketService.getInstance().refreshFriendsStatus();
   }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
 
-  const handleRespondToRequest = useCallback(async (friendId: string, action: 'accept' | 'reject') => {
+  const handleRespondToRequest = useCallback(async (friendId: string, action: 'accept' | 'reject', options?: { notificationId?: string }) => {
     try {
       setRequestProcessingId(friendId);
       const token = await StorageService.getAuthToken();
@@ -572,6 +561,10 @@ export const HomeScreen: React.FC = () => {
           NotificationService.show('info', message || 'Friend request declined');
         }
 
+        if (options?.notificationId) {
+          removeNotificationLocally(options.notificationId);
+        }
+
         await Promise.all([loadFriendData(), loadNotifications(), loadUnreadSummary()]);
       } else {
         NotificationService.show('error', response.error || 'Failed to update request');
@@ -582,7 +575,7 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setRequestProcessingId(null);
     }
-  }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
+  }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary, removeNotificationLocally]);
 
   const handleRemoveFriend = useCallback(async (friendId: string) => {
     try {
@@ -627,7 +620,6 @@ export const HomeScreen: React.FC = () => {
         return;
       }
       markNotificationAsRead(notification.id);
-      setIsNotificationsVisible(false);
     },
     [markNotificationAsRead]
   );
@@ -829,13 +821,21 @@ export const HomeScreen: React.FC = () => {
                             <View style={styles.notificationActions}>
                               <TouchableOpacity
                                 style={[styles.notificationActionButton, styles.notificationAccept]}
-                                onPress={() => handleRespondToRequest(String(relatedUserId), 'accept')}
+                                onPress={() =>
+                                  handleRespondToRequest(String(relatedUserId), 'accept', {
+                                    notificationId: notification.id,
+                                  })
+                                }
                               >
                                 <Text style={styles.notificationActionText}>Accept</Text>
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={[styles.notificationActionButton, styles.notificationDecline]}
-                                onPress={() => handleRespondToRequest(String(relatedUserId), 'reject')}
+                                onPress={() =>
+                                  handleRespondToRequest(String(relatedUserId), 'reject', {
+                                    notificationId: notification.id,
+                                  })
+                                }
                               >
                                 <Text style={[styles.notificationActionText, styles.notificationDeclineText]}>
                                   Decline
