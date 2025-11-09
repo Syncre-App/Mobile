@@ -260,6 +260,12 @@ async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<
     return;
   }
 
+  try {
+    await ApiService.post('/keys/identity/unlock', { password }, token);
+  } catch (error) {
+    // best effort; continue to fetch identity info
+  }
+
   const existing = await ApiService.get('/keys/identity', token);
   if (existing.success && existing.data) {
     const saltBase64 = existing.data.salt;
