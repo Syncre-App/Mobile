@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  DeviceEventEmitter,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
 
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
@@ -41,6 +43,8 @@ export const HomeScreen: React.FC = () => {
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
+  const [chatUnreadCounts, setChatUnreadCounts] = useState<Record<string, number>>({});
+  const [totalUnreadChats, setTotalUnreadChats] = useState(0);
   const unreadCount = useMemo(
     () => notifications.filter((notification) => !notification.read).length,
     [notifications]
@@ -64,6 +68,55 @@ export const HomeScreen: React.FC = () => {
       read: Boolean(notification.read),
     }));
     StorageService.setObject('notifications_cache', minimized).catch(() => {});
+  }, []);
+
+  const loadUnreadSummary = useCallback(async () => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        setChatUnreadCounts({});
+        setTotalUnreadChats(0);
+        try {
+          await Notifications.setBadgeCountAsync(0);
+        } catch (err) {
+          console.warn('[HomeScreen] Failed to update badge count:', err);
+        }
+        return;
+      }
+
+      const response = await ApiService.get('/chat/unread/summary', token);
+      if (response.success && response.data) {
+        const mapping = response.data.chats || {};
+        const normalized = Object.keys(mapping).reduce((acc, key) => {
+          const value = Number(mapping[key]) || 0;
+          if (value > 0) {
+            acc[key] = value;
+          }
+          return acc;
+        }, {} as Record<string, number>);
+        setChatUnreadCounts(normalized);
+        const total = Number(
+          response.data.total ??
+            Object.values(normalized).reduce((sum, val) => sum + val, 0)
+        );
+        setTotalUnreadChats(total);
+        try {
+          await Notifications.setBadgeCountAsync(total);
+        } catch (err) {
+          console.warn('[HomeScreen] Failed to update badge count:', err);
+        }
+      } else {
+        setChatUnreadCounts({});
+        setTotalUnreadChats(0);
+        try {
+          await Notifications.setBadgeCountAsync(0);
+        } catch (err) {
+          console.warn('[HomeScreen] Failed to reset badge count:', err);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load unread summary:', error);
+    }
   }, []);
 
   const persistUserProfiles = useCallback(() => {
@@ -316,10 +369,11 @@ export const HomeScreen: React.FC = () => {
       await loadChats();
       await loadFriendData();
       await loadNotifications();
+      await loadUnreadSummary();
     } catch (error) {
       console.error('Failed to load user data:', error);
     }
-  }, [loadChats, loadFriendData, loadNotifications, cacheUsers]);
+  }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary, cacheUsers]);
 
   const connectWebSocket = useCallback(async () => {
     try {
@@ -418,13 +472,14 @@ export const HomeScreen: React.FC = () => {
       if (state === 'active') {
         PushService.registerForPushNotifications();
         WebSocketService.getInstance().refreshFriendsStatus();
+        loadUnreadSummary();
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [ensureNotificationUsers]);
+  }, [ensureNotificationUsers, loadUnreadSummary]);
 
   const markNotificationAsRead = useCallback(
     async (notificationId: string) => {
@@ -493,9 +548,9 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleFriendStateChanged = useCallback(async () => {
-    await Promise.all([loadFriendData(), loadChats(), loadNotifications()]);
+    await Promise.all([loadFriendData(), loadChats(), loadNotifications(), loadUnreadSummary()]);
     WebSocketService.getInstance().refreshFriendsStatus();
-  }, [loadChats, loadFriendData, loadNotifications]);
+  }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
 
   const handleRespondToRequest = useCallback(async (friendId: string, action: 'accept' | 'reject') => {
     try {
@@ -517,7 +572,7 @@ export const HomeScreen: React.FC = () => {
           NotificationService.show('info', message || 'Friend request declined');
         }
 
-        await Promise.all([loadFriendData(), loadNotifications()]);
+        await Promise.all([loadFriendData(), loadNotifications(), loadUnreadSummary()]);
       } else {
         NotificationService.show('error', response.error || 'Failed to update request');
       }
@@ -527,7 +582,7 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setRequestProcessingId(null);
     }
-  }, [loadChats, loadFriendData, loadNotifications]);
+  }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
 
   const handleRemoveFriend = useCallback(async (friendId: string) => {
     try {
@@ -542,7 +597,7 @@ export const HomeScreen: React.FC = () => {
       if (response.success) {
         const message = response.data?.message || 'Friend removed successfully';
         NotificationService.show('success', message);
-        await Promise.all([loadFriendData(), loadChats(), loadNotifications()]);
+        await Promise.all([loadFriendData(), loadChats(), loadNotifications(), loadUnreadSummary()]);
       } else {
         NotificationService.show('error', response.error || 'Failed to remove friend');
       }
@@ -552,27 +607,30 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setRemovingFriendId(null);
     }
-  }, [loadChats, loadFriendData, loadNotifications]);
+  }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
 
   const handleChatRefresh = useCallback(async () => {
-    await Promise.all([loadChats(), loadFriendData(), loadNotifications()]);
-  }, [loadChats, loadFriendData, loadNotifications]);
+    await Promise.all([loadChats(), loadFriendData(), loadNotifications(), loadUnreadSummary()]);
+  }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
 
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
 
-  useEffect(() => {
-    if (!isNotificationsVisible) {
-      return;
-    }
-
-    markNotificationsAsRead();
-  }, [isNotificationsVisible, markNotificationsAsRead]);
-
   const handleNotificationsPress = useCallback(() => {
     setIsNotificationsVisible((prev) => !prev);
   }, []);
+
+  const handleNotificationPress = useCallback(
+    (notification: any) => {
+      if (notification.type === 'friend_request') {
+        return;
+      }
+      markNotificationAsRead(notification.id);
+      setIsNotificationsVisible(false);
+    },
+    [markNotificationAsRead]
+  );
 
   useEffect(() => {
     const unsubscribe = PushService.addNotificationListeners(() => {
@@ -580,6 +638,15 @@ export const HomeScreen: React.FC = () => {
     });
     return unsubscribe;
   }, [loadNotifications]);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('unread:refresh', () => {
+      loadUnreadSummary();
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [loadUnreadSummary]);
 
   const handleRealtimeMessage = useCallback((message: WebSocketMessage) => {
     if (!message || !message.type) {
@@ -629,10 +696,19 @@ export const HomeScreen: React.FC = () => {
         handleFriendStateChanged();
         break;
       }
+      case 'message_envelope':
+      case 'new_message': {
+        loadUnreadSummary();
+        break;
+      }
+      case 'message_status': {
+        loadUnreadSummary();
+        break;
+      }
       default:
         break;
     }
-  }, [handleFriendStateChanged, handleRespondToRequest, loadNotifications]);
+  }, [handleFriendStateChanged, handleRespondToRequest, loadNotifications, loadUnreadSummary]);
 
   useEffect(() => {
     const wsService = WebSocketService.getInstance();
@@ -689,6 +765,13 @@ export const HomeScreen: React.FC = () => {
                   presencePlacement="overlay"
                   style={styles.profileAvatar}
                 />
+                {totalUnreadChats > 0 && (
+                  <View style={styles.profileBadge}>
+                    <Text style={styles.profileBadgeText}>
+                      {totalUnreadChats > 99 ? '99+' : totalUnreadChats}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -720,7 +803,7 @@ export const HomeScreen: React.FC = () => {
                         key={notification.id}
                         style={styles.notificationItem}
                         activeOpacity={0.85}
-                        onPress={() => markNotificationAsRead(notification.id)}
+                        onPress={() => handleNotificationPress(notification)}
                       >
                         <UserAvatar
                           uri={relatedUser?.profile_picture}
@@ -746,19 +829,13 @@ export const HomeScreen: React.FC = () => {
                             <View style={styles.notificationActions}>
                               <TouchableOpacity
                                 style={[styles.notificationActionButton, styles.notificationAccept]}
-                                onPress={async () => {
-                                  await markNotificationAsRead(notification.id);
-                                  handleRespondToRequest(String(relatedUserId), 'accept');
-                                }}
+                                onPress={() => handleRespondToRequest(String(relatedUserId), 'accept')}
                               >
                                 <Text style={styles.notificationActionText}>Accept</Text>
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={[styles.notificationActionButton, styles.notificationDecline]}
-                                onPress={async () => {
-                                  await markNotificationAsRead(notification.id);
-                                  handleRespondToRequest(String(relatedUserId), 'reject');
-                                }}
+                                onPress={() => handleRespondToRequest(String(relatedUserId), 'reject')}
                               >
                                 <Text style={[styles.notificationActionText, styles.notificationDeclineText]}>
                                   Decline
@@ -796,6 +873,7 @@ export const HomeScreen: React.FC = () => {
               userStatuses={userStatuses}
               onRemoveFriend={handleRemoveFriend}
               removingFriendId={removingFriendId}
+              unreadCounts={chatUnreadCounts}
             />
           </View>
         </SafeAreaView>
@@ -923,6 +1001,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   notificationBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  profileBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#1E84FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  profileBadgeText: {
     color: '#ffffff',
     fontSize: 10,
     fontWeight: '700',

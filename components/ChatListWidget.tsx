@@ -49,6 +49,7 @@ interface ChatListWidgetProps {
   userStatuses: UserStatus;
   onRemoveFriend: (friendId: string) => void;
   removingFriendId?: string | null;
+  unreadCounts?: Record<string, number>;
 }
 
 export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
@@ -58,6 +59,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   userStatuses,
   onRemoveFriend,
   removingFriendId = null,
+  unreadCounts = {},
 }) => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -212,6 +214,9 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       : 'offline';
     const isUserOnline = normalizedStatus === 'online';
     const isRemoving = removingFriendId === otherUserId;
+    const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
+    const unread = unreadCounts[chatIdKey] || 0;
+    const hasUnread = unread > 0;
 
     return (
       <TouchableOpacity 
@@ -221,7 +226,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         activeOpacity={0.6}
         disabled={isRemoving}
       >
-        <View style={styles.chatCard}>
+        <View style={[styles.chatCard, hasUnread && styles.chatCardUnread]}>
           <UserAvatar
             uri={otherUserId ? userDetails[otherUserId]?.profile_picture : undefined}
             name={displayName}
@@ -232,7 +237,14 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
           />
 
           <View style={styles.chatContent}>
-            <Text style={styles.chatName} numberOfLines={1}>{displayName}</Text>
+            <View style={styles.chatTitleRow}>
+              <Text style={styles.chatName} numberOfLines={1}>{displayName}</Text>
+              {hasUnread && (
+                <View style={styles.chatUnreadPill}>
+                  <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={styles.rightColumn}>
@@ -303,17 +315,36 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
+  chatCardUnread: {
+    backgroundColor: 'rgba(30, 132, 255, 0.08)',
+  },
   avatarContainer: {
     marginRight: 16,
   },
   chatContent: {
     flex: 1,
   },
+  chatTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   chatName: {
     color: 'white',
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 2,
+  },
+  chatUnreadPill: {
+    backgroundColor: '#1E84FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  chatUnreadText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   rightColumn: {
     justifyContent: 'center',
