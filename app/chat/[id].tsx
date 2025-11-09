@@ -265,7 +265,6 @@ const ChatScreen: React.FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showScrollToBottomButton, setShowScrollToBottomButton] = useState(false);
-  const [headerHeight, setHeaderHeight] = useState(0);
 
   const currentUserId = user?.id ? String(user.id) : null;
 
@@ -1250,8 +1249,8 @@ const ChatScreen: React.FC = () => {
 
   const isComposerEmpty = newMessage.trim().length === 0;
   const keyboardOffset = useMemo(
-    () => (Platform.OS === 'ios' ? headerHeight + insets.top : headerHeight),
-    [headerHeight, insets.top]
+    () => (Platform.OS === 'ios' ? Math.max(insets.bottom, 0) : 0),
+    [insets.bottom]
   );
 
   return (
@@ -1263,7 +1262,7 @@ const ChatScreen: React.FC = () => {
       />
       <Stack.Screen options={{ title: receiverUsername }} />
 
-      <View style={styles.header} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
+      <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button">
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </Pressable>
