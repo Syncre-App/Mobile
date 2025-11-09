@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { ApiService } from '../services/ApiService';
 import Constants from 'expo-constants';
 import { UpdateService } from '../services/UpdateService';
+import { IdentityService } from '../services/IdentityService';
+import { StorageService } from '../services/StorageService';
 
 export default function RootLayout() {
   const [maintenance, setMaintenance] = useState(true);
@@ -28,6 +30,15 @@ export default function RootLayout() {
         if (updateStatus.requiresUpdate) {
           router.replace('/update');
           return;
+        }
+
+        const token = await StorageService.getAuthToken();
+        if (token) {
+          const needsIdentity = await IdentityService.requiresBootstrap(token);
+          if (needsIdentity) {
+            router.replace('/identity');
+            return;
+          }
         }
 
         setMaintenance(false);
