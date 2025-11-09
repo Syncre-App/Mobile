@@ -27,6 +27,7 @@ export class WebSocketService {
   private typingListeners: Map<string, ((payload: { userId: string; username: string }) => void)[]> = new Map();
   private stopTypingListeners: Map<string, ((payload: { userId: string }) => void)[]> = new Map();
   private connectionStatusListeners: ((isConnected: boolean) => void)[] = [];
+  private pendingMessages: WebSocketMessage[] = [];
 
   public get socket(): WebSocket | null {
     return this.ws;
@@ -93,6 +94,7 @@ export class WebSocketService {
         
         // Start ping/pong after auth
         this.startPingPong();
+        this.flushPendingMessages();
       };
 
       this.ws.onmessage = (event) => {
@@ -226,12 +228,32 @@ export class WebSocketService {
     this.statusListeners.forEach(listener => listener(this.userStatuses));
   }
 
-  send(message: WebSocketMessage): void {
-    if (this.ws && this.isConnected) {
-      this.ws.send(JSON.stringify(message));
-    } else {
-      console.warn('⚠️ Cannot send message: WebSocket not connected');
+  private flushPendingMessages(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return;
     }
+    while (this.pendingMessages.length) {
+      const next = this.pendingMessages.shift();
+      if (next) {
+        try {
+          this.ws.send(JSON.stringify(next));
+        } catch (error) {
+          console.error('❌ Failed to send pending WebSocket message:', error);
+          this.pendingMessages.unshift(next);
+          break;
+        }
+      }
+    }
+  }
+
+  send(message: WebSocketMessage): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.isConnected) {
+      this.ws.send(JSON.stringify(message));
+      return;
+    }
+
+    console.warn('⚠️ WebSocket not ready, queueing message', message.type);
+    this.pendingMessages.push(message);
   }
 
   joinChat(chatId: string, deviceId?: string): void {
