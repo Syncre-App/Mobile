@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
 import { ApiService } from '../services/ApiService';
 import Constants from 'expo-constants';
+import { UpdateService } from '../services/UpdateService';
 
 export default function RootLayout() {
   const [maintenance, setMaintenance] = useState(true);
@@ -23,6 +24,12 @@ export default function RootLayout() {
           router.replace('/maintenance');
           return;
         }
+        const updateStatus = await UpdateService.checkForMandatoryUpdate();
+        if (updateStatus.requiresUpdate) {
+          router.replace('/update');
+          return;
+        }
+
         setMaintenance(false);
         router.replace('/home');
       } catch (error) {

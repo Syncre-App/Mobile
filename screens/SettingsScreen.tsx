@@ -13,16 +13,17 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { GlassCard } from '../components/GlassCard';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
+import { UpdateService } from '../services/UpdateService';
 
 export const SettingsScreen: React.FC = () => {
   const router = useRouter();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
   const [selectedLanguage, setSelectedLanguage] = useState('English');
+  const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
   router.back();
@@ -188,6 +189,22 @@ export const SettingsScreen: React.FC = () => {
             'Clear Cache',
             'Clear cached data to free up space',
             handleClearCache,
+            undefined,
+            false
+          )}
+        </GlassCard>
+
+        {/* About Section */}
+        <GlassCard width="100%" style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>About</Text>
+          </View>
+
+          {renderSettingItem(
+            'information-circle',
+            'App Version',
+            appVersion,
+            undefined,
             undefined,
             false
           )}
