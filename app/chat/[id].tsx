@@ -1248,10 +1248,7 @@ const ChatScreen: React.FC = () => {
   }
 
   const isComposerEmpty = newMessage.trim().length === 0;
-  const keyboardOffset = useMemo(
-    () => (Platform.OS === 'ios' ? Math.max(insets.bottom, 0) : 0),
-    [insets.bottom]
-  );
+  const keyboardOffset = useMemo(() => 0, []);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -1409,7 +1406,12 @@ const ChatScreen: React.FC = () => {
         
 
 
-                <View style={[styles.inputContainer, { paddingBottom: insets.bottom }]}>
+        <View
+          style={[
+            styles.inputContainer,
+            { paddingBottom: Math.max(insets.bottom - (Platform.OS === 'ios' ? 6 : 0), 4) },
+          ]}
+        >
 
 
                   <TextInput
