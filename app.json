@@ -2,7 +2,7 @@
   "expo": {
     "name": "syncre",
     "slug": "syncre",
-    "version": "1.0.4",
+    "version": "1.0.4-fix",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "scheme": "syncre",
