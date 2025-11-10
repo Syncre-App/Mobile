@@ -117,7 +117,13 @@ class ReencryptionServiceClass {
           continue;
         }
 
-        const plaintext = await CryptoService.decryptMessage(chatId, raw.envelopes);
+        const plaintext = await CryptoService.decryptMessage({
+          chatId,
+          envelopes: raw.envelopes,
+          senderId,
+          currentUserId,
+          token,
+        });
         if (!plaintext) {
           continue;
         }

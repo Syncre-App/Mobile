@@ -345,17 +345,37 @@ async function encryptForRecipient({
 async function decryptEnvelope(options: {
   chatId: string;
   envelope: EnvelopeEntry;
+  senderId?: string | number | null;
+  currentUserId?: string | number | null;
+  token?: string | null;
 }): Promise<DecryptionResult | null> {
-  const { chatId, envelope } = options;
-  if (!envelope.senderIdentityKey) {
-    console.warn('[CryptoService] Missing senderIdentityKey, cannot decrypt envelope');
-    return null;
-  }
-
-  const senderKeyBytes = fromBase64(envelope.senderIdentityKey);
+  const { chatId, envelope, senderId, currentUserId, token } = options;
   const identity = await ensureIdentityAvailable();
   const privateKeyBytes = fromBase64(identity.privateKey);
 
+  let senderKeyBase64 = envelope.senderIdentityKey || null;
+  const senderIdStr = senderId?.toString?.();
+  const currentUserIdStr = currentUserId?.toString?.();
+
+  if (!senderKeyBase64) {
+    if (senderIdStr && currentUserIdStr && senderIdStr === currentUserIdStr) {
+      senderKeyBase64 = identity.publicKey;
+    } else if (senderIdStr && token) {
+      try {
+        senderKeyBase64 = await getRecipientPublicKey(senderIdStr, token);
+      } catch (error) {
+        console.warn('[CryptoService] Failed to resolve sender identity key from API', error);
+        return null;
+      }
+    }
+  }
+
+  if (!senderKeyBase64) {
+    console.warn('[CryptoService] Missing sender identity key, cannot decrypt envelope');
+    return null;
+  }
+
+  const senderKeyBytes = fromBase64(senderKeyBase64);
   const sharedSecret = nacl.box.before(senderKeyBytes, privateKeyBytes);
   const symmetricKey = deriveSymmetricKey(sharedSecret, chatId);
   const cipher = new XChaCha20Poly1305(symmetricKey);
@@ -433,9 +453,16 @@ export const CryptoService = {
     };
   },
 
-  async decryptMessage(chatId: string, envelopes: EnvelopeEntry[]): Promise<string | null> {
+  async decryptMessage(params: {
+    chatId: string;
+    envelopes: EnvelopeEntry[];
+    senderId?: string | number | null;
+    currentUserId?: string | number | null;
+    token?: string | null;
+  }): Promise<string | null> {
+    const { chatId, envelopes, senderId, currentUserId, token } = params;
     for (const envelope of envelopes) {
-      const result = await decryptEnvelope({ chatId, envelope });
+      const result = await decryptEnvelope({ chatId, envelope, senderId, currentUserId, token });
       if (result?.plaintext) {
         return result.plaintext;
       }

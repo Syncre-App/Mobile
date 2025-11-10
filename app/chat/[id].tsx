@@ -349,7 +349,7 @@ const ChatScreen: React.FC = () => {
   }, [messages, currentUserId]);
 
   const transformMessages = useCallback(
-    async (rawMessages: any[], otherUserId: string | null) => {
+    async (rawMessages: any[], otherUserId: string | null, token: string | null) => {
       const results: Message[] = [];
       const ownerId = currentUserId;
       let missingEnvelope = false;
@@ -374,7 +374,13 @@ const ChatScreen: React.FC = () => {
           if (!chatId) {
             continue;
           }
-          const decrypted = await CryptoService.decryptMessage(String(chatId), raw.envelopes);
+          const decrypted = await CryptoService.decryptMessage({
+            chatId: String(chatId),
+            envelopes: raw.envelopes,
+            senderId,
+            currentUserId: ownerId,
+            token: token || undefined,
+          });
           if (decrypted) {
             content = decrypted;
           } else {
@@ -592,7 +598,7 @@ const ChatScreen: React.FC = () => {
           return;
         }
 
-        const transformed = await transformMessages(rawMessages, otherUserId ?? null);
+        const transformed = await transformMessages(rawMessages, otherUserId ?? null, token);
         const cleaned = transformed.filter(Boolean);
 
         setMessagesAnimated(() => cleaned);
@@ -743,7 +749,7 @@ const ChatScreen: React.FC = () => {
           return;
         }
 
-        const transformed = await transformMessages(rawMessages, otherUserIdRef.current);
+        const transformed = await transformMessages(rawMessages, otherUserIdRef.current, token);
         const cleaned = transformed.filter(Boolean);
 
         setMessagesWithoutAnimation((prev) => {
@@ -977,7 +983,15 @@ const ChatScreen: React.FC = () => {
           }
 
           try {
-            const decrypted = await CryptoService.decryptMessage(targetChatId, envelopes);
+            const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+            authTokenRef.current = token || null;
+            const decrypted = await CryptoService.decryptMessage({
+              chatId: targetChatId,
+              envelopes,
+              senderId: payload.senderId ?? payload.userId ?? null,
+              currentUserId,
+              token: token || undefined,
+            });
             if (!decrypted) {
               console.warn('Decryption failed for incoming message envelope.');
               return;
