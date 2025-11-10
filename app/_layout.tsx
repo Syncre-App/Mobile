@@ -7,6 +7,7 @@ import Constants from 'expo-constants';
 import { UpdateService } from '../services/UpdateService';
 import { IdentityService } from '../services/IdentityService';
 import { StorageService } from '../services/StorageService';
+import { CryptoService } from '../services/CryptoService';
 
 export default function RootLayout() {
   const [maintenance, setMaintenance] = useState(true);
@@ -35,9 +36,22 @@ export default function RootLayout() {
         const token = await StorageService.getAuthToken();
         if (token) {
           const needsIdentitySetup = await IdentityService.requiresBootstrap(token);
-          const mode = needsIdentitySetup ? 'setup' : 'unlock';
+          const hasLocalIdentity = Boolean(await CryptoService.getStoredIdentity());
+
+          if (needsIdentitySetup) {
+            setMaintenance(false);
+            router.replace('/identity?mode=setup');
+            return;
+          }
+
+          if (!hasLocalIdentity) {
+            setMaintenance(false);
+            router.replace('/identity?mode=unlock');
+            return;
+          }
+
           setMaintenance(false);
-          router.replace(`/identity?mode=${mode}`);
+          router.replace('/home');
           return;
         }
 

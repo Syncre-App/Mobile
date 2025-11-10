@@ -63,23 +63,27 @@ export default function IdentityScreen() {
       }
 
       const remoteResponse = await ApiService.get('/keys/identity', token);
-      if (!remoteResponse.success && remoteResponse.statusCode !== 404) {
+      const remoteData = remoteResponse.success ? remoteResponse.data : null;
+      const remotePublicKey = remoteData?.publicKey || null;
+      const remoteHasEncrypted = remoteResponse.success && Boolean(remoteData?.encryptedPrivateKey);
+      if (!remoteHasEncrypted && remoteResponse.statusCode !== 404 && mode === 'unlock') {
         setError(remoteResponse.error || 'Failed to check secure backup. Try again.');
         return;
       }
 
-      const remoteData = remoteResponse.success ? remoteResponse.data : null;
-      const remotePublicKey = remoteData?.publicKey || null;
-      const remoteHasEncrypted = Boolean(remoteData?.encryptedPrivateKey);
+      const localIdentity = await CryptoService.getStoredIdentity();
 
       if (mode === 'unlock' && !remoteHasEncrypted) {
         setError('No secure backup found. Please set up your PIN on one of your existing devices.');
         return;
       }
 
-      const localIdentity = await CryptoService.getStoredIdentity();
-
-      if (localIdentity && remotePublicKey && localIdentity.publicKey !== remotePublicKey) {
+      if (
+        mode === 'unlock' &&
+        localIdentity &&
+        remotePublicKey &&
+        localIdentity.publicKey !== remotePublicKey
+      ) {
         const choice = await new Promise<'remote' | 'local' | null>((resolve) => {
           Alert.alert(
             'Secure identity mismatch',

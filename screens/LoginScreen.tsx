@@ -18,6 +18,7 @@ import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { IdentityService } from '../services/IdentityService';
+import { CryptoService } from '../services/CryptoService';
 
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -67,9 +68,20 @@ export const LoginScreen: React.FC = () => {
         }
 
         if (token) {
-          const needsSetup = await IdentityService.requiresBootstrap(token);
+          const [needsSetup, localIdentity] = await Promise.all([
+            IdentityService.requiresBootstrap(token),
+            CryptoService.getStoredIdentity(),
+          ]);
+
           notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');
-          router.replace(`/identity?mode=${needsSetup ? 'setup' : 'unlock'}` as any);
+
+          if (needsSetup) {
+            router.replace('/identity?mode=setup' as any);
+          } else if (!localIdentity) {
+            router.replace('/identity?mode=unlock' as any);
+          } else {
+            router.replace('/home' as any);
+          }
         } else {
           notificationService.show('error', 'Missing authentication token', 'Error');
         }
