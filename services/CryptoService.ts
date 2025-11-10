@@ -170,8 +170,8 @@ async function getRecipientPublicKey(userId: string, token: string): Promise<str
     return entry.key;
   }
 
-  if (identityResponse.statusCode !== 404) {
-    throw new Error(identityResponse.error || 'Missing recipient identity key');
+  if (identityResponse.statusCode && identityResponse.statusCode !== 404) {
+    console.warn('[CryptoService] identity lookup failed, falling back to device registry:', identityResponse.error);
   }
 
   const legacyResponse = await ApiService.get(`/keys/${userId}`, token);
