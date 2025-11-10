@@ -190,7 +190,7 @@ async function getRecipientPublicKey(userId: string, token: string): Promise<str
 }
 
 interface BootstrapParams {
-  password: string;
+  pin: string;
   token: string;
 }
 
@@ -225,16 +225,19 @@ async function registerDeviceIdentity(identity: IdentityKeyPair, token: string):
 
 async function uploadIdentityBundle({
   identity,
-  password,
+  pin,
   token,
 }: {
   identity: IdentityKeyPair;
-  password: string;
+  pin: string;
   token: string;
 }): Promise<void> {
+  if (!pin || !pin.trim()) {
+    throw new Error('Secure PIN is required for identity backup');
+  }
   const saltBytes = randomBytes(16);
   const iterations = 200000;
-  const passphraseKey = await derivePassphraseKey(password, saltBytes, iterations);
+  const passphraseKey = await derivePassphraseKey(pin, saltBytes, iterations);
   const secretKeyBytes = fromBase64(identity.privateKey);
   const { encryptedPrivateKey, nonce } = await encryptPrivateKey(secretKeyBytes, passphraseKey);
 
@@ -253,17 +256,14 @@ async function uploadIdentityBundle({
   await registerDeviceIdentity(identity, token);
 }
 
-async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<void> {
+async function bootstrapIdentity({ pin, token }: BootstrapParams): Promise<void> {
+  if (!pin || !pin.trim()) {
+    throw new Error('Secure PIN is required to unlock encrypted messages');
+  }
   const localIdentity = await getLocalIdentity();
   if (localIdentity) {
-    await uploadIdentityBundle({ identity: localIdentity, password, token });
+    await uploadIdentityBundle({ identity: localIdentity, pin, token });
     return;
-  }
-
-  try {
-    await ApiService.post('/keys/identity/unlock', { password }, token);
-  } catch (error) {
-    // best effort; continue to fetch identity info
   }
 
   const existing = await ApiService.get('/keys/identity', token);
@@ -275,7 +275,7 @@ async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<
     }
     const saltBytes = fromBase64(saltBase64);
     const iterations = existing.data.iterations || 150000;
-    const passphraseKey = await derivePassphraseKey(password, saltBytes, iterations);
+    const passphraseKey = await derivePassphraseKey(pin, saltBytes, iterations);
     const privateKeyBytes = await decryptPrivateKey(existing.data.encryptedPrivateKey, nonceBase64, passphraseKey);
     const privateKey = toBase64(privateKeyBytes);
     const identity: IdentityKeyPair = {
@@ -284,7 +284,7 @@ async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<
       keyVersion: existing.data.version || 1,
     };
     await persistLocalIdentity(identity);
-    await uploadIdentityBundle({ identity, password, token });
+    await uploadIdentityBundle({ identity, pin, token });
     return;
   }
 
@@ -302,7 +302,7 @@ async function bootstrapIdentity({ password, token }: BootstrapParams): Promise<
   };
 
   await persistLocalIdentity(freshIdentity);
-  await uploadIdentityBundle({ identity: freshIdentity, password, token });
+  await uploadIdentityBundle({ identity: freshIdentity, pin, token });
 }
 
 async function encryptForRecipient({

@@ -17,16 +17,17 @@ import { StorageService } from '../services/StorageService';
 import { CryptoService } from '../services/CryptoService';
 import { NotificationService } from '../services/NotificationService';
 import { IdentityService } from '../services/IdentityService';
+import { PinService } from '../services/PinService';
 
 export default function IdentityBootstrapScreen() {
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setError(null);
-    if (!password.trim()) {
-      setError('Password is required to unlock your secure messages.');
+    if (!pin.trim()) {
+      setError('Secure PIN is required to unlock your secure messages.');
       return;
     }
     setIsSubmitting(true);
@@ -37,7 +38,8 @@ export default function IdentityBootstrapScreen() {
         router.replace('/');
         return;
       }
-      await CryptoService.bootstrapIdentity({ password, token });
+      await PinService.setPin(pin.trim());
+      await CryptoService.bootstrapIdentity({ pin: pin.trim(), token });
       IdentityService.clearCache();
       NotificationService.show('success', 'Secure messaging unlocked');
       router.replace('/home');
@@ -46,7 +48,7 @@ export default function IdentityBootstrapScreen() {
       setError(err?.message || 'Failed to unlock keys. Please double-check your password.');
     } finally {
       setIsSubmitting(false);
-      setPassword('');
+      setPin('');
     }
   };
 
@@ -61,18 +63,19 @@ export default function IdentityBootstrapScreen() {
         <GlassCard width="100%" style={styles.card}>
           <Text style={styles.title}>Secure Sync Needed</Text>
           <Text style={styles.subtitle}>
-            To read and send encrypted messages on this device, please confirm your account
-            password so we can restore your keys.
+            To read and send encrypted messages on this device, please confirm your secure PIN so we
+            can restore your keys.
           </Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Account password"
+            placeholder="Secure PIN"
             placeholderTextColor="rgba(255, 255, 255, 0.4)"
             secureTextEntry
             autoCapitalize="none"
-            value={password}
-            onChangeText={setPassword}
+            keyboardType="number-pad"
+            value={pin}
+            onChangeText={setPin}
             editable={!isSubmitting}
           />
 
