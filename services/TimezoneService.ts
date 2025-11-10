@@ -1,0 +1,33 @@
+const DEFAULT_TIMEZONE = 'Europe/Budapest';
+
+let cachedTimezone: string | null = null;
+
+const detectTimezone = (): string => {
+  try {
+    const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (resolved && resolved !== 'Etc/Unknown') {
+      return resolved;
+    }
+  } catch (error) {
+    console.warn('TimezoneService: failed to resolve via Intl API', error);
+  }
+
+  return DEFAULT_TIMEZONE;
+};
+
+export const TimezoneService = {
+  getTimezone(forceRefresh = false): string {
+    if (!cachedTimezone || forceRefresh) {
+      cachedTimezone = detectTimezone() || DEFAULT_TIMEZONE;
+    }
+    return cachedTimezone;
+  },
+
+  applyHeader<T extends Record<string, string>>(headers: T): T {
+    const timezone = this.getTimezone();
+    if (timezone) {
+      headers['X-Client-Timezone'] = timezone;
+    }
+    return headers;
+  },
+};

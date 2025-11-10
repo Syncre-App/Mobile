@@ -15,6 +15,7 @@ import { CryptoService } from '../../services/CryptoService';
 import { DeviceService } from '../../services/DeviceService';
 import { WebSocketMessage, WebSocketService } from '../../services/WebSocketService';
 import { UserCacheService } from '../../services/UserCacheService';
+import { TimezoneService } from '../../services/TimezoneService';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -28,6 +29,10 @@ interface Message {
   receiverId: string;
   content: string;
   timestamp: string;
+  utcTimestamp?: string;
+  timezone?: string;
+  deliveredAt?: string;
+  seenAt?: string;
   status?: MessageStatus;
   isPlaceholder?: boolean;
 }
@@ -38,6 +43,50 @@ type ChatListItem =
   | { kind: 'typing'; id: string };
 
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const pickFirstTimestamp = (source: Record<string, any>, keys: string[]): string | undefined => {
+  for (const key of keys) {
+    const value = source?.[key];
+    if (typeof value === 'string' && value.trim().length) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const resolveMessageTimestamps = (
+  source: Record<string, any>,
+  fallbackTimezone: string
+): { local: string; utc: string; timezone: string } => {
+  const local =
+    pickFirstTimestamp(source, [
+      'createdAtLocal',
+      'created_at_local',
+      'timestampLocal',
+      'timestamp',
+      'createdAt',
+      'created_at',
+    ]) ?? new Date().toISOString();
+
+  const utc =
+    pickFirstTimestamp(source, [
+      'createdAt',
+      'created_at',
+      'timestamp',
+      'utcTimestamp',
+      'createdAtUtc',
+      'created_at_utc',
+    ]) ?? local;
+
+  const timezone = source?.timezone || fallbackTimezone;
+  return { local, utc, timezone };
+};
+
+const resolveDeliveryTimestamp = (source: Record<string, any>): string | undefined =>
+  pickFirstTimestamp(source, ['deliveredAtLocal', 'delivered_at_local', 'deliveredAt', 'delivered_at']);
+
+const resolveSeenTimestamp = (source: Record<string, any>): string | undefined =>
+  pickFirstTimestamp(source, ['seenAtLocal', 'seen_at_local', 'seenAt', 'seen_at']);
 
 const parseDate = (value: string): Date => {
   const date = new Date(value);
@@ -349,10 +398,16 @@ const ChatScreen: React.FC = () => {
   }, [messages, currentUserId]);
 
   const transformMessages = useCallback(
-    async (rawMessages: any[], otherUserId: string | null, token: string | null) => {
+    async (
+      rawMessages: any[],
+      otherUserId: string | null,
+      token: string | null,
+      options?: { timezone?: string }
+    ) => {
       const results: Message[] = [];
       const ownerId = currentUserId;
       let missingEnvelope = false;
+      const timezoneFallback = options?.timezone || TimezoneService.getTimezone();
 
       for (const raw of rawMessages) {
         const idValue = raw.id ?? `${chatId}-${raw.createdAt ?? raw.created_at ?? Date.now()}`;
@@ -367,7 +422,9 @@ const ChatScreen: React.FC = () => {
           otherUserId ??
           (participantIdsRef.current.find((pid) => pid !== String(senderId)) ?? '');
 
-        const timestamp = raw.createdAt ?? raw.created_at ?? new Date().toISOString();
+        const { local, utc, timezone } = resolveMessageTimestamps(raw, timezoneFallback);
+        const deliveredAt = resolveDeliveryTimestamp(raw);
+        const seenAt = resolveSeenTimestamp(raw);
 
         let content: string | null = null;
         if (raw.isEncrypted && Array.isArray(raw.envelopes)) {
@@ -397,9 +454,9 @@ const ChatScreen: React.FC = () => {
 
         let status: MessageStatus | undefined;
         if (ownerId && String(senderId) === ownerId) {
-          if (raw.seenAt) {
+          if (seenAt) {
             status = 'seen';
-          } else if (raw.deliveredAt) {
+          } else if (deliveredAt) {
             status = 'delivered';
           } else if (raw.id) {
             status = 'sent';
@@ -411,7 +468,11 @@ const ChatScreen: React.FC = () => {
           senderId: String(senderId),
           receiverId: String(receiverId),
           content,
-          timestamp: String(timestamp),
+          timestamp: String(local),
+          utcTimestamp: utc,
+          timezone,
+          deliveredAt: deliveredAt ?? undefined,
+          seenAt: seenAt ?? undefined,
           status,
         });
       }
@@ -588,6 +649,7 @@ const ChatScreen: React.FC = () => {
         }
 
         const response = await ApiService.get(`/chat/${chatIdentifier}/messages?${params.toString()}`, token);
+        const responseTimezone = response.data?.timezone;
         const rawMessages = response.success && Array.isArray(response.data?.messages) ? response.data.messages : [];
 
         if (!rawMessages.length) {
@@ -598,7 +660,9 @@ const ChatScreen: React.FC = () => {
           return;
         }
 
-        const transformed = await transformMessages(rawMessages, otherUserId ?? null, token);
+        const transformed = await transformMessages(rawMessages, otherUserId ?? null, token, {
+          timezone: responseTimezone,
+        });
         const cleaned = transformed.filter(Boolean);
 
         setMessagesAnimated(() => cleaned);
@@ -743,13 +807,16 @@ const ChatScreen: React.FC = () => {
         }
 
         const response = await ApiService.get(`/chat/${chatId}/messages?${params.toString()}`, token);
+        const responseTimezone = response.data?.timezone;
         const rawMessages = response.success && Array.isArray(response.data?.messages) ? response.data.messages : [];
         if (!rawMessages.length) {
           setHasMore(false);
           return;
         }
 
-        const transformed = await transformMessages(rawMessages, otherUserIdRef.current, token);
+        const transformed = await transformMessages(rawMessages, otherUserIdRef.current, token, {
+          timezone: responseTimezone,
+        });
         const cleaned = transformed.filter(Boolean);
 
         setMessagesWithoutAnimation((prev) => {
@@ -961,7 +1028,15 @@ const ChatScreen: React.FC = () => {
           if (!status) {
             return;
           }
-          const statusTimestamp = payload.timestamp || payload.deliveredAt || payload.seenAt || null;
+          const statusTimestamp =
+            pickFirstTimestamp(payload, [
+              'timestampLocal',
+              'timestamp',
+              'seenAtLocal',
+              'seenAt',
+              'deliveredAtLocal',
+              'deliveredAt',
+            ]) || null;
           updateOutgoingStatus(
             status,
             payload.messageId ? String(payload.messageId) : undefined,
@@ -970,9 +1045,13 @@ const ChatScreen: React.FC = () => {
           return;
         }
         case 'message_envelope_sent': {
+          const ackTimestamps = resolveMessageTimestamps(
+            payload,
+            payload.timezone || TimezoneService.getTimezone()
+          );
           applyAckToLatestMessage({
             messageId: payload.messageId ?? payload.id,
-            createdAt: payload.created_at ?? payload.timestamp,
+            createdAt: ackTimestamps.local,
           });
           return;
         }
@@ -997,12 +1076,18 @@ const ChatScreen: React.FC = () => {
               return;
             }
 
+            const { local, utc, timezone } = resolveMessageTimestamps(
+              payload,
+              payload.timezone || TimezoneService.getTimezone()
+            );
             const newEntry: Message = {
               id: String(payload.messageId ?? payload.id ?? Date.now()),
               senderId: String(payload.senderId ?? ''),
               receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
               content: decrypted,
-              timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
             };
 
             setMessagesAnimated((prev) => {
@@ -1020,12 +1105,18 @@ const ChatScreen: React.FC = () => {
           return;
         }
         case 'new_message': {
+          const { local, utc, timezone } = resolveMessageTimestamps(
+            payload,
+            payload.timezone || TimezoneService.getTimezone()
+          );
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
             senderId: String(payload.senderId ?? ''),
             receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
             content: payload.content ?? '',
-            timestamp: payload.created_at ?? payload.timestamp ?? new Date().toISOString(),
+            timestamp: local,
+            utcTimestamp: utc,
+            timezone,
           };
 
           setMessagesAnimated((prev) => {

@@ -13,6 +13,7 @@ export interface WebSocketMessage {
 
 import { DeviceEventEmitter } from 'react-native';
 import { ReencryptionService } from './ReencryptionService';
+import { TimezoneService } from './TimezoneService';
 
 export class WebSocketService {
   private static instance: WebSocketService;
@@ -90,7 +91,8 @@ export class WebSocketService {
         if (this.currentToken) {
           this.send({
             type: 'auth',
-            token: this.currentToken  // Send as top-level property, not in data
+            token: this.currentToken,  // Send as top-level property, not in data
+            timezone: TimezoneService.getTimezone(),
           });
           console.log('🌐 Sent auth message with token');
         }
@@ -245,7 +247,8 @@ export class WebSocketService {
       const next = this.pendingMessages.shift();
       if (next) {
         try {
-          this.ws.send(JSON.stringify(next));
+          const payload = this.enrichWithTimezone(next);
+          this.ws.send(JSON.stringify(payload));
         } catch (error) {
           console.error('❌ Failed to send pending WebSocket message:', error);
           this.pendingMessages.unshift(next);
@@ -256,13 +259,22 @@ export class WebSocketService {
   }
 
   send(message: WebSocketMessage): void {
+    const payload = this.enrichWithTimezone(message);
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.isConnected) {
-      this.ws.send(JSON.stringify(message));
+      this.ws.send(JSON.stringify(payload));
       return;
     }
 
     console.warn('⚠️ WebSocket not ready, queueing message', message.type);
-    this.pendingMessages.push(message);
+    this.pendingMessages.push(payload);
+  }
+
+  private enrichWithTimezone(message: WebSocketMessage): WebSocketMessage {
+    const timezone = TimezoneService.getTimezone();
+    if (!timezone || (message && typeof message === 'object' && 'timezone' in message)) {
+      return message;
+    }
+    return { ...message, timezone };
   }
 
   joinChat(chatId: string, deviceId?: string): void {

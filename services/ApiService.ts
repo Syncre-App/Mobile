@@ -1,4 +1,5 @@
 import { UserCacheService } from './UserCacheService';
+import { TimezoneService } from './TimezoneService';
 
 const BASE_URL = 'https://api.syncre.xyz/v1';
 
@@ -12,15 +13,20 @@ export interface ApiResponse<T = any> {
 export class ApiService {
   public static readonly baseUrl = BASE_URL;
 
+  private static buildHeaders(token?: string): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    TimezoneService.applyHeader(headers);
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
   static async post<T = any>(endpoint: string, data: any, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = this.buildHeaders(token);
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'POST',
@@ -55,13 +61,7 @@ export class ApiService {
 
   static async get<T = any>(endpoint: string, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = this.buildHeaders(token);
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'GET',
@@ -139,13 +139,7 @@ export class ApiService {
 
   static async put<T = any>(endpoint: string, data: any, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = this.buildHeaders(token);
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'PUT',
@@ -172,13 +166,7 @@ export class ApiService {
 
   static async delete<T = any>(endpoint: string, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = this.buildHeaders(token);
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'DELETE',
