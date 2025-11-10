@@ -5,10 +5,12 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
@@ -23,9 +25,7 @@ export default function IdentityScreen() {
   const mode = params?.mode === 'setup' ? 'setup' : 'unlock';
 
   const [pin, setPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
   const [obscurePin, setObscurePin] = useState(true);
-  const [obscureConfirmPin, setObscureConfirmPin] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,9 +35,9 @@ export default function IdentityScreen() {
   );
   const subtitle = useMemo(() => {
     if (mode === 'setup') {
-      return 'Válassz egy 6 számjegyű PIN-kódot. Ezzel védjük a privát kulcsodat, és minden eszközön ezzel fogod feloldani a titkosított beszélgetéseidet.';
+      return 'Pick a 4–6 digit PIN. This protects your private key and lets you restore messages on any device.';
     }
-    return 'Add meg a Secure PIN-ed, hogy ezen az eszközön is elérhesd a titkosított üzeneteidet.';
+    return 'Enter your PIN to unlock encrypted messages on this device.';
   }, [mode]);
 
   const handleSubmit = async () => {
@@ -47,22 +47,10 @@ export default function IdentityScreen() {
       setError('Secure PIN is required.');
       return;
     }
-    if (trimmedPin.length < 6) {
-      setError('PIN must be at least 6 digits.');
+    if (trimmedPin.length < 4 || trimmedPin.length > 6) {
+      setError('PIN must be between 4 and 6 digits.');
       return;
     }
-    if (mode === 'setup') {
-      const confirm = confirmPin.trim();
-      if (!confirm) {
-        setError('Please confirm your PIN.');
-        return;
-      }
-      if (confirm !== trimmedPin) {
-        setError('PIN entries do not match.');
-        return;
-      }
-    }
-
     try {
       setIsSubmitting(true);
       const token = await StorageService.getAuthToken();
@@ -86,7 +74,6 @@ export default function IdentityScreen() {
     } finally {
       setIsSubmitting(false);
       setPin('');
-      setConfirmPin('');
     }
   };
 
@@ -98,66 +85,72 @@ export default function IdentityScreen() {
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <GlassCard width="100%" style={styles.card}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <GlassCard width="100%" style={styles.card}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder={mode === 'setup' ? 'Choose a Secure PIN' : 'Enter Secure PIN'}
-            placeholderTextColor="rgba(255, 255, 255, 0.4)"
-            secureTextEntry={obscurePin}
-            autoCapitalize="none"
-            keyboardType="number-pad"
-            value={pin}
-            onChangeText={setPin}
-            editable={!isSubmitting}
-          />
-          <TouchableOpacity
-            style={styles.toggle}
-            onPress={() => setObscurePin((prev) => !prev)}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.toggleText}>{obscurePin ? 'Show PIN' : 'Hide PIN'}</Text>
-          </TouchableOpacity>
+            <View style={styles.infoBox}>
+            <Text style={styles.infoTitle}>Why this matters</Text>
+            <Text style={styles.infoText}>
+              Your PIN encrypts the private key that unlocks your history. Lose the PIN and your
+              messages stay locked forever.
+            </Text>
+              <View style={styles.stepList}>
+                <View style={styles.stepRow}>
+                  <View style={styles.stepDot} />
+                  <Text style={styles.stepText}>Numbers only, 4–6 digits</Text>
+                </View>
+                <View style={styles.stepRow}>
+                  <View style={styles.stepDot} />
+                  <Text style={styles.stepText}>Use the same PIN on every device</Text>
+                </View>
+                <View style={styles.stepRow}>
+                  <View style={styles.stepDot} />
+                  <Text style={styles.stepText}>Without it, past messages can’t be restored</Text>
+                </View>
+              </View>
+            </View>
 
-          {mode === 'setup' ? (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm Secure PIN"
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                secureTextEntry={obscureConfirmPin}
-                autoCapitalize="none"
-                keyboardType="number-pad"
-                value={confirmPin}
-                onChangeText={setConfirmPin}
-                editable={!isSubmitting}
-              />
-              <TouchableOpacity
-                style={styles.toggle}
-                onPress={() => setObscureConfirmPin((prev) => !prev)}
-                disabled={isSubmitting}
-              >
-                <Text style={styles.toggleText}>{obscureConfirmPin ? 'Show PIN' : 'Hide PIN'}</Text>
-              </TouchableOpacity>
-            </>
-          ) : null}
+            <Text style={styles.fieldLabel}>PIN code</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={mode === 'setup' ? 'Enter a 4–6 digit PIN' : 'Enter your PIN'}
+              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              secureTextEntry={obscurePin}
+              autoCapitalize="none"
+              keyboardType="number-pad"
+              maxLength={6}
+              value={pin}
+              onChangeText={setPin}
+              editable={!isSubmitting}
+            />
+            <TouchableOpacity
+              style={styles.toggle}
+              onPress={() => setObscurePin((prev) => !prev)}
+              disabled={isSubmitting}
+            >
+            </TouchableOpacity>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <TouchableOpacity
-            style={[styles.button, isSubmitting && styles.buttonDisabled]}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.buttonText}>{mode === 'setup' ? 'Save PIN' : 'Unlock'}</Text>
-            )}
-          </TouchableOpacity>
-        </GlassCard>
+            <TouchableOpacity
+              style={[styles.button, isSubmitting && styles.buttonDisabled]}
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.buttonText}>{mode === 'setup' ? 'Save PIN' : 'Unlock'}</Text>
+              )}
+            </TouchableOpacity>
+          </GlassCard>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -173,10 +166,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
+  scroll: {
+    paddingVertical: 32,
+    paddingHorizontal: 4,
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   card: {
-    alignSelf: 'center',
     width: '100%',
     maxWidth: 420,
+    alignSelf: 'center',
     gap: 16,
   },
   title: {
@@ -188,6 +188,52 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.75)',
     lineHeight: 20,
   },
+  infoBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 16,
+    padding: 16,
+    gap: 6,
+  },
+  infoTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  infoText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  infoBullet: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13,
+  },
+  stepList: {
+    marginTop: 8,
+    gap: 10,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stepDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2C82FF',
+  },
+  stepText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 13,
+    flex: 1,
+  },
+  fieldLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 12,
+  },
   input: {
     borderRadius: 18,
     borderWidth: 1,
@@ -197,11 +243,14 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    marginTop: 6,
+    marginBottom: 4,
   },
   toggle: {
     alignSelf: 'flex-end',
-    marginTop: -12,
+    marginTop: -8,
     marginBottom: 8,
+    paddingHorizontal: 4,
   },
   toggleText: {
     color: '#2C82FF',
