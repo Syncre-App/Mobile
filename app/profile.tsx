@@ -36,8 +36,16 @@ export default function ProfileScreen() {
         {
           text: 'Logout',
           onPress: async () => {
-            const { StorageService } = await import('../services/StorageService');
-            await StorageService.removeAuthToken();
+            const [{ StorageService }, { CryptoService }, { PinService }] = await Promise.all([
+              import('../services/StorageService'),
+              import('../services/CryptoService'),
+              import('../services/PinService'),
+            ]);
+            await Promise.all([
+              CryptoService.resetIdentity(),
+              PinService.clearPin(),
+              StorageService.removeAuthToken(),
+            ]);
             router.replace('/' as any);
           },
           style: 'destructive',
