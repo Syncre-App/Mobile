@@ -388,7 +388,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = syncre/syncre.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = R9PZGUCNJ3;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -431,7 +431,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = syncre/syncre.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = R9PZGUCNJ3;
 				INFOPLIST_FILE = syncre/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Syncre;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
