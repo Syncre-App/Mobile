@@ -44,6 +44,7 @@ class ReencryptionServiceClass {
         token,
         currentUserId,
       });
+      console.log('[ReencryptionService] Completed re-encryption push for chat', chatId);
     } catch (error) {
       console.warn('[ReencryptionService] Failed to process re-encrypt request:', error);
     } finally {
@@ -111,6 +112,11 @@ class ReencryptionServiceClass {
           },
           token
         );
+        console.log('[ReencryptionService] Appended envelope', {
+          messageId: raw.id ?? raw.messageId,
+          targetUserId,
+          targetDeviceId,
+        });
       } catch (error) {
         console.warn('[ReencryptionService] Failed to append envelope for message', raw.id, error);
       }

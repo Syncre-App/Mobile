@@ -244,6 +244,8 @@ const ChatScreen: React.FC = () => {
   const lastSeenMessageIdRef = useRef<string | null>(null);
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
   const markSeenInFlightRef = useRef(false);
+  const missingEnvelopeRef = useRef(false);
+  const reencryptRequestedRef = useRef(false);
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const remoteTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -333,6 +335,7 @@ const ChatScreen: React.FC = () => {
     async (rawMessages: any[], otherUserId: string | null) => {
       const results: Message[] = [];
       const ownerId = currentUserId;
+      let missingEnvelope = false;
 
       for (const raw of rawMessages) {
         const idValue = raw.id ?? `${chatId}-${raw.createdAt ?? raw.created_at ?? Date.now()}`;
@@ -365,6 +368,7 @@ const ChatScreen: React.FC = () => {
         }
 
         if (content == null) {
+          missingEnvelope = true;
           continue;
         }
 
@@ -389,6 +393,9 @@ const ChatScreen: React.FC = () => {
         });
       }
 
+      if (missingEnvelope) {
+        missingEnvelopeRef.current = true;
+      }
       return results;
     },
     [chatId, currentUserId]
@@ -572,6 +579,9 @@ const ChatScreen: React.FC = () => {
         const cleaned = transformed.filter(Boolean);
 
         setMessagesAnimated(() => cleaned);
+        if (missingEnvelopeRef.current) {
+          requestReencrypt('missing_history');
+        }
         lastSeenMessageIdRef.current = null;
         setHasMore(response.data?.hasMore ?? false);
         nextCursorRef.current = response.data?.nextCursor || null;
@@ -588,7 +598,7 @@ const ChatScreen: React.FC = () => {
         initialLoadCompleteRef.current = true;
       }
     },
-    [generatePlaceholderMessages, scrollToBottom, setMessagesAnimated, transformMessages]
+    [generatePlaceholderMessages, scrollToBottom, setMessagesAnimated, transformMessages, requestReencrypt]
   );
   
   const refreshMessages = useCallback(async () => {
@@ -1149,6 +1159,7 @@ const ChatScreen: React.FC = () => {
       if (String(event.chatId) !== String(chatId)) {
         return;
       }
+      reencryptRequestedRef.current = false;
       refreshMessages();
     });
     return () => {
@@ -1774,3 +1785,24 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
+  const requestReencrypt = useCallback(
+    (reason: string) => {
+      if (!chatId) {
+        return;
+      }
+      const payload: WebSocketMessage = {
+        type: 'request_reencrypt',
+        chatId,
+        reason,
+        targetDeviceId: deviceIdRef.current || undefined,
+      };
+      wsService.send(payload);
+      reencryptRequestedRef.current = true;
+      missingEnvelopeRef.current = false;
+    },
+    [chatId, wsService]
+  );
+  useEffect(() => {
+    reencryptRequestedRef.current = false;
+    missingEnvelopeRef.current = false;
+  }, [chatId]);
