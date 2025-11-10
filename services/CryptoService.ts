@@ -406,6 +406,10 @@ export const CryptoService = {
     return ensureIdentityAvailable();
   },
 
+  async getStoredIdentity(): Promise<IdentityKeyPair | null> {
+    return getLocalIdentity();
+  },
+
   async resetIdentity(): Promise<void> {
     await SecureStore.deleteItemAsync(IDENTITY_PRIVATE_KEY_KEY);
     await SecureStore.deleteItemAsync(IDENTITY_PUBLIC_KEY_KEY);

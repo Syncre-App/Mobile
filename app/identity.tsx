@@ -3,6 +3,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
+import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { CryptoService } from '../services/CryptoService';
 import { NotificationService } from '../services/NotificationService';
@@ -58,6 +60,56 @@ export default function IdentityScreen() {
         setError('Session expired. Please sign in again.');
         router.replace('/');
         return;
+      }
+
+      const remoteResponse = await ApiService.get('/keys/identity', token);
+      if (!remoteResponse.success && remoteResponse.statusCode !== 404) {
+        setError(remoteResponse.error || 'Failed to check secure backup. Try again.');
+        return;
+      }
+
+      const remoteData = remoteResponse.success ? remoteResponse.data : null;
+      const remotePublicKey = remoteData?.publicKey || null;
+      const remoteHasEncrypted = Boolean(remoteData?.encryptedPrivateKey);
+
+      if (mode === 'unlock' && !remoteHasEncrypted) {
+        setError('No secure backup found. Please set up your PIN on one of your existing devices.');
+        return;
+      }
+
+      const localIdentity = await CryptoService.getStoredIdentity();
+
+      if (localIdentity && remotePublicKey && localIdentity.publicKey !== remotePublicKey) {
+        const choice = await new Promise<'remote' | 'local' | null>((resolve) => {
+          Alert.alert(
+            'Secure identity mismatch',
+            'This device has a different encryption key than the backup on the server. Which one should we keep?',
+            [
+              {
+                text: 'Use backup',
+                style: 'destructive',
+                onPress: () => resolve('remote'),
+              },
+              {
+                text: 'Use this device',
+                onPress: () => resolve('local'),
+              },
+              {
+                text: 'Cancel',
+                style: 'cancel',
+                onPress: () => resolve(null),
+              },
+            ]
+          );
+        });
+
+        if (!choice) {
+          return;
+        }
+
+        if (choice === 'remote') {
+          await CryptoService.resetIdentity();
+        }
       }
 
       await PinService.setPin(trimmedPin);
