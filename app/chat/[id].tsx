@@ -263,25 +263,6 @@ const ChatScreen: React.FC = () => {
     },
     [chatId, wsService]
   );
-  const requestReencrypt = useCallback(
-    (reason: string) => {
-      if (!chatId) {
-        return;
-      }
-      const payload: WebSocketMessage = {
-        type: 'request_reencrypt',
-        chatId,
-        reason,
-        targetDeviceId: deviceIdRef.current || undefined,
-      };
-      wsService.send(payload);
-      reencryptRequestedRef.current = true;
-      missingEnvelopeRef.current = false;
-    },
-    [chatId, wsService]
-  );
-
-
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const remoteTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
