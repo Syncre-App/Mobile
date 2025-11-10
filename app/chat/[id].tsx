@@ -246,6 +246,23 @@ const ChatScreen: React.FC = () => {
   const markSeenInFlightRef = useRef(false);
   const missingEnvelopeRef = useRef(false);
   const reencryptRequestedRef = useRef(false);
+  const requestReencrypt = useCallback(
+    (reason: string) => {
+      if (!chatId) {
+        return;
+      }
+      const payload: WebSocketMessage = {
+        type: 'request_reencrypt',
+        chatId,
+        reason,
+        targetDeviceId: deviceIdRef.current || undefined,
+      };
+      wsService.send(payload);
+      reencryptRequestedRef.current = true;
+      missingEnvelopeRef.current = false;
+    },
+    [chatId, wsService]
+  );
 
 
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
