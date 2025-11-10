@@ -187,23 +187,19 @@ export class WebSocketService {
 
     switch (message.type) {
       case 'pong':
-        // Pong received, connection is alive
         break;
-        
       case 'user_status_update':
         if (message.data) {
           this.userStatuses[message.data.userId] = message.data.status;
           this.notifyStatusListeners();
         }
         break;
-        
       case 'bulk_status_update':
         if (message.data && message.data.statuses) {
           this.userStatuses = { ...this.userStatuses, ...message.data.statuses };
           this.notifyStatusListeners();
         }
         break;
-
       case 'friend_status_change':
         if (message.userId && message.status) {
           this.userStatuses = {
@@ -213,7 +209,6 @@ export class WebSocketService {
           this.notifyStatusListeners();
         }
         break;
-
       case 'typing':
         this.handleTyping(message);
         break;
@@ -233,10 +228,8 @@ export class WebSocketService {
           messageId: message.messageId ?? message.data?.messageId,
         });
         break;
-        
       default:
-        // The default case is now primarily for events that are just passed to listeners.
-        // console.log('🌐 Received WebSocket message:', message);
+        break;
     }
   }
 
