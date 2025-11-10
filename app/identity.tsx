@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, router } from 'expo-router';
-import React, { useState } from 'react';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,7 +9,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
@@ -19,36 +18,75 @@ import { NotificationService } from '../services/NotificationService';
 import { IdentityService } from '../services/IdentityService';
 import { PinService } from '../services/PinService';
 
-export default function IdentityBootstrapScreen() {
+export default function IdentityScreen() {
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const mode = params?.mode === 'setup' ? 'setup' : 'unlock';
+
   const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [obscurePin, setObscurePin] = useState(true);
+  const [obscureConfirmPin, setObscureConfirmPin] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const title = useMemo(
+    () => (mode === 'setup' ? 'Create Secure PIN' : 'Unlock Secure Messages'),
+    [mode]
+  );
+  const subtitle = useMemo(() => {
+    if (mode === 'setup') {
+      return 'Válassz egy 6 számjegyű PIN-kódot. Ezzel védjük a privát kulcsodat, és minden eszközön ezzel fogod feloldani a titkosított beszélgetéseidet.';
+    }
+    return 'Add meg a Secure PIN-ed, hogy ezen az eszközön is elérhesd a titkosított üzeneteidet.';
+  }, [mode]);
+
   const handleSubmit = async () => {
     setError(null);
-    if (!pin.trim()) {
-      setError('Secure PIN is required to unlock your secure messages.');
+    const trimmedPin = pin.trim();
+    if (!trimmedPin) {
+      setError('Secure PIN is required.');
       return;
     }
-    setIsSubmitting(true);
+    if (trimmedPin.length < 6) {
+      setError('PIN must be at least 6 digits.');
+      return;
+    }
+    if (mode === 'setup') {
+      const confirm = confirmPin.trim();
+      if (!confirm) {
+        setError('Please confirm your PIN.');
+        return;
+      }
+      if (confirm !== trimmedPin) {
+        setError('PIN entries do not match.');
+        return;
+      }
+    }
+
     try {
+      setIsSubmitting(true);
       const token = await StorageService.getAuthToken();
       if (!token) {
         setError('Session expired. Please sign in again.');
         router.replace('/');
         return;
       }
-      await PinService.setPin(pin.trim());
-      await CryptoService.bootstrapIdentity({ pin: pin.trim(), token });
+
+      await PinService.setPin(trimmedPin);
+      await CryptoService.bootstrapIdentity({ pin: trimmedPin, token });
       IdentityService.clearCache();
-      NotificationService.show('success', 'Secure messaging unlocked');
+      NotificationService.show(
+        'success',
+        mode === 'setup' ? 'Secure PIN saved' : 'Secure messaging unlocked'
+      );
       router.replace('/home');
     } catch (err: any) {
-      console.error('[IdentityBootstrap] Failed to bootstrap identity:', err);
-      setError(err?.message || 'Failed to unlock keys. Please double-check your password.');
+      console.error('[IdentityScreen] Failed to process identity:', err);
+      setError(err?.message || 'Failed to process secure keys. Please double-check your PIN.');
     } finally {
       setIsSubmitting(false);
       setPin('');
+      setConfirmPin('');
     }
   };
 
@@ -61,23 +99,50 @@ export default function IdentityBootstrapScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <GlassCard width="100%" style={styles.card}>
-          <Text style={styles.title}>Secure Sync Needed</Text>
-          <Text style={styles.subtitle}>
-            To read and send encrypted messages on this device, please confirm your secure PIN so we
-            can restore your keys.
-          </Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Secure PIN"
+            placeholder={mode === 'setup' ? 'Choose a Secure PIN' : 'Enter Secure PIN'}
             placeholderTextColor="rgba(255, 255, 255, 0.4)"
-            secureTextEntry
+            secureTextEntry={obscurePin}
             autoCapitalize="none"
             keyboardType="number-pad"
             value={pin}
             onChangeText={setPin}
             editable={!isSubmitting}
           />
+          <TouchableOpacity
+            style={styles.toggle}
+            onPress={() => setObscurePin((prev) => !prev)}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.toggleText}>{obscurePin ? 'Show PIN' : 'Hide PIN'}</Text>
+          </TouchableOpacity>
+
+          {mode === 'setup' ? (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Confirm Secure PIN"
+                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                secureTextEntry={obscureConfirmPin}
+                autoCapitalize="none"
+                keyboardType="number-pad"
+                value={confirmPin}
+                onChangeText={setConfirmPin}
+                editable={!isSubmitting}
+              />
+              <TouchableOpacity
+                style={styles.toggle}
+                onPress={() => setObscureConfirmPin((prev) => !prev)}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.toggleText}>{obscureConfirmPin ? 'Show PIN' : 'Hide PIN'}</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -89,7 +154,7 @@ export default function IdentityBootstrapScreen() {
             {isSubmitting ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.buttonText}>Unlock Secure Messages</Text>
+              <Text style={styles.buttonText}>{mode === 'setup' ? 'Save PIN' : 'Unlock'}</Text>
             )}
           </TouchableOpacity>
         </GlassCard>
@@ -132,6 +197,15 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  toggle: {
+    alignSelf: 'flex-end',
+    marginTop: -12,
+    marginBottom: 8,
+  },
+  toggleText: {
+    color: '#2C82FF',
+    fontSize: 13,
   },
   error: {
     color: '#ff6b6b',

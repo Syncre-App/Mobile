@@ -34,15 +34,15 @@ export default function RootLayout() {
 
         const token = await StorageService.getAuthToken();
         if (token) {
-          const needsIdentity = await IdentityService.requiresBootstrap(token);
-          if (needsIdentity) {
-            router.replace('/identity');
-            return;
-          }
+          const needsIdentitySetup = await IdentityService.requiresBootstrap(token);
+          const mode = needsIdentitySetup ? 'setup' : 'unlock';
+          setMaintenance(false);
+          router.replace(`/identity?mode=${mode}`);
+          return;
         }
 
         setMaintenance(false);
-        router.replace('/home');
+        router.replace('/');
       } catch (error) {
         setMaintenance(true);
         router.replace('/maintenance');

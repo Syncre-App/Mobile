@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
     ActivityIndicator,
     Image,
@@ -17,36 +17,20 @@ import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
-import { CryptoService } from '../services/CryptoService';
-import { PinService } from '../services/PinService';
+import { IdentityService } from '../services/IdentityService';
 
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [obscurePassword, setObscurePassword] = useState(true);
-  const [pin, setPin] = useState('');
-  const [obscurePin, setObscurePin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    PinService.getPin().then((savedPin) => {
-      if (savedPin) {
-        setPin(savedPin);
-      }
-    });
-  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
       notificationService.show('error', 'Please fill in both email and password fields', 'Error');
       return;
     }
-    if (!pin.trim()) {
-      notificationService.show('error', 'Secure PIN is required', 'Error');
-      return;
-    }
-
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!emailValid) {
       notificationService.show('error', 'Please enter a valid email address', 'Error');
@@ -83,17 +67,12 @@ export const LoginScreen: React.FC = () => {
         }
 
         if (token) {
-          try {
-            await PinService.setPin(pin.trim());
-            await CryptoService.bootstrapIdentity({ pin: pin.trim(), token });
-          } catch (identityError) {
-            console.error('Failed to bootstrap identity keys:', identityError);
-            notificationService.show('error', 'Unable to initialize secure messaging keys', 'Encryption error');
-          }
+          const needsSetup = await IdentityService.requiresBootstrap(token);
+          notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');
+          router.replace(`/identity?mode=${needsSetup ? 'setup' : 'unlock'}` as any);
+        } else {
+          notificationService.show('error', 'Missing authentication token', 'Error');
         }
-
-        notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');
-        router.replace('/home' as any);
       } else {
         console.warn('Login failed response:', response);
         notificationService.show('error', response.error || 'Login failed', 'Error');
@@ -144,17 +123,6 @@ export const LoginScreen: React.FC = () => {
               style={styles.field}
             />
 
-            <TransparentField
-              placeholder="Secure PIN (new or existing)"
-              value={pin}
-              onChangeText={setPin}
-              secureTextEntry={obscurePin}
-              keyboardType="number-pad"
-              prefixIcon={<Ionicons name="key" size={18} color="#fff7" />}
-              suffixIcon={<Ionicons name={obscurePin ? 'eye' : 'eye-off'} size={18} color="#fff7" />}
-              onSuffixPress={() => setObscurePin(!obscurePin)}
-              style={styles.field}
-            />
 
             <View style={styles.row}>
               <View style={styles.rememberRow}>
