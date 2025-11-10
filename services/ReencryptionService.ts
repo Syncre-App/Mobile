@@ -66,61 +66,103 @@ class ReencryptionServiceClass {
     currentUserId: string;
   }) {
     const deviceId = await DeviceService.getOrCreateDeviceId();
-    const params = new URLSearchParams();
-    params.set('limit', String(this.MESSAGE_LIMIT));
-    if (deviceId) {
-      params.set('deviceId', deviceId);
-    }
+    let beforeCursor: string | null = null;
+    let processed = 0;
+    let appended = 0;
+    console.log('[ReencryptionService] Starting re-encrypt job', {
+      chatId,
+      targetUserId,
+      targetDeviceId,
+    });
 
-    const response = await ApiService.get(`/chat/${chatId}/messages?${params.toString()}`, token);
-    if (!response.success || !Array.isArray(response.data?.messages)) {
-      console.warn('[ReencryptionService] Unable to fetch messages for re-encryption', response.error);
-      return;
-    }
-
-    const messages: any[] = response.data.messages;
-    for (const raw of messages) {
-      const senderId = raw.senderId ?? raw.sender_id ?? raw.userId;
-      if (!senderId || senderId.toString() !== currentUserId) {
-        continue;
+    while (true) {
+      const params = new URLSearchParams();
+      params.set('limit', String(this.MESSAGE_LIMIT));
+      if (deviceId) {
+        params.set('deviceId', deviceId);
+      }
+      if (beforeCursor) {
+        params.set('before', beforeCursor);
       }
 
-      if (!raw.isEncrypted || !Array.isArray(raw.envelopes) || !raw.envelopes.length) {
-        continue;
+      const response = await ApiService.get(`/chat/${chatId}/messages?${params.toString()}`, token);
+      if (!response.success || !Array.isArray(response.data?.messages)) {
+        console.warn('[ReencryptionService] Unable to fetch messages for re-encryption', response.error);
+        break;
       }
 
-      const plaintext = await CryptoService.decryptMessage(chatId, raw.envelopes);
-      if (!plaintext) {
-        continue;
+      const messages: any[] = response.data.messages;
+      if (!messages.length) {
+        break;
       }
 
-      try {
-        const envelope = await CryptoService.buildEnvelopeForRecipient({
-          chatId,
-          message: plaintext,
-          recipientUserId: targetUserId,
-          recipientDeviceId,
-          token,
-          currentUserId,
-        });
+      for (const raw of messages) {
+        const senderId = raw.senderId ?? raw.sender_id ?? raw.userId;
+        if (!senderId || senderId.toString() !== currentUserId) {
+          continue;
+        }
 
-        await ApiService.post(
-          '/keys/envelopes',
-          {
+        if (!raw.isEncrypted || !Array.isArray(raw.envelopes) || !raw.envelopes.length) {
+          continue;
+        }
+
+        const hasEnvelope =
+          raw.envelopes?.some?.(
+            (entry: any) =>
+              entry.recipientId?.toString?.() === targetUserId &&
+              (targetDeviceId ? entry.recipientDevice === targetDeviceId : true)
+          ) ?? false;
+
+        if (hasEnvelope) {
+          continue;
+        }
+
+        const plaintext = await CryptoService.decryptMessage(chatId, raw.envelopes);
+        if (!plaintext) {
+          continue;
+        }
+
+        try {
+          const envelope = await CryptoService.buildEnvelopeForRecipient({
+            chatId,
+            message: plaintext,
+            recipientUserId: targetUserId,
+            recipientDeviceId,
+            token,
+            currentUserId,
+          });
+
+          await ApiService.post(
+            '/keys/envelopes',
+            {
+              messageId: raw.id ?? raw.messageId,
+              envelopes: [envelope],
+            },
+            token
+          );
+          appended += 1;
+          console.log('[ReencryptionService] Appended envelope', {
             messageId: raw.id ?? raw.messageId,
-            envelopes: [envelope],
-          },
-          token
-        );
-        console.log('[ReencryptionService] Appended envelope', {
-          messageId: raw.id ?? raw.messageId,
-          targetUserId,
-          targetDeviceId,
-        });
-      } catch (error) {
-        console.warn('[ReencryptionService] Failed to append envelope for message', raw.id, error);
+            targetUserId,
+            targetDeviceId,
+          });
+        } catch (error) {
+          console.warn('[ReencryptionService] Failed to append envelope for message', raw.id, error);
+        }
       }
+
+      processed += messages.length;
+      if (!response.data?.hasMore || !response.data?.nextCursor) {
+        break;
+      }
+      beforeCursor = response.data.nextCursor;
     }
+
+    console.log('[ReencryptionService] Finished re-encrypt job', {
+      chatId,
+      processed,
+      appended,
+    });
   }
 }
 
