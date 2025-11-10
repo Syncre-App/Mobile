@@ -590,6 +590,19 @@ const ChatScreen: React.FC = () => {
     },
     [generatePlaceholderMessages, scrollToBottom, setMessagesAnimated, transformMessages]
   );
+  
+  const refreshMessages = useCallback(async () => {
+    if (!chatId) {
+      return;
+    }
+
+    const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+    if (!token) {
+      return;
+    }
+    authTokenRef.current = token;
+    await loadMessagesForChat(token, chatId, receiverNameRef.current, otherUserIdRef.current);
+  }, [chatId, loadMessagesForChat]);
 
   const loadChatDetails = useCallback(async () => {
     if (!chatId || !currentUserId) {
@@ -1127,6 +1140,21 @@ const ChatScreen: React.FC = () => {
       }
     };
   }, [ensureTypingStopped, handleIncomingMessage, wsService]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('chat:envelopes_appended', (event: any) => {
+      if (!event || !event.chatId) {
+        return;
+      }
+      if (String(event.chatId) !== String(chatId)) {
+        return;
+      }
+      refreshMessages();
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [chatId, refreshMessages]);
 
   useEffect(() => {
     if (!messages.length || !currentUserId) {

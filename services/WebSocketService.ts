@@ -11,6 +11,9 @@ export interface WebSocketMessage {
   [key: string]: any;
 }
 
+import { DeviceEventEmitter } from 'react-native';
+import { ReencryptionService } from './ReencryptionService';
+
 export class WebSocketService {
   private static instance: WebSocketService;
   private ws: WebSocket | null = null;
@@ -216,6 +219,19 @@ export class WebSocketService {
         break;
       case 'stop-typing':
         this.handleStopTyping(message);
+        break;
+      case 'request_reencrypt':
+        ReencryptionService.handleRequest({
+          chatId: message.chatId ?? message.data?.chatId,
+          targetUserId: message.targetUserId ?? message.data?.targetUserId,
+          targetDeviceId: message.targetDeviceId ?? message.data?.targetDeviceId,
+        });
+        break;
+      case 'envelopes_appended':
+        DeviceEventEmitter.emit('chat:envelopes_appended', {
+          chatId: message.chatId ?? message.data?.chatId,
+          messageId: message.messageId ?? message.data?.messageId,
+        });
         break;
         
       default:

@@ -312,6 +312,7 @@ async function encryptForRecipient({
   recipientPublicKey,
   privateKeyBytes,
   senderPublicKey,
+  recipientDeviceId,
 }: {
   chatId: string;
   message: string;
@@ -319,6 +320,7 @@ async function encryptForRecipient({
   recipientPublicKey: string;
   privateKeyBytes: Uint8Array;
   senderPublicKey: string;
+  recipientDeviceId?: string | null;
 }): Promise<EnvelopeEntry> {
   const recipientKeyBytes = fromBase64(recipientPublicKey);
   const sharedSecret = nacl.box.before(recipientKeyBytes, privateKeyBytes);
@@ -330,7 +332,7 @@ async function encryptForRecipient({
 
   return {
     recipientId: recipientUserId,
-    recipientDevice: null,
+    recipientDevice: recipientDeviceId || null,
     payload: toBase64(payload),
     nonce: toBase64(nonce),
     keyVersion: 1,
@@ -420,6 +422,7 @@ export const CryptoService = {
           recipientPublicKey: publicKey,
           privateKeyBytes,
           senderPublicKey: identity.publicKey,
+          recipientDeviceId: null,
         })
       );
     }
@@ -438,5 +441,32 @@ export const CryptoService = {
       }
     }
     return null;
+  },
+
+  async buildEnvelopeForRecipient(params: {
+    chatId: string;
+    message: string;
+    recipientUserId: string;
+    recipientDeviceId?: string | null;
+    token: string;
+    currentUserId: string;
+  }): Promise<EnvelopeEntry> {
+    const { chatId, message, recipientUserId, recipientDeviceId = null, token, currentUserId } = params;
+    const { identity, privateKeyBytes } = await getSenderIdentity();
+    const recipientKey =
+      recipientUserId === currentUserId ? identity.publicKey : await getRecipientPublicKey(recipientUserId, token);
+    return encryptForRecipient({
+      chatId,
+      message,
+      recipientUserId,
+      recipientPublicKey: recipientKey,
+      privateKeyBytes,
+      senderPublicKey: identity.publicKey,
+      recipientDeviceId,
+    });
+  },
+
+  async fetchRecipientPublicKey(userId: string, token: string): Promise<string> {
+    return getRecipientPublicKey(userId, token);
   },
 };
