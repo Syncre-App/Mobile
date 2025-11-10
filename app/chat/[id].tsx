@@ -1137,6 +1137,11 @@ const ChatScreen: React.FC = () => {
   }, [chatId, wsService]);
 
   useEffect(() => {
+    reencryptRequestedRef.current = false;
+    missingEnvelopeRef.current = false;
+  }, [chatId]);
+
+  useEffect(() => {
     wsService.connect().catch((error) => console.error('Failed to ensure WebSocket connection for chat screen:', error));
     const unsubscribe = wsService.addMessageListener(handleIncomingMessage);
 
@@ -1802,7 +1807,3 @@ export default ChatScreen;
     },
     [chatId, wsService]
   );
-  useEffect(() => {
-    reencryptRequestedRef.current = false;
-    missingEnvelopeRef.current = false;
-  }, [chatId]);
