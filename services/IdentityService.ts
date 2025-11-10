@@ -36,8 +36,9 @@ class IdentityServiceClass {
 
     const response = await ApiService.get('/keys/identity', authToken);
     if (response.success) {
-      this.setCache(authToken, false);
-      return false;
+      const needsBootstrap = !response.data?.encryptedPrivateKey;
+      this.setCache(authToken, needsBootstrap);
+      return needsBootstrap;
     }
 
     const needsBootstrap = response.statusCode === 404;
