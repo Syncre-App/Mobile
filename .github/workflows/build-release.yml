@@ -64,14 +64,15 @@ jobs:
       - name: Build iOS archive (.ipa)
         run: |
           cd ios
-          xcodebuild -scheme Syncre \
-            -workspace Syncre.xcworkspace \
-            -configuration Release \
-            -archivePath build/Syncre.xcarchive archive
+          xcodebuild -scheme syncre \
+          -workspace syncre.xcworkspace \
+          -configuration Release \
+          -archivePath build/syncre.xcarchive archive
           xcodebuild -exportArchive \
-            -archivePath build/Syncre.xcarchive \
-            -exportOptionsPlist ExportOptions.plist \
-            -exportPath build
+          -archivePath build/syncre.xcarchive \
+          -exportOptionsPlist ExportOptions.plist \
+          -exportPath build
+
 
       - name: Upload iOS IPA to release
         uses: softprops/action-gh-release@v2
