@@ -58,7 +58,28 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install jq
+            brew install jq cocoapods
+
+            # Use pnpm (this repo uses pnpm lockfile). Enable corepack and activate pnpm.
+            corepack enable
+            corepack prepare pnpm@latest --activate || true
+
+            # Expo CLI for prebuild
+            npm install -g expo-cli
+
+            # Install JS deps with pnpm (fallback to npm if pnpm isn't available)
+            if command -v pnpm >/dev/null 2>&1; then
+              pnpm install --frozen-lockfile || pnpm install
+            else
+              npm ci || npm install
+            fi
+
+            # Run expo prebuild in CI mode (expo warns when --non-interactive is unsupported)
+            CI=1 npx expo prebuild --platform ios --non-interactive
+
+            # Install CocoaPods dependencies for the generated iOS project
+            cd ios
+            pod install --repo-update
           npm install -g expo-cli
           npm ci || npm install
           npx expo prebuild --platform ios --non-interactive
