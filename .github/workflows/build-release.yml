@@ -40,7 +40,7 @@ jobs:
         with:
           files: android/app/build/outputs/apk/release/app-release.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
 
   build-ios:
     name: Build iOS Archive
@@ -79,4 +79,4 @@ jobs:
         with:
           files: ios/build/Syncre.ipa
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
