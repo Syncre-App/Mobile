@@ -45,7 +45,6 @@ jobs:
   build-ios:
     name: Build iOS Archive
     runs-on: macos-latest
-    needs: build-android
 
     steps:
       - name: Checkout repository
