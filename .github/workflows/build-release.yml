@@ -1,0 +1,82 @@
+name: Build Android & iOS on Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-android:
+    name: Build Android Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          npm install -g expo-cli
+          npm ci || npm install
+          npx expo prebuild --platform android --non-interactive
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build Android release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease
+
+      - name: Upload Android APK to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/release/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-ios:
+    name: Build iOS Archive
+    runs-on: macos-latest
+    needs: build-android
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          npm install -g expo-cli
+          npm ci || npm install
+          npx expo prebuild --platform ios --non-interactive
+
+      - name: Build iOS archive (.ipa)
+        run: |
+          cd ios
+          xcodebuild -scheme Syncre \
+            -workspace Syncre.xcworkspace \
+            -configuration Release \
+            -archivePath build/Syncre.xcarchive archive
+          xcodebuild -exportArchive \
+            -archivePath build/Syncre.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath build
+
+      - name: Upload iOS IPA to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ios/build/Syncre.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
