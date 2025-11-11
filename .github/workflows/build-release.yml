@@ -57,26 +57,32 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install -g expo-cli
+          npm install -g expo-cli jq
           npm ci || npm install
           npx expo prebuild --platform ios --non-interactive
+
+      - name: Detect Xcode scheme
+        id: detect_scheme
+        run: |
+          cd ios
+          scheme=$(xcodebuild -list -json | jq -r '.workspace.schemes[0]')
+          echo "scheme=$scheme" >> $GITHUB_OUTPUT
 
       - name: Build iOS archive (.ipa)
         run: |
           cd ios
-          xcodebuild -scheme syncre \
-          -workspace syncre.xcworkspace \
-          -configuration Release \
-          -archivePath build/syncre.xcarchive archive
+          xcodebuild -scheme "${{ steps.detect_scheme.outputs.scheme }}" \
+            -workspace *.xcworkspace \
+            -configuration Release \
+            -archivePath build/App.xcarchive archive
           xcodebuild -exportArchive \
-          -archivePath build/syncre.xcarchive \
-          -exportOptionsPlist ExportOptions.plist \
-          -exportPath build
-
+            -archivePath build/App.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath build
 
       - name: Upload iOS IPA to release
         uses: softprops/action-gh-release@v2
         with:
-          files: ios/build/Syncre.ipa
+          files: ios/build/*.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
