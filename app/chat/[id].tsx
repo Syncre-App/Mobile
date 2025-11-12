@@ -340,16 +340,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onMoveShouldSetPanResponder: (_, gesture) =>
           Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 4,
         onPanResponderMove: (_, gesture) => {
-          if (gesture.dx > 0) {
+          if (!isMine && gesture.dx > 0) {
             swipeAnim.setValue(Math.min(gesture.dx, 80));
-          } else if (isMine) {
+          } else if (isMine && gesture.dx < 0) {
             swipeAnim.setValue(Math.max(gesture.dx, -80));
           } else {
             swipeAnim.setValue(0);
           }
         },
         onPanResponderRelease: (_, gesture) => {
-          const rightSwipe = gesture.dx > SWIPE_REPLY_THRESHOLD;
+          const rightSwipe = !isMine && gesture.dx > SWIPE_REPLY_THRESHOLD;
           const leftSwipe = isMine && gesture.dx < -SWIPE_REPLY_THRESHOLD;
           if ((rightSwipe || leftSwipe) && onReplySwipe) {
             onReplySwipe();
@@ -397,11 +397,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     message.isPlaceholder && styles.placeholderBubble,
   ];
 
-  const replyHintOpacity = swipeAnim.interpolate({
-    inputRange: [-SWIPE_REPLY_THRESHOLD, -10, 0, 10, SWIPE_REPLY_THRESHOLD],
-    outputRange: [1, 0, 0, 0, 1],
-    extrapolate: 'clamp',
-  });
+  const replyHintOpacity = useMemo(() => {
+    if (isMine) {
+      return swipeAnim.interpolate({
+        inputRange: [-SWIPE_REPLY_THRESHOLD, -10, 0],
+        outputRange: [1, 0, 0],
+        extrapolate: 'clamp',
+      });
+    }
+    return swipeAnim.interpolate({
+      inputRange: [0, 10, SWIPE_REPLY_THRESHOLD],
+      outputRange: [0, 0, 1],
+      extrapolate: 'clamp',
+    });
+  }, [isMine, swipeAnim]);
 
   const statusText =
     showStatus && message.status
