@@ -425,23 +425,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         >
           <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
         </Animated.View>
-        {message.replyTo && (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.replyConnector,
-              isMine ? styles.replyConnectorMine : styles.replyConnectorTheirs,
-            ]}
-          >
-            <View style={styles.replyConnectorVertical} />
-            <View
-              style={[
-                styles.replyConnectorCurve,
-                isMine && styles.replyConnectorCurveMine,
-              ]}
-            />
-          </View>
-        )}
         <View style={bubbleStyle}>
           {message.replyTo && (
             <Pressable
@@ -474,15 +457,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             onPress={() => onOpenThread(message.id)}
           >
             <View style={styles.threadSummaryContent}>
-              <View style={styles.threadSummaryLineGroup}>
-                <View style={styles.threadSummaryLine} />
-                <View
-                  style={[
-                    styles.threadSummaryLineCurve,
-                    isMine && styles.threadSummaryLineCurveMine,
-                  ]}
-                />
-              </View>
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={14}
+                color="rgba(255, 255, 255, 0.9)"
+              />
               <Text style={styles.threadSummaryText}>
                 {replyCount} {replyCount === 1 ? 'Reply' : 'Replies'}
               </Text>
@@ -1296,6 +1275,12 @@ const ChatScreen: React.FC = () => {
     setThreadRootId(null);
     scrollToMessageById(target);
   }, [scrollToMessageById, threadRootId]);
+
+  useEffect(() => {
+    if (replyContext) {
+      requestAnimationFrame(() => composerRef.current?.focus());
+    }
+  }, [replyContext]);
 
   useEffect(() => {
     if (!chatId || !wsService) {
@@ -2270,44 +2255,6 @@ const styles = StyleSheet.create({
     left: undefined,
     right: -28,
   },
-  replyConnector: {
-    position: 'absolute',
-    left: -22,
-    top: 4,
-    bottom: 4,
-    width: 24,
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  replyConnectorMine: {
-    left: undefined,
-    right: -22,
-    alignItems: 'flex-end',
-  },
-  replyConnectorTheirs: {},
-  replyConnectorVertical: {
-    flex: 1,
-    width: 2,
-    backgroundColor: REPLY_ACCENT,
-    borderRadius: 1,
-  },
-  replyConnectorCurve: {
-    width: 12,
-    height: 12,
-    borderLeftWidth: 2,
-    borderBottomWidth: 2,
-    borderColor: REPLY_ACCENT,
-    borderBottomLeftRadius: 12,
-  },
-  replyConnectorCurveMine: {
-    borderLeftWidth: 0,
-    borderBottomLeftRadius: 0,
-    borderRightWidth: 2,
-    borderBottomWidth: 2,
-    borderRightColor: REPLY_ACCENT,
-    borderBottomColor: REPLY_ACCENT,
-    borderBottomRightRadius: 12,
-  },
   messageText: {
     fontSize: 16,
     color: '#ffffff',
@@ -2510,28 +2457,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  threadSummaryLineGroup: {
-    alignItems: 'center',
-  },
-  threadSummaryLine: {
-    width: 2,
-    height: 16,
-    backgroundColor: REPLY_ACCENT,
-    borderRadius: 1,
-  },
-  threadSummaryLineCurve: {
-    width: 10,
-    height: 10,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-    borderColor: REPLY_ACCENT,
-    borderBottomLeftRadius: 10,
-  },
-  threadSummaryLineCurveMine: {
-    borderLeftWidth: 0,
-    borderRightWidth: 2,
-    borderBottomRightRadius: 10,
-  },
   threadSummaryText: {
     color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 12,
@@ -2597,8 +2522,3 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
-  useEffect(() => {
-    if (replyContext) {
-      requestAnimationFrame(() => composerRef.current?.focus());
-    }
-  }, [replyContext]);
