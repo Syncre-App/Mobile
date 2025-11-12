@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import { getInfoAsync } from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
     Alert,
     Image,
+    Platform,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -31,6 +32,20 @@ interface User {
   profile_picture?: string | null;
   [key: string]: any;
 }
+
+const MAX_PROFILE_SIZE_BYTES = 5 * 1024 * 1024;
+
+const resolveExtension = (fileName?: string, mimeType?: string | null) => {
+  const fromName = fileName?.split('.').pop()?.toLowerCase();
+  if (fromName && fromName.length <= 5) {
+    return fromName;
+  }
+  const fromMime = mimeType?.split('/').pop()?.toLowerCase();
+  if (fromMime && fromMime.length <= 5) {
+    return fromMime;
+  }
+  return 'jpg';
+};
 
 export const EditProfileScreen: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -78,8 +93,14 @@ export const EditProfileScreen: React.FC = () => {
 
   const handlePickImage = async () => {
     try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        NotificationService.show('error', 'Media access is required to pick a profile photo');
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'] as ImagePicker.MediaType[],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.9,
         aspect: [1, 1],
@@ -90,14 +111,38 @@ export const EditProfileScreen: React.FC = () => {
       }
 
       const asset = result.assets[0];
-      const fileInfo = await getInfoAsync(asset.uri);
-      if (fileInfo.exists && fileInfo.size && fileInfo.size > 5 * 1024 * 1024) {
+      let normalizedUri = asset.uri;
+      let fileSize = asset.fileSize ?? null;
+
+      if (!fileSize) {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+          if (fileInfo.exists && typeof fileInfo.size === 'number') {
+            fileSize = fileInfo.size;
+          }
+        } catch (infoError) {
+          console.warn('Failed to inspect selected image info', infoError);
+        }
+      }
+
+      if (fileSize && fileSize > MAX_PROFILE_SIZE_BYTES) {
         NotificationService.show('error', 'Image must be smaller than 5 MB');
         return;
       }
 
+      if (Platform.OS === 'android' && normalizedUri.startsWith('content://')) {
+        try {
+          const tempExt = resolveExtension(asset.fileName, asset.mimeType);
+          const tempUri = `${FileSystem.cacheDirectory}profile-upload-${Date.now()}.${tempExt}`;
+          await FileSystem.copyAsync({ from: normalizedUri, to: tempUri });
+          normalizedUri = tempUri;
+        } catch (copyError) {
+          console.warn('Failed to copy Android content URI for upload', copyError);
+        }
+      }
+
       setSelectedImage({
-        uri: asset.uri,
+        uri: normalizedUri,
         mimeType: asset.mimeType || 'image/jpeg',
         fileName: asset.fileName ?? undefined,
       });
@@ -129,8 +174,7 @@ export const EditProfileScreen: React.FC = () => {
       }
 
       const formData = new FormData();
-      const extension = selectedImage.fileName?.split('.').pop()?.toLowerCase();
-      const safeExtension = extension && extension.length <= 4 ? extension : (selectedImage.mimeType === 'image/png' ? 'png' : 'jpg');
+      const safeExtension = resolveExtension(selectedImage.fileName, selectedImage.mimeType);
       const fileName = selectedImage.fileName || `profile-${Date.now()}.${safeExtension}`;
 
       formData.append('profilePicture', {

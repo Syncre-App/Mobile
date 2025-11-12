@@ -106,7 +106,8 @@ export const VerifyScreen: React.FC = () => {
               placeholder="Code"
               value={code}
               onChangeText={setCode}
-              keyboardType="numeric"
+              keyboardType="default"
+              autoCapitalize="characters"
               style={styles.inputField}
             />
 

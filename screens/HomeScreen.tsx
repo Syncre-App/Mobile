@@ -866,15 +866,17 @@ export const HomeScreen: React.FC = () => {
 
           {/* Chat List */}
           <View style={styles.chatSection}>
-            <ChatListWidget 
-              chats={chats}
-              isLoading={chatsLoading}
-              onRefresh={handleChatRefresh}
-              userStatuses={userStatuses}
-              onRemoveFriend={handleRemoveFriend}
-              removingFriendId={removingFriendId}
-              unreadCounts={chatUnreadCounts}
-            />
+            <GlassCard width="100%" style={styles.chatListCard}>
+              <ChatListWidget 
+                chats={chats}
+                isLoading={chatsLoading}
+                onRefresh={handleChatRefresh}
+                userStatuses={userStatuses}
+                onRemoveFriend={handleRemoveFriend}
+                removingFriendId={removingFriendId}
+                unreadCounts={chatUnreadCounts}
+              />
+            </GlassCard>
           </View>
         </SafeAreaView>
       )}
@@ -1127,6 +1129,12 @@ const styles = StyleSheet.create({
   },
   chatSection: {
     flex: 1,
+  },
+  chatListCard: {
+    width: '100%',
+    flex: 1,
+    marginHorizontal: 20,
+    padding: 0,
   },
   section: {
     paddingHorizontal: 20,

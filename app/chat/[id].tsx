@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, DeviceEventEmitter, FlatList, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Platform, RefreshControl, StatusBar, StyleSheet, Text, TextInput, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
+import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, FlatList, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Platform, RefreshControl, StatusBar, StyleSheet, Text, TextInput, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -157,6 +157,8 @@ const formatTimestamp = (date: Date): string => {
 
   return timeFormatter.format(date);
 };
+
+const MESSAGE_CHAR_LIMIT = 2000;
 
 
 const layoutNext = () => {
@@ -344,6 +346,7 @@ const ChatScreen: React.FC = () => {
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
   const [timestampVisibleFor, setTimestampVisibleFor] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
 
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -886,7 +889,7 @@ const ChatScreen: React.FC = () => {
   );
 
   const handleSendMessage = useCallback(async () => {
-    if (!newMessage.trim() || !currentUserId || !chatId) {
+    if (!newMessage.trim() || newMessage.length > MESSAGE_CHAR_LIMIT || !currentUserId || !chatId) {
       return;
     }
 
@@ -966,6 +969,56 @@ const ChatScreen: React.FC = () => {
     setMessagesAnimated,
     wsService,
   ]);
+
+  const deleteMessage = useCallback(
+    async (message: Message) => {
+      if (!chatId || !message?.id || deletingMessageId) {
+        return;
+      }
+
+      try {
+        setDeletingMessageId(message.id);
+        const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+        if (!token) {
+          throw new Error('Missing auth token');
+        }
+        authTokenRef.current = token;
+        const response = await ApiService.delete(`/chat/${chatId}/messages/${message.id}`, token);
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to delete message');
+        }
+        setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== message.id));
+        NotificationService.show('success', 'Message deleted', 'Deleted');
+      } catch (error) {
+        console.error('Failed to delete message:', error);
+        NotificationService.show(
+          'error',
+          error instanceof Error ? error.message : 'Failed to delete message',
+          'Delete failed'
+        );
+      } finally {
+        setDeletingMessageId(null);
+      }
+    },
+    [authTokenRef, chatId, deletingMessageId, setMessagesAnimated]
+  );
+
+  const handleMessageLongPress = useCallback(
+    (message: Message, isMine: boolean) => {
+      if (!isMine) {
+        return;
+      }
+      Alert.alert('Delete message?', 'This will remove the message for everyone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteMessage(message),
+        },
+      ]);
+    },
+    [deleteMessage]
+  );
 
   useEffect(() => {
     if (!chatId || !wsService) {
@@ -1145,6 +1198,15 @@ const ChatScreen: React.FC = () => {
           scrollToBottom();
           return;
         }
+        case 'message_deleted': {
+          const deletedId = String(payload.messageId ?? payload.id ?? payload.data?.messageId ?? '');
+          if (!deletedId) {
+            return;
+          }
+          setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== deletedId));
+          setDeletingMessageId((prev) => (prev === deletedId ? null : prev));
+          return;
+        }
         default:
           break;
       }
@@ -1155,6 +1217,7 @@ const ChatScreen: React.FC = () => {
       currentUserId,
       scrollToBottom,
       setMessagesAnimated,
+      setDeletingMessageId,
       updateOutgoingStatus,
     ]
   );
@@ -1394,8 +1457,18 @@ const ChatScreen: React.FC = () => {
       const shouldShowStatus = lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
       const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
 
+      const isDeleting = deletingMessageId === messageItem.id;
+
       return (
-          <Pressable onPress={() => setTimestampVisibleFor(prev => prev === messageItem.id ? null : messageItem.id)}>
+        <Pressable
+          onPress={() =>
+            setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
+          }
+          onLongPress={() => handleMessageLongPress(messageItem, isMine)}
+          delayLongPress={250}
+          disabled={isDeleting}
+        >
+          <View style={isDeleting ? styles.messageDeleting : undefined}>
             <MessageBubble
               key={messageItem.id}
               message={messageItem}
@@ -1405,10 +1478,19 @@ const ChatScreen: React.FC = () => {
               showStatus={shouldShowStatus}
               showTimestamp={shouldShowTimestamp}
             />
-          </Pressable>
+          </View>
+        </Pressable>
       );
     },
-    [currentUserId, decoratedData, lastOutgoingMessageId, timestampVisibleFor, typingUserLabel]
+    [
+      currentUserId,
+      decoratedData,
+      deletingMessageId,
+      handleMessageLongPress,
+      lastOutgoingMessageId,
+      timestampVisibleFor,
+      typingUserLabel,
+    ]
   );
 
   const listHeader = useMemo(
@@ -1429,8 +1511,12 @@ const ChatScreen: React.FC = () => {
     );
   }
 
+  const messageLength = newMessage.length;
   const isComposerEmpty = newMessage.trim().length === 0;
+  const isComposerOverLimit = messageLength > MESSAGE_CHAR_LIMIT;
+  const composerRemaining = MESSAGE_CHAR_LIMIT - messageLength;
   const keyboardOffset = useMemo(() => 0, []);
+  const sendButtonDisabled = isComposerEmpty || isComposerOverLimit || isSendingMessage;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -1594,87 +1680,51 @@ const ChatScreen: React.FC = () => {
             { paddingBottom: Math.max(insets.bottom - (Platform.OS === 'ios' ? 6 : 0), 4) },
           ]}
         >
+          <View style={styles.composerColumn}>
+            <TextInput
+              style={[styles.textInput, isComposerOverLimit && styles.textInputError]}
+              value={newMessage}
+              onChangeText={handleComposerChange}
+              placeholder="Message…"
+              placeholderTextColor="rgba(255, 255, 255, 0.45)"
+              multiline
+              editable={!isSendingMessage}
+            />
+            <View style={styles.composerMetaRow}>
+              <Text
+                style={[
+                  styles.composerCounter,
+                  isComposerOverLimit && styles.composerCounterExceeded,
+                ]}
+              >
+                {Math.min(messageLength, MESSAGE_CHAR_LIMIT)} / {MESSAGE_CHAR_LIMIT}
+              </Text>
+              {isComposerOverLimit && (
+                <Text style={styles.composerLimitWarning}>
+                  {Math.abs(composerRemaining)} over limit
+                </Text>
+              )}
+            </View>
+          </View>
 
-
-                  <TextInput
-
-
-                    style={styles.textInput}
-
-
-                    value={newMessage}
-
-
-                    onChangeText={handleComposerChange}
-
-
-                    placeholder="Message…"
-
-
-                    placeholderTextColor="rgba(255, 255, 255, 0.45)"
-
-
-                    multiline
-
-
-                    editable={!isSendingMessage}
-
-
-                  />
-
-
-                  <Pressable
-
-
-                    onPress={handleSendMessage}
-
-
-                    style={({ pressed }) => [
-
-
-                      styles.sendButton,
-
-
-                      !isComposerEmpty && styles.sendButtonActive,
-
-
-                      isSendingMessage && styles.sendButtonDisabled,
-
-
-                      pressed && styles.sendButtonPressed,
-
-
-                    ]}
-
-
-                    disabled={isComposerEmpty || isSendingMessage}
-
-
-                    accessibilityRole="button"
-
-
-                  >
-
-
-                    {isSendingMessage ? (
-
-
-                      <ActivityIndicator size="small" color="#ffffff" />
-
-
-                    ) : (
-
-
-                      <Ionicons name="paper-plane" size={20} color="#ffffff" />
-
-
-                    )}
-
-
-                  </Pressable>
-
-
-                </View>
+          <Pressable
+            onPress={handleSendMessage}
+            style={({ pressed }) => [
+              styles.sendButton,
+              !sendButtonDisabled && styles.sendButtonActive,
+              sendButtonDisabled && styles.sendButtonDisabled,
+              pressed && !sendButtonDisabled && styles.sendButtonPressed,
+            ]}
+            disabled={sendButtonDisabled}
+            accessibilityRole="button"
+          >
+            {isSendingMessage ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Ionicons name="paper-plane" size={20} color="#ffffff" />
+            )}
+          </Pressable>
+        </View>
 
 
               </KeyboardAvoidingView>
@@ -1757,6 +1807,9 @@ const styles = StyleSheet.create({
   messageRow: {
     marginBottom: 2,
     maxWidth: '82%',
+  },
+  messageDeleting: {
+    opacity: 0.4,
   },
   messageRowStacked: {
     marginTop: 2,
@@ -1877,8 +1930,12 @@ const styles = StyleSheet.create({
     borderTopColor: 'transparent',
     backgroundColor: 'transparent',
   },
-  textInput: {
+  composerColumn: {
     flex: 1,
+    marginRight: 12,
+  },
+  textInput: {
+    width: '100%',
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
     borderRadius: 20,
     paddingHorizontal: 16,
@@ -1886,9 +1943,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFFFFF',
     maxHeight: 140,
-    marginRight: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  textInputError: {
+    borderColor: '#FF6B6B',
+    backgroundColor: 'rgba(255, 107, 107, 0.08)',
+  },
+  composerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  composerCounter: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  composerCounterExceeded: {
+    color: '#FF6B6B',
+  },
+  composerLimitWarning: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    fontWeight: '500',
   },
   sendButton: {
     width: 44,
