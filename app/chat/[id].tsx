@@ -1518,11 +1518,13 @@ const ChatScreen: React.FC = () => {
 
   const isComposerEmpty = newMessage.trim().length === 0;
   const keyboardOffset = useMemo(
-    () =>
-      Platform.OS === 'ios'
-        ? insets.bottom
-        : Math.max(insets.top, StatusBar.currentHeight || 0),
-    [insets.bottom, insets.top]
+    () => (Platform.OS === 'ios' ? insets.bottom : 0),
+    [insets.bottom]
+  );
+
+  const composerBottomPadding = useMemo(
+    () => (Platform.OS === 'ios' ? Math.max(insets.bottom - 6, 4) : 6),
+    [insets.bottom]
   );
   const sendButtonDisabled = isComposerEmpty || isSendingMessage;
 
@@ -1693,12 +1695,7 @@ const ChatScreen: React.FC = () => {
         
 
 
-        <View
-          style={[
-            styles.inputContainer,
-            { paddingBottom: Math.max(insets.bottom - (Platform.OS === 'ios' ? 6 : 0), 4) },
-          ]}
-        >
+        <View style={[styles.inputContainer, { paddingBottom: composerBottomPadding }]}>
           <View style={styles.composerColumn}>
             <TextInput
               style={styles.textInput}
