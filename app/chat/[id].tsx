@@ -245,6 +245,7 @@ const formatTimestamp = (date: Date): string => {
 
 const MESSAGE_CHAR_LIMIT = 2000;
 const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
+const SWIPE_REPLY_THRESHOLD = 40;
 
 
 const layoutNext = () => {
@@ -332,33 +333,41 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gesture) =>
-        Math.abs(gesture.dx) > Math.abs(gesture.dy) && gesture.dx > 6,
-      onPanResponderMove: (_, gesture) => {
-        if (gesture.dx > 0) {
-          swipeAnim.setValue(Math.min(gesture.dx, 80));
-        }
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx > 60 && onReplySwipe) {
-          onReplySwipe();
-        }
-        Animated.spring(swipeAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(swipeAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      },
-    })
-  ).current;
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 4,
+        onPanResponderMove: (_, gesture) => {
+          if (gesture.dx > 0) {
+            swipeAnim.setValue(Math.min(gesture.dx, 80));
+          } else if (isMine) {
+            swipeAnim.setValue(Math.max(gesture.dx, -80));
+          } else {
+            swipeAnim.setValue(0);
+          }
+        },
+        onPanResponderRelease: (_, gesture) => {
+          const rightSwipe = gesture.dx > SWIPE_REPLY_THRESHOLD;
+          const leftSwipe = isMine && gesture.dx < -SWIPE_REPLY_THRESHOLD;
+          if ((rightSwipe || leftSwipe) && onReplySwipe) {
+            onReplySwipe();
+          }
+          Animated.spring(swipeAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(swipeAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [isMine, onReplySwipe, swipeAnim]
+  );
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -389,8 +398,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   ];
 
   const replyHintOpacity = swipeAnim.interpolate({
-    inputRange: [0, 60],
-    outputRange: [0, 1],
+    inputRange: [-SWIPE_REPLY_THRESHOLD, -10, 0, 10, SWIPE_REPLY_THRESHOLD],
+    outputRange: [1, 0, 0, 0, 1],
     extrapolate: 'clamp',
   });
 
