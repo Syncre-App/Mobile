@@ -26,7 +26,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.devbeni.syncre"
+      "package": "com.devbeni.syncre",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
