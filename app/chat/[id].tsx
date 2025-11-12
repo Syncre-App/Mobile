@@ -248,6 +248,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     styles.messageRow,
     isMine ? styles.messageRowMine : styles.messageRowTheirs,
     !isFirstInGroup && styles.messageRowStacked,
+    isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
   ];
 
   const bubbleStyle = [
@@ -1819,14 +1820,19 @@ const styles = StyleSheet.create({
     height: 12,
   },
   messageRow: {
-    marginBottom: 2,
     maxWidth: '82%',
   },
   messageDeleting: {
     opacity: 0.4,
   },
   messageRowStacked: {
-    marginTop: 2,
+    marginTop: 6,
+  },
+  messageRowCompact: {
+    marginBottom: 2,
+  },
+  messageRowSpaced: {
+    marginBottom: 12,
   },
   messageRowMine: {
     alignSelf: 'flex-end',
