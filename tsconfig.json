@@ -3,6 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
     "paths": {
       "@/*": [
         "./*"

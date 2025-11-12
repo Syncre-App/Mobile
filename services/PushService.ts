@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import appConfig from '../app.json';
 
 import { ApiService } from './ApiService';
 import { StorageService } from './StorageService';
@@ -19,12 +20,23 @@ Notifications.setNotificationHandler({
   }),
 });
 
+const FALLBACK_PROJECT_ID =
+  (appConfig?.expo as any)?.extra?.eas?.projectId || process.env.EXPO_PROJECT_ID;
+
 const getExpoProjectId = (): string | undefined => {
+  const manifestExtra =
+    (Constants.manifest2 as any)?.extra ||
+    Constants.manifest?.extra ||
+    (Constants as any)?.manifestExtra ||
+    Constants.expoConfig?.extra;
+
   return (
-    Constants.expoConfig?.extra?.eas?.projectId ||
-    Constants.expoConfig?.extra?.projectId ||
     Constants.easConfig?.projectId ||
-    process.env.EXPO_PROJECT_ID
+    manifestExtra?.eas?.projectId ||
+    manifestExtra?.projectId ||
+    process.env.EXPO_PROJECT_ID ||
+    process.env.EXPO_PUBLIC_PROJECT_ID ||
+    FALLBACK_PROJECT_ID
   );
 };
 
