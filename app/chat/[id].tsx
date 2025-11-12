@@ -1523,7 +1523,10 @@ const ChatScreen: React.FC = () => {
   );
 
   const composerBottomPadding = useMemo(
-    () => (Platform.OS === 'ios' ? Math.max(insets.bottom - 6, 4) : 6),
+    () =>
+      Platform.OS === 'ios'
+        ? Math.max(insets.bottom - 6, 4)
+        : Math.max(insets.bottom, 10),
     [insets.bottom]
   );
   const sendButtonDisabled = isComposerEmpty || isSendingMessage;
@@ -1533,13 +1536,10 @@ const ChatScreen: React.FC = () => {
       style={[
         styles.container,
         {
-          paddingTop: Math.max(
-            insets.top,
-            Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 0
-          ),
+          paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
         },
       ]}
-      edges={['left', 'right']}
+      edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <LinearGradient
