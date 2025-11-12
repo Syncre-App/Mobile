@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     Alert,
+    Platform,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -11,7 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassCard } from '../components/GlassCard';
 import { UpdateService } from '../services/UpdateService';
@@ -19,6 +20,9 @@ import { UpdateService } from '../services/UpdateService';
 export default function ProfileScreen() {
   const router = useRouter();
   const appVersion = UpdateService.getCurrentVersion();
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, StatusBar.currentHeight || 0);
+  const horizontalInset = Math.max(insets.left, insets.right, 16);
 
   const handleBack = () => {
     router.back();
@@ -91,7 +95,17 @@ export default function ProfileScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        {
+          paddingTop: topInset + 12,
+          paddingHorizontal: horizontalInset,
+          backgroundColor: '#03040A',
+        },
+      ]}
+      edges={['left', 'right']}
+    >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Background Gradient */}
@@ -217,12 +231,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    padding: 16,
     paddingBottom: 32,
+    paddingHorizontal: 16,
   },
   section: {
     marginBottom: 16,
     overflow: 'hidden',
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
   },
   sectionHeader: {
     paddingHorizontal: 20,
