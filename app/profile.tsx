@@ -131,7 +131,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Account Section */}
-        <GlassCard style={styles.section}>
+        <GlassCard width="100%" style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Account</Text>
           </View>
@@ -165,7 +165,7 @@ export default function ProfileScreen() {
         </GlassCard>
 
         {/* About Section */}
-        <GlassCard style={styles.section}>
+        <GlassCard width="100%" style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>About</Text>
           </View>
@@ -193,7 +193,7 @@ export default function ProfileScreen() {
         </GlassCard>
 
         {/* Logout Section */}
-        <GlassCard style={styles.section}>
+        <GlassCard width="100%" style={styles.section}>
           {renderSettingItem(
             'log-out',
             'Logout',

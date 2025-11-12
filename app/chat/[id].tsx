@@ -23,6 +23,13 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 type MessageStatus = 'sending' | 'sent' | 'delivered' | 'seen';
 
+interface ReplyMetadata {
+  messageId: string;
+  senderId: string;
+  senderLabel?: string;
+  preview?: string;
+}
+
 interface Message {
   id: string;
   senderId: string;
@@ -35,12 +42,90 @@ interface Message {
   seenAt?: string;
   status?: MessageStatus;
   isPlaceholder?: boolean;
+  replyTo?: ReplyMetadata;
 }
 
 type ChatListItem =
   | { kind: 'message'; id: string; message: Message }
   | { kind: 'date'; id: string; label: string }
   | { kind: 'typing'; id: string };
+
+const MESSAGE_PAYLOAD_VERSION = 1;
+
+const normalizePreviewText = (value: string): string => {
+  if (!value) {
+    return '';
+  }
+  const condensed = value.replace(/\s+/g, ' ').trim();
+  if (condensed.length > 140) {
+    return `${condensed.slice(0, 140)}…`;
+  }
+  return condensed;
+};
+
+const sanitizeReplyMetadata = (raw: any): ReplyMetadata | undefined => {
+  if (!raw) {
+    return undefined;
+  }
+  const replyId = raw.messageId ?? raw.id;
+  const replySenderId = raw.senderId ?? raw.sender_id;
+  if (!replyId || !replySenderId) {
+    return undefined;
+  }
+  const preview =
+    typeof raw.preview === 'string' && raw.preview.trim().length
+      ? raw.preview
+      : undefined;
+  const senderLabel =
+    typeof raw.senderLabel === 'string' && raw.senderLabel.trim().length
+      ? raw.senderLabel
+      : undefined;
+
+  return {
+    messageId: String(replyId),
+    senderId: String(replySenderId),
+    senderLabel,
+    preview,
+  };
+};
+
+const encodeMessagePayload = (text: string, replyTo?: ReplyMetadata | null): string => {
+  const payload: Record<string, any> = {
+    v: MESSAGE_PAYLOAD_VERSION,
+    text,
+  };
+  if (replyTo) {
+    payload.replyTo = {
+      messageId: replyTo.messageId,
+      senderId: replyTo.senderId,
+      senderLabel: replyTo.senderLabel,
+      preview: replyTo.preview,
+    };
+  }
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return text;
+  }
+};
+
+const decodeMessagePayload = (raw: string): { text: string; replyTo?: ReplyMetadata } => {
+  if (typeof raw !== 'string') {
+    return { text: '' };
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.text === 'string') {
+      return {
+        text: parsed.text,
+        replyTo: sanitizeReplyMetadata(parsed.replyTo),
+      };
+    }
+  } catch {
+    // swallow JSON parse errors and treat as plain text
+  }
+  return { text: raw };
+};
 
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
@@ -280,6 +365,21 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
       <Animated.View style={[containerStyle, { opacity: fadeAnim }]}>
         <View style={bubbleStyle}>
+          {message.replyTo && (
+            <View style={[styles.replyChip, isMine && styles.replyChipMine]}>
+              <View style={styles.replyChipBar} />
+              <View style={styles.replyChipBody}>
+                <Text style={styles.replyChipLabel} numberOfLines={1}>
+                  {message.replyTo.senderLabel}
+                </Text>
+                {message.replyTo.preview ? (
+                  <Text style={styles.replyChipText} numberOfLines={1}>
+                    {message.replyTo.preview}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          )}
           <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
             {message.content}
           </Text>
@@ -346,6 +446,7 @@ const ChatScreen: React.FC = () => {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
+  const [replyContext, setReplyContext] = useState<ReplyMetadata | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
   const [timestampVisibleFor, setTimestampVisibleFor] = useState<string | null>(null);
@@ -357,6 +458,41 @@ const ChatScreen: React.FC = () => {
   const [showScrollToBottomButton, setShowScrollToBottomButton] = useState(false);
 
   const currentUserId = user?.id ? String(user.id) : null;
+
+  const getReplyLabel = useCallback(
+    (senderId: string) => {
+      if (currentUserId && senderId === currentUserId) {
+        return 'You';
+      }
+      return receiverNameRef.current || receiverUsername || 'Friend';
+    },
+    [currentUserId, receiverUsername]
+  );
+
+  const resolveReplyMetadata = useCallback(
+    (metadata?: ReplyMetadata) => {
+      if (!metadata) {
+        return undefined;
+      }
+      return {
+        messageId: metadata.messageId,
+        senderId: metadata.senderId,
+        senderLabel: metadata.senderLabel || getReplyLabel(metadata.senderId),
+        preview: metadata.preview || 'Message',
+      };
+    },
+    [getReplyLabel]
+  );
+
+  const buildReplyPayloadFromMessage = useCallback(
+    (message: Message): ReplyMetadata => ({
+      messageId: message.id,
+      senderId: message.senderId,
+      senderLabel: getReplyLabel(message.senderId),
+      preview: normalizePreviewText(message.content) || 'Message',
+    }),
+    [getReplyLabel]
+  );
 
   const setMessagesWithoutAnimation = useCallback(
     (updater: (prev: Message[]) => Message[]) => {
@@ -485,17 +621,21 @@ const ChatScreen: React.FC = () => {
           }
         }
 
+        const decodedPayload = decodeMessagePayload(content);
+        const replyTo = resolveReplyMetadata(decodedPayload.replyTo);
+
         results.push({
           id: String(idValue),
           senderId: String(senderId),
           receiverId: String(receiverId),
-          content,
+          content: decodedPayload.text,
           timestamp: String(local),
           utcTimestamp: utc,
           timezone,
           deliveredAt: deliveredAt ?? undefined,
           seenAt: seenAt ?? undefined,
           status,
+          replyTo,
         });
       }
 
@@ -504,7 +644,7 @@ const ChatScreen: React.FC = () => {
       }
       return results;
     },
-    [chatId, currentUserId]
+    [chatId, currentUserId, resolveReplyMetadata]
   );
 
   const generatePlaceholderMessages = useCallback(
@@ -902,6 +1042,9 @@ const ChatScreen: React.FC = () => {
     }
 
     const trimmedMessage = newMessage.trim();
+    const pendingReply = replyContext;
+    const normalizedReply = replyContext ? resolveReplyMetadata(replyContext) : undefined;
+    const encodedPayload = encodeMessagePayload(trimmedMessage, normalizedReply);
     const temporaryId = `temp-${Date.now()}`;
     const optimisticMessage: Message = {
       id: temporaryId,
@@ -910,6 +1053,7 @@ const ChatScreen: React.FC = () => {
       content: trimmedMessage,
       timestamp: new Date().toISOString(),
       status: 'sending',
+      replyTo: normalizedReply,
     };
 
     setMessagesAnimated((prev) => {
@@ -920,6 +1064,7 @@ const ChatScreen: React.FC = () => {
       scrollToBottom();
     });
     setNewMessage('');
+    setReplyContext(null);
     requestAnimationFrame(() => {
       composerRef.current?.focus();
     });
@@ -950,7 +1095,7 @@ const ChatScreen: React.FC = () => {
 
       const encryptedPayload = await CryptoService.buildEncryptedPayload({
         chatId,
-        message: trimmedMessage,
+        message: encodedPayload,
         recipientUserIds: recipientIds,
         token,
         currentUserId,
@@ -968,6 +1113,9 @@ const ChatScreen: React.FC = () => {
       NotificationService.show('error', 'Failed to send message. Please try again.');
       setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== temporaryId));
       setNewMessage(trimmedMessage);
+      if (pendingReply) {
+        setReplyContext(pendingReply);
+      }
     } finally {
       setIsSendingMessage(false);
     }
@@ -976,6 +1124,8 @@ const ChatScreen: React.FC = () => {
     currentUserId,
     ensureTypingStopped,
     newMessage,
+    replyContext,
+    resolveReplyMetadata,
     scrollToBottom,
     setMessagesAnimated,
     wsService,
@@ -1016,19 +1166,26 @@ const ChatScreen: React.FC = () => {
 
   const handleMessageLongPress = useCallback(
     (message: Message, isMine: boolean) => {
-      if (!isMine) {
+      if (message.isPlaceholder) {
         return;
       }
-      Alert.alert('Delete message?', 'This will remove the message for everyone.', [
-        { text: 'Cancel', style: 'cancel' },
+      const buttons: Array<{ text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }> = [
         {
+          text: 'Reply',
+          onPress: () => setReplyContext(buildReplyPayloadFromMessage(message)),
+        },
+      ];
+      if (isMine) {
+        buttons.push({
           text: 'Delete',
           style: 'destructive',
           onPress: () => deleteMessage(message),
-        },
-      ]);
+        });
+      }
+      buttons.push({ text: 'Cancel', style: 'cancel' });
+      Alert.alert('Message options', undefined, buttons);
     },
-    [deleteMessage]
+    [buildReplyPayloadFromMessage, deleteMessage]
   );
 
   useEffect(() => {
@@ -1160,14 +1317,16 @@ const ChatScreen: React.FC = () => {
               payload,
               payload.timezone || TimezoneService.getTimezone()
             );
+            const decodedPayload = decodeMessagePayload(decrypted);
             const newEntry: Message = {
               id: String(payload.messageId ?? payload.id ?? Date.now()),
               senderId: String(payload.senderId ?? ''),
               receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-              content: decrypted,
+              content: decodedPayload.text,
               timestamp: local,
               utcTimestamp: utc,
               timezone,
+              replyTo: resolveReplyMetadata(decodedPayload.replyTo),
             };
 
             setMessagesAnimated((prev) => {
@@ -1189,14 +1348,16 @@ const ChatScreen: React.FC = () => {
             payload,
             payload.timezone || TimezoneService.getTimezone()
           );
+          const decodedPayload = decodeMessagePayload(payload.content ?? '');
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
             senderId: String(payload.senderId ?? ''),
             receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-            content: payload.content ?? '',
+            content: decodedPayload.text,
             timestamp: local,
             utcTimestamp: utc,
             timezone,
+            replyTo: resolveReplyMetadata(decodedPayload.replyTo),
           };
 
           setMessagesAnimated((prev) => {
@@ -1229,6 +1390,7 @@ const ChatScreen: React.FC = () => {
       scrollToBottom,
       setMessagesAnimated,
       setDeletingMessageId,
+      resolveReplyMetadata,
       updateOutgoingStatus,
     ]
   );
@@ -1709,7 +1871,26 @@ const ChatScreen: React.FC = () => {
 
 
         
-
+        {replyContext && (
+          <View style={styles.replyPreview}>
+            <View style={styles.replyPreviewBar} />
+            <View style={styles.replyPreviewBody}>
+              <Text style={styles.replyPreviewLabel}>{replyContext.senderLabel}</Text>
+              <Text style={styles.replyPreviewText} numberOfLines={1}>
+                {replyContext.preview}
+              </Text>
+            </View>
+            <Pressable
+              style={styles.replyPreviewClose}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => setReplyContext(null)}
+              accessibilityLabel="Cancel reply"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close" size={16} color="#ffffff" />
+            </Pressable>
+          </View>
+        )}
 
         <View style={[styles.inputContainer, { paddingBottom: composerBottomPadding }]}>
           <View style={styles.composerColumn}>
@@ -1873,6 +2054,37 @@ const styles = StyleSheet.create({
   placeholderBubble: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
+  replyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  replyChipMine: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  replyChipBar: {
+    width: 3,
+    height: '100%',
+    marginRight: 8,
+    borderRadius: 2,
+    backgroundColor: '#2C82FF',
+  },
+  replyChipBody: {
+    flex: 1,
+  },
+  replyChipLabel: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  replyChipText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 13,
+  },
   messageText: {
     fontSize: 16,
     color: '#ffffff',
@@ -1940,6 +2152,41 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.65)',
     fontSize: 13,
     fontWeight: '500',
+  },
+  replyPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  replyPreviewBar: {
+    width: 3,
+    height: '100%',
+    backgroundColor: '#2C82FF',
+    borderRadius: 2,
+    marginRight: 10,
+  },
+  replyPreviewBody: {
+    flex: 1,
+  },
+  replyPreviewLabel: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  replyPreviewText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 13,
+  },
+  replyPreviewClose: {
+    marginLeft: 8,
+    padding: 4,
   },
   inputContainer: {
     flexDirection: 'row',
