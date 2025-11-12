@@ -474,11 +474,12 @@ const ChatScreen: React.FC = () => {
       if (!metadata) {
         return undefined;
       }
+      const previewText = metadata.preview ? normalizePreviewText(metadata.preview) : undefined;
       return {
         messageId: metadata.messageId,
         senderId: metadata.senderId,
         senderLabel: metadata.senderLabel || getReplyLabel(metadata.senderId),
-        preview: metadata.preview || 'Message',
+        preview: previewText || 'Message',
       };
     },
     [getReplyLabel]
@@ -622,7 +623,8 @@ const ChatScreen: React.FC = () => {
         }
 
         const decodedPayload = decodeMessagePayload(content);
-        const replyTo = resolveReplyMetadata(decodedPayload.replyTo);
+        const serverReply = resolveReplyMetadata((raw as any)?.reply);
+        const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
 
         results.push({
           id: String(idValue),
@@ -1107,6 +1109,7 @@ const ChatScreen: React.FC = () => {
         envelopes: encryptedPayload.envelopes,
         senderDeviceId: encryptedPayload.senderDeviceId,
         messageType: 'e2ee',
+        replyMetadata: normalizedReply,
       });
     } catch (error) {
       console.error(`Error sending encrypted message to chat ${chatId}:`, error);
@@ -1318,6 +1321,8 @@ const ChatScreen: React.FC = () => {
               payload.timezone || TimezoneService.getTimezone()
             );
             const decodedPayload = decodeMessagePayload(decrypted);
+            const serverReply = resolveReplyMetadata(payload.reply);
+            const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
             const newEntry: Message = {
               id: String(payload.messageId ?? payload.id ?? Date.now()),
               senderId: String(payload.senderId ?? ''),
@@ -1326,7 +1331,7 @@ const ChatScreen: React.FC = () => {
               timestamp: local,
               utcTimestamp: utc,
               timezone,
-              replyTo: resolveReplyMetadata(decodedPayload.replyTo),
+              replyTo,
             };
 
             setMessagesAnimated((prev) => {
@@ -1349,6 +1354,8 @@ const ChatScreen: React.FC = () => {
             payload.timezone || TimezoneService.getTimezone()
           );
           const decodedPayload = decodeMessagePayload(payload.content ?? '');
+          const serverReply = resolveReplyMetadata(payload.reply);
+          const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
             senderId: String(payload.senderId ?? ''),
@@ -1357,7 +1364,7 @@ const ChatScreen: React.FC = () => {
             timestamp: local,
             utcTimestamp: utc,
             timezone,
-            replyTo: resolveReplyMetadata(decodedPayload.replyTo),
+            replyTo,
           };
 
           setMessagesAnimated((prev) => {
