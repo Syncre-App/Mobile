@@ -7,7 +7,6 @@ import {
   AppState,
   DeviceEventEmitter,
   Platform,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
@@ -30,6 +30,7 @@ import { UserStatus, WebSocketMessage, WebSocketService } from '../services/WebS
 
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [user, setUser] = useState<any>(null);
   const [chats, setChats] = useState<any[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
@@ -727,7 +728,18 @@ export const HomeScreen: React.FC = () => {
           <Text style={styles.loadingText}>Validating session...</Text>
         </View>
       ) : (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView
+          style={[
+            styles.safeArea,
+            {
+              paddingTop: Math.max(
+                insets.top,
+                Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 0
+              ),
+            },
+          ]}
+          edges={['left', 'right']}
+        >
           {/* Simple header with profile */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Chats</Text>
@@ -890,7 +902,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 0,
   },
   scrollView: {
     flex: 1,

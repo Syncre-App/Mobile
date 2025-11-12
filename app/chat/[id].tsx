@@ -1515,11 +1515,28 @@ const ChatScreen: React.FC = () => {
   const isComposerEmpty = newMessage.trim().length === 0;
   const isComposerOverLimit = messageLength > MESSAGE_CHAR_LIMIT;
   const composerRemaining = MESSAGE_CHAR_LIMIT - messageLength;
-  const keyboardOffset = useMemo(() => 0, []);
+  const keyboardOffset = useMemo(
+    () =>
+      Platform.OS === 'ios'
+        ? insets.bottom
+        : Math.max(insets.top, StatusBar.currentHeight || 0),
+    [insets.bottom, insets.top]
+  );
   const sendButtonDisabled = isComposerEmpty || isComposerOverLimit || isSendingMessage;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        {
+          paddingTop: Math.max(
+            insets.top,
+            Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 0
+          ),
+        },
+      ]}
+      edges={['left', 'right']}
+    >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <LinearGradient
         colors={['#03040A', '#071026']}
@@ -1736,6 +1753,7 @@ const ChatScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 0,
   },
   fallbackContainer: {
     flex: 1,
