@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -17,7 +17,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
@@ -48,6 +48,12 @@ const resolveExtension = (fileName?: string, mimeType?: string | null) => {
 };
 
 export const EditProfileScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const topInset = useMemo(() => {
+    const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0;
+    return Math.max(insets.top, statusBarHeight);
+  }, [insets.top]);
+  const containerPaddingTop = topInset > 0 ? topInset + (Platform.OS === 'android' ? 8 : 0) : 16;
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -239,7 +245,7 @@ export const EditProfileScreen: React.FC = () => {
 
   if (initialLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]}>
         <LinearGradient
           colors={['#03040A', '#071026']}
           start={{ x: 0, y: 0 }}
@@ -255,7 +261,7 @@ export const EditProfileScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Background Gradient */}
@@ -267,7 +273,7 @@ export const EditProfileScreen: React.FC = () => {
       />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: topInset > 0 ? 4 : 12 }]}>
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
