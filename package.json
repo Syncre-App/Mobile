@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "build": "eas build && eas submit",
-    "real-build": " npx expo run:ios --configuration Release && npx expo run:android --variant=release"
+    "real-build": "npx expo run:ios --configuration Release && npx expo run:android --variant=release"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
