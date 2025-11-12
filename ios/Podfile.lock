@@ -2253,7 +2253,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RNWorklets (0.6.1):
+  - RNWorklets (0.5.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2275,9 +2275,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - RNWorklets/worklets (= 0.6.1)
+    - RNWorklets/worklets (= 0.5.1)
     - Yoga
-  - RNWorklets/worklets (0.6.1):
+  - RNWorklets/worklets (0.5.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2299,9 +2299,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - RNWorklets/worklets/apple (= 0.6.1)
+    - RNWorklets/worklets/apple (= 0.5.1)
     - Yoga
-  - RNWorklets/worklets/apple (0.6.1):
+  - RNWorklets/worklets/apple (0.5.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2358,7 +2358,7 @@ DEPENDENCIES:
   - "ExpoFileSystem (from `../node_modules/.pnpm/expo-file-system@19.0.17_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0_/node_modules/expo-file-system/ios`)"
   - "ExpoFont (from `../node_modules/.pnpm/expo-font@14.0.9_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-font/ios`)"
   - "ExpoHaptics (from `../node_modules/.pnpm/expo-haptics@15.0.7_expo@54.0.23/node_modules/expo-haptics/ios`)"
-  - "ExpoHead (from `../node_modules/.pnpm/expo-router@6.0.14_4981ef8e5d60a002a3163ae227bae7c3/node_modules/expo-router/ios`)"
+  - "ExpoHead (from `../node_modules/.pnpm/expo-router@6.0.14_0a93d2edd2f5faa376bed09d03356a65/node_modules/expo-router/ios`)"
   - "ExpoImage (from `../node_modules/.pnpm/expo-image@3.0.10_expo@54.0.23_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0__r_e312a186586e74dba7c9bbc3e24d9ced/node_modules/expo-image/ios`)"
   - "ExpoImagePicker (from `../node_modules/.pnpm/expo-image-picker@17.0.8_expo@54.0.23/node_modules/expo-image-picker/ios`)"
   - "ExpoInsights (from `../node_modules/.pnpm/expo-insights@0.10.7_expo@54.0.23/node_modules/expo-insights/ios`)"
@@ -2442,11 +2442,11 @@ DEPENDENCIES:
   - "ReactNativeDependencies (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0/node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)"
   - "RNCAsyncStorage (from `../node_modules/.pnpm/@react-native-async-storage+async-storage@2.2.0_react-native@0.81.5_@babel+core@7.28.4__7fd457485382322b56f55b64b44b3a00/node_modules/@react-native-async-storage/async-storage`)"
   - "RNGestureHandler (from `../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.28.4_@types+react_56410d40bc832e188f8e0cea96af19fe/node_modules/react-native-gesture-handler`)"
-  - "RNReanimated (from `../node_modules/.pnpm/react-native-reanimated@4.1.3_@babel+core@7.28.4_react-native-worklets@0.6.1_@babel+cor_fb65521fab63f352918a0b3fc3a4b078/node_modules/react-native-reanimated`)"
+  - "RNReanimated (from `../node_modules/.pnpm/react-native-reanimated@4.1.3_@babel+core@7.28.4_react-native-worklets@0.5.1_@babel+cor_9c1c4cce8b78cfcaadce37bb46d80735/node_modules/react-native-reanimated`)"
   - "RNScreens (from `../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-screens`)"
   - "RNSVG (from `../node_modules/.pnpm/react-native-svg@15.12.1_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-svg`)"
   - "RNVectorIcons (from `../node_modules/.pnpm/react-native-vector-icons@10.3.0/node_modules/react-native-vector-icons`)"
-  - "RNWorklets (from `../node_modules/.pnpm/react-native-worklets@0.6.1_@babel+core@7.28.4_react-native@0.81.5_@babel+core@7.28.4_@_2f8dbde6f608c886670e1d8195b7e71a/node_modules/react-native-worklets`)"
+  - "RNWorklets (from `../node_modules/.pnpm/react-native-worklets@0.5.1_@babel+core@7.28.4_react-native@0.81.5_@babel+core@7.28.4_@_68d099c066d0b9ce993d49b53d2537e0/node_modules/react-native-worklets`)"
   - "Yoga (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/yoga`)"
 
 SPEC REPOS:
@@ -2501,7 +2501,7 @@ EXTERNAL SOURCES:
   ExpoHaptics:
     :path: "../node_modules/.pnpm/expo-haptics@15.0.7_expo@54.0.23/node_modules/expo-haptics/ios"
   ExpoHead:
-    :path: "../node_modules/.pnpm/expo-router@6.0.14_4981ef8e5d60a002a3163ae227bae7c3/node_modules/expo-router/ios"
+    :path: "../node_modules/.pnpm/expo-router@6.0.14_0a93d2edd2f5faa376bed09d03356a65/node_modules/expo-router/ios"
   ExpoImage:
     :path: "../node_modules/.pnpm/expo-image@3.0.10_expo@54.0.23_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0__r_e312a186586e74dba7c9bbc3e24d9ced/node_modules/expo-image/ios"
   ExpoImagePicker:
@@ -2668,7 +2668,7 @@ EXTERNAL SOURCES:
   RNGestureHandler:
     :path: "../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.28.4_@types+react_56410d40bc832e188f8e0cea96af19fe/node_modules/react-native-gesture-handler"
   RNReanimated:
-    :path: "../node_modules/.pnpm/react-native-reanimated@4.1.3_@babel+core@7.28.4_react-native-worklets@0.6.1_@babel+cor_fb65521fab63f352918a0b3fc3a4b078/node_modules/react-native-reanimated"
+    :path: "../node_modules/.pnpm/react-native-reanimated@4.1.3_@babel+core@7.28.4_react-native-worklets@0.5.1_@babel+cor_9c1c4cce8b78cfcaadce37bb46d80735/node_modules/react-native-reanimated"
   RNScreens:
     :path: "../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-screens"
   RNSVG:
@@ -2676,7 +2676,7 @@ EXTERNAL SOURCES:
   RNVectorIcons:
     :path: "../node_modules/.pnpm/react-native-vector-icons@10.3.0/node_modules/react-native-vector-icons"
   RNWorklets:
-    :path: "../node_modules/.pnpm/react-native-worklets@0.6.1_@babel+core@7.28.4_react-native@0.81.5_@babel+core@7.28.4_@_2f8dbde6f608c886670e1d8195b7e71a/node_modules/react-native-worklets"
+    :path: "../node_modules/.pnpm/react-native-worklets@0.5.1_@babel+core@7.28.4_react-native@0.81.5_@babel+core@7.28.4_@_68d099c066d0b9ce993d49b53d2537e0/node_modules/react-native-worklets"
   Yoga:
     :path: "../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/yoga"
 
@@ -2787,11 +2787,11 @@ SPEC CHECKSUMS:
   ReactNativeDependencies: 71ce9c28beb282aa720ea7b46980fff9669f428a
   RNCAsyncStorage: 3a4f5e2777dae1688b781a487923a08569e27fe4
   RNGestureHandler: 2914750df066d89bf9d8f48a10ad5f0051108ac3
-  RNReanimated: f599f8d1bac2a069286d00a54a5d1391da2f8a7d
+  RNReanimated: 995265072b2df5e04aa44341b8eab2371ace75a0
   RNScreens: d8d6f1792f6e7ac12b0190d33d8d390efc0c1845
   RNSVG: 31d6639663c249b7d5abc9728dde2041eb2a3c34
   RNVectorIcons: 4351544f100d4f12cac156a7c13399e60bab3e26
-  RNWorklets: 64cd5ca9abbbeb0499480b0aca773aa481c3636c
+  RNWorklets: bb39a0ab616340d4167afa4df25823e85c201905
   SDWebImage: 9f177d83116802728e122410fb25ad88f5c7608a
   SDWebImageAVIFCoder: afe194a084e851f70228e4be35ef651df0fc5c57
   SDWebImageSVGCoder: 15a300a97ec1c8ac958f009c02220ac0402e936c
