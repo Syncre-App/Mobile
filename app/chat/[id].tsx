@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
+import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -310,6 +310,7 @@ interface MessageBubbleProps {
   showStatus: boolean;
   showTimestamp: boolean;
   onReplyPress?: (reply: ReplyMetadata) => void;
+  onReplySwipe?: () => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -320,8 +321,37 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   showStatus,
   showTimestamp,
   onReplyPress,
+  onReplySwipe,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const swipeAnim = useRef(new Animated.Value(0)).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > Math.abs(gesture.dy) && gesture.dx > 6,
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dx > 0) {
+          swipeAnim.setValue(Math.min(gesture.dx, 80));
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx > 60 && onReplySwipe) {
+          onReplySwipe();
+        }
+        Animated.spring(swipeAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(swipeAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -365,7 +395,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Text>
         </View>
       )}
-      <Animated.View style={[containerStyle, { opacity: fadeAnim }]}>
+      <Animated.View
+        style={[
+          containerStyle,
+          { opacity: fadeAnim, transform: [{ translateX: swipeAnim }] },
+        ]}
+        {...panResponder.panHandlers}
+      >
         <View style={bubbleStyle}>
           {message.replyTo && (
             <Pressable
@@ -1224,12 +1260,7 @@ const ChatScreen: React.FC = () => {
       if (message.isPlaceholder) {
         return;
       }
-      const buttons: Array<{ text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }> = [
-        {
-          text: 'Reply',
-          onPress: () => setReplyContext(buildReplyPayloadFromMessage(message)),
-        },
-      ];
+      const buttons: Array<{ text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }> = [];
       if (isMine) {
         buttons.push({
           text: 'Delete',
@@ -1535,10 +1566,6 @@ const ChatScreen: React.FC = () => {
     itemVisiblePercentThreshold: 60,
   });
 
-  const handleReplyChipPress = useCallback((reply: ReplyMetadata) => {
-    setThreadRootId(reply.messageId);
-  }, []);
-
   useEffect(() => {
     if (initialLoadCompleteRef.current && messages.length > 0) {
       // Only auto-scroll if the user is near the bottom or if it's the first message
@@ -1723,6 +1750,7 @@ const ChatScreen: React.FC = () => {
               showStatus={shouldShowStatus}
               showTimestamp={shouldShowTimestamp}
               onReplyPress={(reply) => setThreadRootId(reply.messageId)}
+              onReplySwipe={() => setReplyContext(buildReplyPayloadFromMessage(messageItem))}
             />
           </View>
         </Pressable>
@@ -1733,7 +1761,6 @@ const ChatScreen: React.FC = () => {
       decoratedData,
       deletingMessageId,
       handleMessageLongPress,
-      handleReplyChipPress,
       lastOutgoingMessageId,
       timestampVisibleFor,
       typingUserLabel,
