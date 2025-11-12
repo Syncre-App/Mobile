@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
+import { ActivityIndicator, Animated, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -244,6 +244,7 @@ const formatTimestamp = (date: Date): string => {
 };
 
 const MESSAGE_CHAR_LIMIT = 2000;
+const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
 
 
 const layoutNext = () => {
@@ -311,6 +312,9 @@ interface MessageBubbleProps {
   showTimestamp: boolean;
   onReplyPress?: (reply: ReplyMetadata) => void;
   onReplySwipe?: () => void;
+  onOpenThread?: (messageId: string) => void;
+  isHighlighted?: boolean;
+  replyCount?: number;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -322,6 +326,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   showTimestamp,
   onReplyPress,
   onReplySwipe,
+  onOpenThread,
+  isHighlighted = false,
+  replyCount = 0,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -381,6 +388,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     message.isPlaceholder && styles.placeholderBubble,
   ];
 
+  const replyHintOpacity = swipeAnim.interpolate({
+    inputRange: [0, 60],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
   const statusText =
     showStatus && message.status
       ? formatStatusLabel(message.status)
@@ -402,6 +415,33 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         ]}
         {...panResponder.panHandlers}
       >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.replyHint,
+            isMine && styles.replyHintMine,
+            { opacity: replyHintOpacity, transform: [{ scale: replyHintOpacity }] },
+          ]}
+        >
+          <Ionicons name="reply-outline" size={18} color="#ffffff" />
+        </Animated.View>
+        {message.replyTo && (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.replyConnector,
+              isMine ? styles.replyConnectorMine : styles.replyConnectorTheirs,
+            ]}
+          >
+            <View style={styles.replyConnectorVertical} />
+            <View
+              style={[
+                styles.replyConnectorCurve,
+                isMine && styles.replyConnectorCurveMine,
+              ]}
+            />
+          </View>
+        )}
         <View style={bubbleStyle}>
           {message.replyTo && (
             <Pressable
@@ -427,6 +467,24 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         </View>
         {statusText && (
           <Text style={styles.statusText}>{statusText}</Text>
+        )}
+        {replyCount > 0 && onOpenThread && (
+          <Pressable
+            style={[styles.threadSummaryButton, isMine && styles.threadSummaryButtonMine]}
+            onPress={() => onOpenThread(message.id)}
+          >
+            <View style={styles.threadSummaryContent}>
+              <View
+                style={[
+                  styles.threadSummaryLine,
+                  isMine && styles.threadSummaryLineMine,
+                ]}
+              />
+              <Text style={styles.threadSummaryText}>
+                {replyCount} {replyCount === 1 ? 'Reply' : 'Replies'}
+              </Text>
+            </View>
+          </Pressable>
         )}
       </Animated.View>
     </>
@@ -490,10 +548,9 @@ const ChatScreen: React.FC = () => {
   const [replyContext, setReplyContext] = useState<ReplyMetadata | null>(null);
   const [threadRootId, setThreadRootId] = useState<string | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
   const [timestampVisibleFor, setTimestampVisibleFor] = useState<string | null>(null);
-  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
-
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -599,6 +656,17 @@ const ChatScreen: React.FC = () => {
     return items;
   }, [messages, isRemoteTyping]);
 
+  const replyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    messages.forEach((msg) => {
+      const targetId = msg.replyTo?.messageId;
+      if (targetId) {
+        counts.set(targetId, (counts.get(targetId) ?? 0) + 1);
+      }
+    });
+    return counts;
+  }, [messages]);
+
   const scrollToMessageById = useCallback(
     (targetId: string) => {
       const index = decoratedData.findIndex((item) => item.kind === 'message' && item.message.id === targetId);
@@ -610,6 +678,10 @@ const ChatScreen: React.FC = () => {
             flatListRef.current?.scrollToOffset({ offset: index * 60, animated: true });
           }
           setTimestampVisibleFor(targetId);
+          setHighlightedMessageId(targetId);
+          setTimeout(() => {
+            setHighlightedMessageId((prev) => (prev === targetId ? null : prev));
+          }, 2000);
         });
       } else {
         pendingScrollIdRef.current = targetId;
@@ -1222,58 +1294,6 @@ const ChatScreen: React.FC = () => {
     scrollToMessageById(target);
   }, [scrollToMessageById, threadRootId]);
 
-  const deleteMessage = useCallback(
-    async (message: Message) => {
-      if (!chatId || !message?.id || deletingMessageId) {
-        return;
-      }
-
-      try {
-        setDeletingMessageId(message.id);
-        const token = authTokenRef.current ?? (await StorageService.getAuthToken());
-        if (!token) {
-          throw new Error('Missing auth token');
-        }
-        authTokenRef.current = token;
-        const response = await ApiService.delete(`/chat/${chatId}/messages/${message.id}`, token);
-        if (!response.success) {
-          throw new Error(response.error || 'Failed to delete message');
-        }
-        setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== message.id));
-        NotificationService.show('success', 'Message deleted', 'Deleted');
-      } catch (error) {
-        console.error('Failed to delete message:', error);
-        NotificationService.show(
-          'error',
-          error instanceof Error ? error.message : 'Failed to delete message',
-          'Delete failed'
-        );
-      } finally {
-        setDeletingMessageId(null);
-      }
-    },
-    [authTokenRef, chatId, deletingMessageId, setMessagesAnimated]
-  );
-
-  const handleMessageLongPress = useCallback(
-    (message: Message, isMine: boolean) => {
-      if (message.isPlaceholder) {
-        return;
-      }
-      const buttons: Array<{ text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }> = [];
-      if (isMine) {
-        buttons.push({
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMessage(message),
-        });
-      }
-      buttons.push({ text: 'Cancel', style: 'cancel' });
-      Alert.alert('Message options', undefined, buttons);
-    },
-    [buildReplyPayloadFromMessage, deleteMessage]
-  );
-
   useEffect(() => {
     if (!chatId || !wsService) {
       return;
@@ -1466,7 +1486,6 @@ const ChatScreen: React.FC = () => {
             return;
           }
           setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== deletedId));
-          setDeletingMessageId((prev) => (prev === deletedId ? null : prev));
           return;
         }
         default:
@@ -1676,6 +1695,11 @@ const ChatScreen: React.FC = () => {
           const fallbackOffset = index * 60; // approximate row height
           flatListRef.current?.scrollToOffset({ offset: fallbackOffset, animated: false });
         }
+        setTimestampVisibleFor(targetId);
+        setHighlightedMessageId(targetId);
+        setTimeout(() => {
+          setHighlightedMessageId((prev) => (prev === targetId ? null : prev));
+        }, 2000);
         pendingScrollIdRef.current = null;
       });
     } else {
@@ -1728,39 +1752,37 @@ const ChatScreen: React.FC = () => {
 
       const shouldShowStatus = lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
       const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
-
-      const isDeleting = deletingMessageId === messageItem.id;
+      const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
       return (
         <Pressable
           onPress={() =>
             setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
           }
-          onLongPress={() => handleMessageLongPress(messageItem, isMine)}
-          delayLongPress={250}
-          disabled={isDeleting}
         >
-          <View style={isDeleting ? styles.messageDeleting : undefined}>
-            <MessageBubble
-              key={messageItem.id}
-              message={messageItem}
-              isMine={isMine}
-              isFirstInGroup={isFirstInGroup}
-              isLastInGroup={isLastInGroup}
-              showStatus={shouldShowStatus}
-              showTimestamp={shouldShowTimestamp}
-              onReplyPress={(reply) => setThreadRootId(reply.messageId)}
-              onReplySwipe={() => setReplyContext(buildReplyPayloadFromMessage(messageItem))}
-            />
-          </View>
+          <MessageBubble
+            key={messageItem.id}
+            message={messageItem}
+            isMine={isMine}
+            isFirstInGroup={isFirstInGroup}
+            isLastInGroup={isLastInGroup}
+            showStatus={shouldShowStatus}
+            showTimestamp={shouldShowTimestamp}
+            onReplyPress={(reply) => setThreadRootId(reply.messageId)}
+            onReplySwipe={() => setReplyContext(buildReplyPayloadFromMessage(messageItem))}
+            isHighlighted={highlightedMessageId === messageItem.id}
+            replyCount={replyCount}
+            onOpenThread={(messageId) => setThreadRootId(messageId)}
+          />
         </Pressable>
       );
     },
     [
       currentUserId,
       decoratedData,
-      deletingMessageId,
-      handleMessageLongPress,
+      replyCounts,
+      buildReplyPayloadFromMessage,
+      highlightedMessageId,
       lastOutgoingMessageId,
       timestampVisibleFor,
       typingUserLabel,
@@ -2025,7 +2047,11 @@ const ChatScreen: React.FC = () => {
         <View style={styles.threadModalOverlay}>
           <View style={styles.threadModalCard}>
             <View style={styles.threadModalHeader}>
-              <Text style={styles.threadModalTitle}>Thread</Text>
+              <Text style={styles.threadModalTitle}>
+                {threadMessages.length > 1
+                  ? `${threadMessages.length - 1} ${threadMessages.length - 1 === 1 ? 'Reply' : 'Replies'}`
+                  : 'Thread'}
+              </Text>
               <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
                 <Ionicons name="close" size={20} color="#ffffff" />
               </Pressable>
@@ -2138,9 +2164,7 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     maxWidth: '82%',
-  },
-  messageDeleting: {
-    opacity: 0.4,
+    position: 'relative',
   },
   messageRowStacked: {
     marginTop: 6,
@@ -2190,6 +2214,13 @@ const styles = StyleSheet.create({
   placeholderBubble: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
+  highlightedBubble: {
+    shadowColor: '#2C82FF',
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: 'rgba(44, 130, 255, 0.2)',
+  },
   replyChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2220,6 +2251,60 @@ const styles = StyleSheet.create({
   replyChipText: {
     color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 13,
+  },
+  replyHint: {
+    position: 'absolute',
+    left: -28,
+    top: '50%',
+    marginTop: -12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#2C82FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  replyHintMine: {
+    left: undefined,
+    right: -28,
+  },
+  replyConnector: {
+    position: 'absolute',
+    left: -22,
+    top: 4,
+    bottom: 4,
+    width: 24,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  replyConnectorMine: {
+    left: undefined,
+    right: -22,
+    alignItems: 'flex-end',
+  },
+  replyConnectorTheirs: {},
+  replyConnectorVertical: {
+    flex: 1,
+    width: 2,
+    backgroundColor: REPLY_ACCENT,
+    borderRadius: 1,
+  },
+  replyConnectorCurve: {
+    width: 12,
+    height: 12,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: REPLY_ACCENT,
+    borderBottomLeftRadius: 12,
+  },
+  replyConnectorCurveMine: {
+    borderLeftWidth: 0,
+    borderBottomLeftRadius: 0,
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    borderRightColor: REPLY_ACCENT,
+    borderBottomColor: REPLY_ACCENT,
+    borderBottomRightRadius: 12,
   },
   messageText: {
     fontSize: 16,
@@ -2405,6 +2490,36 @@ const styles = StyleSheet.create({
   threadJumpButtonText: {
     color: '#ffffff',
     fontSize: 15,
+    fontWeight: '600',
+  },
+  threadSummaryButton: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  threadSummaryButtonMine: {
+    alignSelf: 'flex-end',
+  },
+  threadSummaryContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  threadSummaryLine: {
+    width: 1.5,
+    height: 16,
+    backgroundColor: REPLY_ACCENT,
+    borderRadius: 1,
+  },
+  threadSummaryLineMine: {
+    backgroundColor: '#2C82FF',
+  },
+  threadSummaryText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
     fontWeight: '600',
   },
   inputContainer: {
