@@ -889,7 +889,12 @@ const ChatScreen: React.FC = () => {
   );
 
   const handleSendMessage = useCallback(async () => {
-    if (!newMessage.trim() || newMessage.length > MESSAGE_CHAR_LIMIT || !currentUserId || !chatId) {
+    if (!newMessage.trim() || !currentUserId || !chatId) {
+      return;
+    }
+
+    if (newMessage.length > MESSAGE_CHAR_LIMIT) {
+      NotificationService.show('error', 'Messages are limited to 2000 characters');
       return;
     }
 
@@ -1511,10 +1516,7 @@ const ChatScreen: React.FC = () => {
     );
   }
 
-  const messageLength = newMessage.length;
   const isComposerEmpty = newMessage.trim().length === 0;
-  const isComposerOverLimit = messageLength > MESSAGE_CHAR_LIMIT;
-  const composerRemaining = MESSAGE_CHAR_LIMIT - messageLength;
   const keyboardOffset = useMemo(
     () =>
       Platform.OS === 'ios'
@@ -1522,7 +1524,7 @@ const ChatScreen: React.FC = () => {
         : Math.max(insets.top, StatusBar.currentHeight || 0),
     [insets.bottom, insets.top]
   );
-  const sendButtonDisabled = isComposerEmpty || isComposerOverLimit || isSendingMessage;
+  const sendButtonDisabled = isComposerEmpty || isSendingMessage;
 
   return (
     <SafeAreaView
@@ -1699,7 +1701,7 @@ const ChatScreen: React.FC = () => {
         >
           <View style={styles.composerColumn}>
             <TextInput
-              style={[styles.textInput, isComposerOverLimit && styles.textInputError]}
+              style={styles.textInput}
               value={newMessage}
               onChangeText={handleComposerChange}
               placeholder="Message…"
@@ -1707,21 +1709,6 @@ const ChatScreen: React.FC = () => {
               multiline
               editable={!isSendingMessage}
             />
-            <View style={styles.composerMetaRow}>
-              <Text
-                style={[
-                  styles.composerCounter,
-                  isComposerOverLimit && styles.composerCounterExceeded,
-                ]}
-              >
-                {Math.min(messageLength, MESSAGE_CHAR_LIMIT)} / {MESSAGE_CHAR_LIMIT}
-              </Text>
-              {isComposerOverLimit && (
-                <Text style={styles.composerLimitWarning}>
-                  {Math.abs(composerRemaining)} over limit
-                </Text>
-              )}
-            </View>
           </View>
 
           <Pressable
@@ -1729,7 +1716,6 @@ const ChatScreen: React.FC = () => {
             style={({ pressed }) => [
               styles.sendButton,
               !sendButtonDisabled && styles.sendButtonActive,
-              sendButtonDisabled && styles.sendButtonDisabled,
               pressed && !sendButtonDisabled && styles.sendButtonPressed,
             ]}
             disabled={sendButtonDisabled}
@@ -1742,10 +1728,7 @@ const ChatScreen: React.FC = () => {
             )}
           </Pressable>
         </View>
-
-
-              </KeyboardAvoidingView>
-
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -1941,7 +1924,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
     borderTopWidth: 1,
@@ -1964,29 +1947,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  textInputError: {
-    borderColor: '#FF6B6B',
-    backgroundColor: 'rgba(255, 107, 107, 0.08)',
-  },
-  composerMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  composerCounter: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  composerCounterExceeded: {
-    color: '#FF6B6B',
-  },
-  composerLimitWarning: {
-    color: '#FF6B6B',
-    fontSize: 12,
-    fontWeight: '500',
-  },
   sendButton: {
     width: 44,
     height: 44,
@@ -2004,9 +1964,6 @@ const styles = StyleSheet.create({
       width: 0,
       height: 4,
     },
-  },
-  sendButtonDisabled: {
-    opacity: 0.6,
   },
   sendButtonPressed: {
     opacity: 0.8,
