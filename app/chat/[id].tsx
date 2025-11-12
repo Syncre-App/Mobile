@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Platform, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
+import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -309,6 +309,7 @@ interface MessageBubbleProps {
   isLastInGroup: boolean;
   showStatus: boolean;
   showTimestamp: boolean;
+  onReplyPress?: (reply: ReplyMetadata) => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -318,6 +319,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isLastInGroup,
   showStatus,
   showTimestamp,
+  onReplyPress,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -366,7 +368,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       <Animated.View style={[containerStyle, { opacity: fadeAnim }]}>
         <View style={bubbleStyle}>
           {message.replyTo && (
-            <View style={[styles.replyChip, isMine && styles.replyChipMine]}>
+            <Pressable
+              onPress={() => onReplyPress?.(message.replyTo as ReplyMetadata)}
+              style={[styles.replyChip, isMine && styles.replyChipMine]}
+            >
               <View style={styles.replyChipBar} />
               <View style={styles.replyChipBody}>
                 <Text style={styles.replyChipLabel} numberOfLines={1}>
@@ -378,7 +383,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   </Text>
                 ) : null}
               </View>
-            </View>
+            </Pressable>
           )}
           <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
             {message.content}
@@ -447,6 +452,7 @@ const ChatScreen: React.FC = () => {
   const composerRef = useRef<TextInput>(null);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
   const [replyContext, setReplyContext] = useState<ReplyMetadata | null>(null);
+  const [threadRootId, setThreadRootId] = useState<string | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
   const [timestampVisibleFor, setTimestampVisibleFor] = useState<string | null>(null);
@@ -495,6 +501,20 @@ const ChatScreen: React.FC = () => {
     [getReplyLabel]
   );
 
+  const threadMessages = useMemo(() => {
+    if (!threadRootId) {
+      return [];
+    }
+    const root = messages.find((msg) => msg.id === threadRootId);
+    const replies = messages.filter((msg) => msg.replyTo?.messageId === threadRootId);
+    const sortedReplies = replies.slice().sort((a, b) => {
+      const da = parseDate(a.timestamp).getTime();
+      const db = parseDate(b.timestamp).getTime();
+      return da - db;
+    });
+    return root ? [root, ...sortedReplies] : sortedReplies;
+  }, [messages, threadRootId]);
+
   const setMessagesWithoutAnimation = useCallback(
     (updater: (prev: Message[]) => Message[]) => {
       setMessages((prev) => updater(prev));
@@ -542,6 +562,25 @@ const ChatScreen: React.FC = () => {
 
     return items;
   }, [messages, isRemoteTyping]);
+
+  const scrollToMessageById = useCallback(
+    (targetId: string) => {
+      const index = decoratedData.findIndex((item) => item.kind === 'message' && item.message.id === targetId);
+      if (index >= 0) {
+        requestAnimationFrame(() => {
+          try {
+            flatListRef.current?.scrollToIndex({ index, animated: true });
+          } catch (error) {
+            flatListRef.current?.scrollToOffset({ offset: index * 60, animated: true });
+          }
+          setTimestampVisibleFor(targetId);
+        });
+      } else {
+        pendingScrollIdRef.current = targetId;
+      }
+    },
+    [decoratedData]
+  );
 
   const lastOutgoingMessageId = useMemo(() => {
     if (!currentUserId) {
@@ -1134,6 +1173,19 @@ const ChatScreen: React.FC = () => {
     wsService,
   ]);
 
+  const handleThreadClose = useCallback(() => {
+    setThreadRootId(null);
+  }, []);
+
+  const handleThreadJumpToChat = useCallback(() => {
+    if (!threadRootId) {
+      return;
+    }
+    const target = threadRootId;
+    setThreadRootId(null);
+    scrollToMessageById(target);
+  }, [scrollToMessageById, threadRootId]);
+
   const deleteMessage = useCallback(
     async (message: Message) => {
       if (!chatId || !message?.id || deletingMessageId) {
@@ -1483,6 +1535,10 @@ const ChatScreen: React.FC = () => {
     itemVisiblePercentThreshold: 60,
   });
 
+  const handleReplyChipPress = useCallback((reply: ReplyMetadata) => {
+    setThreadRootId(reply.messageId);
+  }, []);
+
   useEffect(() => {
     if (initialLoadCompleteRef.current && messages.length > 0) {
       // Only auto-scroll if the user is near the bottom or if it's the first message
@@ -1666,6 +1722,7 @@ const ChatScreen: React.FC = () => {
               isLastInGroup={isLastInGroup}
               showStatus={shouldShowStatus}
               showTimestamp={shouldShowTimestamp}
+              onReplyPress={(reply) => setThreadRootId(reply.messageId)}
             />
           </View>
         </Pressable>
@@ -1676,6 +1733,7 @@ const ChatScreen: React.FC = () => {
       decoratedData,
       deletingMessageId,
       handleMessageLongPress,
+      handleReplyChipPress,
       lastOutgoingMessageId,
       timestampVisibleFor,
       typingUserLabel,
@@ -1931,6 +1989,50 @@ const ChatScreen: React.FC = () => {
         </View>
       </KeyboardAvoidingView>
         </TouchableWithoutFeedback>
+      <Modal
+        visible={Boolean(threadRootId)}
+        transparent
+        animationType="slide"
+        onRequestClose={handleThreadClose}
+      >
+        <View style={styles.threadModalOverlay}>
+          <View style={styles.threadModalCard}>
+            <View style={styles.threadModalHeader}>
+              <Text style={styles.threadModalTitle}>Thread</Text>
+              <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
+                <Ionicons name="close" size={20} color="#ffffff" />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.threadModalScroll}>
+              {threadMessages.length ? (
+                threadMessages.map((threadMessage, index) => (
+                  <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
+                    <View style={styles.threadMessageHeader}>
+                      <Text style={styles.threadMessageAuthor}>
+                        {getReplyLabel(threadMessage.senderId)}
+                      </Text>
+                      <Text style={styles.threadMessageTimestamp}>
+                        {formatTimestamp(parseDate(threadMessage.timestamp))}
+                      </Text>
+                    </View>
+                    <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
+                    {index === 0 && (
+                      <Text style={styles.threadMessageBadge}>Original message</Text>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.threadEmptyText}>
+                  Original message is not available in this history.
+                </Text>
+              )}
+            </ScrollView>
+            <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
+              <Text style={styles.threadJumpButtonText}>View in chat</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -2194,6 +2296,89 @@ const styles = StyleSheet.create({
   replyPreviewClose: {
     marginLeft: 8,
     padding: 4,
+  },
+  threadModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  threadModalCard: {
+    backgroundColor: '#101526',
+    borderRadius: 20,
+    padding: 16,
+    maxHeight: '80%',
+  },
+  threadModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  threadModalTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  threadModalClose: {
+    padding: 6,
+  },
+  threadModalScroll: {
+    paddingVertical: 8,
+  },
+  threadMessageCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+  },
+  threadMessageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  threadMessageAuthor: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  threadMessageTimestamp: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 12,
+  },
+  threadMessageText: {
+    color: '#ffffff',
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  threadMessageBadge: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+  },
+  threadEmptyText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+  threadJumpButton: {
+    marginTop: 8,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#2C82FF',
+  },
+  threadJumpButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   inputContainer: {
     flexDirection: 'row',
