@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   AppState,
   DeviceEventEmitter,
+  Platform,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -889,6 +890,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 0,
   },
   scrollView: {
     flex: 1,
