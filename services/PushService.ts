@@ -36,6 +36,14 @@ export const PushService = {
         return;
       }
 
+      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      if (isExpoGo) {
+        console.warn(
+          'Expo Go (SDK 53+) does not support remote push notifications — build a development client to test pushes'
+        );
+        return;
+      }
+
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
 
