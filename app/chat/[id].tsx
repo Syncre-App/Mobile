@@ -423,7 +423,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             { opacity: replyHintOpacity, transform: [{ scale: replyHintOpacity }] },
           ]}
         >
-          <Ionicons name="reply-outline" size={18} color="#ffffff" />
+          <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
         </Animated.View>
         {message.replyTo && (
           <View
@@ -474,12 +474,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             onPress={() => onOpenThread(message.id)}
           >
             <View style={styles.threadSummaryContent}>
-              <View
-                style={[
-                  styles.threadSummaryLine,
-                  isMine && styles.threadSummaryLineMine,
-                ]}
-              />
+              <View style={styles.threadSummaryLineGroup}>
+                <View style={styles.threadSummaryLine} />
+                <View
+                  style={[
+                    styles.threadSummaryLineCurve,
+                    isMine && styles.threadSummaryLineCurveMine,
+                  ]}
+                />
+              </View>
               <Text style={styles.threadSummaryText}>
                 {replyCount} {replyCount === 1 ? 'Reply' : 'Replies'}
               </Text>
@@ -1498,7 +1501,6 @@ const ChatScreen: React.FC = () => {
       currentUserId,
       scrollToBottom,
       setMessagesAnimated,
-      setDeletingMessageId,
       resolveReplyMetadata,
       updateOutgoingStatus,
     ]
@@ -2493,12 +2495,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   threadSummaryButton: {
-    marginTop: 4,
+    marginTop: 6,
     alignSelf: 'flex-start',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   threadSummaryButtonMine: {
     alignSelf: 'flex-end',
@@ -2506,19 +2508,32 @@ const styles = StyleSheet.create({
   threadSummaryContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+  },
+  threadSummaryLineGroup: {
+    alignItems: 'center',
   },
   threadSummaryLine: {
-    width: 1.5,
+    width: 2,
     height: 16,
     backgroundColor: REPLY_ACCENT,
     borderRadius: 1,
   },
-  threadSummaryLineMine: {
-    backgroundColor: '#2C82FF',
+  threadSummaryLineCurve: {
+    width: 10,
+    height: 10,
+    borderBottomWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: REPLY_ACCENT,
+    borderBottomLeftRadius: 10,
+  },
+  threadSummaryLineCurveMine: {
+    borderLeftWidth: 0,
+    borderRightWidth: 2,
+    borderBottomRightRadius: 10,
   },
   threadSummaryText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -2582,3 +2597,8 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
+  useEffect(() => {
+    if (replyContext) {
+      requestAnimationFrame(() => composerRef.current?.focus());
+    }
+  }, [replyContext]);
