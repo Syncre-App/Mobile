@@ -9,6 +9,7 @@ import { StorageService } from './StorageService';
 import { DeviceService } from './DeviceService';
 
 const LAST_REGISTERED_TOKEN_KEY = 'push_last_token';
+const DEFAULT_ANDROID_CHANNEL = 'default';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -43,6 +44,16 @@ const getExpoProjectId = (): string | undefined => {
 export const PushService = {
   async registerForPushNotifications() {
     try {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync(DEFAULT_ANDROID_CHANNEL, {
+          name: 'syncre',
+          importance: Notifications.AndroidImportance.MAX,
+          showBadge: true,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#2C82FF',
+        });
+      }
+
       if (!Device.isDevice) {
         console.warn('Push notifications are not supported on simulators');
         return;
@@ -77,6 +88,7 @@ export const PushService = {
 
       const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId });
       const expoToken = tokenResponse.data;
+      console.log('[PushService] Obtained Expo push token', expoToken);
 
       const authToken = await StorageService.getAuthToken();
       if (!authToken) {
