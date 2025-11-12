@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, FlatList, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Platform, RefreshControl, StatusBar, StyleSheet, Text, TextInput, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
+import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Platform, RefreshControl, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -343,6 +343,7 @@ const ChatScreen: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const composerRef = useRef<TextInput>(null);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
   const [timestampVisibleFor, setTimestampVisibleFor] = useState<string | null>(null);
@@ -917,6 +918,9 @@ const ChatScreen: React.FC = () => {
       scrollToBottom();
     });
     setNewMessage('');
+    requestAnimationFrame(() => {
+      composerRef.current?.focus();
+    });
     setIsSendingMessage(true);
     ensureTypingStopped();
 
@@ -1522,13 +1526,15 @@ const ChatScreen: React.FC = () => {
     [insets.bottom]
   );
 
-  const composerBottomPadding = useMemo(
-    () =>
-      Platform.OS === 'ios'
-        ? Math.max(insets.bottom - 6, 4)
-        : Math.max(insets.bottom, 10),
-    [insets.bottom]
-  );
+  const composerBottomPadding = useMemo(() => {
+    if (Platform.OS === 'ios') {
+      return Math.max(insets.bottom - 6, 4);
+    }
+    if (insets.bottom > 0) {
+      return Math.max(insets.bottom - 4, 2);
+    }
+    return 2;
+  }, [insets.bottom]);
   const sendButtonDisabled = isComposerEmpty || isSendingMessage;
 
   return (
@@ -1558,13 +1564,12 @@ const ChatScreen: React.FC = () => {
         <View style={styles.headerButtonPlaceholder} />
       </View>
 
-
-                    <KeyboardAvoidingView
-                      style={styles.keyboardAvoidingView}
-                      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                      keyboardVerticalOffset={keyboardOffset}
-                    >
-
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoidingView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={keyboardOffset}
+          >
 
                 {isThreadLoading ? (
 
@@ -1698,13 +1703,13 @@ const ChatScreen: React.FC = () => {
         <View style={[styles.inputContainer, { paddingBottom: composerBottomPadding }]}>
           <View style={styles.composerColumn}>
             <TextInput
+              ref={composerRef}
               style={styles.textInput}
               value={newMessage}
               onChangeText={handleComposerChange}
               placeholder="Message…"
               placeholderTextColor="rgba(255, 255, 255, 0.45)"
               multiline
-              editable={!isSendingMessage}
             />
           </View>
 
@@ -1726,6 +1731,7 @@ const ChatScreen: React.FC = () => {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 };
