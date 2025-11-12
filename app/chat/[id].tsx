@@ -345,6 +345,7 @@ const ChatScreen: React.FC = () => {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
   const [timestampVisibleFor, setTimestampVisibleFor] = useState<string | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
@@ -1383,6 +1384,15 @@ const ChatScreen: React.FC = () => {
   }, [chatId, refreshMessages]);
 
   useEffect(() => {
+    const showListener = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
+    const hideListener = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!messages.length || !currentUserId) {
       return;
     }
@@ -1530,11 +1540,11 @@ const ChatScreen: React.FC = () => {
     if (Platform.OS === 'ios') {
       return Math.max(insets.bottom - 6, 4);
     }
-    if (insets.bottom > 0) {
-      return Math.max(insets.bottom - 4, 2);
+    if (isKeyboardVisible) {
+      return 2;
     }
-    return 2;
-  }, [insets.bottom]);
+    return Math.max(insets.bottom, 12);
+  }, [insets.bottom, isKeyboardVisible]);
   const sendButtonDisabled = isComposerEmpty || isSendingMessage;
 
   return (
