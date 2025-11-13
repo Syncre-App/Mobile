@@ -2143,6 +2143,11 @@ const ChatScreen: React.FC = () => {
           onPress={() =>
             setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
           }
+          onLongPress={() => {
+            if (messageItem.isPlaceholder) return;
+            setReplyContext(buildReplyPayloadFromMessage(messageItem));
+          }}
+          delayLongPress={120}
         >
           <MessageBubble
             key={messageItem.id}
@@ -2471,7 +2476,7 @@ const ChatScreen: React.FC = () => {
         friends={friendRoster}
         lockedIds={lockedMemberIds}
         excludedIds={excludedMemberIds}
-        minimumTotal={MIN_GROUP_MEMBERS}
+        minimumTotal={memberPickerMode === 'create' ? MIN_GROUP_MEMBERS : 2}
         maxTotal={MAX_GROUP_MEMBERS}
         mode={memberPickerMode}
         isLoading={isFriendRosterLoading}
