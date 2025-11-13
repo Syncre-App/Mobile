@@ -276,6 +276,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         ? userDetails[otherUserId]?.profile_picture
         : undefined;
     const groupSubtitle = isGroupChat ? getGroupSubtitle(chat) : null;
+    const presenceValue = isGroupChat ? undefined : (isUserOnline ? 'online' : 'offline');
 
     return (
       <TouchableOpacity 
@@ -290,7 +291,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             uri={avatarUri}
             name={displayName}
             size={56}
-            presence={!isGroupChat && isUserOnline ? 'online' : undefined}
+            presence={presenceValue}
             presencePlacement="overlay"
             style={styles.avatarContainer}
           />
