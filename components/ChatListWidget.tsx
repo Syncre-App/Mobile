@@ -82,7 +82,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     if (chats.length > 0 && currentUserId) {
       fetchUserDetails();
     }
-  }, [chats, currentUserId]);
+  }, [chats, currentUserId, fetchUserDetails]);
 
   const getCurrentUserId = async () => {
     try {

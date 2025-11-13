@@ -74,13 +74,16 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
     return map;
   }, [friends]);
 
+  const lockedKey = useMemo(() => lockedIds.join(','), [lockedIds]);
+  const excludedKey = useMemo(() => excludedIds.join(','), [excludedIds]);
+
   useEffect(() => {
     if (!visible) {
       return;
     }
     setSelectedIds(new Set());
     setSearch('');
-  }, [visible, lockedIds.join(','), excludedIds.join(',')]);
+  }, [visible, lockedKey, excludedKey]);
 
   const filteredFriends = useMemo(() => {
     const query = search.trim().toLowerCase();
