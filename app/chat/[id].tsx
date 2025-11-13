@@ -330,6 +330,8 @@ interface MessageBubbleProps {
   isHighlighted?: boolean;
   replyCount?: number;
   showSenderMetadata?: boolean;
+  onBubblePress?: () => void;
+  onBubbleLongPress?: () => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -345,6 +347,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isHighlighted = false,
   replyCount = 0,
   showSenderMetadata = false,
+  onBubblePress,
+  onBubbleLongPress,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -469,11 +473,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         >
           <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
         </Animated.View>
-        <View
+        <Pressable
+          onPress={onBubblePress}
+          onLongPress={onBubbleLongPress}
           style={[
             styles.messageContent,
             isMine ? styles.messageContentMine : styles.messageContentTheirs,
           ]}
+          delayLongPress={120}
         >
           {showSenderMetadata && !isMine ? (
             <View style={styles.senderMetaRow}>
@@ -531,7 +538,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               </View>
             </Pressable>
           )}
-        </View>
+        </Pressable>
       </Animated.View>
     </>
   );
@@ -2139,32 +2146,28 @@ const ChatScreen: React.FC = () => {
       const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
       return (
-        <Pressable
-          onPress={() =>
+        <MessageBubble
+          key={messageItem.id}
+          message={messageItem}
+          isMine={isMine}
+          isFirstInGroup={isFirstInGroup}
+          isLastInGroup={isLastInGroup}
+          showStatus={shouldShowStatus}
+          showTimestamp={shouldShowTimestamp}
+          onReplyPress={(reply) => setThreadRootId(reply.messageId)}
+          onReplySwipe={() => setReplyContext(buildReplyPayloadFromMessage(messageItem))}
+          isHighlighted={highlightedMessageId === messageItem.id}
+          replyCount={replyCount}
+          onOpenThread={(messageId) => setThreadRootId(messageId)}
+          showSenderMetadata={Boolean(chatDetails?.isGroup)}
+          onBubblePress={() =>
             setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
           }
-          onLongPress={() => {
+          onBubbleLongPress={() => {
             if (messageItem.isPlaceholder) return;
             setReplyContext(buildReplyPayloadFromMessage(messageItem));
           }}
-          delayLongPress={120}
-        >
-          <MessageBubble
-            key={messageItem.id}
-            message={messageItem}
-            isMine={isMine}
-            isFirstInGroup={isFirstInGroup}
-            isLastInGroup={isLastInGroup}
-            showStatus={shouldShowStatus}
-            showTimestamp={shouldShowTimestamp}
-            onReplyPress={(reply) => setThreadRootId(reply.messageId)}
-            onReplySwipe={() => setReplyContext(buildReplyPayloadFromMessage(messageItem))}
-            isHighlighted={highlightedMessageId === messageItem.id}
-            replyCount={replyCount}
-            onOpenThread={(messageId) => setThreadRootId(messageId)}
-            showSenderMetadata={Boolean(chatDetails?.isGroup)}
-          />
-        </Pressable>
+        />
       );
     },
     [
