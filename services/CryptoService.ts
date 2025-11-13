@@ -8,6 +8,7 @@ import { SHA256 } from '@stablelib/sha256';
 import { deriveKey as pbkdf2DeriveKey } from '@stablelib/pbkdf2';
 import { ApiResponse, ApiService } from './ApiService';
 import { DeviceService } from './DeviceService';
+import { StorageService } from './StorageService';
 
 // @ts-ignore
 if (typeof globalThis.Buffer === 'undefined') {
@@ -19,6 +20,7 @@ const IDENTITY_PRIVATE_KEY_KEY = 'e2ee_identity_private_v1';
 const IDENTITY_PUBLIC_KEY_KEY = 'e2ee_identity_public_v1';
 const IDENTITY_VERSION_KEY = 'e2ee_identity_version';
 const KEY_INFO_CONTEXT = 'syncre-chat-v1';
+const DEVICE_REGISTRATION_KEY = 'syncre_identity_registration_v1';
 const HKDF_KEY_LENGTH = 32;
 
 export interface EnvelopeEntry {
@@ -202,6 +204,7 @@ interface BootstrapParams {
   pin: string;
   token: string;
   identityResponse?: ApiResponse<RemoteIdentityRecord>;
+  forceBackup?: boolean;
 }
 
 async function getSenderIdentity(): Promise<{
@@ -216,9 +219,21 @@ async function getSenderIdentity(): Promise<{
   };
 }
 
-async function registerDeviceIdentity(identity: IdentityKeyPair, token: string): Promise<void> {
+async function registerDeviceIdentity(
+  identity: IdentityKeyPair,
+  token: string,
+  options?: { force?: boolean }
+): Promise<void> {
   try {
     const deviceId = await DeviceService.getOrCreateDeviceId();
+    const fingerprint = `${deviceId}:${identity.publicKey}:${identity.keyVersion || 1}`;
+    if (!options?.force) {
+      const existing = await StorageService.getItem(DEVICE_REGISTRATION_KEY);
+      if (existing === fingerprint) {
+        return;
+      }
+    }
+
     await ApiService.post(
       '/keys/register',
       {
@@ -228,6 +243,7 @@ async function registerDeviceIdentity(identity: IdentityKeyPair, token: string):
       },
       token
     );
+    await StorageService.setItem(DEVICE_REGISTRATION_KEY, fingerprint);
   } catch (error) {
     console.warn('[CryptoService] Failed to register device identity:', error);
   }
@@ -266,18 +282,26 @@ async function uploadIdentityBundle({
   await registerDeviceIdentity(identity, token);
 }
 
-async function bootstrapIdentity({ pin, token, identityResponse }: BootstrapParams): Promise<void> {
+async function bootstrapIdentity({ pin, token, identityResponse, forceBackup = false }: BootstrapParams): Promise<void> {
   if (!pin || !pin.trim()) {
     throw new Error('Secure PIN is required to unlock encrypted messages');
   }
+
+  const existing = identityResponse || (await ApiService.get('/keys/identity', token));
+  const remoteHasEncrypted = existing.success && Boolean(existing.data?.encryptedPrivateKey);
+  const shouldUploadLocal = forceBackup || !remoteHasEncrypted;
+
   const localIdentity = await getLocalIdentity();
   if (localIdentity) {
-    await uploadIdentityBundle({ identity: localIdentity, pin, token });
+    if (shouldUploadLocal) {
+      await uploadIdentityBundle({ identity: localIdentity, pin, token });
+    } else {
+      await registerDeviceIdentity(localIdentity, token);
+    }
     return;
   }
 
-  const existing = identityResponse || (await ApiService.get('/keys/identity', token));
-  if (existing.success && existing.data) {
+  if (existing.success && existing.data && existing.data.encryptedPrivateKey) {
     const saltBase64 = existing.data.salt;
     const nonceBase64 = existing.data.nonce;
     if (!saltBase64 || !nonceBase64) {
@@ -288,10 +312,6 @@ async function bootstrapIdentity({ pin, token, identityResponse }: BootstrapPara
     const passphraseKey = await derivePassphraseKey(pin, saltBytes, iterations);
 
     const encryptedBase64 = existing.data.encryptedPrivateKey;
-    if (!encryptedBase64) {
-      throw new Error('Missing encrypted private key');
-    }
-
     const privateKeyBytes = await decryptPrivateKey(encryptedBase64, nonceBase64, passphraseKey);
     const privateKey = toBase64(privateKeyBytes);
     const identity: IdentityKeyPair = {
@@ -300,7 +320,11 @@ async function bootstrapIdentity({ pin, token, identityResponse }: BootstrapPara
       keyVersion: existing.data.version || 1,
     };
     await persistLocalIdentity(identity);
-    await uploadIdentityBundle({ identity, pin, token });
+    if (forceBackup) {
+      await uploadIdentityBundle({ identity, pin, token });
+    } else {
+      await registerDeviceIdentity(identity, token, { force: true });
+    }
     return;
   }
 
@@ -430,6 +454,7 @@ export const CryptoService = {
     await SecureStore.deleteItemAsync(IDENTITY_PRIVATE_KEY_KEY);
     await SecureStore.deleteItemAsync(IDENTITY_PUBLIC_KEY_KEY);
     await SecureStore.deleteItemAsync(IDENTITY_VERSION_KEY);
+    await StorageService.removeItem(DEVICE_REGISTRATION_KEY);
     recipientPublicKeyCache.clear();
   },
 

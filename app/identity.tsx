@@ -69,6 +69,7 @@ export default function IdentityScreen() {
       const remoteData = remoteResponse.success ? remoteResponse.data : null;
       const remotePublicKey = remoteData?.publicKey || null;
       const remoteHasEncrypted = remoteResponse.success && Boolean(remoteData?.encryptedPrivateKey);
+      const shouldBackup = mode === 'setup' || !remoteHasEncrypted;
       if (!remoteHasEncrypted && remoteResponse.statusCode !== 404 && mode === 'unlock') {
         setError(remoteResponse.error || 'Failed to check secure backup. Try again.');
         return;
@@ -118,7 +119,12 @@ export default function IdentityScreen() {
       }
 
       await PinService.setPin(trimmedPin);
-      await CryptoService.bootstrapIdentity({ pin: trimmedPin, token, identityResponse: remoteResponse });
+      await CryptoService.bootstrapIdentity({
+        pin: trimmedPin,
+        token,
+        identityResponse: remoteResponse,
+        forceBackup: shouldBackup,
+      });
       IdentityService.clearCache();
       NotificationService.show(
         'success',
