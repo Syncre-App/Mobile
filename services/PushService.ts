@@ -27,9 +27,9 @@ const FALLBACK_PROJECT_ID =
 const getExpoProjectId = (): string | undefined => {
   const manifestExtra =
     (Constants.manifest2 as any)?.extra ||
-    Constants.manifest?.extra ||
+    (Constants.manifest as any)?.extra ||
     (Constants as any)?.manifestExtra ||
-    Constants.expoConfig?.extra;
+    (Constants.expoConfig as any)?.extra;
 
   return (
     Constants.easConfig?.projectId ||
