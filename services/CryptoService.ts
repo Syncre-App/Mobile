@@ -6,7 +6,7 @@ import { XChaCha20Poly1305 } from '@stablelib/xchacha20poly1305';
 import { HKDF } from '@stablelib/hkdf';
 import { SHA256 } from '@stablelib/sha256';
 import { deriveKey as pbkdf2DeriveKey } from '@stablelib/pbkdf2';
-import { ApiService } from './ApiService';
+import { ApiResponse, ApiService } from './ApiService';
 import { DeviceService } from './DeviceService';
 
 // @ts-ignore
@@ -189,9 +189,19 @@ async function getRecipientPublicKey(userId: string, token: string): Promise<str
   return entry.key;
 }
 
+interface RemoteIdentityRecord {
+  publicKey: string;
+  encryptedPrivateKey?: string | null;
+  nonce?: string | null;
+  salt?: string | null;
+  iterations?: number | null;
+  version?: number | null;
+}
+
 interface BootstrapParams {
   pin: string;
   token: string;
+  identityResponse?: ApiResponse<RemoteIdentityRecord>;
 }
 
 async function getSenderIdentity(): Promise<{
@@ -256,7 +266,7 @@ async function uploadIdentityBundle({
   await registerDeviceIdentity(identity, token);
 }
 
-async function bootstrapIdentity({ pin, token }: BootstrapParams): Promise<void> {
+async function bootstrapIdentity({ pin, token, identityResponse }: BootstrapParams): Promise<void> {
   if (!pin || !pin.trim()) {
     throw new Error('Secure PIN is required to unlock encrypted messages');
   }
@@ -266,7 +276,7 @@ async function bootstrapIdentity({ pin, token }: BootstrapParams): Promise<void>
     return;
   }
 
-  const existing = await ApiService.get('/keys/identity', token);
+  const existing = identityResponse || (await ApiService.get('/keys/identity', token));
   if (existing.success && existing.data) {
     const saltBase64 = existing.data.salt;
     const nonceBase64 = existing.data.nonce;
@@ -276,7 +286,13 @@ async function bootstrapIdentity({ pin, token }: BootstrapParams): Promise<void>
     const saltBytes = fromBase64(saltBase64);
     const iterations = existing.data.iterations || 150000;
     const passphraseKey = await derivePassphraseKey(pin, saltBytes, iterations);
-    const privateKeyBytes = await decryptPrivateKey(existing.data.encryptedPrivateKey, nonceBase64, passphraseKey);
+
+    const encryptedBase64 = existing.data.encryptedPrivateKey;
+    if (!encryptedBase64) {
+      throw new Error('Missing encrypted private key');
+    }
+
+    const privateKeyBytes = await decryptPrivateKey(encryptedBase64, nonceBase64, passphraseKey);
     const privateKey = toBase64(privateKeyBytes);
     const identity: IdentityKeyPair = {
       privateKey,

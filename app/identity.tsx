@@ -62,7 +62,10 @@ export default function IdentityScreen() {
         return;
       }
 
-      const remoteResponse = await ApiService.get('/keys/identity', token);
+      const [remoteResponse, localIdentity] = await Promise.all([
+        ApiService.get('/keys/identity', token),
+        CryptoService.getStoredIdentity(),
+      ]);
       const remoteData = remoteResponse.success ? remoteResponse.data : null;
       const remotePublicKey = remoteData?.publicKey || null;
       const remoteHasEncrypted = remoteResponse.success && Boolean(remoteData?.encryptedPrivateKey);
@@ -70,8 +73,6 @@ export default function IdentityScreen() {
         setError(remoteResponse.error || 'Failed to check secure backup. Try again.');
         return;
       }
-
-      const localIdentity = await CryptoService.getStoredIdentity();
 
       if (mode === 'unlock' && !remoteHasEncrypted) {
         setError('No secure backup found. Please set up your PIN on one of your existing devices.');
@@ -117,7 +118,7 @@ export default function IdentityScreen() {
       }
 
       await PinService.setPin(trimmedPin);
-      await CryptoService.bootstrapIdentity({ pin: trimmedPin, token });
+      await CryptoService.bootstrapIdentity({ pin: trimmedPin, token, identityResponse: remoteResponse });
       IdentityService.clearCache();
       NotificationService.show(
         'success',
