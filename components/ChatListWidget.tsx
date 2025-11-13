@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -98,7 +98,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     }
   };
 
-  const fetchUserDetails = async () => {
+  const fetchUserDetails = useCallback(async () => {
     try {
       const token = await StorageService.getAuthToken();
       if (!token) return;
@@ -146,7 +146,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     } catch (error) {
       console.log('❌ Error fetching user details:', error);
     }
-  };
+  }, [chats, currentUserId, userDetails]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

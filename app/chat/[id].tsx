@@ -682,36 +682,50 @@ const ChatScreen: React.FC = () => {
         return;
       }
 
-      const updatedParticipants: ChatParticipant[] = Array.isArray(nextChat.participants)
+      const normalizedParticipants: ChatParticipant[] = Array.isArray(nextChat.participants)
         ? (nextChat.participants as any[]).map((participant) => ({
             id: participant.id?.toString?.() ?? String(participant.id),
             username: participant.username || participant.email || 'Friend',
             profile_picture: participant.profile_picture || null,
             status: participant.status || null,
           }))
-        : chatDetails?.participants || [];
+        : [];
 
-      syncParticipants(updatedParticipants);
+      if (normalizedParticipants.length) {
+        UserCacheService.addUsers(
+          normalizedParticipants.map((participant) => ({
+            ...participant,
+            id: participant.id,
+          })) as any[]
+        );
+      }
+
+      const participantsPayload =
+        normalizedParticipants.length > 0
+          ? normalizedParticipants
+          : (nextChat.participants as ChatParticipant[]) || [];
+      syncParticipants(participantsPayload);
 
       const updatedUserIds: string[] = Array.isArray(nextChat.userIds)
         ? nextChat.userIds.map((pid: any) => pid?.toString?.() ?? String(pid))
         : participantIdsRef.current;
 
       participantIdsRef.current = updatedUserIds;
-      setChatDetails({
-        id: nextChat.id?.toString?.() ?? chatDetails?.id ?? chatId ?? '',
-        isGroup: Boolean(nextChat.isGroup ?? nextChat.is_group ?? chatDetails?.isGroup),
+
+      setChatDetails((prev) => ({
+        id: nextChat.id?.toString?.() ?? prev?.id ?? chatId ?? '',
+        isGroup: Boolean(nextChat.isGroup ?? nextChat.is_group ?? prev?.isGroup),
         ownerId:
           nextChat.ownerId?.toString?.() ??
           nextChat.owner_id?.toString?.() ??
-          chatDetails?.ownerId ??
+          prev?.ownerId ??
           null,
-        name: nextChat.name ?? chatDetails?.name ?? null,
-        avatarUrl: nextChat.avatarUrl ?? nextChat.avatar_url ?? chatDetails?.avatarUrl ?? null,
-        participants: updatedParticipants,
-      });
+        name: nextChat.name ?? nextChat.displayName ?? prev?.name ?? null,
+        avatarUrl: nextChat.avatarUrl ?? nextChat.avatar_url ?? prev?.avatarUrl ?? null,
+        participants: participantsPayload.length ? participantsPayload : prev?.participants ?? [],
+      }));
     },
-    [chatDetails, chatId, syncParticipants]
+    [chatId, syncParticipants]
   );
 
   const resolveReplyMetadata = useCallback(
@@ -2188,6 +2202,30 @@ const ChatScreen: React.FC = () => {
   }, [insets.bottom, isKeyboardVisible]);
   const sendButtonDisabled = isComposerEmpty || isSendingMessage;
 
+  const isGroupChat = Boolean(chatDetails?.isGroup);
+  const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
+  const shouldShowAddButton = isGroupChat ? isGroupOwner : Boolean(otherUserIdRef.current);
+  const addButtonMode: 'create' | 'add' = isGroupChat ? 'add' : 'create';
+  const receiverPresenceLabel = useMemo(() => {
+    if (!chatDetails || chatDetails.isGroup) {
+      return null;
+    }
+    const counterpart = chatDetails.participants?.find(
+      (participant) => participant.id !== currentUserId
+    );
+    if (!counterpart?.status) {
+      return null;
+    }
+    const normalized = String(counterpart.status).toLowerCase();
+    if (normalized === 'online') {
+      return 'Online';
+    }
+    if (normalized === 'away') {
+      return 'Away';
+    }
+    return 'Offline';
+  }, [chatDetails, currentUserId]);
+
   if (!chatId) {
     return (
       <SafeAreaView style={styles.fallbackContainer}>
@@ -2195,11 +2233,6 @@ const ChatScreen: React.FC = () => {
       </SafeAreaView>
     );
   }
-
-  const isGroupChat = Boolean(chatDetails?.isGroup);
-  const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
-  const shouldShowAddButton = isGroupChat ? isGroupOwner : Boolean(otherUserIdRef.current);
-  const addButtonMode: 'create' | 'add' = isGroupChat ? 'add' : 'create';
 
   return (
     <SafeAreaView
@@ -2222,9 +2255,14 @@ const ChatScreen: React.FC = () => {
         <Pressable onPress={handleNavigateBack} style={styles.headerButton} accessibilityRole="button">
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {receiverUsername}
-        </Text>
+        <View style={styles.headerTitleWrapper}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {receiverUsername}
+          </Text>
+          {!isGroupChat && receiverPresenceLabel ? (
+            <Text style={styles.presenceLabel}>{receiverPresenceLabel}</Text>
+          ) : null}
+        </View>
         {shouldShowAddButton ? (
           <Pressable
             onPress={() => handleOpenMemberPicker(addButtonMode)}
@@ -2529,6 +2567,10 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
   },
+  headerTitleWrapper: {
+    flex: 1,
+    alignItems: 'center',
+  },
   headerActionButton: {
     width: 44,
     height: 44,
@@ -2549,6 +2591,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     letterSpacing: 0.2,
+  },
+  presenceLabel: {
+    marginTop: 2,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   keyboardAvoidingView: {
     flex: 1,
