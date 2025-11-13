@@ -13,7 +13,6 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { GlassCard } from '../components/GlassCard';
 import { UpdateService } from '../services/UpdateService';
 
