@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
+import { ActivityIndicator, Animated, BackHandler, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-
-import { TapGestureHandler } from 'react-native-gesture-handler';
 
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
@@ -243,9 +242,9 @@ const formatTimestamp = (date: Date): string => {
   return timeFormatter.format(date);
 };
 
-const MESSAGE_CHAR_LIMIT = 2000;
+const MESSAGE_CHAR_LIMIT = 5000;
 const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
-const SWIPE_REPLY_THRESHOLD = 40;
+const SWIPE_REPLY_THRESHOLD = 32;
 
 
 const layoutNext = () => {
@@ -333,33 +332,44 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
+  const swipePeakRef = useRef(0);
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 4,
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 6,
+        onPanResponderGrant: () => {
+          swipePeakRef.current = 0;
+        },
         onPanResponderMove: (_, gesture) => {
+          let nextValue = 0;
           if (!isMine && gesture.dx > 0) {
-            swipeAnim.setValue(Math.min(gesture.dx, 80));
+            nextValue = Math.min(gesture.dx, 80);
           } else if (isMine && gesture.dx < 0) {
-            swipeAnim.setValue(Math.max(gesture.dx, -80));
-          } else {
-            swipeAnim.setValue(0);
+            nextValue = Math.max(gesture.dx, -80);
+          }
+          swipeAnim.setValue(nextValue);
+          const magnitude = isMine ? -nextValue : nextValue;
+          if (magnitude > swipePeakRef.current) {
+            swipePeakRef.current = magnitude;
           }
         },
         onPanResponderRelease: (_, gesture) => {
-          const rightSwipe = !isMine && gesture.dx > SWIPE_REPLY_THRESHOLD;
-          const leftSwipe = isMine && gesture.dx < -SWIPE_REPLY_THRESHOLD;
-          if ((rightSwipe || leftSwipe) && onReplySwipe) {
+          const magnitude =
+            swipePeakRef.current ||
+            (isMine ? Math.abs(Math.min(gesture.dx, 0)) : Math.abs(Math.max(gesture.dx, 0)));
+          if (magnitude > SWIPE_REPLY_THRESHOLD && onReplySwipe) {
             onReplySwipe();
           }
+          swipePeakRef.current = 0;
           Animated.spring(swipeAnim, {
             toValue: 0,
             useNativeDriver: true,
           }).start();
         },
         onPanResponderTerminate: () => {
+          swipePeakRef.current = 0;
           Animated.spring(swipeAnim, {
             toValue: 0,
             useNativeDriver: true,
@@ -496,9 +506,11 @@ const ChatScreen: React.FC = () => {
   const chatId = useMemo(() => (Array.isArray(id) ? id[0] : id), [id]);
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
 
   const wsService = useMemo(() => WebSocketService.getInstance(), []);
   const flatListRef = useRef<FlatList<ChatListItem>>(null);
+  const composerLimitWarningRef = useRef(false);
 
   const receiverNameRef = useRef('Loading…');
   const otherUserIdRef = useRef<string | null>(null);
@@ -534,7 +546,6 @@ const ChatScreen: React.FC = () => {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const remoteTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadCompleteRef = useRef(false);
-  const tapGestureRef = useRef(null);
   const isNearTopRef = useRef(false);
   const isNearBottomRef = useRef(true);
 
@@ -555,6 +566,33 @@ const ChatScreen: React.FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showScrollToBottomButton, setShowScrollToBottomButton] = useState(false);
+
+  const handleNavigateBack = useCallback(() => {
+    if (threadRootId) {
+      setThreadRootId(null);
+      return true;
+    }
+    if (replyContext) {
+      setReplyContext(null);
+      return true;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      router.replace('/home');
+    }
+    return true;
+  }, [navigation, replyContext, router, threadRootId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android') {
+        return undefined;
+      }
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => handleNavigateBack());
+      return () => subscription.remove();
+    }, [handleNavigateBack])
+  );
 
   const currentUserId = user?.id ? String(user.id) : null;
 
@@ -1156,12 +1194,23 @@ const ChatScreen: React.FC = () => {
 
   const handleComposerChange = useCallback(
     (value: string) => {
-      setNewMessage(value);
+      let nextValue = value;
+      if (value.length > MESSAGE_CHAR_LIMIT) {
+        nextValue = value.slice(0, MESSAGE_CHAR_LIMIT);
+        if (!composerLimitWarningRef.current) {
+          NotificationService.show('warning', `Messages are limited to ${MESSAGE_CHAR_LIMIT} characters`);
+          composerLimitWarningRef.current = true;
+        }
+      } else if (composerLimitWarningRef.current) {
+        composerLimitWarningRef.current = false;
+      }
+
+      setNewMessage(nextValue);
       if (!chatId) {
         return;
       }
 
-      if (value.length > 0 && !typingStateRef.current.isTyping) {
+      if (nextValue.length > 0 && !typingStateRef.current.isTyping) {
         typingStateRef.current.isTyping = true;
         wsService.sendTyping(chatId);
       }
@@ -1186,7 +1235,7 @@ const ChatScreen: React.FC = () => {
     }
 
     if (newMessage.length > MESSAGE_CHAR_LIMIT) {
-      NotificationService.show('error', 'Messages are limited to 2000 characters');
+      NotificationService.show('error', `Messages are limited to ${MESSAGE_CHAR_LIMIT} characters`);
       return;
     }
 
@@ -1804,14 +1853,6 @@ const ChatScreen: React.FC = () => {
     [isLoadingMore]
   );
 
-  if (!chatId) {
-    return (
-      <SafeAreaView style={styles.fallbackContainer}>
-        <Text style={styles.fallbackText}>Unable to open this chat.</Text>
-      </SafeAreaView>
-    );
-  }
-
   const isComposerEmpty = newMessage.trim().length === 0;
   const keyboardOffset = useMemo(
     () => (Platform.OS === 'ios' ? insets.bottom : 0),
@@ -1828,6 +1869,14 @@ const ChatScreen: React.FC = () => {
     return Math.max(insets.bottom, 12);
   }, [insets.bottom, isKeyboardVisible]);
   const sendButtonDisabled = isComposerEmpty || isSendingMessage;
+
+  if (!chatId) {
+    return (
+      <SafeAreaView style={styles.fallbackContainer}>
+        <Text style={styles.fallbackText}>Unable to open this chat.</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -1847,7 +1896,7 @@ const ChatScreen: React.FC = () => {
       <Stack.Screen options={{ title: receiverUsername }} />
 
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button">
+        <Pressable onPress={handleNavigateBack} style={styles.headerButton} accessibilityRole="button">
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -2018,6 +2067,7 @@ const ChatScreen: React.FC = () => {
               style={styles.textInput}
               value={newMessage}
               onChangeText={handleComposerChange}
+              maxLength={MESSAGE_CHAR_LIMIT}
               placeholder="Message…"
               placeholderTextColor="rgba(255, 255, 255, 0.45)"
               multiline

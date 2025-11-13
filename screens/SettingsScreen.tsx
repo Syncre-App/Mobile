@@ -59,7 +59,7 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const renderSettingItem = (
-    icon: string,
+    icon: string | null,
     title: string,
     subtitle?: string,
     onPress?: () => void,
@@ -72,8 +72,10 @@ export const SettingsScreen: React.FC = () => {
       style={[styles.settingItem, !hasTopBorder && styles.settingItemFirst]}
     >
       <View style={styles.settingLeft}>
-        <Ionicons name={icon as any} size={24} color="rgba(255, 255, 255, 0.7)" />
-        <View style={styles.settingTexts}>
+        {icon ? (
+          <Ionicons name={icon as any} size={24} color="rgba(255, 255, 255, 0.7)" />
+        ) : null}
+        <View style={[styles.settingTexts, !icon && styles.settingTextsNoIcon]}>
           <Text style={styles.settingTitle}>{title}</Text>
           {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
         </View>
@@ -201,7 +203,7 @@ export const SettingsScreen: React.FC = () => {
           </View>
 
           {renderSettingItem(
-            'information-circle',
+            null,
             'App Version',
             appVersion,
             undefined,
@@ -281,6 +283,9 @@ const styles = StyleSheet.create({
   settingTexts: {
     marginLeft: 16,
     flex: 1,
+  },
+  settingTextsNoIcon: {
+    marginLeft: 0,
   },
   settingTitle: {
     color: 'white',
