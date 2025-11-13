@@ -256,7 +256,7 @@ const formatTimestamp = (date: Date): string => {
 
 const MESSAGE_CHAR_LIMIT = 5000;
 const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
-const SWIPE_REPLY_THRESHOLD = 32;
+const SWIPE_REPLY_THRESHOLD = 18;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
 
