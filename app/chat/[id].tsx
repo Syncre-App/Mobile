@@ -2155,7 +2155,10 @@ const ChatScreen: React.FC = () => {
           showStatus={shouldShowStatus}
           showTimestamp={shouldShowTimestamp}
           onReplyPress={(reply) => setThreadRootId(reply.messageId)}
-          onReplySwipe={() => setReplyContext(buildReplyPayloadFromMessage(messageItem))}
+          onReplySwipe={() => {
+            if (messageItem.isPlaceholder) return;
+            setReplyContext(buildReplyPayloadFromMessage(messageItem));
+          }}
           isHighlighted={highlightedMessageId === messageItem.id}
           replyCount={replyCount}
           onOpenThread={(messageId) => setThreadRootId(messageId)}
