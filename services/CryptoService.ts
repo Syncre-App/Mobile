@@ -22,6 +22,7 @@ const IDENTITY_VERSION_KEY = 'e2ee_identity_version';
 const KEY_INFO_CONTEXT = 'syncre-chat-v1';
 const DEVICE_REGISTRATION_KEY = 'syncre_identity_registration_v1';
 const HKDF_KEY_LENGTH = 32;
+const IDENTITY_PBKDF_ITERATIONS = 60000;
 
 export interface EnvelopeEntry {
   recipientId: string;
@@ -262,7 +263,7 @@ async function uploadIdentityBundle({
     throw new Error('Secure PIN is required for identity backup');
   }
   const saltBytes = randomBytes(16);
-  const iterations = 200000;
+  const iterations = IDENTITY_PBKDF_ITERATIONS;
   const passphraseKey = await derivePassphraseKey(pin, saltBytes, iterations);
   const secretKeyBytes = fromBase64(identity.privateKey);
   const { encryptedPrivateKey, nonce } = await encryptPrivateKey(secretKeyBytes, passphraseKey);
@@ -289,6 +290,7 @@ async function bootstrapIdentity({ pin, token, identityResponse, forceBackup = f
 
   const existing = identityResponse || (await ApiService.get('/keys/identity', token));
   const remoteHasEncrypted = existing.success && Boolean(existing.data?.encryptedPrivateKey);
+  const remoteIterations = existing.data?.iterations || IDENTITY_PBKDF_ITERATIONS;
   const shouldUploadLocal = forceBackup || !remoteHasEncrypted;
 
   const localIdentity = await getLocalIdentity();
@@ -324,6 +326,13 @@ async function bootstrapIdentity({ pin, token, identityResponse, forceBackup = f
       await uploadIdentityBundle({ identity, pin, token });
     } else {
       await registerDeviceIdentity(identity, token, { force: true });
+      if (remoteIterations > IDENTITY_PBKDF_ITERATIONS) {
+        setTimeout(() => {
+          uploadIdentityBundle({ identity, pin, token }).catch((err) =>
+            console.warn('[CryptoService] Failed to refresh identity bundle:', err)
+          );
+        }, 0);
+      }
     }
     return;
   }
