@@ -35,7 +35,7 @@ interface User {
 
 const MAX_PROFILE_SIZE_BYTES = 5 * 1024 * 1024;
 
-const resolveExtension = (fileName?: string, mimeType?: string | null) => {
+const resolveExtension = (fileName?: string | null, mimeType?: string | null) => {
   const fromName = fileName?.split('.').pop()?.toLowerCase();
   if (fromName && fromName.length <= 5) {
     return fromName;
@@ -139,7 +139,8 @@ export const EditProfileScreen: React.FC = () => {
       if (Platform.OS === 'android' && normalizedUri.startsWith('content://')) {
         try {
           const tempExt = resolveExtension(asset.fileName, asset.mimeType);
-          const tempUri = `${FileSystem.cacheDirectory}profile-upload-${Date.now()}.${tempExt}`;
+          const fsCacheDir = (FileSystem as any).cacheDirectory ?? (FileSystem as any).documentDirectory ?? '';
+          const tempUri = `${fsCacheDir}profile-upload-${Date.now()}.${tempExt}`;
           await FileSystem.copyAsync({ from: normalizedUri, to: tempUri });
           normalizedUri = tempUri;
         } catch (copyError) {
