@@ -15,6 +15,9 @@ import { DeviceService } from '../../services/DeviceService';
 import { WebSocketMessage, WebSocketService } from '../../services/WebSocketService';
 import { UserCacheService } from '../../services/UserCacheService';
 import { TimezoneService } from '../../services/TimezoneService';
+import { ChatService } from '../../services/ChatService';
+import { GroupMemberPicker } from '../../components/GroupMemberPicker';
+import { UserAvatar } from '../../components/UserAvatar';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -33,6 +36,8 @@ interface Message {
   id: string;
   senderId: string;
   receiverId: string;
+  senderName?: string | null;
+  senderAvatar?: string | null;
   content: string;
   timestamp: string;
   utcTimestamp?: string;
@@ -42,6 +47,13 @@ interface Message {
   status?: MessageStatus;
   isPlaceholder?: boolean;
   replyTo?: ReplyMetadata;
+}
+
+interface ChatParticipant {
+  id: string;
+  username: string;
+  profile_picture?: string | null;
+  status?: string | null;
 }
 
 type ChatListItem =
@@ -244,7 +256,9 @@ const formatTimestamp = (date: Date): string => {
 
 const MESSAGE_CHAR_LIMIT = 5000;
 const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
-const SWIPE_REPLY_THRESHOLD = 32;
+const SWIPE_REPLY_THRESHOLD = 18;
+const MIN_GROUP_MEMBERS = 3;
+const MAX_GROUP_MEMBERS = 10;
 
 
 const layoutNext = () => {
@@ -315,6 +329,9 @@ interface MessageBubbleProps {
   onOpenThread?: (messageId: string) => void;
   isHighlighted?: boolean;
   replyCount?: number;
+  showSenderMetadata?: boolean;
+  onBubblePress?: () => void;
+  onBubbleLongPress?: () => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -329,6 +346,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onOpenThread,
   isHighlighted = false,
   replyCount = 0,
+  showSenderMetadata = false,
+  onBubblePress,
+  onBubbleLongPress,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -453,49 +473,72 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         >
           <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
         </Animated.View>
-        <View style={bubbleStyle}>
-          {message.replyTo && (
-            <Pressable
-              onPress={() => onReplyPress?.(message.replyTo as ReplyMetadata)}
-              style={[styles.replyChip, isMine && styles.replyChipMine]}
-            >
-              <View style={styles.replyChipBar} />
-              <View style={styles.replyChipBody}>
-                <Text style={styles.replyChipLabel} numberOfLines={1}>
-                  {message.replyTo.senderLabel}
-                </Text>
-                {message.replyTo.preview ? (
-                  <Text style={styles.replyChipText} numberOfLines={1}>
-                    {message.replyTo.preview}
+        <Pressable
+          onPress={onBubblePress}
+          onLongPress={onBubbleLongPress}
+          style={[
+            styles.messageContent,
+            isMine ? styles.messageContentMine : styles.messageContentTheirs,
+          ]}
+          delayLongPress={120}
+        >
+          {showSenderMetadata && !isMine ? (
+            <View style={styles.senderMetaRow}>
+              <UserAvatar
+                uri={message.senderAvatar || undefined}
+                name={message.senderName || 'Member'}
+                size={32}
+                style={styles.senderMetaAvatar}
+              />
+              <Text style={styles.senderMetaName} numberOfLines={1}>
+                {message.senderName || 'Member'}
+              </Text>
+            </View>
+          ) : null}
+          <View style={bubbleStyle}>
+            {message.replyTo && (
+              <Pressable
+                onPress={() => onReplyPress?.(message.replyTo as ReplyMetadata)}
+                style={[styles.replyChip, isMine && styles.replyChipMine]}
+              >
+                <View style={styles.replyChipBar} />
+                <View style={styles.replyChipBody}>
+                  <Text style={styles.replyChipLabel} numberOfLines={1}>
+                    {message.replyTo.senderLabel}
                   </Text>
-                ) : null}
+                  {message.replyTo.preview ? (
+                    <Text style={styles.replyChipText} numberOfLines={1}>
+                      {message.replyTo.preview}
+                    </Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            )}
+            <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
+              {message.content}
+            </Text>
+          </View>
+          {statusText && (
+            <Text style={styles.statusText}>{statusText}</Text>
+          )}
+          {replyCount > 0 && onOpenThread && (
+            <Pressable
+              style={[styles.threadSummaryButton, isMine && styles.threadSummaryButtonMine]}
+              onPress={() => onOpenThread(message.id)}
+            >
+              <View style={styles.threadSummaryContent}>
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={14}
+                  color="rgba(255, 255, 255, 0.9)"
+                />
+                <Text style={styles.threadSummaryText}>
+                  {replyCount} {replyCount === 1 ? 'Reply' : 'Replies'}
+                </Text>
               </View>
             </Pressable>
           )}
-          <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
-            {message.content}
-          </Text>
-        </View>
-        {statusText && (
-          <Text style={styles.statusText}>{statusText}</Text>
-        )}
-        {replyCount > 0 && onOpenThread && (
-          <Pressable
-            style={[styles.threadSummaryButton, isMine && styles.threadSummaryButtonMine]}
-            onPress={() => onOpenThread(message.id)}
-          >
-            <View style={styles.threadSummaryContent}>
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={14}
-                color="rgba(255, 255, 255, 0.9)"
-              />
-              <Text style={styles.threadSummaryText}>
-                {replyCount} {replyCount === 1 ? 'Reply' : 'Replies'}
-              </Text>
-            </View>
-          </Pressable>
-        )}
+        </Pressable>
       </Animated.View>
     </>
   );
@@ -550,6 +593,14 @@ const ChatScreen: React.FC = () => {
   const isNearBottomRef = useRef(true);
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
+  const [chatDetails, setChatDetails] = useState<{
+    id: string;
+    isGroup: boolean;
+    ownerId: string | null;
+    name: string | null;
+    avatarUrl: string | null;
+    participants: ChatParticipant[];
+  } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isThreadLoading, setIsThreadLoading] = useState(true);
@@ -566,6 +617,15 @@ const ChatScreen: React.FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showScrollToBottomButton, setShowScrollToBottomButton] = useState(false);
+  const [friendRoster, setFriendRoster] = useState<ChatParticipant[]>([]);
+  const [isFriendRosterLoading, setIsFriendRosterLoading] = useState(false);
+  const [memberPickerVisible, setMemberPickerVisible] = useState(false);
+  const [memberPickerMode, setMemberPickerMode] = useState<'create' | 'add'>('create');
+  const [lockedMemberIds, setLockedMemberIds] = useState<string[]>([]);
+  const [excludedMemberIds, setExcludedMemberIds] = useState<string[]>([]);
+  const [memberPickerError, setMemberPickerError] = useState<string | null>(null);
+  const [memberPickerBusy, setMemberPickerBusy] = useState(false);
+  const participantLookupRef = useRef<Record<string, ChatParticipant>>({});
 
   const handleNavigateBack = useCallback(() => {
     if (threadRootId) {
@@ -606,6 +666,75 @@ const ChatScreen: React.FC = () => {
     [currentUserId, receiverUsername]
   );
 
+  const syncParticipants = useCallback((participants: ChatParticipant[] = []) => {
+    const lookup: Record<string, ChatParticipant> = {};
+    participants.forEach((participant) => {
+      if (!participant || !participant.id) {
+        return;
+      }
+      const key = participant.id?.toString?.() ?? String(participant.id);
+      lookup[key] = {
+        id: key,
+        username: participant.username || `User ${key}`,
+        profile_picture: participant.profile_picture || null,
+        status: participant.status || null,
+      };
+    });
+    participantLookupRef.current = lookup;
+  }, []);
+
+  const applyChatUpdate = useCallback(
+    (nextChat: any) => {
+      if (!nextChat) {
+        return;
+      }
+
+      const normalizedParticipants: ChatParticipant[] = Array.isArray(nextChat.participants)
+        ? (nextChat.participants as any[]).map((participant) => ({
+            id: participant.id?.toString?.() ?? String(participant.id),
+            username: participant.username || participant.email || 'Friend',
+            profile_picture: participant.profile_picture || null,
+            status: participant.status || null,
+          }))
+        : [];
+
+      if (normalizedParticipants.length) {
+        UserCacheService.addUsers(
+          normalizedParticipants.map((participant) => ({
+            ...participant,
+            id: participant.id,
+          })) as any[]
+        );
+      }
+
+      const participantsPayload =
+        normalizedParticipants.length > 0
+          ? normalizedParticipants
+          : (nextChat.participants as ChatParticipant[]) || [];
+      syncParticipants(participantsPayload);
+
+      const updatedUserIds: string[] = Array.isArray(nextChat.userIds)
+        ? nextChat.userIds.map((pid: any) => pid?.toString?.() ?? String(pid))
+        : participantIdsRef.current;
+
+      participantIdsRef.current = updatedUserIds;
+
+      setChatDetails((prev) => ({
+        id: nextChat.id?.toString?.() ?? prev?.id ?? chatId ?? '',
+        isGroup: Boolean(nextChat.isGroup ?? nextChat.is_group ?? prev?.isGroup),
+        ownerId:
+          nextChat.ownerId?.toString?.() ??
+          nextChat.owner_id?.toString?.() ??
+          prev?.ownerId ??
+          null,
+        name: nextChat.name ?? nextChat.displayName ?? prev?.name ?? null,
+        avatarUrl: nextChat.avatarUrl ?? nextChat.avatar_url ?? prev?.avatarUrl ?? null,
+        participants: participantsPayload.length ? participantsPayload : prev?.participants ?? [],
+      }));
+    },
+    [chatId, syncParticipants]
+  );
+
   const resolveReplyMetadata = useCallback(
     (metadata?: ReplyMetadata) => {
       if (!metadata) {
@@ -620,6 +749,24 @@ const ChatScreen: React.FC = () => {
       };
     },
     [getReplyLabel]
+  );
+
+  const resolveSenderProfile = useCallback(
+    (senderId: string | null | undefined) => {
+      if (!senderId) {
+        return { name: 'Member', avatar: null };
+      }
+      const normalized = senderId.toString();
+      if (currentUserId && normalized === currentUserId) {
+        return { name: 'You', avatar: user?.profile_picture || null };
+      }
+      const participant = participantLookupRef.current[normalized];
+      return {
+        name: participant?.username || 'Member',
+        avatar: participant?.profile_picture || null,
+      };
+    },
+    [currentUserId, user?.profile_picture]
   );
 
   const buildReplyPayloadFromMessage = useCallback(
@@ -811,10 +958,13 @@ const ChatScreen: React.FC = () => {
         const serverReply = resolveReplyMetadata((raw as any)?.reply);
         const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
 
+        const senderProfile = resolveSenderProfile(String(senderId));
         results.push({
           id: String(idValue),
           senderId: String(senderId),
           receiverId: String(receiverId),
+          senderName: senderProfile.name,
+          senderAvatar: senderProfile.avatar,
           content: decodedPayload.text,
           timestamp: String(local),
           utcTimestamp: utc,
@@ -831,7 +981,7 @@ const ChatScreen: React.FC = () => {
       }
       return results;
     },
-    [chatId, currentUserId, resolveReplyMetadata]
+    [chatId, currentUserId, resolveReplyMetadata, resolveSenderProfile]
   );
 
   const generatePlaceholderMessages = useCallback(
@@ -843,6 +993,8 @@ const ChatScreen: React.FC = () => {
           id: 'placeholder-1',
           senderId: 'friend',
           receiverId: String(currentUserId ?? 'me'),
+          senderName: friendlyName,
+          senderAvatar: null,
           content: `👋 ${friendlyName} hasn't sent any messages yet, but this space is ready when they do.`,
           timestamp: new Date(now - 60_000).toISOString(),
           isPlaceholder: true,
@@ -851,13 +1003,15 @@ const ChatScreen: React.FC = () => {
           id: 'placeholder-2',
           senderId: String(currentUserId ?? 'me'),
           receiverId: 'friend',
+          senderName: 'You',
+          senderAvatar: user?.profile_picture || null,
           content: 'Start the conversation with a quick hello!',
           timestamp: new Date(now - 30_000).toISOString(),
           isPlaceholder: true,
         },
       ] as Message[];
     },
-    [currentUserId]
+    [currentUserId, user?.profile_picture]
   );
 
   const ensureTypingStopped = useCallback(() => {
@@ -1050,6 +1204,111 @@ const ChatScreen: React.FC = () => {
     await loadMessagesForChat(token, chatId, receiverNameRef.current, otherUserIdRef.current);
   }, [chatId, loadMessagesForChat]);
 
+  const ensureFriendRoster = useCallback(async () => {
+    setIsFriendRosterLoading(true);
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        setFriendRoster([]);
+        return;
+      }
+      const response = await ApiService.get('/user/friends', token);
+      if (response.success && Array.isArray(response.data?.friends)) {
+        const roster = (response.data.friends as any[]).map((friend) => ({
+          id: friend.id?.toString?.() ?? String(friend.id),
+          username: friend.username || friend.email || 'Friend',
+          profile_picture: friend.profile_picture || null,
+          status: friend.status || null,
+        }));
+        setFriendRoster(roster);
+        UserCacheService.addUsers(roster as any[]);
+      }
+    } catch (error) {
+      console.error('Failed to load friend roster:', error);
+    } finally {
+      setIsFriendRosterLoading(false);
+    }
+  }, []);
+
+  const handleOpenMemberPicker = useCallback(
+    async (mode: 'create' | 'add') => {
+      if (mode === 'create' && !otherUserIdRef.current) {
+        NotificationService.show('info', 'Please wait until the chat has loaded');
+        return;
+      }
+      setMemberPickerMode(mode);
+      setMemberPickerError(null);
+      if (!friendRoster.length) {
+        await ensureFriendRoster();
+      }
+
+      if (mode === 'create') {
+        const locked = otherUserIdRef.current ? [otherUserIdRef.current] : [];
+        setLockedMemberIds(locked);
+        setExcludedMemberIds([currentUserId || '', ...locked].filter(Boolean));
+      } else {
+        const excluded = chatDetails?.participants?.map((participant) => participant.id) || [];
+        setLockedMemberIds([]);
+        setExcludedMemberIds([...excluded, currentUserId || ''].filter(Boolean));
+      }
+      setMemberPickerVisible(true);
+    },
+    [chatDetails?.participants, currentUserId, ensureFriendRoster, friendRoster.length]
+  );
+
+  const handleMemberPickerClose = useCallback(() => {
+    setMemberPickerVisible(false);
+    setMemberPickerError(null);
+    setMemberPickerBusy(false);
+  }, []);
+
+  const handleMemberPickerConfirm = useCallback(
+    async (selectedIds: string[]) => {
+      if (!chatId) {
+        return;
+      }
+
+      if (memberPickerMode === 'create') {
+        const combined = new Set<string>(lockedMemberIds);
+        selectedIds.forEach((id) => combined.add(id));
+        const totalParticipants = combined.size + 1;
+        if (totalParticipants < MIN_GROUP_MEMBERS) {
+          setMemberPickerError(`Select at least ${MIN_GROUP_MEMBERS - 1} friends in total`);
+          return;
+        }
+        handleMemberPickerClose();
+        router.push({
+          pathname: '/group/create',
+          params: {
+            members: JSON.stringify(Array.from(combined)),
+            sourceChatId: chatId,
+          },
+        } as any);
+        return;
+      }
+
+      if (!selectedIds.length) {
+        setMemberPickerError('Select at least one friend to add');
+        return;
+      }
+
+      setMemberPickerBusy(true);
+      const response = await ChatService.addMembers(chatId, selectedIds);
+      setMemberPickerBusy(false);
+      if (!response.success) {
+        setMemberPickerError(response.error || 'Failed to add members');
+        return;
+      }
+      if (response.data?.chat) {
+        applyChatUpdate(response.data.chat);
+      }
+      NotificationService.show('success', 'Members added to group');
+      DeviceEventEmitter.emit('chats:refresh');
+      handleMemberPickerClose();
+    },
+    [applyChatUpdate, chatId, handleMemberPickerClose, lockedMemberIds, memberPickerMode]
+  );
+
   const loadChatDetails = useCallback(async () => {
     if (!chatId || !currentUserId) {
       return;
@@ -1070,32 +1329,84 @@ const ChatScreen: React.FC = () => {
       }
 
       const chatData = chatResponse.data.chat;
-      let participantIds: string[] = [];
-      try {
-        const parsed = JSON.parse(chatData.users ?? '[]');
-        participantIds = Array.isArray(parsed) ? parsed.map((pid: any) => pid?.toString?.() ?? String(pid)) : [];
-      } catch {
-        participantIds = [];
-      }
-      participantIdsRef.current = participantIds;
+      const normalizedParticipants: ChatParticipant[] = Array.isArray(chatData.participants)
+        ? (chatData.participants as any[]).map((participant) => ({
+            id: participant.id?.toString?.() ?? String(participant.id),
+            username: participant.username || participant.email || 'Friend',
+            profile_picture: participant.profile_picture || null,
+            status: participant.status || null,
+          }))
+        : [];
 
-      const otherParticipantId =
-        participantIds.find((pid) => pid !== currentUserId) ?? (participantIds.length > 0 ? participantIds[0] : null);
+      if (normalizedParticipants.length) {
+        UserCacheService.addUsers(normalizedParticipants as any[]);
+      }
+      syncParticipants(normalizedParticipants);
+
+      const parsedUserIds: string[] = Array.isArray(chatData.userIds)
+        ? chatData.userIds.map((pid: any) => pid?.toString?.() ?? String(pid))
+        : (() => {
+            try {
+              const parsed = JSON.parse(chatData.users ?? '[]');
+              if (Array.isArray(parsed)) {
+                return parsed.map((pid: any) => pid?.toString?.() ?? String(pid));
+              }
+            } catch (err) {
+              console.warn('chat:parseUsers', 'Failed to parse chat user list', err);
+            }
+            return [];
+          })();
+
+      participantIdsRef.current = parsedUserIds;
+
+      const isGroupChat = Boolean(chatData.isGroup ?? chatData.is_group);
+      const ownerIdValue =
+        chatData.ownerId?.toString?.() ?? chatData.owner_id?.toString?.() ?? null;
+      const avatarUrl = chatData.avatarUrl ?? chatData.avatar_url ?? null;
+
+      let otherParticipantId: string | null = null;
+      let displayName = 'Friend';
+
+      if (isGroupChat) {
+        displayName = chatData.name || chatData.displayName || 'Group chat';
+      } else {
+        if (!normalizedParticipants.length && parsedUserIds.length) {
+          const fallbackId =
+            parsedUserIds.find((pid) => pid !== currentUserId) ?? parsedUserIds[0];
+          if (fallbackId) {
+            const userResponse = await ApiService.getUserById(fallbackId, token);
+            if (userResponse.success && userResponse.data) {
+              normalizedParticipants.push({
+                id: fallbackId,
+                username: userResponse.data.username || userResponse.data.email || 'Friend',
+                profile_picture: userResponse.data.profile_picture || null,
+                status: userResponse.data.status || null,
+              });
+              syncParticipants(normalizedParticipants);
+            }
+          }
+        }
+
+        const counterpart = normalizedParticipants.find(
+          (participant) => participant.id !== currentUserId
+        );
+        otherParticipantId = counterpart?.id ?? null;
+        displayName = counterpart?.username || displayName;
+      }
 
       otherUserIdRef.current = otherParticipantId || null;
-
-      let displayName = 'Friend';
-      if (otherParticipantId) {
-        const userResponse = await ApiService.getUserById(otherParticipantId, token);
-        if (userResponse.success && userResponse.data) {
-          const fetchedUser = userResponse.data;
-          displayName = fetchedUser.username || fetchedUser.email || displayName;
-        }
-      }
-
       receiverNameRef.current = displayName;
       setReceiverUsername(displayName);
       setTypingUserLabel(displayName);
+
+      const chatPayload = {
+        ...chatData,
+        participants: normalizedParticipants,
+        userIds: parsedUserIds,
+        avatarUrl,
+        ownerId: ownerIdValue,
+      };
+      applyChatUpdate(chatPayload);
 
       await loadMessagesForChat(token, chatId, displayName, otherParticipantId);
     } catch (error) {
@@ -1115,6 +1426,8 @@ const ChatScreen: React.FC = () => {
     generatePlaceholderMessages,
     loadMessagesForChat,
     setMessagesAnimated,
+    syncParticipants,
+    applyChatUpdate,
   ]);
 
   const loadEarlier = useCallback(
@@ -1248,6 +1561,8 @@ const ChatScreen: React.FC = () => {
       id: temporaryId,
       senderId: currentUserId,
       receiverId: String(otherUserIdRef.current ?? ''),
+      senderName: user?.username || 'You',
+      senderAvatar: user?.profile_picture || null,
       content: trimmedMessage,
       timestamp: new Date().toISOString(),
       status: 'sending',
@@ -1481,10 +1796,13 @@ const ChatScreen: React.FC = () => {
             const decodedPayload = decodeMessagePayload(decrypted);
             const serverReply = resolveReplyMetadata(payload.reply);
             const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
+            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
             const newEntry: Message = {
               id: String(payload.messageId ?? payload.id ?? Date.now()),
               senderId: String(payload.senderId ?? ''),
               receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
               content: decodedPayload.text,
               timestamp: local,
               utcTimestamp: utc,
@@ -1514,10 +1832,13 @@ const ChatScreen: React.FC = () => {
           const decodedPayload = decodeMessagePayload(payload.content ?? '');
           const serverReply = resolveReplyMetadata(payload.reply);
           const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
+          const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
             senderId: String(payload.senderId ?? ''),
             receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+            senderName: senderProfile.name,
+            senderAvatar: senderProfile.avatar,
             content: decodedPayload.text,
             timestamp: local,
             utcTimestamp: utc,
@@ -1543,6 +1864,20 @@ const ChatScreen: React.FC = () => {
           setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== deletedId));
           return;
         }
+        case 'chat_updated':
+        case 'chat_members_added':
+        case 'chat_members_removed': {
+          if (payload.chat) {
+            applyChatUpdate(payload.chat);
+          }
+          return;
+        }
+        case 'chat_deleted':
+        case 'chat_removed': {
+          NotificationService.show('warning', 'This conversation is no longer available');
+          router.replace('/home');
+          return;
+        }
         default:
           break;
       }
@@ -1555,6 +1890,8 @@ const ChatScreen: React.FC = () => {
       setMessagesAnimated,
       resolveReplyMetadata,
       updateOutgoingStatus,
+      resolveSenderProfile,
+      applyChatUpdate,
     ]
   );
 
@@ -1809,26 +2146,31 @@ const ChatScreen: React.FC = () => {
       const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
       return (
-        <Pressable
-          onPress={() =>
+        <MessageBubble
+          key={messageItem.id}
+          message={messageItem}
+          isMine={isMine}
+          isFirstInGroup={isFirstInGroup}
+          isLastInGroup={isLastInGroup}
+          showStatus={shouldShowStatus}
+          showTimestamp={shouldShowTimestamp}
+          onReplyPress={(reply) => setThreadRootId(reply.messageId)}
+          onReplySwipe={() => {
+            if (messageItem.isPlaceholder) return;
+            setReplyContext(buildReplyPayloadFromMessage(messageItem));
+          }}
+          isHighlighted={highlightedMessageId === messageItem.id}
+          replyCount={replyCount}
+          onOpenThread={(messageId) => setThreadRootId(messageId)}
+          showSenderMetadata={Boolean(chatDetails?.isGroup)}
+          onBubblePress={() =>
             setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
           }
-        >
-          <MessageBubble
-            key={messageItem.id}
-            message={messageItem}
-            isMine={isMine}
-            isFirstInGroup={isFirstInGroup}
-            isLastInGroup={isLastInGroup}
-            showStatus={shouldShowStatus}
-            showTimestamp={shouldShowTimestamp}
-            onReplyPress={(reply) => setThreadRootId(reply.messageId)}
-            onReplySwipe={() => setReplyContext(buildReplyPayloadFromMessage(messageItem))}
-            isHighlighted={highlightedMessageId === messageItem.id}
-            replyCount={replyCount}
-            onOpenThread={(messageId) => setThreadRootId(messageId)}
-          />
-        </Pressable>
+          onBubbleLongPress={() => {
+            if (messageItem.isPlaceholder) return;
+            setReplyContext(buildReplyPayloadFromMessage(messageItem));
+          }}
+        />
       );
     },
     [
@@ -1840,6 +2182,7 @@ const ChatScreen: React.FC = () => {
       lastOutgoingMessageId,
       timestampVisibleFor,
       typingUserLabel,
+      chatDetails?.isGroup,
     ]
   );
 
@@ -1870,6 +2213,30 @@ const ChatScreen: React.FC = () => {
   }, [insets.bottom, isKeyboardVisible]);
   const sendButtonDisabled = isComposerEmpty || isSendingMessage;
 
+  const isGroupChat = Boolean(chatDetails?.isGroup);
+  const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
+  const shouldShowAddButton = isGroupChat ? isGroupOwner : Boolean(otherUserIdRef.current);
+  const addButtonMode: 'create' | 'add' = isGroupChat ? 'add' : 'create';
+  const receiverPresenceLabel = useMemo(() => {
+    if (!chatDetails || chatDetails.isGroup) {
+      return null;
+    }
+    const counterpart = chatDetails.participants?.find(
+      (participant) => participant.id !== currentUserId
+    );
+    if (!counterpart?.status) {
+      return null;
+    }
+    const normalized = String(counterpart.status).toLowerCase();
+    if (normalized === 'online') {
+      return 'Online';
+    }
+    if (normalized === 'away') {
+      return 'Away';
+    }
+    return 'Offline';
+  }, [chatDetails, currentUserId]);
+
   if (!chatId) {
     return (
       <SafeAreaView style={styles.fallbackContainer}>
@@ -1899,10 +2266,26 @@ const ChatScreen: React.FC = () => {
         <Pressable onPress={handleNavigateBack} style={styles.headerButton} accessibilityRole="button">
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {receiverUsername}
-        </Text>
-        <View style={styles.headerButtonPlaceholder} />
+        <View style={styles.headerTitleWrapper}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {receiverUsername}
+          </Text>
+          {!isGroupChat && receiverPresenceLabel ? (
+            <Text style={styles.presenceLabel}>{receiverPresenceLabel}</Text>
+          ) : null}
+        </View>
+        {shouldShowAddButton ? (
+          <Pressable
+            onPress={() => handleOpenMemberPicker(addButtonMode)}
+            style={styles.headerActionButton}
+            accessibilityRole="button"
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFFFFF" />
+            <Ionicons name="add" size={12} color="#FFFFFF" style={styles.headerActionAdd} />
+          </Pressable>
+        ) : (
+          <View style={styles.headerButtonPlaceholder} />
+        )}
       </View>
 
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -2093,6 +2476,21 @@ const ChatScreen: React.FC = () => {
         </View>
       </KeyboardAvoidingView>
         </TouchableWithoutFeedback>
+      <GroupMemberPicker
+        visible={memberPickerVisible}
+        title={memberPickerMode === 'create' ? 'Create a group chat' : 'Add members'}
+        friends={friendRoster}
+        lockedIds={lockedMemberIds}
+        excludedIds={excludedMemberIds}
+        minimumTotal={memberPickerMode === 'create' ? MIN_GROUP_MEMBERS : 2}
+        maxTotal={MAX_GROUP_MEMBERS}
+        mode={memberPickerMode}
+        isLoading={isFriendRosterLoading}
+        isSubmitting={memberPickerBusy}
+        errorMessage={memberPickerError}
+        onClose={handleMemberPickerClose}
+        onConfirm={handleMemberPickerConfirm}
+      />
       <Modal
         visible={Boolean(threadRootId)}
         transparent
@@ -2180,6 +2578,23 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
   },
+  headerTitleWrapper: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerActionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActionAdd: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+  },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
@@ -2187,6 +2602,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     letterSpacing: 0.2,
+  },
+  presenceLabel: {
+    marginTop: 2,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -2265,6 +2685,29 @@ const styles = StyleSheet.create({
   },
   theirBubbleLast: {
     borderBottomLeftRadius: 22,
+  },
+  messageContent: {
+    flexShrink: 1,
+    maxWidth: '90%',
+  },
+  messageContentMine: {
+    alignItems: 'flex-end',
+  },
+  messageContentTheirs: {
+    alignItems: 'flex-start',
+  },
+  senderMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  senderMetaAvatar: {
+    marginRight: 8,
+  },
+  senderMetaName: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 12,
+    fontWeight: '600',
   },
   placeholderBubble: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',

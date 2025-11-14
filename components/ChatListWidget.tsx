@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,8 +23,13 @@ interface Chat {
   users: string; // JSON string of user IDs
   created_at: string;
   updated_at: string;
-  // Additional properties that might be populated
+  isGroup?: boolean;
+  name?: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  ownerId?: string | null;
   participants?: User[];
+  // Additional properties that might be populated
   lastMessage?: {
     id: string;
     content: string;
@@ -50,6 +55,8 @@ interface ChatListWidgetProps {
   onRemoveFriend: (friendId: string) => void;
   removingFriendId?: string | null;
   unreadCounts?: Record<string, number>;
+  onEditGroup?: (chat: Chat) => void;
+  onDeleteGroup?: (chat: Chat) => void;
 }
 
 export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
@@ -60,6 +67,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   onRemoveFriend,
   removingFriendId = null,
   unreadCounts = {},
+  onEditGroup = () => {},
+  onDeleteGroup = () => {},
 }) => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,7 +82,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     if (chats.length > 0 && currentUserId) {
       fetchUserDetails();
     }
-  }, [chats, currentUserId]);
+  }, [chats, currentUserId, fetchUserDetails]);
 
   const getCurrentUserId = async () => {
     try {
@@ -89,7 +98,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     }
   };
 
-  const fetchUserDetails = async () => {
+  const fetchUserDetails = useCallback(async () => {
     try {
       const token = await StorageService.getAuthToken();
       if (!token) return;
@@ -137,7 +146,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     } catch (error) {
       console.log('❌ Error fetching user details:', error);
     }
-  };
+  }, [chats, currentUserId, userDetails]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -171,6 +180,28 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     return 'Loading...';
   };
 
+  const getGroupDisplayName = (chat: Chat): string => {
+    return chat.name || chat.displayName || 'Group chat';
+  };
+
+  const getGroupSubtitle = (chat: Chat): string => {
+    if (!Array.isArray(chat.participants) || !chat.participants.length) {
+      return '';
+    }
+
+    const names = chat.participants
+      .filter((participant) => participant.id?.toString?.() !== currentUserId)
+      .map((participant) => participant.username || participant.email || 'Member');
+
+    const visible = names.slice(0, 3);
+    let label = visible.join(', ');
+    const remaining = names.length - visible.length;
+    if (remaining > 0) {
+      label = `${label} +${remaining}`;
+    }
+    return label;
+  };
+
   const handleChatPress = (chat: Chat) => {
     router.push({
       pathname: '/chat/[id]',
@@ -179,6 +210,27 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   };
 
   const handleChatLongPress = (chat: Chat) => {
+    if (chat.isGroup) {
+      const ownerId = chat.ownerId?.toString?.();
+      if (!ownerId || ownerId !== currentUserId) {
+        return;
+      }
+      Alert.alert(
+        'Group Options',
+        getGroupDisplayName(chat),
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Edit group', onPress: () => onEditGroup(chat) },
+          {
+            text: 'Delete group',
+            style: 'destructive',
+            onPress: () => onDeleteGroup(chat),
+          },
+        ],
+      );
+      return;
+    }
+
     const otherUserId = getOtherUserId(chat);
     if (!otherUserId) return;
 
@@ -202,8 +254,9 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   };
 
   const renderChatItem = ({ item: chat }: { item: Chat }) => {
-    const displayName = getChatDisplayName(chat);
-    const otherUserId = getOtherUserId(chat);
+    const isGroupChat = Boolean(chat.isGroup);
+    const displayName = isGroupChat ? getGroupDisplayName(chat) : getChatDisplayName(chat);
+    const otherUserId = isGroupChat ? null : getOtherUserId(chat);
     const cachedUser = otherUserId ? userDetails[otherUserId] : null;
     const statusValueRaw =
       otherUserId && userStatuses[otherUserId]
@@ -212,11 +265,18 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const normalizedStatus = statusValueRaw
       ? String(statusValueRaw).toLowerCase()
       : 'offline';
-    const isUserOnline = normalizedStatus === 'online';
-    const isRemoving = removingFriendId === otherUserId;
+    const isUserOnline = !isGroupChat && normalizedStatus === 'online';
+    const isRemoving = !isGroupChat && removingFriendId === otherUserId;
     const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
     const unread = unreadCounts[chatIdKey] || 0;
     const hasUnread = unread > 0;
+    const avatarUri = isGroupChat
+      ? chat.avatarUrl || undefined
+      : otherUserId
+        ? userDetails[otherUserId]?.profile_picture
+        : undefined;
+    const groupSubtitle = isGroupChat ? getGroupSubtitle(chat) : null;
+    const presenceValue = isGroupChat ? undefined : (isUserOnline ? 'online' : 'offline');
 
     return (
       <TouchableOpacity 
@@ -228,10 +288,10 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       >
         <View style={[styles.chatCard, hasUnread && styles.chatCardUnread]}>
           <UserAvatar
-            uri={otherUserId ? userDetails[otherUserId]?.profile_picture : undefined}
+            uri={avatarUri}
             name={displayName}
             size={56}
-            presence={isUserOnline ? 'online' : 'offline'}
+            presence={presenceValue}
             presencePlacement="overlay"
             style={styles.avatarContainer}
           />
@@ -245,6 +305,11 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
                 </View>
               )}
             </View>
+            {groupSubtitle ? (
+              <Text style={styles.chatSubtitle} numberOfLines={1}>
+                {groupSubtitle}
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.rightColumn}>
@@ -334,6 +399,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 2,
+  },
+  chatSubtitle: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 13,
   },
   chatUnreadPill: {
     backgroundColor: '#1E84FF',

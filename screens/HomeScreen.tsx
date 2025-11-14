@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  Alert,
   DeviceEventEmitter,
   Platform,
   StatusBar,
@@ -22,6 +23,7 @@ import { FriendSearchWidget } from '../components/FriendSearchWidget';
 import { GlassCard } from '../components/GlassCard';
 import { UserAvatar } from '../components/UserAvatar';
 import { ApiService } from '../services/ApiService';
+import { ChatService } from '../services/ChatService';
 import { NotificationService } from '../services/NotificationService';
 import { PushService } from '../services/PushService';
 import { StorageService } from '../services/StorageService';
@@ -229,6 +231,18 @@ export const HomeScreen: React.FC = () => {
         if (response.success && response.data) {
           // API returns { chats: [...] } according to documentation
           setChats(response.data.chats || []);
+          if (Array.isArray(response.data.chats)) {
+            response.data.chats.forEach((chat: any) => {
+              if (Array.isArray(chat.participants)) {
+                UserCacheService.addUsers(
+                  chat.participants.map((participant: any) => ({
+                    ...participant,
+                    id: participant.id?.toString?.() ?? String(participant.id),
+                  }))
+                );
+              }
+            });
+          }
         } else {
           console.warn('loadChats: failed to fetch chats:', response.error);
         }
@@ -543,6 +557,45 @@ export const HomeScreen: React.FC = () => {
     WebSocketService.getInstance().refreshFriendsStatus();
   }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
 
+  const handleEditGroup = useCallback(
+    (chat: any) => {
+      if (!chat?.id) return;
+      router.push({
+        pathname: '/group/[id]/edit',
+        params: { id: chat.id?.toString?.() ?? String(chat.id) },
+      } as any);
+    },
+    [router]
+  );
+
+  const handleDeleteGroup = useCallback(
+    (chat: any) => {
+      if (!chat?.id) return;
+      Alert.alert(
+        'Delete group',
+        `Are you sure you want to delete ${chat.name || 'this group'}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              const response = await ChatService.deleteGroup(chat.id?.toString?.() ?? String(chat.id));
+              if (response.success) {
+                NotificationService.show('success', 'Group deleted');
+                DeviceEventEmitter.emit('chats:refresh');
+                loadChats();
+              } else {
+                NotificationService.show('error', response.error || 'Failed to delete group');
+              }
+            },
+          },
+        ]
+      );
+    },
+    [loadChats]
+  );
+
   const handleRespondToRequest = useCallback(async (friendId: string, action: 'accept' | 'reject', options?: { notificationId?: string }) => {
     try {
       setRequestProcessingId(friendId);
@@ -642,6 +695,15 @@ export const HomeScreen: React.FC = () => {
     };
   }, [loadUnreadSummary]);
 
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('chats:refresh', () => {
+      loadChats();
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [loadChats]);
+
   const handleRealtimeMessage = useCallback((message: WebSocketMessage) => {
     if (!message || !message.type) {
       return;
@@ -688,6 +750,15 @@ export const HomeScreen: React.FC = () => {
       case 'friend_removed': {
         NotificationService.show('info', `${friendName} removed you as a friend`);
         handleFriendStateChanged();
+        break;
+      }
+      case 'chat_group_created':
+      case 'chat_updated':
+      case 'chat_members_added':
+      case 'chat_members_removed':
+      case 'chat_deleted':
+      case 'chat_removed': {
+        loadChats();
         break;
       }
       case 'message_envelope':
@@ -887,6 +958,8 @@ export const HomeScreen: React.FC = () => {
               onRemoveFriend={handleRemoveFriend}
               removingFriendId={removingFriendId}
               unreadCounts={chatUnreadCounts}
+              onEditGroup={handleEditGroup}
+              onDeleteGroup={handleDeleteGroup}
             />
           </View>
         </SafeAreaView>

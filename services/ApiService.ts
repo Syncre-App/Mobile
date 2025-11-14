@@ -192,15 +192,16 @@ export class ApiService {
 
   static async upload<T = any>(endpoint: string, formData: FormData, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {};
+      const headerRecord: Record<string, string> = {};
+      TimezoneService.applyHeader(headerRecord);
 
       if (token) {
-        headers.Authorization = `Bearer ${token}`;
+        headerRecord.Authorization = `Bearer ${token}`;
       }
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'POST',
-        headers,
+        headers: headerRecord as HeadersInit,
         body: formData,
       });
 
