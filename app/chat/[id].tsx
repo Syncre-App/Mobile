@@ -1783,7 +1783,7 @@ const ChatScreen: React.FC = () => {
       }
       const document: any =
         (pickerResult.assets && pickerResult.assets[0]) ||
-        (pickerResult.type === 'success' ? pickerResult : null);
+        ((pickerResult as any)?.uri ? (pickerResult as any) : null);
       if (!document?.uri) {
         NotificationService.show('error', 'Unable to read the selected file');
         return;
