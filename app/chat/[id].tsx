@@ -2077,18 +2077,21 @@ const ChatScreen: React.FC = () => {
           }
         );
       } else {
-        Alert.alert(
-          'Message options',
-          undefined,
-          actions
-            .filter((action) => action.label !== 'Cancel')
-            .map((action) => ({
-              text: action.label,
-              onPress: action.onPress,
-              style: action.destructive ? 'destructive' : 'default',
-            }))
-            .concat([{ text: 'Cancel', style: 'cancel' }])
-        );
+        const alertButtons = actions
+          .filter((action) => action.label !== 'Cancel')
+          .map((action) => ({
+            text: action.label,
+            onPress: action.onPress,
+            style: (action.destructive ? 'destructive' : 'default') as 'destructive' | 'default',
+          }));
+
+        alertButtons.push({
+          text: 'Cancel',
+          onPress: () => {},
+          style: 'cancel' as 'cancel',
+        });
+
+        Alert.alert('Message options', undefined, alertButtons);
       }
     },
     [buildReplyPayloadFromMessage, confirmDeleteMessage, currentUserId, startEditMessage]
