@@ -2576,11 +2576,11 @@ const [messageActionContext, setMessageActionContext] = useState<{
         return;
       }
       try {
-        await Share.share({
-          url: target,
-          title: attachment.name,
-          message: target,
-        });
+        const payload =
+          Platform.OS === 'ios'
+            ? { url: target, title: attachment.name }
+            : { url: target, title: attachment.name, message: target };
+        await Share.share(payload);
       } catch (error) {
         console.error('Failed to share attachment', error);
         NotificationService.show('error', 'Unable to share this file');
