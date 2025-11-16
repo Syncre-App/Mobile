@@ -870,17 +870,19 @@ const ChatScreen: React.FC = () => {
   const isNearBottomRef = useRef(true);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [attachmentPickerBusy, setAttachmentPickerBusy] = useState(false);
-  const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
-  const previewListRef = useRef<FlatList<MessageAttachment>>(null);
-  const [previewIndex, setPreviewIndex] = useState(0);
-  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
-  const [messageActionContext, setMessageActionContext] = useState<{
+const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
+const previewListRef = useRef<FlatList<MessageAttachment>>(null);
+const [previewIndex, setPreviewIndex] = useState(0);
+const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+const [messageActionContext, setMessageActionContext] = useState<{
     message: Message;
     actions: Array<{ label: string; onPress: () => void; destructive?: boolean }>;
     anchorY: number;
   } | null>(null);
   const messageActionAnim = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
+  const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
   const messageActionAnchorTop = useMemo(() => {
     if (!messageActionContext) {
       return 0;
@@ -921,6 +923,18 @@ const ChatScreen: React.FC = () => {
   }, [messageActionAnim, messageActionContext]);
 
   useEffect(() => {
+    if (attachmentSheetVisible) {
+      attachmentSheetAnim.setValue(0);
+      Animated.spring(attachmentSheetAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 90,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [attachmentSheetAnim, attachmentSheetVisible]);
+
+  useEffect(() => {
     if (previewContext && previewContext.attachments.length) {
       const nextIndex = Math.min(
         Math.max(previewContext.index, 0),
@@ -940,6 +954,16 @@ const ChatScreen: React.FC = () => {
     ? previewContext.attachments[Math.min(previewIndex, previewContext.attachments.length - 1)]
     : null;
   const handleClosePreview = useCallback(() => setPreviewContext(null), []);
+
+  const closeAttachmentSheet = useCallback(() => {
+    Animated.timing(attachmentSheetAnim, {
+      toValue: 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start(() => {
+      setAttachmentSheetVisible(false);
+    });
+  }, [attachmentSheetAnim]);
 
   const handleMessageActionSelect = useCallback(
     (action: { label: string; onPress: () => void }) => {
@@ -2036,6 +2060,7 @@ const ChatScreen: React.FC = () => {
   );
 
   const handlePickDocument = useCallback(async () => {
+    closeAttachmentSheet();
     try {
       const pickerResult = await DocumentPicker.getDocumentAsync({
         multiple: true,
@@ -2072,6 +2097,7 @@ const ChatScreen: React.FC = () => {
   }, [handleUploadBatch]);
 
   const handlePickPhoto = useCallback(async () => {
+    closeAttachmentSheet();
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (permission.status !== 'granted') {
@@ -2104,7 +2130,41 @@ const ChatScreen: React.FC = () => {
     }
   }, [handleUploadBatch]);
 
-  const handleAttachmentPicker = useCallback(() => {
+  const handlePickVideo = useCallback(async () => {
+    closeAttachmentSheet();
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.status !== 'granted') {
+        NotificationService.show('warning', 'Video access is required to send clips');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsMultipleSelection: true,
+        quality: 1,
+      });
+      if (result.canceled) {
+        return;
+      }
+
+      const files: UploadableAsset[] = (result.assets || [])
+        .filter((asset) => asset?.uri)
+        .map((asset) => ({
+          uri: asset.uri,
+          name: asset.fileName || `video-${Date.now()}.mp4`,
+          type: asset.mimeType || 'video/mp4',
+          size: asset.fileSize,
+        }));
+
+      await handleUploadBatch(files);
+    } catch (error) {
+      console.error('Video picker failed:', error);
+      NotificationService.show('error', 'Unable to add this video');
+    }
+  }, [handleUploadBatch, closeAttachmentSheet]);
+
+  const handleAttachmentTrigger = useCallback(() => {
     if (!chatId) {
       NotificationService.show('error', 'This conversation is not available');
       return;
@@ -2113,12 +2173,12 @@ const ChatScreen: React.FC = () => {
       NotificationService.show('info', 'Please wait for the current upload to complete');
       return;
     }
-    Alert.alert('Add attachment', 'Choose what to share', [
-      { text: 'Photo', onPress: () => handlePickPhoto() },
-      { text: 'File', onPress: () => handlePickDocument() },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, [attachmentPickerBusy, chatId, handlePickDocument, handlePickPhoto]);
+    if (pendingAttachments.length >= MAX_PENDING_ATTACHMENTS) {
+      NotificationService.show('warning', `You can attach up to ${MAX_PENDING_ATTACHMENTS} items per message`);
+      return;
+    }
+    setAttachmentSheetVisible(true);
+  }, [attachmentPickerBusy, chatId, pendingAttachments.length]);
 
   const handleRemoveAttachment = useCallback(
     async (attachmentId: string) => {
@@ -3482,7 +3542,7 @@ const ChatScreen: React.FC = () => {
 
         <View style={[styles.inputContainer, { paddingBottom: composerBottomPadding }]}>
           <Pressable
-            onPress={handleAttachmentPicker}
+            onPress={handleAttachmentTrigger}
             style={[
               styles.attachButton,
               (attachmentPickerBusy || Boolean(editingMessage)) && styles.attachButtonDisabled,
@@ -3736,6 +3796,62 @@ const ChatScreen: React.FC = () => {
                 </Pressable>
               ))}
             </View>
+          </Animated.View>
+        </Animated.View>
+      ) : null}
+      {attachmentSheetVisible ? (
+        <Animated.View
+          style={[styles.messageActionOverlay, { opacity: attachmentSheetAnim }]}
+          pointerEvents="box-none"
+        >
+          <Pressable style={styles.messageActionBackdrop} onPress={closeAttachmentSheet} />
+          <Animated.View
+            style={[
+              styles.attachmentSheet,
+              {
+                transform: [
+                  {
+                    translateY: attachmentSheetAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [40, 0],
+                    }),
+                  },
+                ],
+                opacity: attachmentSheetAnim,
+              },
+            ]}
+          >
+            <Text style={styles.attachmentSheetTitle}>Add attachment</Text>
+            <Pressable
+              style={styles.attachmentSheetButton}
+              onPress={handlePickPhoto}
+            >
+              <Ionicons name="images-outline" size={18} color="#ffffff" />
+              <View style={styles.attachmentSheetLabelColumn}>
+                <Text style={styles.attachmentSheetButtonLabel}>Photos</Text>
+                <Text style={styles.attachmentSheetButtonHint}>Camera roll</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={styles.attachmentSheetButton}
+              onPress={handlePickVideo}
+            >
+              <Ionicons name="videocam-outline" size={18} color="#ffffff" />
+              <View style={styles.attachmentSheetLabelColumn}>
+                <Text style={styles.attachmentSheetButtonLabel}>Videos</Text>
+                <Text style={styles.attachmentSheetButtonHint}>Gallery clips</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={styles.attachmentSheetButton}
+              onPress={handlePickDocument}
+            >
+              <Ionicons name="document-text-outline" size={18} color="#ffffff" />
+              <View style={styles.attachmentSheetLabelColumn}>
+                <Text style={styles.attachmentSheetButtonLabel}>Files</Text>
+                <Text style={styles.attachmentSheetButtonHint}>Browse documents</Text>
+              </View>
+            </Pressable>
           </Animated.View>
         </Animated.View>
       ) : null}
@@ -4573,6 +4689,44 @@ const styles = StyleSheet.create({
   },
   messageActionButtonTextDestructive: {
     color: '#FF5C5C',
+  },
+  attachmentSheet: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 24,
+    borderRadius: 20,
+    backgroundColor: '#0B1023',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  attachmentSheetTitle: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginTop: 4,
+  },
+  attachmentSheetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  attachmentSheetLabelColumn: {
+    flex: 1,
+  },
+  attachmentSheetButtonLabel: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  attachmentSheetButtonHint: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
   },
   scrollToBottomButton: {
     position: 'absolute',
