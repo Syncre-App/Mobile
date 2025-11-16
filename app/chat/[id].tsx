@@ -6,6 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 
 import { useAuth } from '../../hooks/useAuth';
@@ -17,7 +18,7 @@ import { DeviceService } from '../../services/DeviceService';
 import { WebSocketMessage, WebSocketService } from '../../services/WebSocketService';
 import { UserCacheService } from '../../services/UserCacheService';
 import { TimezoneService } from '../../services/TimezoneService';
-import { ChatService } from '../../services/ChatService';
+import { ChatService, type UploadableAsset } from '../../services/ChatService';
 import { GroupMemberPicker } from '../../components/GroupMemberPicker';
 import { UserAvatar } from '../../components/UserAvatar';
 
@@ -43,6 +44,8 @@ interface MessageAttachment {
   isImage: boolean;
   previewUrl?: string;
   downloadUrl?: string;
+  publicViewUrl?: string;
+  publicDownloadUrl?: string;
 }
 
 interface Message {
@@ -82,6 +85,7 @@ type ChatListItem =
   | { kind: 'typing'; id: string };
 
 const MESSAGE_PAYLOAD_VERSION = 1;
+const API_ROOT = ApiService.baseUrl.replace(/\/v1\/?$/i, '');
 const ATTACHMENT_STATUS_MAP: Record<string, 'pending' | 'active' | 'expired'> = {
   pending: 'pending',
   active: 'active',
@@ -96,7 +100,7 @@ const buildAbsoluteUrl = (pathValue?: string | null): string | undefined => {
     return pathValue;
   }
   const normalized = pathValue.startsWith('/') ? pathValue : `/${pathValue}`;
-  return `${ApiService.baseUrl}${normalized}`;
+  return `${API_ROOT}${normalized}`;
 };
 
 const formatBytes = (size: number): string => {
@@ -116,8 +120,10 @@ const mapServerAttachment = (raw: any): MessageAttachment => ({
   fileSize: Number(raw.fileSize) || 0,
   status: ATTACHMENT_STATUS_MAP[String(raw.status)] ?? 'active',
   isImage: Boolean(raw.isImage),
-  previewUrl: buildAbsoluteUrl(raw.previewPath),
-  downloadUrl: buildAbsoluteUrl(raw.downloadPath),
+  previewUrl: buildAbsoluteUrl(raw.publicViewPath || raw.previewPath),
+  downloadUrl: buildAbsoluteUrl(raw.downloadPath || raw.publicDownloadPath),
+  publicViewUrl: buildAbsoluteUrl(raw.publicViewPath),
+  publicDownloadUrl: buildAbsoluteUrl(raw.publicDownloadPath),
 });
 
 const mapServerAttachments = (raw?: any): MessageAttachment[] => {
@@ -570,6 +576,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     showStatus && message.status
       ? formatStatusLabel(message.status)
       : null;
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const hasAttachments = attachments.length > 0;
+  const multipleAttachments = attachments.length > 1;
 
   return (
     <>
@@ -638,18 +647,29 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 </View>
               </Pressable>
             )}
-            {Array.isArray(message.attachments) && message.attachments.length > 0 ? (
-              <View style={styles.attachmentGroup}>
-                {message.attachments.map((attachment) => {
+            {hasAttachments ? (
+              <View
+                style={[
+                  styles.attachmentGroup,
+                  isMine ? styles.attachmentGroupMine : styles.attachmentGroupTheirs,
+                ]}
+              >
+                {attachments.map((attachment) => {
                   const isExpired = attachment.status === 'expired';
                   const isPreviewable = attachment.isImage && attachment.previewUrl;
+                  const cardStyles = [
+                    styles.attachmentCard,
+                    isPreviewable ? styles.attachmentImageCard : styles.attachmentFileCard,
+                  ];
+                  if (isPreviewable) {
+                    cardStyles.push(
+                      multipleAttachments ? styles.attachmentImageCardCompact : styles.attachmentImageCardLarge
+                    );
+                  }
                   return (
                     <Pressable
                       key={`${message.id}-attachment-${attachment.id}`}
-                      style={[
-                        styles.attachmentCard,
-                        isPreviewable ? styles.attachmentImageCard : styles.attachmentFileCard,
-                      ]}
+                      style={cardStyles}
                       onPress={() => !isExpired && onAttachmentPress?.(attachment)}
                       disabled={isExpired}
                     >
@@ -1823,12 +1843,37 @@ const ChatScreen: React.FC = () => {
     [chatId, wsService]
   );
 
-  const handleAttachmentPicker = useCallback(async () => {
-    if (!chatId || attachmentPickerBusy) {
-      return;
-    }
+  const uploadSelectedAttachment = useCallback(
+    async (file: UploadableAsset) => {
+      if (!chatId) {
+        NotificationService.show('error', 'This conversation is not available');
+        return;
+      }
+      if (attachmentPickerBusy) {
+        NotificationService.show('info', 'Please wait for the current upload to complete');
+        return;
+      }
+      try {
+        setAttachmentPickerBusy(true);
+        const response = await ChatService.uploadAttachment(chatId, file);
+        if (!response.success || !response.data?.attachment) {
+          NotificationService.show('error', response.error || 'Failed to upload attachment');
+          return;
+        }
+        const mapped = mapServerAttachment(response.data.attachment);
+        setPendingAttachments((prev) => [...prev, mapped]);
+      } catch (error) {
+        console.error('Attachment upload failed:', error);
+        NotificationService.show('error', 'Unable to upload attachment');
+      } finally {
+        setAttachmentPickerBusy(false);
+      }
+    },
+    [attachmentPickerBusy, chatId]
+  );
+
+  const handlePickDocument = useCallback(async () => {
     try {
-      setAttachmentPickerBusy(true);
       const pickerResult = await DocumentPicker.getDocumentAsync({
         multiple: false,
         copyToCacheDirectory: true,
@@ -1845,36 +1890,71 @@ const ChatScreen: React.FC = () => {
         return;
       }
 
-      const uploadResponse = await ChatService.uploadAttachment(
-        chatId,
-        {
-          uri: document.uri,
-          name: document.name || `upload-${Date.now()}`,
-          type: document.mimeType || document.type || 'application/octet-stream',
-        },
-        authTokenRef.current || undefined
-      );
+      await uploadSelectedAttachment({
+        uri: document.uri,
+        name: document.name || `upload-${Date.now()}`,
+        type: document.mimeType || document.type || 'application/octet-stream',
+      });
+    } catch (error) {
+      console.error('Document picker failed:', error);
+      NotificationService.show('error', 'Unable to add this file');
+    }
+  }, [uploadSelectedAttachment]);
 
-      if (!uploadResponse.success || !uploadResponse.data?.attachment) {
-        NotificationService.show('error', uploadResponse.error || 'Failed to upload file');
+  const handlePickPhoto = useCallback(async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.status !== 'granted') {
+        NotificationService.show('warning', 'Photo access is required to send images');
         return;
       }
 
-      const mapped = mapServerAttachment(uploadResponse.data.attachment);
-      setPendingAttachments((prev) => [...prev, mapped]);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+        allowsMultipleSelection: false,
+      });
+      if (result.canceled) {
+        return;
+      }
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        NotificationService.show('error', 'Unable to read the selected image');
+        return;
+      }
+
+      await uploadSelectedAttachment({
+        uri: asset.uri,
+        name: asset.fileName || `photo-${Date.now()}.jpg`,
+        type: asset.mimeType || 'image/jpeg',
+      });
     } catch (error) {
-      console.error('Attachment picker failed:', error);
-      NotificationService.show('error', 'Unable to add this file');
-    } finally {
-      setAttachmentPickerBusy(false);
+      console.error('Image picker failed:', error);
+      NotificationService.show('error', 'Unable to add this photo');
     }
-  }, [attachmentPickerBusy, chatId]);
+  }, [uploadSelectedAttachment]);
+
+  const handleAttachmentPicker = useCallback(() => {
+    if (!chatId) {
+      NotificationService.show('error', 'This conversation is not available');
+      return;
+    }
+    if (attachmentPickerBusy) {
+      NotificationService.show('info', 'Please wait for the current upload to complete');
+      return;
+    }
+    Alert.alert('Add attachment', 'Choose what to share', [
+      { text: 'Photo', onPress: () => handlePickPhoto() },
+      { text: 'File', onPress: () => handlePickDocument() },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [attachmentPickerBusy, chatId, handlePickDocument, handlePickPhoto]);
 
   const handleRemoveAttachment = useCallback(
     async (attachmentId: string) => {
       setPendingAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId));
       try {
-        await ChatService.deleteAttachment(attachmentId, authTokenRef.current || undefined);
+        await ChatService.deleteAttachment(attachmentId);
       } catch (error) {
         console.error('Failed to remove attachment', error);
       }
@@ -2057,22 +2137,32 @@ const ChatScreen: React.FC = () => {
       if (!attachment) {
         return;
       }
-      handleOpenLink(attachment.downloadUrl || attachment.previewUrl);
+      const target =
+        attachment.publicDownloadUrl ||
+        attachment.downloadUrl ||
+        attachment.publicViewUrl ||
+        attachment.previewUrl;
+      if (!target) {
+        NotificationService.show('error', 'Download is not available for this file');
+        return;
+      }
+      handleOpenLink(target);
     },
     [handleOpenLink]
   );
 
   const handleShareAttachment = useCallback(
     async (attachment?: MessageAttachment | null) => {
-      if (!attachment?.downloadUrl) {
-        NotificationService.show('error', 'Download is not available for this file');
+      const target = attachment?.publicDownloadUrl || attachment?.downloadUrl;
+      if (!attachment || !target) {
+        NotificationService.show('error', 'Share link is not available for this file');
         return;
       }
       try {
         await Share.share({
-          url: attachment.downloadUrl,
+          url: target,
           title: attachment.name,
-          message: attachment.downloadUrl,
+          message: target,
         });
       } catch (error) {
         console.error('Failed to share attachment', error);
@@ -3311,9 +3401,10 @@ const ChatScreen: React.FC = () => {
                 <Ionicons name="close" size={18} color="#ffffff" />
               </Pressable>
             </View>
-            {previewAttachment?.isImage && previewAttachment.previewUrl ? (
+            {previewAttachment?.isImage &&
+            (previewAttachment.previewUrl || previewAttachment.publicViewUrl) ? (
               <Image
-                source={{ uri: previewAttachment.previewUrl }}
+                source={{ uri: previewAttachment.previewUrl || previewAttachment.publicViewUrl }}
                 style={styles.attachmentModalImage}
                 contentFit="contain"
               />
@@ -3891,19 +3982,38 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   attachmentGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: 8,
     rowGap: 8,
+    width: '100%',
+    marginTop: 6,
+  },
+  attachmentGroupMine: {
+    justifyContent: 'flex-end',
+  },
+  attachmentGroupTheirs: {
+    justifyContent: 'flex-start',
   },
   attachmentCard: {
     borderRadius: 18,
     overflow: 'hidden',
-    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   attachmentImageCard: {
-    width: 220,
-    height: 160,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  attachmentImageCardLarge: {
+    width: 240,
+    height: 200,
+  },
+  attachmentImageCardCompact: {
+    width: 150,
+    height: 150,
   },
   attachmentFileCard: {
-    padding: 10,
+    padding: 12,
+    minWidth: 200,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   attachmentImage: {
