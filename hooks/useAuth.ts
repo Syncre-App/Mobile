@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { CryptoService } from '../services/CryptoService';
+import { LocationSyncService } from '../services/LocationSyncService';
+import { TimezoneService } from '../services/TimezoneService';
 
 export interface AuthUser {
   id: string;
@@ -32,6 +34,7 @@ export const useAuth = (): UseAuthResult => {
   const refreshUser = useCallback(async () => {
     try {
       setIsLoading(true);
+      TimezoneService.refreshFromDevice();
       await loadUserFromStorage();
 
       const token = await StorageService.getAuthToken();
@@ -49,6 +52,7 @@ export const useAuth = (): UseAuthResult => {
         } catch (cryptoError) {
           console.error('useAuth: failed to ensure identity keys', cryptoError);
         }
+        await LocationSyncService.sync();
       }
     } catch (error) {
       console.error('useAuth: failed to refresh user', error);

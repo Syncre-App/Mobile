@@ -23,6 +23,18 @@ export const TimezoneService = {
     return cachedTimezone;
   },
 
+  refreshFromDevice(): string {
+    cachedTimezone = detectTimezone() || DEFAULT_TIMEZONE;
+    return cachedTimezone;
+  },
+
+  setTimezone(timezone?: string | null): string {
+    if (timezone && typeof timezone === 'string' && timezone.trim().length) {
+      cachedTimezone = timezone.trim();
+    }
+    return this.getTimezone();
+  },
+
   applyHeader<T extends Record<string, string>>(headers: T): T {
     const timezone = this.getTimezone();
     if (timezone) {
