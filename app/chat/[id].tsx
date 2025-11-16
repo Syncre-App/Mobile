@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ActionSheetIOS, Alert, Animated, BackHandler, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable, Linking, Share } from 'react-native';
+import { ActivityIndicator, Alert, Animated, BackHandler, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable, Linking, Share, GestureResponderEvent, Dimensions } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -444,7 +444,7 @@ interface MessageBubbleProps {
   replyCount?: number;
   showSenderMetadata?: boolean;
   onBubblePress?: () => void;
-  onBubbleLongPress?: () => void;
+  onBubbleLongPress?: (event: GestureResponderEvent) => void;
   onAttachmentPress?: (attachment: MessageAttachment) => void;
   onLinkPress?: (url: string) => void;
 }
@@ -599,7 +599,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         </Animated.View>
         <Pressable
           onPress={onBubblePress}
-          onLongPress={onBubbleLongPress}
+          onLongPress={(event) => onBubbleLongPress?.(event)}
           style={[
             styles.messageContent,
             isMine ? styles.messageContentMine : styles.messageContentTheirs,
@@ -794,6 +794,62 @@ const ChatScreen: React.FC = () => {
   const [attachmentPickerBusy, setAttachmentPickerBusy] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<MessageAttachment | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [messageActionContext, setMessageActionContext] = useState<{
+    message: Message;
+    actions: Array<{ label: string; onPress: () => void; destructive?: boolean }>;
+    anchorY: number;
+  } | null>(null);
+  const messageActionAnim = useRef(new Animated.Value(0)).current;
+  const windowHeight = Dimensions.get('window').height;
+  const messageActionAnchorTop = useMemo(() => {
+    if (!messageActionContext) {
+      return 0;
+    }
+    const offset = messageActionContext.anchorY - 120;
+    const clamped = Math.max(offset, 80);
+    return Math.min(clamped, windowHeight - 220);
+  }, [messageActionContext, windowHeight]);
+
+  const dismissMessageActions = useCallback(
+    (onFinished?: () => void) => {
+      if (!messageActionContext) {
+        onFinished?.();
+        return;
+      }
+      Animated.timing(messageActionAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start(() => {
+        setMessageActionContext(null);
+        onFinished?.();
+      });
+    },
+    [messageActionAnim, messageActionContext]
+  );
+
+  useEffect(() => {
+    if (messageActionContext) {
+      messageActionAnim.setValue(0);
+      Animated.spring(messageActionAnim, {
+        toValue: 1,
+        friction: 7,
+        tension: 90,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [messageActionAnim, messageActionContext]);
+
+  const handleMessageActionSelect = useCallback(
+    (action: { label: string; onPress: () => void }) => {
+      dismissMessageActions(() => {
+        requestAnimationFrame(() => {
+          action.onPress?.();
+        });
+      });
+    },
+    [dismissMessageActions]
+  );
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
   const [chatDetails, setChatDetails] = useState<{
@@ -2027,7 +2083,7 @@ const ChatScreen: React.FC = () => {
   );
 
   const handleBubbleLongPress = useCallback(
-    (message: Message) => {
+    (message: Message, event?: GestureResponderEvent) => {
       if (message.isPlaceholder) {
         if (message.replyTo) {
           setReplyContext(buildReplyPayloadFromMessage(message));
@@ -2052,49 +2108,19 @@ const ChatScreen: React.FC = () => {
         });
       }
 
-      if (canDelete) {
-        actions.push({
-          label: 'Delete',
-          destructive: true,
-          onPress: () => confirmDeleteMessage(message),
-        });
-      }
+  if (canDelete) {
+    actions.push({
+      label: 'Delete',
+      destructive: true,
+      onPress: () => confirmDeleteMessage(message),
+    });
+  }
 
       actions.push({ label: 'Cancel', onPress: () => {} });
-
-      if (Platform.OS === 'ios') {
-        ActionSheetIOS.showActionSheetWithOptions(
-          {
-            options: actions.map((action) => action.label),
-            cancelButtonIndex: actions.length - 1,
-            destructiveButtonIndex: actions.findIndex((action) => action.destructive),
-          },
-          (index) => {
-            const action = actions[index];
-            if (action && action.onPress) {
-              action.onPress();
-            }
-          }
-        );
-      } else {
-        const alertButtons: Array<{ text: string; onPress: () => void; style?: 'destructive' | 'default' | 'cancel' }> = actions
-          .filter((action) => action.label !== 'Cancel')
-          .map((action) => ({
-            text: action.label,
-            onPress: action.onPress,
-            style: (action.destructive ? 'destructive' : 'default') as 'destructive' | 'default',
-          }));
-
-        alertButtons.push({
-          text: 'Cancel',
-          onPress: () => {},
-          style: 'cancel',
-        });
-
-        Alert.alert('Message options', undefined, alertButtons);
-      }
+      const anchorY = event?.nativeEvent?.pageY ?? windowHeight / 2;
+      setMessageActionContext({ message, actions, anchorY });
     },
-    [buildReplyPayloadFromMessage, confirmDeleteMessage, currentUserId, startEditMessage]
+    [buildReplyPayloadFromMessage, confirmDeleteMessage, currentUserId, startEditMessage, windowHeight]
   );
 
   const handleSendMessage = useCallback(async () => {
@@ -2840,7 +2866,7 @@ const ChatScreen: React.FC = () => {
           onBubblePress={() =>
             setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
           }
-          onBubbleLongPress={() => handleBubbleLongPress(messageItem)}
+          onBubbleLongPress={(event) => handleBubbleLongPress(messageItem, event)}
           onAttachmentPress={handleAttachmentTap}
           onLinkPress={handleOpenLink}
         />
@@ -3321,6 +3347,69 @@ const ChatScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+      {messageActionContext ? (
+        <Animated.View
+          style={[styles.messageActionOverlay, { opacity: messageActionAnim }]}
+          pointerEvents="box-none"
+        >
+          <Pressable
+            style={styles.messageActionBackdrop}
+            onPress={() => dismissMessageActions()}
+          />
+          <Animated.View
+            style={[
+              styles.messageActionSheetContainer,
+              {
+                top: messageActionAnchorTop,
+                opacity: messageActionAnim,
+                transform: [
+                  {
+                    translateY: messageActionAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-12, 0],
+                    }),
+                  },
+                  {
+                    scale: messageActionAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.92, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents="box-none"
+          >
+            <View style={styles.messageActionSheet}>
+              <View style={styles.messageActionHeader}>
+                <Text style={styles.messageActionTitle}>Message</Text>
+                <Text style={styles.messageActionPreview} numberOfLines={2}>
+                  {messageActionContext.message.content || 'Attachment'}
+                </Text>
+              </View>
+              {messageActionContext.actions.map((action) => (
+                <Pressable
+                  key={`${messageActionContext.message.id}-${action.label}`}
+                  style={[
+                    styles.messageActionButton,
+                    action.destructive && styles.messageActionButtonDestructive,
+                  ]}
+                  onPress={() => handleMessageActionSelect(action)}
+                >
+                  <Text
+                    style={[
+                      styles.messageActionButtonText,
+                      action.destructive && styles.messageActionButtonTextDestructive,
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Animated.View>
+        </Animated.View>
+      ) : null}
     </SafeAreaView>
   );
 };
@@ -4009,6 +4098,65 @@ const styles = StyleSheet.create({
   attachmentModalButtonText: {
     color: '#03040A',
     fontWeight: '600',
+  },
+  messageActionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+  },
+  messageActionBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  messageActionSheetContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  messageActionSheet: {
+    width: 240,
+    borderRadius: 24,
+    padding: 16,
+    backgroundColor: '#0B1023',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  messageActionHeader: {
+    marginBottom: 8,
+  },
+  messageActionTitle: {
+    color: '#7C8AA4',
+    fontSize: 12,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  messageActionPreview: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  messageActionButton: {
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  messageActionButtonDestructive: {
+    backgroundColor: 'rgba(255, 92, 92, 0.12)',
+  },
+  messageActionButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  messageActionButtonTextDestructive: {
+    color: '#FF5C5C',
   },
   scrollToBottomButton: {
     position: 'absolute',
