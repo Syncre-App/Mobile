@@ -5,6 +5,7 @@ export interface UploadableAsset {
   uri: string;
   name?: string;
   type?: string;
+  size?: number;
 }
 
 const resolveToken = async (token?: string): Promise<string | null> => {

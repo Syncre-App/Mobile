@@ -45,6 +45,8 @@ interface MessageAttachment {
   downloadUrl?: string;
   publicViewUrl?: string;
   publicDownloadUrl?: string;
+  localUri?: string;
+  uploadPending?: boolean;
 }
 
 interface Message {
@@ -123,6 +125,7 @@ const mapServerAttachment = (raw: any): MessageAttachment => ({
   downloadUrl: buildAbsoluteUrl(raw.downloadPath || raw.publicDownloadPath),
   publicViewUrl: buildAbsoluteUrl(raw.publicViewPath),
   publicDownloadUrl: buildAbsoluteUrl(raw.publicDownloadPath),
+  uploadPending: false,
 });
 
 const mapServerAttachments = (raw?: any): MessageAttachment[] => {
@@ -450,7 +453,7 @@ interface MessageBubbleProps {
   showSenderMetadata?: boolean;
   onBubblePress?: () => void;
   onBubbleLongPress?: (event: GestureResponderEvent) => void;
-  onAttachmentPress?: (attachment: MessageAttachment) => void;
+  onAttachmentPress?: (attachment: MessageAttachment, attachments?: MessageAttachment[]) => void;
   onLinkPress?: (url: string) => void;
 }
 
@@ -583,7 +586,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       : null;
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const hasAttachments = attachments.length > 0;
-  const multipleAttachments = attachments.length > 1;
 
   return (
     <>
@@ -652,66 +654,103 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 </View>
               </Pressable>
             )}
-            {hasAttachments ? (
-              <View
-                style={[
-                  styles.attachmentGroup,
-                  isMine ? styles.attachmentGroupMine : styles.attachmentGroupTheirs,
-                ]}
-              >
-                {attachments.map((attachment) => {
-                  const isExpired = attachment.status === 'expired';
-                  const isPreviewable = attachment.isImage && attachment.previewUrl;
-                  const cardStyles = [
-                    styles.attachmentCard,
-                    isPreviewable ? styles.attachmentImageCard : styles.attachmentFileCard,
-                  ];
-                  if (isPreviewable) {
-                    cardStyles.push(
-                      multipleAttachments ? styles.attachmentImageCardCompact : styles.attachmentImageCardLarge
-                    );
-                  }
-                  return (
+            {(() => {
+              if (!hasAttachments) return null;
+              const previewableImageAttachments = attachments.filter(
+                (attachment) =>
+                  attachment.isImage &&
+                  attachment.status !== 'expired' &&
+                  (attachment.previewUrl || attachment.publicViewUrl)
+              );
+              const previewableImageIds = new Set(previewableImageAttachments.map((attachment) => attachment.id));
+              const fileAttachments = attachments.filter((attachment) => !previewableImageIds.has(attachment.id));
+              const showImagePreview = previewableImageAttachments.length > 0;
+              const primaryImage = showImagePreview ? previewableImageAttachments[0] : null;
+              const remainingImages = showImagePreview ? previewableImageAttachments.slice(1) : [];
+
+              return (
+                <>
+                  {primaryImage ? (
                     <Pressable
-                      key={`${message.id}-attachment-${attachment.id}`}
-                      style={cardStyles}
-                      onPress={() => !isExpired && onAttachmentPress?.(attachment)}
-                      disabled={isExpired}
+                      key={`${message.id}-hero-image`}
+                      style={styles.heroImageCard}
+                      onPress={() => onAttachmentPress?.(primaryImage, previewableImageAttachments)}
                     >
-                      {isPreviewable ? (
-                        <Image
-                          source={{ uri: attachment.previewUrl }}
-                          style={styles.attachmentImage}
-                          contentFit="cover"
-                        />
-                      ) : (
-                        <View style={styles.attachmentFileRow}>
-                          <Ionicons
-                            name="document-text-outline"
-                            size={18}
-                            color="rgba(255,255,255,0.9)"
-                            style={styles.attachmentFileIcon}
-                          />
-                          <View style={styles.attachmentFileBody}>
-                            <Text style={styles.attachmentFileName} numberOfLines={1}>
-                              {attachment.name}
-                            </Text>
-                            <Text style={styles.attachmentFileMeta}>
-                              {formatBytes(attachment.fileSize)}
-                            </Text>
-                          </View>
-                        </View>
-                      )}
-                      {isExpired ? (
-                        <View style={styles.attachmentExpiredOverlay}>
-                          <Text style={styles.attachmentExpiredText}>File or Image expired</Text>
+                      <Image
+                        source={{
+                          uri: primaryImage.previewUrl || primaryImage.publicViewUrl || primaryImage.localUri,
+                        }}
+                        style={styles.heroImage}
+                        contentFit="cover"
+                      />
+                      {remainingImages.length ? (
+                        <View style={styles.attachmentMoreBadge}>
+                          <Text style={styles.attachmentMoreBadgeText}>+{remainingImages.length} more</Text>
                         </View>
                       ) : null}
                     </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
+                  ) : null}
+
+                  {fileAttachments.length ? (
+                    <View
+                      style={[
+                        styles.attachmentGroup,
+                        isMine ? styles.attachmentGroupMine : styles.attachmentGroupTheirs,
+                      ]}
+                    >
+                      {fileAttachments.map((attachment) => {
+                        const isExpired = attachment.status === 'expired';
+                        const isPreviewable =
+                          attachment.isImage && (attachment.previewUrl || attachment.publicViewUrl);
+                        return (
+                          <Pressable
+                            key={`${message.id}-file-${attachment.id}`}
+                            style={[
+                              styles.attachmentCard,
+                              isPreviewable ? styles.attachmentImageCardCompact : styles.attachmentFileCard,
+                            ]}
+                            onPress={() => !isExpired && onAttachmentPress?.(attachment, [attachment])}
+                            disabled={isExpired}
+                          >
+                            {isPreviewable ? (
+                              <Image
+                                source={{
+                                  uri: attachment.previewUrl || attachment.publicViewUrl || attachment.localUri,
+                                }}
+                                style={styles.attachmentImage}
+                                contentFit="cover"
+                              />
+                            ) : (
+                              <View style={styles.attachmentFileRow}>
+                                <Ionicons
+                                  name="document-text-outline"
+                                  size={18}
+                                  color="rgba(255,255,255,0.9)"
+                                  style={styles.attachmentFileIcon}
+                                />
+                                <View style={styles.attachmentFileBody}>
+                                  <Text style={styles.attachmentFileName} numberOfLines={1}>
+                                    {attachment.name}
+                                  </Text>
+                                  <Text style={styles.attachmentFileMeta}>
+                                    {formatBytes(attachment.fileSize)}
+                                  </Text>
+                                </View>
+                              </View>
+                            )}
+                            {isExpired ? (
+                              <View style={styles.attachmentExpiredOverlay}>
+                                <Text style={styles.attachmentExpiredText}>File or Image expired</Text>
+                              </View>
+                            ) : null}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </>
+              );
+            })()}
             {message.content?.length ? (
               <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
                 {textSegments.map((segment, idx) =>
@@ -829,7 +868,9 @@ const ChatScreen: React.FC = () => {
   const isNearBottomRef = useRef(true);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [attachmentPickerBusy, setAttachmentPickerBusy] = useState(false);
-  const [previewAttachment, setPreviewAttachment] = useState<MessageAttachment | null>(null);
+  const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
+  const previewListRef = useRef<FlatList<MessageAttachment>>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [messageActionContext, setMessageActionContext] = useState<{
     message: Message;
@@ -876,6 +917,27 @@ const ChatScreen: React.FC = () => {
       }).start();
     }
   }, [messageActionAnim, messageActionContext]);
+
+  useEffect(() => {
+    if (previewContext && previewContext.attachments.length) {
+      const nextIndex = Math.min(
+        Math.max(previewContext.index, 0),
+        previewContext.attachments.length - 1
+      );
+      setPreviewIndex(nextIndex);
+      requestAnimationFrame(() => {
+        try {
+          previewListRef.current?.scrollToIndex({ index: nextIndex, animated: false });
+        } catch {
+          // ignore scroll failures
+        }
+      });
+    }
+  }, [previewContext]);
+  const currentPreviewAttachment = previewContext
+    ? previewContext.attachments[Math.min(previewIndex, previewContext.attachments.length - 1)]
+    : null;
+  const handleClosePreview = useCallback(() => setPreviewContext(null), []);
 
   const handleMessageActionSelect = useCallback(
     (action: { label: string; onPress: () => void }) => {
@@ -1870,18 +1932,42 @@ const ChatScreen: React.FC = () => {
         NotificationService.show('info', 'Please wait for the current upload to complete');
         return;
       }
+
+      const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const isImage = Boolean(file.type && file.type.toLowerCase().startsWith('image/'));
+      const placeholder: MessageAttachment = {
+        id: tempId,
+        name: file.name || 'Attachment',
+        mimeType: file.type || 'application/octet-stream',
+        fileSize: Number(file.size) || 0,
+        status: 'pending',
+        isImage,
+        previewUrl: isImage ? file.uri : undefined,
+        downloadUrl: undefined,
+        publicViewUrl: undefined,
+        publicDownloadUrl: undefined,
+        localUri: file.uri,
+        uploadPending: true,
+      };
+
+      setPendingAttachments((prev) => [...prev, placeholder]);
+
       try {
         setAttachmentPickerBusy(true);
         const response = await ChatService.uploadAttachment(chatId, file);
         if (!response.success || !response.data?.attachment) {
           NotificationService.show('error', response.error || 'Failed to upload attachment');
+          setPendingAttachments((prev) => prev.filter((attachment) => attachment.id !== tempId));
           return;
         }
         const mapped = mapServerAttachment(response.data.attachment);
-        setPendingAttachments((prev) => [...prev, mapped]);
+        setPendingAttachments((prev) =>
+          prev.map((attachment) => (attachment.id === tempId ? { ...mapped, uploadPending: false } : attachment))
+        );
       } catch (error) {
         console.error('Attachment upload failed:', error);
         NotificationService.show('error', 'Unable to upload attachment');
+        setPendingAttachments((prev) => prev.filter((attachment) => attachment.id !== tempId));
       } finally {
         setAttachmentPickerBusy(false);
       }
@@ -1911,6 +1997,7 @@ const ChatScreen: React.FC = () => {
         uri: document.uri,
         name: document.name || `upload-${Date.now()}`,
         type: document.mimeType || document.type || 'application/octet-stream',
+        size: document.size,
       });
     } catch (error) {
       console.error('Document picker failed:', error);
@@ -1944,6 +2031,7 @@ const ChatScreen: React.FC = () => {
         uri: asset.uri,
         name: asset.fileName || `photo-${Date.now()}.jpg`,
         type: asset.mimeType || 'image/jpeg',
+        size: asset.fileSize,
       });
     } catch (error) {
       console.error('Image picker failed:', error);
@@ -1970,6 +2058,9 @@ const ChatScreen: React.FC = () => {
   const handleRemoveAttachment = useCallback(
     async (attachmentId: string) => {
       setPendingAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId));
+      if (!/^\d+$/.test(attachmentId)) {
+        return;
+      }
       try {
         await ChatService.deleteAttachment(attachmentId);
       } catch (error) {
@@ -2139,12 +2230,31 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   const handleAttachmentTap = useCallback(
-    (attachment: MessageAttachment) => {
+    (attachment: MessageAttachment, siblings?: MessageAttachment[]) => {
       if (!attachment || attachment.status === 'expired') {
         NotificationService.show('info', 'File or image expired');
         return;
       }
-      setPreviewAttachment(attachment);
+      const gallery = (siblings || [])
+        .filter(
+          (item) =>
+            item.isImage &&
+            item.status !== 'expired' &&
+            ((item.previewUrl || item.publicViewUrl) ?? item.localUri)
+        );
+      if (attachment.isImage && (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)) {
+        const source = gallery.length ? gallery : [attachment];
+        const index = source.findIndex((item) => item.id === attachment.id);
+        setPreviewContext({
+          attachments: source,
+          index: index >= 0 ? index : 0,
+        });
+      } else {
+        setPreviewContext({
+          attachments: [attachment],
+          index: 0,
+        });
+      }
     },
     []
   );
@@ -2158,7 +2268,8 @@ const ChatScreen: React.FC = () => {
         attachment.publicDownloadUrl ||
         attachment.downloadUrl ||
         attachment.publicViewUrl ||
-        attachment.previewUrl;
+        attachment.previewUrl ||
+        attachment.localUri;
       if (!target) {
         NotificationService.show('error', 'Download is not available for this file');
         return;
@@ -2254,8 +2365,10 @@ const ChatScreen: React.FC = () => {
     const normalizedReply = replyContext ? resolveReplyMetadata(replyContext) : undefined;
     const encodedPayload = encodeMessagePayload(trimmedMessage, normalizedReply);
     const temporaryId = `temp-${Date.now()}`;
-    const attachmentsSnapshot = pendingAttachments;
-    const attachmentIds = attachmentsSnapshot.map((attachment) => attachment.id);
+    const attachmentsSnapshot = pendingAttachments.filter((attachment) => !attachment.uploadPending);
+    const attachmentIds = attachmentsSnapshot
+      .map((attachment) => attachment.id)
+      .filter((id) => /^\d+$/.test(id));
     const optimisticMessage: Message = {
       id: temporaryId,
       senderId: currentUserId,
@@ -2279,7 +2392,7 @@ const ChatScreen: React.FC = () => {
     setNewMessage('');
     setReplyContext(null);
     if (attachmentsSnapshot.length) {
-      setPendingAttachments([]);
+      setPendingAttachments((prev) => prev.filter((attachment) => attachment.uploadPending));
     }
     requestAnimationFrame(() => {
       composerRef.current?.focus();
@@ -3004,6 +3117,7 @@ const ChatScreen: React.FC = () => {
 
   const isComposerEmpty = newMessage.trim().length === 0;
   const hasPendingAttachments = pendingAttachments.length > 0;
+  const hasUploadingAttachments = pendingAttachments.some((attachment) => attachment.uploadPending);
   const keyboardOffset = useMemo(
     () => (Platform.OS === 'ios' ? insets.bottom : 0),
     [insets.bottom]
@@ -3019,7 +3133,10 @@ const ChatScreen: React.FC = () => {
     return Math.max(insets.bottom, 12);
   }, [insets.bottom, isKeyboardVisible]);
   const sendButtonDisabled =
-    ((isComposerEmpty && !hasPendingAttachments) || isSendingMessage || attachmentPickerBusy);
+    ((isComposerEmpty && !hasPendingAttachments) ||
+      isSendingMessage ||
+      attachmentPickerBusy ||
+      hasUploadingAttachments);
 
   const isGroupChat = Boolean(chatDetails?.isGroup);
   const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
@@ -3268,7 +3385,14 @@ const ChatScreen: React.FC = () => {
                   <Text style={styles.attachmentChipName} numberOfLines={1}>
                     {attachment.name}
                   </Text>
-                  <Text style={styles.attachmentChipMeta}>{formatBytes(attachment.fileSize)}</Text>
+                  {attachment.uploadPending ? (
+                    <View style={styles.attachmentChipProgress}>
+                      <ActivityIndicator size="small" color="#ffffff" />
+                      <Text style={styles.attachmentChipMeta}>Uploading…</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.attachmentChipMeta}>{formatBytes(attachment.fileSize)}</Text>
+                  )}
                 </View>
                 <Pressable
                   onPress={() => handleRemoveAttachment(attachment.id)}
@@ -3403,50 +3527,82 @@ const ChatScreen: React.FC = () => {
         </View>
       </Modal>
       <Modal
-        visible={Boolean(previewAttachment)}
+        visible={Boolean(previewContext)}
         transparent
         animationType="fade"
-        onRequestClose={() => setPreviewAttachment(null)}
+        onRequestClose={handleClosePreview}
       >
         <View style={styles.attachmentModalOverlay}>
           <View style={styles.attachmentModalCard}>
             <View style={styles.attachmentModalHeader}>
               <Text style={styles.attachmentModalTitle} numberOfLines={1}>
-                {previewAttachment?.name || 'Attachment'}
+                {currentPreviewAttachment?.name || 'Attachment'}
               </Text>
-              <Pressable onPress={() => setPreviewAttachment(null)}>
+              <Pressable onPress={handleClosePreview}>
                 <Ionicons name="close" size={18} color="#ffffff" />
               </Pressable>
             </View>
-            {previewAttachment?.isImage &&
-            (previewAttachment.previewUrl || previewAttachment.publicViewUrl) ? (
-              <Image
-                source={{ uri: previewAttachment.previewUrl || previewAttachment.publicViewUrl }}
-                style={styles.attachmentModalImage}
-                contentFit="contain"
-              />
-            ) : (
-              <View style={styles.attachmentModalFile}>
-                <Ionicons name="document-text-outline" size={28} color="#ffffff" />
-                <Text style={styles.attachmentModalFileName} numberOfLines={1}>
-                  {previewAttachment?.name}
-                </Text>
+            <FlatList
+              style={styles.attachmentModalCarousel}
+              contentContainerStyle={styles.attachmentModalCarouselContent}
+              ref={previewListRef}
+              data={previewContext?.attachments || []}
+              keyExtractor={(item) => item.id}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <View style={styles.attachmentPreviewSlide}>
+                  {item.isImage && (item.previewUrl || item.publicViewUrl || item.localUri) ? (
+                    <Image
+                      source={{ uri: item.previewUrl || item.publicViewUrl || item.localUri }}
+                      style={StyleSheet.absoluteFillObject}
+                      contentFit="contain"
+                    />
+                  ) : (
+                    <View style={styles.attachmentModalFile}>
+                      <Ionicons name="document-text-outline" size={28} color="#ffffff" />
+                      <Text style={styles.attachmentModalFileName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.attachmentModalFileMeta}>
+                        {formatBytes(item.fileSize || 0)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+              onMomentumScrollEnd={({ nativeEvent }) => {
+                if (!previewContext) return;
+                const width = nativeEvent.layoutMeasurement.width;
+                if (!width) return;
+                const index = Math.round(nativeEvent.contentOffset.x / width);
+                setPreviewIndex(
+                  Math.min(Math.max(index, 0), (previewContext.attachments.length || 1) - 1)
+                );
+              }}
+            />
+            <View style={styles.attachmentModalFileMetaRow}>
+              <Text style={styles.attachmentModalFileName} numberOfLines={1}>
+                {currentPreviewAttachment?.name || 'Attachment'}
+              </Text>
+              {currentPreviewAttachment?.fileSize ? (
                 <Text style={styles.attachmentModalFileMeta}>
-                  {formatBytes(previewAttachment?.fileSize || 0)}
+                  {formatBytes(currentPreviewAttachment.fileSize)}
                 </Text>
-              </View>
-            )}
+              ) : null}
+            </View>
             <View style={styles.attachmentModalActions}>
               <Pressable
                 style={styles.attachmentModalButton}
-                onPress={() => handleDownloadAttachment(previewAttachment)}
+                onPress={() => handleDownloadAttachment(currentPreviewAttachment)}
               >
                 <Ionicons name="download-outline" size={18} color="#03040A" />
                 <Text style={styles.attachmentModalButtonText}>Download</Text>
               </Pressable>
               <Pressable
                 style={styles.attachmentModalButton}
-                onPress={() => handleShareAttachment(previewAttachment)}
+                onPress={() => handleShareAttachment(currentPreviewAttachment)}
               >
                 <Ionicons name="share-outline" size={18} color="#03040A" />
                 <Text style={styles.attachmentModalButtonText}>Share</Text>
@@ -3998,6 +4154,17 @@ const styles = StyleSheet.create({
   sendButtonPressed: {
     opacity: 0.8,
   },
+  heroImageCard: {
+    marginTop: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  heroImage: {
+    width: '100%',
+    aspectRatio: 3 / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
   attachmentGroup: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -4016,6 +4183,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 8,
   },
   attachmentImageCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
@@ -4071,6 +4239,20 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     textAlign: 'center',
+  },
+  attachmentMoreBadge: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  attachmentMoreBadgeText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   linkText: {
     color: '#5ECDF8',
@@ -4137,6 +4319,11 @@ const styles = StyleSheet.create({
   attachmentChipMeta: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 11,
+  },
+  attachmentChipProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 6,
   },
   attachmentChipRemove: {
     width: 20,
@@ -4205,6 +4392,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
+  attachmentModalCarousel: {
+    marginBottom: 12,
+  },
+  attachmentModalCarouselContent: {
+    paddingVertical: 8,
+    alignItems: 'center',
+    gap: 12,
+  },
   attachmentModalFile: {
     padding: 20,
     borderRadius: 16,
@@ -4225,6 +4420,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     columnGap: 12,
+  },
+  attachmentPreviewSlide: {
+    width: Dimensions.get('window').width - 64,
+    height: 260,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    marginBottom: 12,
+    alignSelf: 'center',
+    overflow: 'hidden',
+  },
+  attachmentModalFileMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   attachmentModalButton: {
     flex: 1,
