@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
+import { Video } from 'expo-av';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
 import { NotificationService } from '../../services/NotificationService';
@@ -41,6 +42,7 @@ interface MessageAttachment {
   fileSize: number;
   status: 'pending' | 'active' | 'expired';
   isImage: boolean;
+  isVideo: boolean;
   previewUrl?: string;
   downloadUrl?: string;
   publicViewUrl?: string;
@@ -116,19 +118,25 @@ const formatBytes = (size: number): string => {
   return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
 };
 
-const mapServerAttachment = (raw: any): MessageAttachment => ({
-  id: String(raw.id),
-  name: raw.name || raw.fileName || 'Attachment',
-  mimeType: raw.mimeType || 'application/octet-stream',
-  fileSize: Number(raw.fileSize) || 0,
-  status: ATTACHMENT_STATUS_MAP[String(raw.status)] ?? 'active',
-  isImage: Boolean(raw.isImage),
-  previewUrl: buildAbsoluteUrl(raw.publicViewPath || raw.previewPath),
-  downloadUrl: buildAbsoluteUrl(raw.downloadPath || raw.publicDownloadPath),
-  publicViewUrl: buildAbsoluteUrl(raw.publicViewPath),
-  publicDownloadUrl: buildAbsoluteUrl(raw.publicDownloadPath),
-  uploadPending: false,
-});
+const mapServerAttachment = (raw: any): MessageAttachment => {
+  const mime = typeof raw.mimeType === 'string' ? raw.mimeType.toLowerCase() : '';
+  const inferredImage = mime.startsWith('image/');
+  const inferredVideo = mime.startsWith('video/');
+  return {
+    id: String(raw.id),
+    name: raw.name || raw.fileName || 'Attachment',
+    mimeType: raw.mimeType || 'application/octet-stream',
+    fileSize: Number(raw.fileSize) || 0,
+    status: ATTACHMENT_STATUS_MAP[String(raw.status)] ?? 'active',
+    isImage: Boolean(raw.isImage ?? inferredImage),
+    isVideo: Boolean(raw.isVideo ?? inferredVideo),
+    previewUrl: buildAbsoluteUrl(raw.publicViewPath || raw.previewPath),
+    downloadUrl: buildAbsoluteUrl(raw.downloadPath || raw.publicDownloadPath),
+    publicViewUrl: buildAbsoluteUrl(raw.publicViewPath),
+    publicDownloadUrl: buildAbsoluteUrl(raw.publicDownloadPath),
+    uploadPending: false,
+  };
+};
 
 const mapServerAttachments = (raw?: any): MessageAttachment[] => {
   if (!raw) {
@@ -140,8 +148,16 @@ const mapServerAttachments = (raw?: any): MessageAttachment[] => {
   return [];
 };
 
+const resolveAttachmentUri = (attachment: MessageAttachment): string | undefined =>
+  attachment.publicViewUrl ||
+  attachment.previewUrl ||
+  attachment.publicDownloadUrl ||
+  attachment.downloadUrl ||
+  attachment.localUri;
+
 const LINK_REGEX = /(https?:\/\/[^\s]+)/gi;
-const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp)$/i.test(url.split('?')[0]);
+const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp|bmp|tiff|heic|heif)$/i.test(url.split('?')[0]);
+const isVideoUrl = (url: string) => /\.(mp4|m4v|mov|avi|webm|mkv)$/i.test(url.split('?')[0]);
 
 const splitTextByLinks = (text: string): Array<{ type: 'text' | 'link'; value: string }> => {
   if (!text || typeof text !== 'string') {
@@ -167,7 +183,7 @@ const splitTextByLinks = (text: string): Array<{ type: 'text' | 'link'; value: s
   return segments;
 };
 
-const findEmbeddableLink = (text: string): string | null => {
+const findEmbeddableLink = (text: string): { type: 'image' | 'video'; url: string } | null => {
   if (!text) {
     return null;
   }
@@ -175,8 +191,15 @@ const findEmbeddableLink = (text: string): string | null => {
   if (!matches) {
     return null;
   }
-  const match = matches.find((url) => isImageUrl(url));
-  return match || null;
+  const imageMatch = matches.find((url) => isImageUrl(url));
+  if (imageMatch) {
+    return { type: 'image', url: imageMatch };
+  }
+  const videoMatch = matches.find((url) => isVideoUrl(url));
+  if (videoMatch) {
+    return { type: 'video', url: videoMatch };
+  }
+  return null;
 };
 
 const buildDeletedLabel = (username?: string | null) => {
@@ -662,32 +685,56 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 (attachment) =>
                   attachment.isImage &&
                   attachment.status !== 'expired' &&
-                  (attachment.previewUrl || attachment.publicViewUrl)
+                  (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
               );
-              const previewableImageIds = new Set(previewableImageAttachments.map((attachment) => attachment.id));
-              const fileAttachments = attachments.filter((attachment) => !previewableImageIds.has(attachment.id));
-              const showImagePreview = previewableImageAttachments.length > 0;
-              const primaryImage = showImagePreview ? previewableImageAttachments[0] : null;
-              const remainingImages = showImagePreview ? previewableImageAttachments.slice(1) : [];
+              const previewableVideoAttachments = attachments.filter(
+                (attachment) =>
+                  attachment.isVideo &&
+                  attachment.status !== 'expired' &&
+                  (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
+              );
+              const combinedPreviewable = [...previewableImageAttachments, ...previewableVideoAttachments];
+              const previewableIds = new Set(combinedPreviewable.map((attachment) => attachment.id));
+              const fileAttachments = attachments.filter((attachment) => !previewableIds.has(attachment.id));
+              const showPreview = combinedPreviewable.length > 0;
+              const primaryItem = showPreview ? combinedPreviewable[0] : null;
+              const remainingPreviewItems = showPreview ? combinedPreviewable.slice(1) : [];
 
               return (
                 <>
-                  {primaryImage ? (
+                  {primaryItem ? (
                     <Pressable
                       key={`${message.id}-hero-image`}
                       style={styles.heroImageCard}
-                      onPress={() => onAttachmentPress?.(primaryImage, previewableImageAttachments)}
+                      onPress={() => onAttachmentPress?.(primaryItem, combinedPreviewable)}
                     >
-                      <Image
-                        source={{
-                          uri: primaryImage.previewUrl || primaryImage.publicViewUrl || primaryImage.localUri,
-                        }}
-                        style={styles.heroImage}
-                        contentFit="cover"
-                      />
-                      {remainingImages.length ? (
+                      {primaryItem.isVideo ? (
+                        resolveAttachmentUri(primaryItem) ? (
+                          <Video
+                            source={{ uri: resolveAttachmentUri(primaryItem)! }}
+                            style={styles.heroVideo}
+                            resizeMode="cover"
+                            useNativeControls
+                            shouldPlay={false}
+                            isLooping={false}
+                          />
+                        ) : (
+                          <View style={styles.heroVideoPlaceholder}>
+                            <Ionicons name="play" size={24} color="#ffffff" />
+                          </View>
+                        )
+                      ) : (
+                        <Image
+                          source={{
+                            uri: primaryItem.previewUrl || primaryItem.publicViewUrl || primaryItem.localUri,
+                          }}
+                          style={styles.heroImage}
+                          contentFit="cover"
+                        />
+                      )}
+                      {remainingPreviewItems.length ? (
                         <View style={styles.attachmentMoreBadge}>
-                          <Text style={styles.attachmentMoreBadgeText}>+{remainingImages.length} more</Text>
+                          <Text style={styles.attachmentMoreBadgeText}>+{remainingPreviewItems.length} more</Text>
                         </View>
                       ) : null}
                     </Pressable>
@@ -703,7 +750,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                       {fileAttachments.map((attachment) => {
                         const isExpired = attachment.status === 'expired';
                         const isPreviewable =
-                          attachment.isImage && (attachment.previewUrl || attachment.publicViewUrl);
+                          (attachment.isImage || attachment.isVideo) &&
+                          (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri);
                         return (
                           <Pressable
                             key={`${message.id}-file-${attachment.id}`}
@@ -715,13 +763,30 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                             disabled={isExpired}
                           >
                             {isPreviewable ? (
-                              <Image
-                                source={{
-                                  uri: attachment.previewUrl || attachment.publicViewUrl || attachment.localUri,
-                                }}
-                                style={styles.attachmentImage}
-                                contentFit="cover"
-                              />
+                              attachment.isVideo ? (
+                                <View style={styles.attachmentVideoThumb}>
+                                  {resolveAttachmentUri(attachment) ? (
+                                    <Video
+                                      source={{ uri: resolveAttachmentUri(attachment)! }}
+                                      style={StyleSheet.absoluteFillObject}
+                                      resizeMode="cover"
+                                      useNativeControls
+                                      shouldPlay={false}
+                                    />
+                                  ) : null}
+                                  <View style={styles.attachmentVideoOverlay}>
+                                    <Ionicons name="play" size={18} color="#ffffff" />
+                                  </View>
+                                </View>
+                              ) : (
+                                <Image
+                                  source={{
+                                    uri: attachment.previewUrl || attachment.publicViewUrl || attachment.localUri,
+                                  }}
+                                  style={styles.attachmentImage}
+                                  contentFit="cover"
+                                />
+                              )
                             ) : (
                               <View style={styles.attachmentFileRow}>
                                 <Ionicons
@@ -773,16 +838,29 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             {embeddableLink && !embedFailed ? (
               <Pressable
                 style={styles.embedPreview}
-                onPress={() => onLinkPress?.(embeddableLink)}
+                onPress={() => onLinkPress?.(embeddableLink.url)}
               >
-                <Image
-                  source={{ uri: embeddableLink }}
-                  style={styles.embedImage}
-                  contentFit="cover"
-                  transition={300}
-                  onLoad={() => setEmbedLoaded(true)}
-                  onError={() => setEmbedFailed(true)}
-                />
+                {embeddableLink.type === 'image' ? (
+                  <Image
+                    source={{ uri: embeddableLink.url }}
+                    style={styles.embedImage}
+                    contentFit="cover"
+                    transition={300}
+                    onLoad={() => setEmbedLoaded(true)}
+                    onError={() => setEmbedFailed(true)}
+                  />
+                ) : (
+                  <Video
+                    source={{ uri: embeddableLink.url }}
+                    style={styles.embedVideo}
+                    resizeMode="cover"
+                    useNativeControls
+                    shouldPlay={false}
+                    onLoadStart={() => setEmbedLoaded(false)}
+                    onLoad={() => setEmbedLoaded(true)}
+                    onError={() => setEmbedFailed(true)}
+                  />
+                )}
                 {!embedLoaded ? (
                   <View style={styles.embedPlaceholder}>
                     <ActivityIndicator size="small" color="#ffffff" />
@@ -1957,6 +2035,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
       const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isImage = Boolean(file.type && file.type.toLowerCase().startsWith('image/'));
+      const isVideo = Boolean(file.type && file.type.toLowerCase().startsWith('video/'));
       const placeholder: MessageAttachment = {
         id: tempId,
         name: file.name || 'Attachment',
@@ -1964,6 +2043,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
         fileSize: Number(file.size) || 0,
         status: 'pending',
         isImage,
+        isVideo,
         previewUrl: isImage ? file.uri : undefined,
         downloadUrl: undefined,
         publicViewUrl: undefined,
@@ -2461,7 +2541,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
     const normalizedReply = replyContext ? resolveReplyMetadata(replyContext) : undefined;
     const encodedPayload = encodeMessagePayload(trimmedMessage, normalizedReply);
     const temporaryId = `temp-${Date.now()}`;
-    const attachmentsSnapshot = pendingAttachments.filter((attachment) => !attachment.uploadPending);
+  const attachmentsSnapshot = pendingAttachments.filter((attachment) => !attachment.uploadPending);
     const attachmentIds = attachmentsSnapshot
       .map((attachment) => attachment.id)
       .filter((id) => /^\d+$/.test(id));
@@ -4307,6 +4387,20 @@ const styles = StyleSheet.create({
     aspectRatio: 3 / 2,
     backgroundColor: 'rgba(255, 255, 255, 0.02)',
   },
+  heroVideo: {
+    width: '100%',
+    aspectRatio: 3 / 2,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 20,
+  },
+  heroVideoPlaceholder: {
+    width: '100%',
+    aspectRatio: 3 / 2,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   attachmentGroup: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -4349,6 +4443,35 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  attachmentVideoThumb: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
+  attachmentVideoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroVideoContainer: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  heroVideoThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  heroVideoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   attachmentFileRow: {
     flexDirection: 'row',
@@ -4409,6 +4532,11 @@ const styles = StyleSheet.create({
   embedImage: {
     width: 220,
     height: 140,
+  },
+  embedVideo: {
+    width: 220,
+    height: 140,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   embedPlaceholder: {
     ...StyleSheet.absoluteFillObject,
