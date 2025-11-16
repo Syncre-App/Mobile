@@ -2116,18 +2116,18 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
       const files: UploadableAsset[] = (result.assets || [])
         .filter((asset) => asset?.uri)
-        .map((asset) => ({
-          uri: asset.uri,
-          name:
-            asset.fileName ||
-            (asset.mimeType?.startsWith('video/')
-              ? `video-${Date.now()}.mp4`
-              : `photo-${Date.now()}.jpg`),
-          type:
-            asset.mimeType ||
-            (asset.mediaType === ImagePicker.MediaType.Video ? 'video/mp4' : 'image/jpeg'),
-          size: asset.fileSize,
-        }));
+        .map((asset) => {
+          const isVideo = asset.type === 'video' || (asset.mimeType?.startsWith?.('video/'));
+          return {
+            uri: asset.uri,
+            name:
+              asset.fileName ||
+              (isVideo ? `video-${Date.now()}.mp4` : `photo-${Date.now()}.jpg`),
+            type:
+              asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg'),
+            size: asset.fileSize,
+          };
+        });
 
       await handleUploadBatch(files);
     } catch (error) {
