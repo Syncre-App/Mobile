@@ -92,6 +92,8 @@ const ATTACHMENT_STATUS_MAP: Record<string, 'pending' | 'active' | 'expired'> = 
   active: 'active',
   expired: 'expired',
 };
+const MAX_PENDING_ATTACHMENTS = 10;
+const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 
 const buildAbsoluteUrl = (pathValue?: string | null): string | undefined => {
   if (!pathValue) {
@@ -1922,14 +1924,10 @@ const ChatScreen: React.FC = () => {
     [chatId, wsService]
   );
 
-  const uploadSelectedAttachment = useCallback(
+  const uploadSingleAttachment = useCallback(
     async (file: UploadableAsset) => {
       if (!chatId) {
         NotificationService.show('error', 'This conversation is not available');
-        return;
-      }
-      if (attachmentPickerBusy) {
-        NotificationService.show('info', 'Please wait for the current upload to complete');
         return;
       }
 
@@ -1953,7 +1951,6 @@ const ChatScreen: React.FC = () => {
       setPendingAttachments((prev) => [...prev, placeholder]);
 
       try {
-        setAttachmentPickerBusy(true);
         const response = await ChatService.uploadAttachment(chatId, file);
         if (!response.success || !response.data?.attachment) {
           NotificationService.show('error', response.error || 'Failed to upload attachment');
@@ -1962,48 +1959,114 @@ const ChatScreen: React.FC = () => {
         }
         const mapped = mapServerAttachment(response.data.attachment);
         setPendingAttachments((prev) =>
-          prev.map((attachment) => (attachment.id === tempId ? { ...mapped, uploadPending: false } : attachment))
+          prev.map((attachment) =>
+            attachment.id === tempId
+              ? {
+                  ...mapped,
+                  uploadPending: false,
+                }
+              : attachment
+          )
         );
       } catch (error) {
         console.error('Attachment upload failed:', error);
         NotificationService.show('error', 'Unable to upload attachment');
         setPendingAttachments((prev) => prev.filter((attachment) => attachment.id !== tempId));
+      }
+    },
+    [chatId]
+  );
+
+  const ensureAttachmentCapacity = useCallback(
+    (files: UploadableAsset[]) => {
+      const sanitized = files.filter((file) => file && file.uri);
+      if (!sanitized.length) {
+        return false;
+      }
+
+      const availableSlots = MAX_PENDING_ATTACHMENTS - pendingAttachments.length;
+      if (sanitized.length > availableSlots) {
+        NotificationService.show(
+          'warning',
+          `You can attach up to ${MAX_PENDING_ATTACHMENTS} items per message`
+        );
+        return false;
+      }
+
+      const currentBytes = pendingAttachments.reduce(
+        (total, attachment) => total + (attachment.fileSize || 0),
+        0
+      );
+      const newBytes = sanitized.reduce((total, file) => total + (file.size || 0), 0);
+      if (currentBytes + newBytes > MAX_ATTACHMENT_BYTES) {
+        NotificationService.show('warning', 'Attachments are limited to 100MB per message');
+        return false;
+      }
+
+      return true;
+    },
+    [pendingAttachments]
+  );
+
+  const handleUploadBatch = useCallback(
+    async (files: UploadableAsset[]) => {
+      const sanitized = files.filter((file) => file && file.uri);
+      if (!sanitized.length) {
+        return;
+      }
+      if (!ensureAttachmentCapacity(sanitized)) {
+        return;
+      }
+      if (attachmentPickerBusy) {
+        NotificationService.show('info', 'Please wait for the current upload to complete');
+        return;
+      }
+
+      setAttachmentPickerBusy(true);
+      try {
+        for (const file of sanitized) {
+          // eslint-disable-next-line no-await-in-loop
+          await uploadSingleAttachment(file);
+        }
       } finally {
         setAttachmentPickerBusy(false);
       }
     },
-    [attachmentPickerBusy, chatId]
+    [attachmentPickerBusy, ensureAttachmentCapacity, uploadSingleAttachment]
   );
 
   const handlePickDocument = useCallback(async () => {
     try {
       const pickerResult = await DocumentPicker.getDocumentAsync({
-        multiple: false,
+        multiple: true,
         copyToCacheDirectory: true,
         type: '*/*',
       });
       if (pickerResult.canceled) {
         return;
       }
-      const document: any =
-        (pickerResult.assets && pickerResult.assets[0]) ||
-        ((pickerResult as any)?.uri ? (pickerResult as any) : null);
-      if (!document?.uri) {
-        NotificationService.show('error', 'Unable to read the selected file');
-        return;
-      }
+      const documents =
+        pickerResult.assets && pickerResult.assets.length
+          ? pickerResult.assets
+          : pickerResult.type === 'success'
+            ? [pickerResult]
+            : [];
 
-      await uploadSelectedAttachment({
-        uri: document.uri,
-        name: document.name || `upload-${Date.now()}`,
-        type: document.mimeType || document.type || 'application/octet-stream',
-        size: document.size,
-      });
+      const files: UploadableAsset[] = documents
+        .filter((doc: any) => doc?.uri)
+        .map((doc: any) => ({
+          uri: doc.uri,
+          name: doc.name || `upload-${Date.now()}`,
+          type: doc.mimeType || doc.type || 'application/octet-stream',
+          size: doc.size,
+        }));
+
+      await handleUploadBatch(files);
     } catch (error) {
       console.error('Document picker failed:', error);
       NotificationService.show('error', 'Unable to add this file');
     }
-  }, [uploadSelectedAttachment]);
+  }, [handleUploadBatch]);
 
   const handlePickPhoto = useCallback(async () => {
     try {
@@ -2016,28 +2079,27 @@ const ChatScreen: React.FC = () => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.9,
-        allowsMultipleSelection: false,
+        allowsMultipleSelection: true,
       });
       if (result.canceled) {
         return;
       }
-      const asset = result.assets?.[0];
-      if (!asset?.uri) {
-        NotificationService.show('error', 'Unable to read the selected image');
-        return;
-      }
 
-      await uploadSelectedAttachment({
-        uri: asset.uri,
-        name: asset.fileName || `photo-${Date.now()}.jpg`,
-        type: asset.mimeType || 'image/jpeg',
-        size: asset.fileSize,
-      });
+      const files: UploadableAsset[] = (result.assets || [])
+        .filter((asset) => asset?.uri)
+        .map((asset) => ({
+          uri: asset.uri,
+          name: asset.fileName || `photo-${Date.now()}.jpg`,
+          type: asset.mimeType || 'image/jpeg',
+          size: asset.fileSize,
+        }));
+
+      await handleUploadBatch(files);
     } catch (error) {
       console.error('Image picker failed:', error);
       NotificationService.show('error', 'Unable to add this photo');
     }
-  }, [uploadSelectedAttachment]);
+  }, [handleUploadBatch]);
 
   const handleAttachmentPicker = useCallback(() => {
     if (!chatId) {
