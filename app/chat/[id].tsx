@@ -967,7 +967,9 @@ useEffect(() => {
               <Text style={styles.editedLabel}>Edited</Text>
             ) : null}
           </View>
-          {statusText ? <Text style={styles.statusText}>{statusText}</Text> : null}
+          {statusText && !(message.status === 'seen' && shouldShowSeenAvatars) ? (
+            <Text style={styles.statusText}>{statusText}</Text>
+          ) : null}
           {shouldShowSeenAvatars && displayedSeenReceipts.length ? (
             <View style={styles.seenReceiptRow}>
               {isGroupChat && unseenReceiptCount > 0 ? (
