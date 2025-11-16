@@ -8,7 +8,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
 import { NotificationService } from '../../services/NotificationService';
@@ -483,6 +482,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
     return findEmbeddableLink(message.content || '');
   }, [message.attachments, message.content, message.isPlaceholder]);
+  const [embedLoaded, setEmbedLoaded] = useState(false);
+  const [embedFailed, setEmbedFailed] = useState(false);
+  useEffect(() => {
+    setEmbedLoaded(false);
+    setEmbedFailed(false);
+  }, [embeddableLink]);
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -724,13 +729,25 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 )}
               </Text>
             ) : null}
-            {embeddableLink ? (
+            {embeddableLink && !embedFailed ? (
               <Pressable
                 style={styles.embedPreview}
                 onPress={() => onLinkPress?.(embeddableLink)}
               >
-                <Image source={{ uri: embeddableLink }} style={styles.embedImage} contentFit="cover" />
-                <Text style={styles.embedLabel}>Tap to open</Text>
+                <Image
+                  source={{ uri: embeddableLink }}
+                  style={styles.embedImage}
+                  contentFit="cover"
+                  transition={300}
+                  onLoad={() => setEmbedLoaded(true)}
+                  onError={() => setEmbedFailed(true)}
+                />
+                {!embedLoaded ? (
+                  <View style={styles.embedPlaceholder}>
+                    <ActivityIndicator size="small" color="#ffffff" />
+                    <Text style={styles.embedPlaceholderText}>Previewing…</Text>
+                  </View>
+                ) : null}
               </Pressable>
             ) : null}
             {message.isEdited && !message.isPlaceholder ? (
@@ -4021,6 +4038,7 @@ const styles = StyleSheet.create({
   attachmentImage: {
     width: '100%',
     height: '100%',
+    backgroundColor: 'rgba(255,255,255,0.02)',
   },
   attachmentFileRow: {
     flexDirection: 'row',
@@ -4067,6 +4085,17 @@ const styles = StyleSheet.create({
   embedImage: {
     width: 220,
     height: 140,
+  },
+  embedPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  embedPlaceholderText: {
+    color: '#ffffff',
+    fontSize: 12,
   },
   embedLabel: {
     paddingVertical: 6,
