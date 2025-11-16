@@ -52,6 +52,13 @@ interface MessageAttachment {
   uploadPending?: boolean;
 }
 
+interface SeenReceipt {
+  userId: string;
+  username?: string | null;
+  avatarUrl?: string | null;
+  seenAt?: string | null;
+}
+
 interface Message {
   id: string;
   senderId: string;
@@ -74,6 +81,7 @@ interface Message {
   editedAt?: string | null;
   isEdited?: boolean;
   deletedLabel?: string | null;
+  seenBy?: SeenReceipt[];
 }
 
 interface ChatParticipant {
@@ -155,6 +163,26 @@ const resolveAttachmentUri = (attachment: MessageAttachment): string | undefined
   attachment.publicDownloadUrl ||
   attachment.downloadUrl ||
   attachment.localUri;
+
+const mapServerReceipts = (raw?: any): SeenReceipt[] => {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((entry) => {
+      const identifier = entry?.userId ?? entry?.viewerId ?? entry?.id;
+      if (!identifier) {
+        return null;
+      }
+      return {
+        userId: String(identifier),
+        username: entry?.username ?? entry?.viewerUsername ?? entry?.viewerName ?? null,
+        avatarUrl: entry?.avatarUrl ?? entry?.viewerAvatar ?? entry?.avatar ?? null,
+        seenAt: entry?.seenAt ?? entry?.timestamp ?? null,
+      } as SeenReceipt;
+    })
+    .filter(Boolean) as SeenReceipt[];
+};
 
 const LINK_REGEX = /(https?:\/\/[^\s]+)/gi;
 const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp|bmp|tiff|heic|heif)$/i.test(url.split('?')[0]);
@@ -481,6 +509,7 @@ interface MessageBubbleProps {
   onBubbleLongPress?: (event: GestureResponderEvent) => void;
   onAttachmentPress?: (attachment: MessageAttachment, attachments?: MessageAttachment[]) => void;
   onLinkPress?: (url: string) => void;
+  isGroupChat: boolean;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -500,6 +529,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onBubbleLongPress,
   onAttachmentPress,
   onLinkPress,
+  isGroupChat,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -631,6 +661,16 @@ useEffect(() => {
       : null;
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const hasAttachments = attachments.length > 0;
+  const seenReceipts = Array.isArray(message.seenBy) ? message.seenBy : [];
+  const shouldShowSeenAvatars =
+    isMine && showStatus && isGroupChat && message.status === 'seen' && seenReceipts.length > 0;
+  const MAX_SEEN_AVATARS = 4;
+  const displayedSeenReceipts = shouldShowSeenAvatars
+    ? seenReceipts.slice(-MAX_SEEN_AVATARS)
+    : [];
+  const unseenReceiptCount = shouldShowSeenAvatars
+    ? Math.max(seenReceipts.length - displayedSeenReceipts.length, 0)
+    : 0;
 
   return (
     <>
@@ -901,8 +941,25 @@ useEffect(() => {
               <Text style={styles.editedLabel}>Edited</Text>
             ) : null}
           </View>
-          {statusText && (
-            <Text style={styles.statusText}>{statusText}</Text>
+          {shouldShowSeenAvatars ? (
+            <View style={styles.seenReceiptRow}>
+              {unseenReceiptCount > 0 ? (
+                <View style={styles.seenReceiptOverflow}>
+                  <Text style={styles.seenReceiptOverflowText}>+{unseenReceiptCount}</Text>
+                </View>
+              ) : null}
+              {displayedSeenReceipts.map((receipt) => (
+                <UserAvatar
+                  key={`${message.id}-seen-${receipt.userId}`}
+                  uri={receipt.avatarUrl || undefined}
+                  name={receipt.username || 'Member'}
+                  size={18}
+                  style={styles.seenReceiptAvatar}
+                />
+              ))}
+            </View>
+          ) : (
+            statusText && <Text style={styles.statusText}>{statusText}</Text>
           )}
           {replyCount > 0 && onOpenThread && (
             <Pressable
@@ -1463,6 +1520,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
           : serverReply || resolveReplyMetadata(decodedPayload.replyTo);
 
         const senderProfile = resolveSenderProfile(String(senderId));
+        const seenBy = mapServerReceipts((raw as any)?.seenBy);
         results.push({
           id: String(idValue),
           senderId: String(senderId),
@@ -1485,6 +1543,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
           isEdited: Boolean(editedAt),
           editedAt: editedAt ?? undefined,
           isPlaceholder: Boolean(isDeleted),
+          seenBy,
         });
       }
 
@@ -1541,7 +1600,12 @@ const [messageActionContext, setMessageActionContext] = useState<{
   }, [chatId, wsService]);
 
   const updateOutgoingStatus = useCallback(
-    (status: MessageStatus, messageId?: string, timestamp?: string | null) => {
+    (
+      status: MessageStatus,
+      messageId?: string,
+      timestamp?: string | null,
+      receipt?: SeenReceipt | null
+    ) => {
       if (!currentUserId) {
         return;
       }
@@ -1552,15 +1616,34 @@ const [messageActionContext, setMessageActionContext] = useState<{
             return msg;
           }
 
+          const applyReceipt = (target: Message): Message => {
+            if (status !== 'seen' || !receipt?.userId) {
+              return {
+                ...target,
+                status,
+                timestamp: timestamp ?? target.timestamp,
+              };
+            }
+            const existing = Array.isArray(target.seenBy) ? target.seenBy : [];
+            const alreadyIndexed = existing.some((entry) => entry.userId === receipt.userId);
+            const mergedReceipts = alreadyIndexed ? existing : [...existing, receipt];
+            return {
+              ...target,
+              status,
+              timestamp: timestamp ?? target.timestamp,
+              seenBy: mergedReceipts,
+            };
+          };
+
           if (messageId) {
             if (msg.id === String(messageId)) {
-              return { ...msg, status, timestamp: timestamp ?? msg.timestamp };
+              return applyReceipt(msg);
             }
             return msg;
           }
 
           if (msg.status !== 'seen') {
-            return { ...msg, status, timestamp: timestamp ?? msg.timestamp };
+            return applyReceipt(msg);
           }
 
           return msg;
@@ -2586,6 +2669,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       status: 'sending',
       replyTo: normalizedReply,
       attachments: attachmentsSnapshot,
+      seenBy: [],
     };
 
     setMessagesAnimated((prev) => {
@@ -2779,10 +2863,20 @@ const [messageActionContext, setMessageActionContext] = useState<{
               'deliveredAtLocal',
               'deliveredAt',
             ]) || null;
+          const viewerReceipt =
+            status === 'seen' && payload.viewerId
+              ? {
+                  userId: String(payload.viewerId),
+                  username: payload.viewerUsername || payload.viewerName || null,
+                  avatarUrl: payload.viewerAvatar || null,
+                  seenAt: statusTimestamp,
+                }
+              : undefined;
           updateOutgoingStatus(
             status,
             payload.messageId ? String(payload.messageId) : undefined,
-            statusTimestamp
+            statusTimestamp,
+            viewerReceipt
           );
           return;
         }
@@ -2827,21 +2921,22 @@ const [messageActionContext, setMessageActionContext] = useState<{
             const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
             const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
             const attachments = mapServerAttachments(payload.attachments);
-            const newEntry: Message = {
-              id: String(payload.messageId ?? payload.id ?? Date.now()),
-              senderId: String(payload.senderId ?? ''),
-              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-              senderName: senderProfile.name,
-              senderAvatar: senderProfile.avatar,
-              content: decodedPayload.text,
-              timestamp: local,
-              utcTimestamp: utc,
-              timezone,
-              replyTo,
-              attachments,
-              isEdited: Boolean(payload.editedAt),
-              editedAt: payload.editedAt ?? undefined,
-            };
+        const newEntry: Message = {
+          id: String(payload.messageId ?? payload.id ?? Date.now()),
+          senderId: String(payload.senderId ?? ''),
+          receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+          senderName: senderProfile.name,
+          senderAvatar: senderProfile.avatar,
+          content: decodedPayload.text,
+          timestamp: local,
+          utcTimestamp: utc,
+          timezone,
+          replyTo,
+          attachments,
+          isEdited: Boolean(payload.editedAt),
+          editedAt: payload.editedAt ?? undefined,
+          seenBy: [],
+        };
 
             setMessagesAnimated((prev) => {
               const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
@@ -3288,13 +3383,14 @@ const [messageActionContext, setMessageActionContext] = useState<{
           isHighlighted={highlightedMessageId === messageItem.id}
           replyCount={replyCount}
           onOpenThread={(messageId) => setThreadRootId(messageId)}
-          showSenderMetadata={Boolean(chatDetails?.isGroup)}
+          showSenderMetadata={isGroupChat}
           onBubblePress={() =>
             setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
           }
           onBubbleLongPress={(event) => handleBubbleLongPress(messageItem, event)}
           onAttachmentPress={handleAttachmentTap}
           onLinkPress={handleOpenLink}
+          isGroupChat={isGroupChat}
         />
       );
     },
@@ -3307,7 +3403,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       lastOutgoingMessageId,
       timestampVisibleFor,
       typingUserLabel,
-      chatDetails?.isGroup,
+      isGroupChat,
     ]
   );
 
@@ -4222,6 +4318,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     alignSelf: 'flex-end',
     marginTop: 2,
+  },
+  seenReceiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  seenReceiptAvatar: {
+    borderWidth: 1,
+    borderColor: 'rgba(3, 4, 10, 0.9)',
+  },
+  seenReceiptOverflow: {
+    minWidth: 28,
+    paddingHorizontal: 6,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  seenReceiptOverflowText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    fontWeight: '600',
   },
   timestampContainer: {
     alignSelf: 'center',
