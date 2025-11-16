@@ -4473,22 +4473,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroVideoContainer: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  heroVideoThumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  heroVideoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   attachmentFileRow: {
     flexDirection: 'row',
     alignItems: 'center',
