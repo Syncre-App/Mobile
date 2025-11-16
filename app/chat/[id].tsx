@@ -3346,6 +3346,16 @@ const [messageActionContext, setMessageActionContext] = useState<{
     }
   }, [decoratedData]);
 
+  const directRecipient = useMemo(() => {
+    if (chatDetails?.isGroup) {
+      return null;
+    }
+    const participants = chatDetails?.participants || [];
+    return (
+      participants.find((participant) => participant.id !== currentUserId) || null
+    );
+  }, [chatDetails?.isGroup, chatDetails?.participants, currentUserId]);
+
   const renderChatItem = useCallback(
     ({ item, index }: { item: ChatListItem; index: number }) => {
       if (item.kind === 'typing') {
@@ -3498,14 +3508,6 @@ const [messageActionContext, setMessageActionContext] = useState<{
     return 'Offline';
   }, [chatDetails, currentUserId]);
 
-  const directRecipient = useMemo(() => {
-    if (!isGroupChat && chatDetails?.participants?.length) {
-      return (
-        chatDetails.participants.find((participant) => participant.id !== currentUserId) || null
-      );
-    }
-    return null;
-  }, [chatDetails?.participants, currentUserId, isGroupChat]);
 
   if (!chatId) {
     return (
