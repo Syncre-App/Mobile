@@ -105,5 +105,32 @@ export class ChatService {
     }
     return ApiService.delete(`/chat/${chatId}`, authToken);
   }
-}
 
+  static async uploadAttachment(
+    chatId: string,
+    file: UploadableAsset,
+    token?: string
+  ): Promise<ApiResponse> {
+    const authToken = await resolveToken(token);
+    if (!authToken) {
+      return unauthenticatedResponse();
+    }
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name || `attachment-${Date.now()}`,
+      type: file.type || 'application/octet-stream',
+    } as any);
+
+    return ApiService.upload(`/chat/${chatId}/attachments`, formData, authToken);
+  }
+
+  static async deleteAttachment(attachmentId: string, token?: string): Promise<ApiResponse> {
+    const authToken = await resolveToken(token);
+    if (!authToken) {
+      return unauthenticatedResponse();
+    }
+    return ApiService.delete(`/chat/attachments/${attachmentId}`, authToken);
+  }
+}

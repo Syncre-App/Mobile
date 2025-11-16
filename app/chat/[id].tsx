@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, BackHandler, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
+import { ActivityIndicator, ActionSheetIOS, Alert, Animated, BackHandler, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable, Linking, Share } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as DocumentPicker from 'expo-document-picker';
+import { Image } from 'expo-image';
 
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
@@ -32,6 +34,17 @@ interface ReplyMetadata {
   preview?: string;
 }
 
+interface MessageAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  fileSize: number;
+  status: 'pending' | 'active' | 'expired';
+  isImage: boolean;
+  previewUrl?: string;
+  downloadUrl?: string;
+}
+
 interface Message {
   id: string;
   senderId: string;
@@ -47,6 +60,13 @@ interface Message {
   status?: MessageStatus;
   isPlaceholder?: boolean;
   replyTo?: ReplyMetadata;
+  attachments?: MessageAttachment[];
+  isDeleted?: boolean;
+  deletedByName?: string | null;
+  deletedAt?: string | null;
+  editedAt?: string | null;
+  isEdited?: boolean;
+  deletedLabel?: string | null;
 }
 
 interface ChatParticipant {
@@ -62,6 +82,99 @@ type ChatListItem =
   | { kind: 'typing'; id: string };
 
 const MESSAGE_PAYLOAD_VERSION = 1;
+const ATTACHMENT_STATUS_MAP: Record<string, 'pending' | 'active' | 'expired'> = {
+  pending: 'pending',
+  active: 'active',
+  expired: 'expired',
+};
+
+const buildAbsoluteUrl = (pathValue?: string | null): string | undefined => {
+  if (!pathValue) {
+    return undefined;
+  }
+  if (/^https?:\/\//i.test(pathValue)) {
+    return pathValue;
+  }
+  const normalized = pathValue.startsWith('/') ? pathValue : `/${pathValue}`;
+  return `${ApiService.baseUrl}${normalized}`;
+};
+
+const formatBytes = (size: number): string => {
+  if (!Number.isFinite(size) || size <= 0) {
+    return '0 B';
+  }
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const index = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+  const value = size / 1024 ** index;
+  return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+};
+
+const mapServerAttachment = (raw: any): MessageAttachment => ({
+  id: String(raw.id),
+  name: raw.name || raw.fileName || 'Attachment',
+  mimeType: raw.mimeType || 'application/octet-stream',
+  fileSize: Number(raw.fileSize) || 0,
+  status: ATTACHMENT_STATUS_MAP[String(raw.status)] ?? 'active',
+  isImage: Boolean(raw.isImage),
+  previewUrl: buildAbsoluteUrl(raw.previewPath),
+  downloadUrl: buildAbsoluteUrl(raw.downloadPath),
+});
+
+const mapServerAttachments = (raw?: any): MessageAttachment[] => {
+  if (!raw) {
+    return [];
+  }
+  if (Array.isArray(raw)) {
+    return raw.map((entry) => mapServerAttachment(entry));
+  }
+  return [];
+};
+
+const LINK_REGEX = /(https?:\/\/[^\s]+)/gi;
+const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp)$/i.test(url.split('?')[0]);
+
+const splitTextByLinks = (text: string): Array<{ type: 'text' | 'link'; value: string }> => {
+  if (!text || typeof text !== 'string') {
+    return [{ type: 'text', value: '' }];
+  }
+  const segments: Array<{ type: 'text' | 'link'; value: string }> = [];
+  let lastIndex = 0;
+  text.replace(LINK_REGEX, (match, _offset, index) => {
+    const startIndex = typeof index === 'number' ? index : text.indexOf(match, lastIndex);
+    if (startIndex > lastIndex) {
+      segments.push({ type: 'text', value: text.slice(lastIndex, startIndex) });
+    }
+    segments.push({ type: 'link', value: match });
+    lastIndex = startIndex + match.length;
+    return match;
+  });
+  if (lastIndex < text.length) {
+    segments.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+  if (!segments.length) {
+    segments.push({ type: 'text', value: text });
+  }
+  return segments;
+};
+
+const findEmbeddableLink = (text: string): string | null => {
+  if (!text) {
+    return null;
+  }
+  const matches = text.match(LINK_REGEX);
+  if (!matches) {
+    return null;
+  }
+  const match = matches.find((url) => isImageUrl(url));
+  return match || null;
+};
+
+const buildDeletedLabel = (username?: string | null) => {
+  if (!username) {
+    return 'Message deleted';
+  }
+  return `${username} deleted a message`;
+};
 
 const normalizePreviewText = (value: string): string => {
   if (!value) {
@@ -332,6 +445,8 @@ interface MessageBubbleProps {
   showSenderMetadata?: boolean;
   onBubblePress?: () => void;
   onBubbleLongPress?: () => void;
+  onAttachmentPress?: (attachment: MessageAttachment) => void;
+  onLinkPress?: (url: string) => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -349,10 +464,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   showSenderMetadata = false,
   onBubblePress,
   onBubbleLongPress,
+  onAttachmentPress,
+  onLinkPress,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
   const swipePeakRef = useRef(0);
+  const textSegments = useMemo(() => splitTextByLinks(message.content || ''), [message.content]);
+  const embeddableLink = useMemo(() => {
+    if (message.isPlaceholder || message.attachments?.length) {
+      return null;
+    }
+    return findEmbeddableLink(message.content || '');
+  }, [message.attachments, message.content, message.isPlaceholder]);
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -514,9 +638,84 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 </View>
               </Pressable>
             )}
-            <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
-              {message.content}
-            </Text>
+            {Array.isArray(message.attachments) && message.attachments.length > 0 ? (
+              <View style={styles.attachmentGroup}>
+                {message.attachments.map((attachment) => {
+                  const isExpired = attachment.status === 'expired';
+                  const isPreviewable = attachment.isImage && attachment.previewUrl;
+                  return (
+                    <Pressable
+                      key={`${message.id}-attachment-${attachment.id}`}
+                      style={[
+                        styles.attachmentCard,
+                        isPreviewable ? styles.attachmentImageCard : styles.attachmentFileCard,
+                      ]}
+                      onPress={() => !isExpired && onAttachmentPress?.(attachment)}
+                      disabled={isExpired}
+                    >
+                      {isPreviewable ? (
+                        <Image
+                          source={{ uri: attachment.previewUrl }}
+                          style={styles.attachmentImage}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View style={styles.attachmentFileRow}>
+                          <Ionicons
+                            name="document-text-outline"
+                            size={18}
+                            color="rgba(255,255,255,0.9)"
+                            style={styles.attachmentFileIcon}
+                          />
+                          <View style={styles.attachmentFileBody}>
+                            <Text style={styles.attachmentFileName} numberOfLines={1}>
+                              {attachment.name}
+                            </Text>
+                            <Text style={styles.attachmentFileMeta}>
+                              {formatBytes(attachment.fileSize)}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+                      {isExpired ? (
+                        <View style={styles.attachmentExpiredOverlay}>
+                          <Text style={styles.attachmentExpiredText}>File or Image expired</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+            {message.content?.length ? (
+              <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
+                {textSegments.map((segment, idx) =>
+                  segment.type === 'link' ? (
+                    <Text
+                      key={`${message.id}-link-${idx}`}
+                      style={styles.linkText}
+                      onPress={() => onLinkPress?.(segment.value)}
+                    >
+                      {segment.value}
+                    </Text>
+                  ) : (
+                    <Text key={`${message.id}-text-${idx}`}>{segment.value}</Text>
+                  )
+                )}
+              </Text>
+            ) : null}
+            {embeddableLink ? (
+              <Pressable
+                style={styles.embedPreview}
+                onPress={() => onLinkPress?.(embeddableLink)}
+              >
+                <Image source={{ uri: embeddableLink }} style={styles.embedImage} contentFit="cover" />
+                <Text style={styles.embedLabel}>Tap to open</Text>
+              </Pressable>
+            ) : null}
+            {message.isEdited && !message.isPlaceholder ? (
+              <Text style={styles.editedLabel}>Edited</Text>
+            ) : null}
           </View>
           {statusText && (
             <Text style={styles.statusText}>{statusText}</Text>
@@ -591,6 +790,10 @@ const ChatScreen: React.FC = () => {
   const initialLoadCompleteRef = useRef(false);
   const isNearTopRef = useRef(false);
   const isNearBottomRef = useRef(true);
+  const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
+  const [attachmentPickerBusy, setAttachmentPickerBusy] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<MessageAttachment | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
   const [chatDetails, setChatDetails] = useState<{
@@ -889,7 +1092,7 @@ const ChatScreen: React.FC = () => {
   }, [messages, currentUserId]);
 
   const transformMessages = useCallback(
-    async (
+  async (
       rawMessages: any[],
       otherUserId: string | null,
       token: string | null,
@@ -917,6 +1120,14 @@ const ChatScreen: React.FC = () => {
         const deliveredAt = resolveDeliveryTimestamp(raw);
         const seenAt = resolveSeenTimestamp(raw);
 
+        const isDeleted = Boolean(raw.isDeleted ?? raw.is_deleted);
+        const deletedByName = raw.deletedByName ?? raw.deleted_by_name ?? raw.deletedBy ?? null;
+        const deletedAt = normalizeTimestampValue(raw.deletedAt ?? raw.deleted_at);
+        const editedAt = normalizeTimestampValue(raw.editedAt ?? raw.edited_at);
+        const attachments = Array.isArray(raw.attachments)
+          ? raw.attachments.map((item: any) => mapServerAttachment(item))
+          : [];
+
         let content: string | null = null;
         if (raw.isEncrypted && Array.isArray(raw.envelopes)) {
           if (!chatId) {
@@ -939,8 +1150,12 @@ const ChatScreen: React.FC = () => {
         }
 
         if (content == null) {
-          missingEnvelope = true;
-          continue;
+          if (isDeleted) {
+            content = buildDeletedLabel(deletedByName || resolveSenderProfile(String(senderId)).name);
+          } else {
+            missingEnvelope = true;
+            continue;
+          }
         }
 
         let status: MessageStatus | undefined;
@@ -956,7 +1171,9 @@ const ChatScreen: React.FC = () => {
 
         const decodedPayload = decodeMessagePayload(content);
         const serverReply = resolveReplyMetadata((raw as any)?.reply);
-        const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
+        const replyTo = isDeleted
+          ? undefined
+          : serverReply || resolveReplyMetadata(decodedPayload.replyTo);
 
         const senderProfile = resolveSenderProfile(String(senderId));
         results.push({
@@ -973,6 +1190,14 @@ const ChatScreen: React.FC = () => {
           seenAt: seenAt ?? undefined,
           status,
           replyTo,
+          attachments,
+          isDeleted,
+          deletedByName: deletedByName || senderProfile.name,
+          deletedAt: deletedAt ?? undefined,
+          deletedLabel: isDeleted ? buildDeletedLabel(deletedByName || senderProfile.name) : null,
+          isEdited: Boolean(editedAt),
+          editedAt: editedAt ?? undefined,
+          isPlaceholder: Boolean(isDeleted),
         });
       }
 
@@ -1542,8 +1767,345 @@ const ChatScreen: React.FC = () => {
     [chatId, wsService]
   );
 
+  const handleAttachmentPicker = useCallback(async () => {
+    if (!chatId || attachmentPickerBusy) {
+      return;
+    }
+    try {
+      setAttachmentPickerBusy(true);
+      const pickerResult = await DocumentPicker.getDocumentAsync({
+        multiple: false,
+        copyToCacheDirectory: true,
+        type: '*/*',
+      });
+      if (pickerResult.canceled) {
+        return;
+      }
+      const document: any =
+        (pickerResult.assets && pickerResult.assets[0]) ||
+        (pickerResult.type === 'success' ? pickerResult : null);
+      if (!document?.uri) {
+        NotificationService.show('error', 'Unable to read the selected file');
+        return;
+      }
+
+      const uploadResponse = await ChatService.uploadAttachment(
+        chatId,
+        {
+          uri: document.uri,
+          name: document.name || `upload-${Date.now()}`,
+          type: document.mimeType || document.type || 'application/octet-stream',
+        },
+        authTokenRef.current || undefined
+      );
+
+      if (!uploadResponse.success || !uploadResponse.data?.attachment) {
+        NotificationService.show('error', uploadResponse.error || 'Failed to upload file');
+        return;
+      }
+
+      const mapped = mapServerAttachment(uploadResponse.data.attachment);
+      setPendingAttachments((prev) => [...prev, mapped]);
+    } catch (error) {
+      console.error('Attachment picker failed:', error);
+      NotificationService.show('error', 'Unable to add this file');
+    } finally {
+      setAttachmentPickerBusy(false);
+    }
+  }, [attachmentPickerBusy, chatId]);
+
+  const handleRemoveAttachment = useCallback(
+    async (attachmentId: string) => {
+      setPendingAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId));
+      try {
+        await ChatService.deleteAttachment(attachmentId, authTokenRef.current || undefined);
+      } catch (error) {
+        console.error('Failed to remove attachment', error);
+      }
+    },
+    []
+  );
+
+  const startEditMessage = useCallback(
+    (message: Message) => {
+      if (message.isPlaceholder || message.isDeleted) {
+        return;
+      }
+      setEditingMessage(message);
+      setNewMessage(message.content);
+      requestAnimationFrame(() => composerRef.current?.focus());
+    },
+    []
+  );
+
+  const handleSubmitEdit = useCallback(async () => {
+    if (!editingMessage || !currentUserId || !chatId) {
+      return;
+    }
+
+    const trimmed = newMessage.trim();
+    if (!trimmed.length) {
+      NotificationService.show('warning', 'Message cannot be empty');
+      return;
+    }
+    if (trimmed.length > MESSAGE_CHAR_LIMIT) {
+      NotificationService.show('error', `Messages are limited to ${MESSAGE_CHAR_LIMIT} characters`);
+      return;
+    }
+
+    setIsSendingMessage(true);
+    ensureTypingStopped();
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token for edit');
+      }
+      authTokenRef.current = token;
+
+      const otherParticipants = participantIdsRef.current
+        .filter((participantId) => participantId !== currentUserId)
+        .filter(Boolean);
+      const recipientIds =
+        otherParticipants.length > 0
+          ? otherParticipants
+          : otherUserIdRef.current
+            ? [otherUserIdRef.current]
+            : [];
+
+      if (!recipientIds.length) {
+        throw new Error('No chat recipients available');
+      }
+
+      const encryptedPayload = await CryptoService.buildEncryptedPayload({
+        chatId,
+        message: encodeMessagePayload(trimmed, resolveReplyMetadata(editingMessage.replyTo)),
+        recipientUserIds: recipientIds,
+        token,
+        currentUserId,
+      });
+
+      wsService.send({
+        type: 'message_edit',
+        chatId,
+        messageId: editingMessage.id,
+        envelopes: encryptedPayload.envelopes,
+        senderDeviceId: encryptedPayload.senderDeviceId,
+        messageType: 'e2ee',
+      });
+
+      setEditingMessage(null);
+      setNewMessage('');
+    } catch (error) {
+      console.error('Failed to edit message', error);
+      NotificationService.show('error', 'Unable to edit this message. Please try again.');
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }, [
+    chatId,
+    currentUserId,
+    editingMessage,
+    ensureTypingStopped,
+    newMessage,
+    resolveReplyMetadata,
+    wsService,
+  ]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessage(null);
+    setNewMessage('');
+  }, []);
+
+  const deleteMessageById = useCallback(
+    async (message: Message) => {
+      if (!chatId) {
+        return;
+      }
+      try {
+        const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+        if (!token) {
+          throw new Error('Missing auth token');
+        }
+        authTokenRef.current = token;
+        const response = await ApiService.delete(`/chat/${chatId}/messages/${message.id}`, token);
+        if (!response.success) {
+          NotificationService.show('error', response.error || 'Unable to delete message');
+          return;
+        }
+        const deletedLabel = buildDeletedLabel(user?.username || 'You');
+        setMessagesAnimated((prev) =>
+          prev.map((msg) => {
+            if (msg.id !== message.id) {
+              return msg;
+            }
+            return {
+              ...msg,
+              content: deletedLabel,
+              isPlaceholder: true,
+              isDeleted: true,
+              deletedByName: user?.username || 'You',
+              deletedLabel,
+              deletedAt: new Date().toISOString(),
+              attachments: (msg.attachments || []).map((attachment) => ({
+                ...attachment,
+                status: 'expired' as const,
+                previewUrl: undefined,
+                downloadUrl: undefined,
+              })),
+            };
+          })
+        );
+      } catch (error) {
+        console.error('Failed to delete message', error);
+        NotificationService.show('error', 'Unable to delete message right now');
+      }
+    },
+    [chatId, setMessagesAnimated, user?.username]
+  );
+
+  const confirmDeleteMessage = useCallback(
+    (message: Message) => {
+      Alert.alert('Delete message?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteMessageById(message) },
+      ]);
+    },
+    [deleteMessageById]
+  );
+
+  const handleOpenLink = useCallback((url?: string | null) => {
+    if (!url) {
+      NotificationService.show('error', 'Link is not available');
+      return;
+    }
+    Linking.openURL(url).catch((error) => {
+      console.error('Failed to open link', error);
+      NotificationService.show('error', 'Unable to open link');
+    });
+  }, []);
+
+  const handleAttachmentTap = useCallback(
+    (attachment: MessageAttachment) => {
+      if (!attachment || attachment.status === 'expired') {
+        NotificationService.show('info', 'File or image expired');
+        return;
+      }
+      setPreviewAttachment(attachment);
+    },
+    []
+  );
+
+  const handleDownloadAttachment = useCallback(
+    (attachment?: MessageAttachment | null) => {
+      if (!attachment) {
+        return;
+      }
+      handleOpenLink(attachment.downloadUrl || attachment.previewUrl);
+    },
+    [handleOpenLink]
+  );
+
+  const handleShareAttachment = useCallback(
+    async (attachment?: MessageAttachment | null) => {
+      if (!attachment?.downloadUrl) {
+        NotificationService.show('error', 'Download is not available for this file');
+        return;
+      }
+      try {
+        await Share.share({
+          url: attachment.downloadUrl,
+          title: attachment.name,
+          message: attachment.downloadUrl,
+        });
+      } catch (error) {
+        console.error('Failed to share attachment', error);
+        NotificationService.show('error', 'Unable to share this file');
+      }
+    },
+    []
+  );
+
+  const handleBubbleLongPress = useCallback(
+    (message: Message) => {
+      if (message.isPlaceholder) {
+        if (message.replyTo) {
+          setReplyContext(buildReplyPayloadFromMessage(message));
+        }
+        return;
+      }
+
+      const canEdit = message.senderId === currentUserId && !message.isDeleted;
+      const canDelete = message.senderId === currentUserId && !message.isDeleted;
+
+      const actions: Array<{ label: string; onPress: () => void; destructive?: boolean }> = [
+        {
+          label: 'Reply',
+          onPress: () => setReplyContext(buildReplyPayloadFromMessage(message)),
+        },
+      ];
+
+      if (canEdit) {
+        actions.push({
+          label: 'Edit',
+          onPress: () => startEditMessage(message),
+        });
+      }
+
+      if (canDelete) {
+        actions.push({
+          label: 'Delete',
+          destructive: true,
+          onPress: () => confirmDeleteMessage(message),
+        });
+      }
+
+      actions.push({ label: 'Cancel', onPress: () => {} });
+
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: actions.map((action) => action.label),
+            cancelButtonIndex: actions.length - 1,
+            destructiveButtonIndex: actions.findIndex((action) => action.destructive),
+          },
+          (index) => {
+            const action = actions[index];
+            if (action && action.onPress) {
+              action.onPress();
+            }
+          }
+        );
+      } else {
+        Alert.alert(
+          'Message options',
+          undefined,
+          actions
+            .filter((action) => action.label !== 'Cancel')
+            .map((action) => ({
+              text: action.label,
+              onPress: action.onPress,
+              style: action.destructive ? 'destructive' : 'default',
+            }))
+            .concat([{ text: 'Cancel', style: 'cancel' }])
+        );
+      }
+    },
+    [buildReplyPayloadFromMessage, confirmDeleteMessage, currentUserId, startEditMessage]
+  );
+
   const handleSendMessage = useCallback(async () => {
-    if (!newMessage.trim() || !currentUserId || !chatId) {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    const trimmedMessage = newMessage.trim();
+    if (!trimmedMessage && pendingAttachments.length === 0) {
+      return;
+    }
+
+    if (editingMessage) {
+      await handleSubmitEdit();
       return;
     }
 
@@ -1552,11 +2114,12 @@ const ChatScreen: React.FC = () => {
       return;
     }
 
-    const trimmedMessage = newMessage.trim();
     const pendingReply = replyContext;
     const normalizedReply = replyContext ? resolveReplyMetadata(replyContext) : undefined;
     const encodedPayload = encodeMessagePayload(trimmedMessage, normalizedReply);
     const temporaryId = `temp-${Date.now()}`;
+    const attachmentsSnapshot = pendingAttachments;
+    const attachmentIds = attachmentsSnapshot.map((attachment) => attachment.id);
     const optimisticMessage: Message = {
       id: temporaryId,
       senderId: currentUserId,
@@ -1567,10 +2130,11 @@ const ChatScreen: React.FC = () => {
       timestamp: new Date().toISOString(),
       status: 'sending',
       replyTo: normalizedReply,
+      attachments: attachmentsSnapshot,
     };
 
     setMessagesAnimated((prev) => {
-      const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
+      const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
       return [...withoutPlaceholders, optimisticMessage];
     });
     InteractionManager.runAfterInteractions(() => {
@@ -1578,6 +2142,9 @@ const ChatScreen: React.FC = () => {
     });
     setNewMessage('');
     setReplyContext(null);
+    if (attachmentsSnapshot.length) {
+      setPendingAttachments([]);
+    }
     requestAnimationFrame(() => {
       composerRef.current?.focus();
     });
@@ -1621,6 +2188,7 @@ const ChatScreen: React.FC = () => {
         senderDeviceId: encryptedPayload.senderDeviceId,
         messageType: 'e2ee',
         replyMetadata: normalizedReply,
+        attachments: attachmentIds,
       });
     } catch (error) {
       console.error(`Error sending encrypted message to chat ${chatId}:`, error);
@@ -1630,14 +2198,20 @@ const ChatScreen: React.FC = () => {
       if (pendingReply) {
         setReplyContext(pendingReply);
       }
+      if (attachmentIds.length) {
+        setPendingAttachments(attachmentsSnapshot);
+      }
     } finally {
       setIsSendingMessage(false);
     }
   }, [
     chatId,
     currentUserId,
+    editingMessage,
     ensureTypingStopped,
+    handleSubmitEdit,
     newMessage,
+    pendingAttachments,
     replyContext,
     resolveReplyMetadata,
     scrollToBottom,
@@ -1797,6 +2371,7 @@ const ChatScreen: React.FC = () => {
             const serverReply = resolveReplyMetadata(payload.reply);
             const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
             const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const attachments = mapServerAttachments(payload.attachments);
             const newEntry: Message = {
               id: String(payload.messageId ?? payload.id ?? Date.now()),
               senderId: String(payload.senderId ?? ''),
@@ -1808,10 +2383,13 @@ const ChatScreen: React.FC = () => {
               utcTimestamp: utc,
               timezone,
               replyTo,
+              attachments,
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
             };
 
             setMessagesAnimated((prev) => {
-              const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
+              const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
               const exists = withoutPlaceholders.some((msg) => msg.id === newEntry.id);
               if (exists) {
                 return withoutPlaceholders;
@@ -1833,6 +2411,7 @@ const ChatScreen: React.FC = () => {
           const serverReply = resolveReplyMetadata(payload.reply);
           const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
           const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+          const attachments = mapServerAttachments(payload.attachments);
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
             senderId: String(payload.senderId ?? ''),
@@ -1844,10 +2423,13 @@ const ChatScreen: React.FC = () => {
             utcTimestamp: utc,
             timezone,
             replyTo,
+            attachments,
+            isEdited: Boolean(payload.editedAt),
+            editedAt: payload.editedAt ?? undefined,
           };
 
           setMessagesAnimated((prev) => {
-            const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder);
+            const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
             if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
               return withoutPlaceholders;
             }
@@ -1861,7 +2443,96 @@ const ChatScreen: React.FC = () => {
           if (!deletedId) {
             return;
           }
-          setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== deletedId));
+          const deletedLabel = buildDeletedLabel(payload.deletedByName);
+          setMessagesAnimated((prev) =>
+            prev.map((msg) => {
+              if (msg.id !== deletedId) {
+                return msg;
+              }
+              return {
+                ...msg,
+                content: deletedLabel,
+                isPlaceholder: true,
+                isDeleted: true,
+                deletedLabel,
+                deletedByName: payload.deletedByName || msg.senderName || 'Member',
+                deletedAt: payload.deletedAt || new Date().toISOString(),
+                attachments: (msg.attachments || []).map((attachment) => ({
+                  ...attachment,
+                  status: 'expired' as const,
+                  previewUrl: undefined,
+                  downloadUrl: undefined,
+                })),
+              };
+            })
+          );
+          return;
+        }
+        case 'message_edited': {
+          const editedId = String(payload.messageId ?? payload.id ?? '');
+          if (!editedId) {
+            return;
+          }
+          const attachments = mapServerAttachments(payload.attachments);
+          const editedAt = payload.editedAt || payload.timestamp || new Date().toISOString();
+          if (Array.isArray(payload.envelopes) && payload.envelopes.length) {
+            try {
+              const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+              authTokenRef.current = token || null;
+              const decrypted = await CryptoService.decryptMessage({
+                chatId: targetChatId,
+                envelopes: payload.envelopes,
+                senderId: payload.senderId ?? payload.userId ?? null,
+                currentUserId,
+                token: token || undefined,
+              });
+              if (!decrypted) {
+                console.warn(`Failed to decrypt edited message ${editedId}`);
+                return;
+              }
+              const decodedPayload = decodeMessagePayload(decrypted);
+              const serverReply = resolveReplyMetadata(payload.reply);
+              const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
+              setMessagesAnimated((prev) =>
+                prev.map((msg) => {
+                  if (msg.id !== editedId) {
+                    return msg;
+                  }
+                  return {
+                    ...msg,
+                    content: decodedPayload.text,
+                    replyTo,
+                    isEdited: true,
+                    editedAt,
+                    attachments,
+                    isPlaceholder: Boolean(msg.isDeleted),
+                  };
+                })
+              );
+            } catch (error) {
+              console.error('Failed to decrypt edited message payload:', error);
+            }
+          } else if (typeof payload.content === 'string') {
+            const decodedPayload = decodeMessagePayload(payload.content);
+            const serverReply = resolveReplyMetadata(payload.reply);
+            const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
+            setMessagesAnimated((prev) =>
+              prev.map((msg) => {
+                if (msg.id !== editedId) {
+                  return msg;
+                }
+                return {
+                  ...msg,
+                  content: decodedPayload.text,
+                  replyTo,
+                  isEdited: true,
+                  editedAt,
+                  attachments,
+                  isPlaceholder: Boolean(msg.isDeleted),
+                };
+              })
+            );
+          }
           return;
         }
         case 'chat_updated':
@@ -2166,10 +2837,9 @@ const ChatScreen: React.FC = () => {
           onBubblePress={() =>
             setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
           }
-          onBubbleLongPress={() => {
-            if (messageItem.isPlaceholder) return;
-            setReplyContext(buildReplyPayloadFromMessage(messageItem));
-          }}
+          onBubbleLongPress={() => handleBubbleLongPress(messageItem)}
+          onAttachmentPress={handleAttachmentTap}
+          onLinkPress={handleOpenLink}
         />
       );
     },
@@ -2197,6 +2867,7 @@ const ChatScreen: React.FC = () => {
   );
 
   const isComposerEmpty = newMessage.trim().length === 0;
+  const hasPendingAttachments = pendingAttachments.length > 0;
   const keyboardOffset = useMemo(
     () => (Platform.OS === 'ios' ? insets.bottom : 0),
     [insets.bottom]
@@ -2211,7 +2882,8 @@ const ChatScreen: React.FC = () => {
     }
     return Math.max(insets.bottom, 12);
   }, [insets.bottom, isKeyboardVisible]);
-  const sendButtonDisabled = isComposerEmpty || isSendingMessage;
+  const sendButtonDisabled =
+    ((isComposerEmpty && !hasPendingAttachments) || isSendingMessage || attachmentPickerBusy);
 
   const isGroupChat = Boolean(chatDetails?.isGroup);
   const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
@@ -2442,8 +3114,63 @@ const ChatScreen: React.FC = () => {
             </Pressable>
           </View>
         )}
+        {pendingAttachments.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.attachmentPreviewContent}
+            style={styles.attachmentPreviewRow}
+          >
+            {pendingAttachments.map((attachment) => (
+              <View key={`pending-${attachment.id}`} style={styles.attachmentChip}>
+                <Ionicons
+                  name={attachment.isImage ? 'image-outline' : 'document-text-outline'}
+                  size={16}
+                  color="#ffffff"
+                />
+                <View style={styles.attachmentChipBody}>
+                  <Text style={styles.attachmentChipName} numberOfLines={1}>
+                    {attachment.name}
+                  </Text>
+                  <Text style={styles.attachmentChipMeta}>{formatBytes(attachment.fileSize)}</Text>
+                </View>
+                <Pressable
+                  onPress={() => handleRemoveAttachment(attachment.id)}
+                  style={styles.attachmentChipRemove}
+                  hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                >
+                  <Ionicons name="close" size={12} color="#ffffff" />
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        ) : null}
+        {editingMessage ? (
+          <View style={styles.editingBanner}>
+            <Ionicons name="create-outline" size={14} color="#ffffff" style={styles.editingBannerIcon} />
+            <Text style={styles.editingBannerText}>Editing message</Text>
+            <Pressable onPress={handleCancelEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={14} color="#ffffff" />
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={[styles.inputContainer, { paddingBottom: composerBottomPadding }]}>
+          <Pressable
+            onPress={handleAttachmentPicker}
+            style={[
+              styles.attachButton,
+              (attachmentPickerBusy || Boolean(editingMessage)) && styles.attachButtonDisabled,
+            ]}
+            disabled={attachmentPickerBusy || Boolean(editingMessage)}
+            accessibilityRole="button"
+          >
+            {attachmentPickerBusy ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Ionicons name="attach" size={18} color="#ffffff" />
+            )}
+          </Pressable>
           <View style={styles.composerColumn}>
             <TextInput
               ref={composerRef}
@@ -2536,6 +3263,58 @@ const ChatScreen: React.FC = () => {
             <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
               <Text style={styles.threadJumpButtonText}>View in chat</Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={Boolean(previewAttachment)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewAttachment(null)}
+      >
+        <View style={styles.attachmentModalOverlay}>
+          <View style={styles.attachmentModalCard}>
+            <View style={styles.attachmentModalHeader}>
+              <Text style={styles.attachmentModalTitle} numberOfLines={1}>
+                {previewAttachment?.name || 'Attachment'}
+              </Text>
+              <Pressable onPress={() => setPreviewAttachment(null)}>
+                <Ionicons name="close" size={18} color="#ffffff" />
+              </Pressable>
+            </View>
+            {previewAttachment?.isImage && previewAttachment.previewUrl ? (
+              <Image
+                source={{ uri: previewAttachment.previewUrl }}
+                style={styles.attachmentModalImage}
+                contentFit="contain"
+              />
+            ) : (
+              <View style={styles.attachmentModalFile}>
+                <Ionicons name="document-text-outline" size={28} color="#ffffff" />
+                <Text style={styles.attachmentModalFileName} numberOfLines={1}>
+                  {previewAttachment?.name}
+                </Text>
+                <Text style={styles.attachmentModalFileMeta}>
+                  {formatBytes(previewAttachment?.fileSize || 0)}
+                </Text>
+              </View>
+            )}
+            <View style={styles.attachmentModalActions}>
+              <Pressable
+                style={styles.attachmentModalButton}
+                onPress={() => handleDownloadAttachment(previewAttachment)}
+              >
+                <Ionicons name="download-outline" size={18} color="#03040A" />
+                <Text style={styles.attachmentModalButtonText}>Download</Text>
+              </Pressable>
+              <Pressable
+                style={styles.attachmentModalButton}
+                onPress={() => handleShareAttachment(previewAttachment)}
+              >
+                <Ionicons name="share-outline" size={18} color="#03040A" />
+                <Text style={styles.attachmentModalButtonText}>Share</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2984,7 +3763,7 @@ const styles = StyleSheet.create({
   },
   composerColumn: {
     flex: 1,
-    marginRight: 12,
+    marginHorizontal: 12,
   },
   textInput: {
     width: '100%',
@@ -3018,6 +3797,215 @@ const styles = StyleSheet.create({
   },
   sendButtonPressed: {
     opacity: 0.8,
+  },
+  attachmentGroup: {
+    rowGap: 8,
+  },
+  attachmentCard: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  attachmentImageCard: {
+    width: 220,
+    height: 160,
+  },
+  attachmentFileCard: {
+    padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  attachmentImage: {
+    width: '100%',
+    height: '100%',
+  },
+  attachmentFileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 8,
+  },
+  attachmentFileIcon: {
+    marginRight: 8,
+  },
+  attachmentFileBody: {
+    flex: 1,
+  },
+  attachmentFileName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  attachmentFileMeta: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+  },
+  attachmentExpiredOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  attachmentExpiredText: {
+    color: '#ffffff',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  linkText: {
+    color: '#5ECDF8',
+    textDecorationLine: 'underline',
+  },
+  embedPreview: {
+    marginTop: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  embedImage: {
+    width: 220,
+    height: 140,
+  },
+  embedLabel: {
+    paddingVertical: 6,
+    textAlign: 'center',
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 12,
+  },
+  editedLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.65)',
+    alignSelf: 'flex-end',
+  },
+  attachmentPreviewRow: {
+    maxHeight: 72,
+  },
+  attachmentPreviewContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    alignItems: 'center',
+    columnGap: 8,
+  },
+  attachmentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    columnGap: 8,
+  },
+  attachmentChipBody: {
+    maxWidth: 180,
+  },
+  attachmentChipName: {
+    color: '#ffffff',
+    fontSize: 13,
+  },
+  attachmentChipMeta: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11,
+  },
+  attachmentChipRemove: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    columnGap: 8,
+  },
+  editingBannerIcon: {
+    marginRight: 2,
+  },
+  editingBannerText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13,
+    flex: 1,
+  },
+  attachButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachButtonDisabled: {
+    opacity: 0.4,
+  },
+  attachmentModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  attachmentModalCard: {
+    width: '100%',
+    borderRadius: 24,
+    backgroundColor: '#101425',
+    padding: 16,
+  },
+  attachmentModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  attachmentModalTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+    marginRight: 12,
+  },
+  attachmentModalImage: {
+    width: '100%',
+    height: 240,
+    borderRadius: 16,
+    marginBottom: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  attachmentModalFile: {
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  attachmentModalFileName: {
+    color: '#ffffff',
+    fontSize: 15,
+  },
+  attachmentModalFileMeta: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 13,
+  },
+  attachmentModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    columnGap: 12,
+  },
+  attachmentModalButton: {
+    flex: 1,
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    paddingVertical: 10,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  attachmentModalButtonText: {
+    color: '#03040A',
+    fontWeight: '600',
   },
   scrollToBottomButton: {
     position: 'absolute',
