@@ -2077,7 +2077,7 @@ const ChatScreen: React.FC = () => {
           }
         );
       } else {
-        const alertButtons = actions
+        const alertButtons: Array<{ text: string; onPress: () => void; style?: 'destructive' | 'default' | 'cancel' }> = actions
           .filter((action) => action.label !== 'Cancel')
           .map((action) => ({
             text: action.label,
@@ -2088,7 +2088,7 @@ const ChatScreen: React.FC = () => {
         alertButtons.push({
           text: 'Cancel',
           onPress: () => {},
-          style: 'cancel' as 'cancel',
+          style: 'cancel',
         });
 
         Alert.alert('Message options', undefined, alertButtons);
