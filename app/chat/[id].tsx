@@ -2101,12 +2101,12 @@ const [messageActionContext, setMessageActionContext] = useState<{
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (permission.status !== 'granted') {
-        NotificationService.show('warning', 'Photo access is required to send images');
+        NotificationService.show('warning', 'Media access is required to send photos or videos');
         return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
         quality: 0.9,
         allowsMultipleSelection: true,
       });
@@ -2118,51 +2118,23 @@ const [messageActionContext, setMessageActionContext] = useState<{
         .filter((asset) => asset?.uri)
         .map((asset) => ({
           uri: asset.uri,
-          name: asset.fileName || `photo-${Date.now()}.jpg`,
-          type: asset.mimeType || 'image/jpeg',
+          name:
+            asset.fileName ||
+            (asset.mimeType?.startsWith('video/')
+              ? `video-${Date.now()}.mp4`
+              : `photo-${Date.now()}.jpg`),
+          type:
+            asset.mimeType ||
+            (asset.mediaType === ImagePicker.MediaType.Video ? 'video/mp4' : 'image/jpeg'),
           size: asset.fileSize,
         }));
 
       await handleUploadBatch(files);
     } catch (error) {
-      console.error('Image picker failed:', error);
-      NotificationService.show('error', 'Unable to add this photo');
+      console.error('Media picker failed:', error);
+      NotificationService.show('error', 'Unable to add this media');
     }
   }, [handleUploadBatch]);
-
-  const handlePickVideo = useCallback(async () => {
-    closeAttachmentSheet();
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (permission.status !== 'granted') {
-        NotificationService.show('warning', 'Video access is required to send clips');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-        allowsMultipleSelection: true,
-        quality: 1,
-      });
-      if (result.canceled) {
-        return;
-      }
-
-      const files: UploadableAsset[] = (result.assets || [])
-        .filter((asset) => asset?.uri)
-        .map((asset) => ({
-          uri: asset.uri,
-          name: asset.fileName || `video-${Date.now()}.mp4`,
-          type: asset.mimeType || 'video/mp4',
-          size: asset.fileSize,
-        }));
-
-      await handleUploadBatch(files);
-    } catch (error) {
-      console.error('Video picker failed:', error);
-      NotificationService.show('error', 'Unable to add this video');
-    }
-  }, [handleUploadBatch, closeAttachmentSheet]);
 
   const handleAttachmentTrigger = useCallback(() => {
     if (!chatId) {
@@ -3828,18 +3800,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
             >
               <Ionicons name="images-outline" size={18} color="#ffffff" />
               <View style={styles.attachmentSheetLabelColumn}>
-                <Text style={styles.attachmentSheetButtonLabel}>Photos</Text>
+                <Text style={styles.attachmentSheetButtonLabel}>Photos & Videos</Text>
                 <Text style={styles.attachmentSheetButtonHint}>Camera roll</Text>
-              </View>
-            </Pressable>
-            <Pressable
-              style={styles.attachmentSheetButton}
-              onPress={handlePickVideo}
-            >
-              <Ionicons name="videocam-outline" size={18} color="#ffffff" />
-              <View style={styles.attachmentSheetLabelColumn}>
-                <Text style={styles.attachmentSheetButtonLabel}>Videos</Text>
-                <Text style={styles.attachmentSheetButtonHint}>Gallery clips</Text>
               </View>
             </Pressable>
             <Pressable
