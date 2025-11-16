@@ -510,7 +510,6 @@ interface MessageBubbleProps {
   onAttachmentPress?: (attachment: MessageAttachment, attachments?: MessageAttachment[]) => void;
   onLinkPress?: (url: string) => void;
   isGroupChat: boolean;
-  lastSeenMessageId?: string | null;
   directRecipient?: ChatParticipant | null;
 }
 
@@ -532,7 +531,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onAttachmentPress,
   onLinkPress,
   isGroupChat,
-  lastSeenMessageId,
   directRecipient,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -667,10 +665,12 @@ useEffect(() => {
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const hasAttachments = attachments.length > 0;
   const seenReceipts = Array.isArray(message.seenBy) ? message.seenBy : [];
-  const isLastSeenMessage =
-    Boolean(lastSeenMessageId) && message.id === lastSeenMessageId && !message.isPlaceholder;
   const shouldShowSeenAvatars =
-    isMine && isLastSeenMessage && (isGroupChat ? seenReceipts.length > 0 : true);
+    isMine &&
+    showStatus &&
+    !message.isPlaceholder &&
+    message.status === 'seen' &&
+    (isGroupChat ? seenReceipts.length > 0 : true);
   const MAX_SEEN_AVATARS = 4;
   const displayedSeenReceipts = (() => {
     if (!shouldShowSeenAvatars) {
@@ -967,6 +967,7 @@ useEffect(() => {
               <Text style={styles.editedLabel}>Edited</Text>
             ) : null}
           </View>
+          {statusText ? <Text style={styles.statusText}>{statusText}</Text> : null}
           {shouldShowSeenAvatars && displayedSeenReceipts.length ? (
             <View style={styles.seenReceiptRow}>
               {isGroupChat && unseenReceiptCount > 0 ? (
@@ -984,9 +985,7 @@ useEffect(() => {
                 />
               ))}
             </View>
-          ) : (
-            statusText && <Text style={styles.statusText}>{statusText}</Text>
-          )}
+          ) : null}
           {replyCount > 0 && onOpenThread && (
             <Pressable
               style={[styles.threadSummaryButton, isMine && styles.threadSummaryButtonMine]}
@@ -1455,23 +1454,6 @@ const [messageActionContext, setMessageActionContext] = useState<{
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const message = messages[i];
       if (!message.isPlaceholder && message.senderId === currentUserId) {
-        return message.id;
-      }
-    }
-    return null;
-  }, [messages, currentUserId]);
-
-  const lastSeenOutgoingMessageId = useMemo(() => {
-    if (!currentUserId) {
-      return null;
-    }
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      const message = messages[i];
-      if (
-        message.senderId === currentUserId &&
-        !message.isPlaceholder &&
-        (message.status === 'seen' || (message.seenBy && message.seenBy.length))
-      ) {
         return message.id;
       }
     }
@@ -3434,6 +3416,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
           onAttachmentPress={handleAttachmentTap}
           onLinkPress={handleOpenLink}
           isGroupChat={Boolean(chatDetails?.isGroup)}
+          directRecipient={directRecipient}
         />
       );
     },
@@ -3447,7 +3430,6 @@ const [messageActionContext, setMessageActionContext] = useState<{
       timestampVisibleFor,
       typingUserLabel,
       Boolean(chatDetails?.isGroup),
-      lastSeenOutgoingMessageId,
       directRecipient,
     ]
   );
