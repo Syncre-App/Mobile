@@ -4,6 +4,10 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+  releases: write
+
 jobs:
   build-android:
     name: Build Android Release
