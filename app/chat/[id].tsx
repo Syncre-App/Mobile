@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { Video } from 'expo-av';
+import { Video, ResizeMode } from 'expo-av';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
 import { NotificationService } from '../../services/NotificationService';
@@ -512,10 +512,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   }, [message.attachments, message.content, message.isPlaceholder]);
   const [embedLoaded, setEmbedLoaded] = useState(false);
   const [embedFailed, setEmbedFailed] = useState(false);
-  useEffect(() => {
-    setEmbedLoaded(false);
-    setEmbedFailed(false);
-  }, [embeddableLink]);
+useEffect(() => {
+  setEmbedLoaded(false);
+  setEmbedFailed(false);
+}, [embeddableLink?.url]);
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -713,7 +713,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                           <Video
                             source={{ uri: resolveAttachmentUri(primaryItem)! }}
                             style={styles.heroVideo}
-                            resizeMode="cover"
+                            resizeMode={ResizeMode.COVER}
                             useNativeControls
                             shouldPlay={false}
                             isLooping={false}
@@ -769,7 +769,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                                     <Video
                                       source={{ uri: resolveAttachmentUri(attachment)! }}
                                       style={StyleSheet.absoluteFillObject}
-                                      resizeMode="cover"
+                                      resizeMode={ResizeMode.COVER}
                                       useNativeControls
                                       shouldPlay={false}
                                     />
@@ -807,7 +807,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                             )}
                             {isExpired ? (
                               <View style={styles.attachmentExpiredOverlay}>
-                                <Text style={styles.attachmentExpiredText}>File or Image expired</Text>
+                                <Text style={styles.attachmentExpiredText}>File or media expired</Text>
                               </View>
                             ) : null}
                           </Pressable>
@@ -853,7 +853,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   <Video
                     source={{ uri: embeddableLink.url }}
                     style={styles.embedVideo}
-                    resizeMode="cover"
+                    resizeMode={ResizeMode.COVER}
                     useNativeControls
                     shouldPlay={false}
                     onLoadStart={() => setEmbedLoaded(false)}
@@ -2408,17 +2408,19 @@ const [messageActionContext, setMessageActionContext] = useState<{
   const handleAttachmentTap = useCallback(
     (attachment: MessageAttachment, siblings?: MessageAttachment[]) => {
       if (!attachment || attachment.status === 'expired') {
-        NotificationService.show('info', 'File or image expired');
+        NotificationService.show('info', 'File or media expired');
         return;
       }
-      const gallery = (siblings || [])
-        .filter(
-          (item) =>
-            item.isImage &&
-            item.status !== 'expired' &&
-            ((item.previewUrl || item.publicViewUrl) ?? item.localUri)
-        );
-      if (attachment.isImage && (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)) {
+      const gallery = (siblings || []).filter(
+        (item) =>
+          (item.isImage || item.isVideo) &&
+          item.status !== 'expired' &&
+          ((item.previewUrl || item.publicViewUrl) ?? item.localUri)
+      );
+      if (
+        (attachment.isImage || attachment.isVideo) &&
+        (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
+      ) {
         const source = gallery.length ? gallery : [attachment];
         const index = source.findIndex((item) => item.id === attachment.id);
         setPreviewContext({
@@ -3553,7 +3555,13 @@ const [messageActionContext, setMessageActionContext] = useState<{
             {pendingAttachments.map((attachment) => (
               <View key={`pending-${attachment.id}`} style={styles.attachmentChip}>
                 <Ionicons
-                  name={attachment.isImage ? 'image-outline' : 'document-text-outline'}
+                  name={
+                    attachment.isVideo
+                      ? 'videocam-outline'
+                      : attachment.isImage
+                        ? 'image-outline'
+                        : 'document-text-outline'
+                  }
                   size={16}
                   color="#ffffff"
                 />
