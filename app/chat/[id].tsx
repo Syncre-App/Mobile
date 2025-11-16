@@ -4006,10 +4006,12 @@ const styles = StyleSheet.create({
   attachmentImageCardLarge: {
     width: 240,
     height: 200,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   attachmentImageCardCompact: {
     width: 150,
     height: 150,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   attachmentFileCard: {
     padding: 12,
