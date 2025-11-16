@@ -5,6 +5,7 @@ import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
@@ -503,6 +504,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
   const swipePeakRef = useRef(0);
+  const replyTriggeredRef = useRef(false);
   const textSegments = useMemo(() => splitTextByLinks(message.content || ''), [message.content]);
   const embeddableLink = useMemo(() => {
     if (message.isPlaceholder || message.attachments?.length) {
@@ -520,10 +522,17 @@ useEffect(() => {
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 6,
+        onMoveShouldSetPanResponder: (_, gesture) => {
+          const horizontal = Math.abs(gesture.dx);
+          const vertical = Math.abs(gesture.dy);
+          if (horizontal < 4) {
+            return false;
+          }
+          return horizontal * 0.8 > vertical;
+        },
         onPanResponderGrant: () => {
           swipePeakRef.current = 0;
+          replyTriggeredRef.current = false;
         },
         onPanResponderMove: (_, gesture) => {
           let nextValue = 0;
@@ -537,15 +546,25 @@ useEffect(() => {
           if (magnitude > swipePeakRef.current) {
             swipePeakRef.current = magnitude;
           }
+          if (
+            magnitude >= SWIPE_REPLY_THRESHOLD &&
+            !replyTriggeredRef.current &&
+            onReplySwipe
+          ) {
+            replyTriggeredRef.current = true;
+            onReplySwipe();
+            Haptics.selectionAsync().catch(() => null);
+          }
         },
         onPanResponderRelease: (_, gesture) => {
           const magnitude =
             swipePeakRef.current ||
             (isMine ? Math.abs(Math.min(gesture.dx, 0)) : Math.abs(Math.max(gesture.dx, 0)));
-          if (magnitude > SWIPE_REPLY_THRESHOLD && onReplySwipe) {
+          if (!replyTriggeredRef.current && magnitude > SWIPE_REPLY_THRESHOLD && onReplySwipe) {
             onReplySwipe();
           }
           swipePeakRef.current = 0;
+          replyTriggeredRef.current = false;
           Animated.spring(swipeAnim, {
             toValue: 0,
             useNativeDriver: true,
@@ -553,6 +572,7 @@ useEffect(() => {
         },
         onPanResponderTerminate: () => {
           swipePeakRef.current = 0;
+          replyTriggeredRef.current = false;
           Animated.spring(swipeAnim, {
             toValue: 0,
             useNativeDriver: true,
@@ -664,15 +684,23 @@ useEffect(() => {
             {message.replyTo && (
               <Pressable
                 onPress={() => onReplyPress?.(message.replyTo as ReplyMetadata)}
-                style={[styles.replyChip, isMine && styles.replyChipMine]}
+                style={[
+                  styles.replyChip,
+                  isMine ? styles.replyChipMine : styles.replyChipTheirs,
+                ]}
               >
-                <View style={styles.replyChipBar} />
+                <View
+                  style={[
+                    styles.replyChipBar,
+                    isMine ? styles.replyChipBarMine : styles.replyChipBarTheirs,
+                  ]}
+                />
                 <View style={styles.replyChipBody}>
                   <Text style={styles.replyChipLabel} numberOfLines={1}>
                     {message.replyTo.senderLabel}
                   </Text>
                   {message.replyTo.preview ? (
-                    <Text style={styles.replyChipText} numberOfLines={1}>
+                    <Text style={styles.replyChipText} numberOfLines={2}>
                       {message.replyTo.preview}
                     </Text>
                   ) : null}
@@ -3526,13 +3554,35 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
         
         {replyContext && (
-          <View style={styles.replyPreview}>
-            <View style={styles.replyPreviewBar} />
+          <View
+            style={[
+              styles.replyPreview,
+              replyContext.senderId === currentUserId
+                ? styles.replyPreviewMine
+                : styles.replyPreviewTheirs,
+            ]}
+          >
+            <View
+              style={[
+                styles.replyPreviewGlyph,
+                replyContext.senderId === currentUserId
+                  ? styles.replyPreviewGlyphMine
+                  : styles.replyPreviewGlyphTheirs,
+              ]}
+            >
+              <Ionicons
+                name="return-down-back-outline"
+                size={18}
+                color={replyContext.senderId === currentUserId ? '#0B1120' : '#FFFFFF'}
+              />
+            </View>
             <View style={styles.replyPreviewBody}>
               <Text style={styles.replyPreviewLabel}>{replyContext.senderLabel}</Text>
-              <Text style={styles.replyPreviewText} numberOfLines={1}>
-                {replyContext.preview}
-              </Text>
+              {replyContext.preview ? (
+                <Text style={styles.replyPreviewText} numberOfLines={2}>
+                  {replyContext.preview}
+                </Text>
+              ) : null}
             </View>
             <Pressable
               style={styles.replyPreviewClose}
@@ -4096,18 +4146,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    padding: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   replyChipMine: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(44, 130, 255, 0.18)',
+    borderColor: 'rgba(44, 130, 255, 0.45)',
+  },
+  replyChipTheirs: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   replyChipBar: {
-    width: 3,
-    height: '100%',
-    marginRight: 8,
-    borderRadius: 2,
+    width: 4,
+    alignSelf: 'stretch',
+    marginRight: 10,
+    borderRadius: 8,
+    backgroundColor: '#2C82FF',
+  },
+  replyChipBarMine: {
+    backgroundColor: '#ffffff',
+    opacity: 0.9,
+  },
+  replyChipBarTheirs: {
     backgroundColor: '#2C82FF',
   },
   replyChipBody: {
@@ -4213,34 +4276,58 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
-  replyPreviewBar: {
-    width: 3,
-    height: '100%',
-    backgroundColor: '#2C82FF',
-    borderRadius: 2,
-    marginRight: 10,
+  replyPreviewMine: {
+    backgroundColor: 'rgba(44, 130, 255, 0.22)',
+    borderColor: 'rgba(44, 130, 255, 0.45)',
+  },
+  replyPreviewTheirs: {
+    backgroundColor: 'rgba(8, 14, 26, 0.95)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  replyPreviewGlyph: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  replyPreviewGlyphMine: {
+    backgroundColor: '#ffffff',
+  },
+  replyPreviewGlyphTheirs: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   replyPreviewBody: {
     flex: 1,
   },
   replyPreviewLabel: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 2,
   },
   replyPreviewText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 13,
+    lineHeight: 18,
   },
   replyPreviewClose: {
     marginLeft: 8,
-    padding: 4,
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   threadModalOverlay: {
     flex: 1,
