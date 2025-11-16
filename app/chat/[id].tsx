@@ -3324,14 +3324,19 @@ const [messageActionContext, setMessageActionContext] = useState<{
   const isComposerEmpty = newMessage.trim().length === 0;
   const hasPendingAttachments = pendingAttachments.length > 0;
   const hasUploadingAttachments = pendingAttachments.some((attachment) => attachment.uploadPending);
-  const keyboardOffset = useMemo(
-    () => (Platform.OS === 'ios' ? insets.bottom : 0),
-    [insets.bottom]
-  );
+  const keyboardOffset = useMemo(() => {
+    if (Platform.OS !== 'ios') {
+      return 0;
+    }
+    if (isKeyboardVisible) {
+      return 0;
+    }
+    return Math.max(insets.bottom - 6, 0);
+  }, [insets.bottom, isKeyboardVisible]);
 
   const composerBottomPadding = useMemo(() => {
     if (Platform.OS === 'ios') {
-      return Math.max(insets.bottom - 6, 4);
+      return isKeyboardVisible ? 6 : Math.max(insets.bottom - 6, 4);
     }
     if (isKeyboardVisible) {
       return 2;
