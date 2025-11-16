@@ -2106,7 +2106,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        mediaTypes: ['images', 'videos'],
         quality: 0.9,
         allowsMultipleSelection: true,
       });
@@ -2117,14 +2117,13 @@ const [messageActionContext, setMessageActionContext] = useState<{
       const files: UploadableAsset[] = (result.assets || [])
         .filter((asset) => asset?.uri)
         .map((asset) => {
-          const isVideo = asset.type === 'video' || (asset.mimeType?.startsWith?.('video/'));
+          const isVideo = asset.type === 'video' || asset.mimeType?.startsWith?.('video/');
           return {
             uri: asset.uri,
             name:
               asset.fileName ||
               (isVideo ? `video-${Date.now()}.mp4` : `photo-${Date.now()}.jpg`),
-            type:
-              asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg'),
+            type: asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg'),
             size: asset.fileSize,
           };
         });
