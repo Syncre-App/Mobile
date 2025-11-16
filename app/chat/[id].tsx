@@ -510,6 +510,8 @@ interface MessageBubbleProps {
   onAttachmentPress?: (attachment: MessageAttachment, attachments?: MessageAttachment[]) => void;
   onLinkPress?: (url: string) => void;
   isGroupChat: boolean;
+  lastSeenMessageId?: string | null;
+  directRecipient?: ChatParticipant | null;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -530,6 +532,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onAttachmentPress,
   onLinkPress,
   isGroupChat,
+  lastSeenMessageId,
+  directRecipient,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -663,15 +667,36 @@ useEffect(() => {
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const hasAttachments = attachments.length > 0;
   const seenReceipts = Array.isArray(message.seenBy) ? message.seenBy : [];
+  const isLastSeenMessage =
+    Boolean(lastSeenMessageId) && message.id === lastSeenMessageId && !message.isPlaceholder;
   const shouldShowSeenAvatars =
-    isMine && showStatus && isGroupChat && message.status === 'seen' && seenReceipts.length > 0;
+    isMine && isLastSeenMessage && (isGroupChat ? seenReceipts.length > 0 : true);
   const MAX_SEEN_AVATARS = 4;
-  const displayedSeenReceipts = shouldShowSeenAvatars
-    ? seenReceipts.slice(-MAX_SEEN_AVATARS)
-    : [];
-  const unseenReceiptCount = shouldShowSeenAvatars
-    ? Math.max(seenReceipts.length - displayedSeenReceipts.length, 0)
-    : 0;
+  const displayedSeenReceipts = (() => {
+    if (!shouldShowSeenAvatars) {
+      return [];
+    }
+    if (isGroupChat) {
+      return seenReceipts.slice(-MAX_SEEN_AVATARS);
+    }
+    if (seenReceipts.length) {
+      return seenReceipts.slice(-1);
+    }
+    if (directRecipient) {
+      return [
+        {
+          userId: directRecipient.id,
+          username: directRecipient.username || 'Friend',
+          avatarUrl: directRecipient.profile_picture || null,
+        },
+      ];
+    }
+    return [];
+  })();
+  const unseenReceiptCount =
+    shouldShowSeenAvatars && isGroupChat
+      ? Math.max(seenReceipts.length - displayedSeenReceipts.length, 0)
+      : 0;
 
   return (
     <>
@@ -942,9 +967,9 @@ useEffect(() => {
               <Text style={styles.editedLabel}>Edited</Text>
             ) : null}
           </View>
-          {shouldShowSeenAvatars ? (
+          {shouldShowSeenAvatars && displayedSeenReceipts.length ? (
             <View style={styles.seenReceiptRow}>
-              {unseenReceiptCount > 0 ? (
+              {isGroupChat && unseenReceiptCount > 0 ? (
                 <View style={styles.seenReceiptOverflow}>
                   <Text style={styles.seenReceiptOverflowText}>+{unseenReceiptCount}</Text>
                 </View>
@@ -1430,6 +1455,23 @@ const [messageActionContext, setMessageActionContext] = useState<{
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const message = messages[i];
       if (!message.isPlaceholder && message.senderId === currentUserId) {
+        return message.id;
+      }
+    }
+    return null;
+  }, [messages, currentUserId]);
+
+  const lastSeenOutgoingMessageId = useMemo(() => {
+    if (!currentUserId) {
+      return null;
+    }
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      if (
+        message.senderId === currentUserId &&
+        !message.isPlaceholder &&
+        (message.status === 'seen' || (message.seenBy && message.seenBy.length))
+      ) {
         return message.id;
       }
     }
@@ -3405,6 +3447,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
       timestampVisibleFor,
       typingUserLabel,
       Boolean(chatDetails?.isGroup),
+      lastSeenOutgoingMessageId,
+      directRecipient,
     ]
   );
 
@@ -3469,6 +3513,15 @@ const [messageActionContext, setMessageActionContext] = useState<{
     }
     return 'Offline';
   }, [chatDetails, currentUserId]);
+
+  const directRecipient = useMemo(() => {
+    if (!isGroupChat && chatDetails?.participants?.length) {
+      return (
+        chatDetails.participants.find((participant) => participant.id !== currentUserId) || null
+      );
+    }
+    return null;
+  }, [chatDetails?.participants, currentUserId, isGroupChat]);
 
   if (!chatId) {
     return (
