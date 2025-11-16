@@ -3743,6 +3743,14 @@ const [messageActionContext, setMessageActionContext] = useState<{
                       style={StyleSheet.absoluteFillObject}
                       contentFit="contain"
                     />
+                  ) : item.isVideo && resolveAttachmentUri(item) ? (
+                    <Video
+                      source={{ uri: resolveAttachmentUri(item)! }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode={ResizeMode.CONTAIN}
+                      useNativeControls
+                      shouldPlay={false}
+                    />
                   ) : (
                     <View style={styles.attachmentModalFile}>
                       <Ionicons name="document-text-outline" size={28} color="#ffffff" />
