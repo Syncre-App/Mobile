@@ -3383,14 +3383,14 @@ const [messageActionContext, setMessageActionContext] = useState<{
           isHighlighted={highlightedMessageId === messageItem.id}
           replyCount={replyCount}
           onOpenThread={(messageId) => setThreadRootId(messageId)}
-          showSenderMetadata={isGroupChat}
+          showSenderMetadata={Boolean(chatDetails?.isGroup)}
           onBubblePress={() =>
             setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
           }
           onBubbleLongPress={(event) => handleBubbleLongPress(messageItem, event)}
           onAttachmentPress={handleAttachmentTap}
           onLinkPress={handleOpenLink}
-          isGroupChat={isGroupChat}
+          isGroupChat={Boolean(chatDetails?.isGroup)}
         />
       );
     },
@@ -3403,7 +3403,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       lastOutgoingMessageId,
       timestampVisibleFor,
       typingUserLabel,
-      isGroupChat,
+      Boolean(chatDetails?.isGroup),
     ]
   );
 
