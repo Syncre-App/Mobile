@@ -2042,15 +2042,18 @@ const ChatScreen: React.FC = () => {
         copyToCacheDirectory: true,
         type: '*/*',
       });
-      if (pickerResult.canceled) {
+      const raw: any = pickerResult;
+      let documents: any[] = [];
+
+      if (Array.isArray(raw.assets) && raw.assets.length) {
+        documents = raw.assets;
+      } else if (Array.isArray(raw.results) && raw.results.length) {
+        documents = raw.results;
+      } else if (raw && typeof raw.uri === 'string' && raw.uri.length) {
+        documents = [raw];
+      } else {
         return;
       }
-      const documents =
-        pickerResult.assets && pickerResult.assets.length
-          ? pickerResult.assets
-          : pickerResult.type === 'success'
-            ? [pickerResult]
-            : [];
 
       const files: UploadableAsset[] = documents
         .filter((doc: any) => doc?.uri)
