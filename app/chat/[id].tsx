@@ -625,6 +625,7 @@ useEffect(() => {
     isMine ? styles.messageRowMine : styles.messageRowTheirs,
     !isFirstInGroup && styles.messageRowStacked,
     isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
+    message.replyTo && styles.messageRowWithReply,
   ];
 
   const bubbleStyle = [
@@ -4169,10 +4170,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   messageRowCompact: {
-    marginBottom: 2,
+    marginBottom: 4,
   },
   messageRowSpaced: {
     marginBottom: 12,
+  },
+  messageRowWithReply: {
+    marginTop: 10,
   },
   messageRowMine: {
     alignSelf: 'flex-end',
