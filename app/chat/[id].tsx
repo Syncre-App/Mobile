@@ -641,6 +641,7 @@ useEffect(() => {
         ? styles.theirBubbleLast
         : styles.theirBubbleStacked,
     message.isPlaceholder && styles.placeholderBubble,
+    message.replyTo && styles.messageBubbleWithReply,
   ];
 
   const replyHintOpacity = useMemo(() => {
@@ -730,6 +731,7 @@ useEffect(() => {
           style={[
             styles.messageContent,
             isMine ? styles.messageContentMine : styles.messageContentTheirs,
+            message.replyTo && styles.messageContentWithReply,
           ]}
           delayLongPress={120}
         >
@@ -4232,6 +4234,10 @@ const styles = StyleSheet.create({
       height: 4,
     },
   },
+  messageBubbleWithReply: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   myBubble: {
     backgroundColor: '#1E84FF',
   },
@@ -4253,6 +4259,9 @@ const styles = StyleSheet.create({
   messageContent: {
     flexShrink: 1,
     maxWidth: '90%',
+  },
+  messageContentWithReply: {
+    minWidth: '75%',
   },
   messageContentMine: {
     alignItems: 'flex-end',
@@ -4285,10 +4294,12 @@ const styles = StyleSheet.create({
   },
   replyChip: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    alignSelf: 'stretch',
+    width: '100%',
     marginBottom: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
   },
@@ -4321,11 +4332,12 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   replyChipText: {
     color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 13,
+    lineHeight: 18,
   },
   replyHint: {
     position: 'absolute',
