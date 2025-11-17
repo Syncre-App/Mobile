@@ -1,5 +1,6 @@
 import * as Linking from 'expo-linking';
 import { Buffer } from 'buffer';
+import { NativeModules } from 'react-native';
 
 export type ShareAttachmentKind = 'text' | 'url' | 'file';
 
@@ -28,17 +29,55 @@ export interface ShareIntentPayload {
 type ShareIntentListener = (payload: ShareIntentPayload | null) => void;
 
 const SHARE_ROUTE_KEYWORDS = ['share', 'share-intent', 'share-intents'];
+const ShareMenuModule = NativeModules?.ShareMenuReactNative;
+
+type ShareMenuItem = {
+  mimeType?: string;
+  data?: string;
+  extraData?: Record<string, any>;
+  text?: string;
+  subject?: string;
+  filename?: string;
+  name?: string;
+  id?: string;
+  identifier?: string;
+  uti?: string;
+  type?: string;
+  filePath?: string;
+  fileSize?: number;
+  contentUri?: string;
+  value?: string;
+};
+
+const isShareMenuItem = (entry: ShareMenuItem | null | undefined): entry is ShareMenuItem =>
+  Boolean(entry);
 
 class ShareIntentManager {
   private payload: ShareIntentPayload | null = null;
   private listeners: Set<ShareIntentListener> = new Set();
   private initialized = false;
+  private shareMenuSubscription: { remove: () => void } | null = null;
 
   init() {
     if (this.initialized) {
       return;
     }
     this.initialized = true;
+
+    if (ShareMenuModule) {
+      try {
+        ShareMenuModule.getSharedItem?.(
+          this.handleShareMenuItem,
+          this.handleShareMenuError
+        );
+        this.shareMenuSubscription = ShareMenuModule.addNewShareListener?.(
+          this.handleShareMenuItem,
+          this.handleShareMenuError
+        );
+      } catch (error) {
+        console.warn('[ShareIntentService] Failed to initialize share menu bridge', error);
+      }
+    }
   }
 
   subscribe(listener: ShareIntentListener): () => void {
@@ -111,6 +150,79 @@ class ShareIntentManager {
       }
     });
   }
+
+  private handleShareMenuItem = (item: ShareMenuItem | ShareMenuItem[] | null) => {
+    if (!item) {
+      return;
+    }
+
+    const base = Array.isArray(item) ? item : [item];
+    const collection = base.filter(isShareMenuItem);
+    if (!collection.length) {
+      return;
+    }
+
+    const attachmentsSource = collection
+      .map((entry, index) => {
+        if (!entry) {
+          return null;
+        }
+
+        const valueCandidate =
+          entry.data ||
+          entry.value ||
+          entry.filePath ||
+          entry.contentUri ||
+          entry.extraData?.data ||
+          '';
+        const normalizedValue = typeof valueCandidate === 'string' ? valueCandidate : '';
+        if (!normalizedValue.length) {
+          return null;
+        }
+
+        return {
+          id: entry.id?.toString?.() ?? entry.identifier?.toString?.() ?? `sharemenu-${Date.now()}-${index}`,
+          value: normalizedValue,
+          mimeType: entry.mimeType || entry.type || entry.extraData?.mimeType,
+          filename:
+            entry.filename ||
+            entry.name ||
+            entry.extraData?.fileName ||
+            entry.extraData?.filename,
+          size: entry.extraData?.size ?? entry.fileSize,
+          uti: entry.uti || entry.extraData?.uti,
+          extra: entry.extraData,
+        };
+      })
+      .filter(Boolean);
+
+    const syntheticPayload = {
+      id:
+        collection[0]?.id?.toString?.() ??
+        collection[0]?.identifier?.toString?.() ??
+        `share-${Date.now()}`,
+      attachments: attachmentsSource,
+      message:
+        collection[0]?.text ||
+        collection[0]?.extraData?.text ||
+        collection[0]?.extraData?.message ||
+        undefined,
+      title: collection[0]?.subject || collection[0]?.extraData?.subject || undefined,
+      extra: collection[0]?.extraData,
+    };
+
+    const normalized = this.normalizePayload(syntheticPayload);
+    if (normalized) {
+      this.payload = normalized;
+      this.notify();
+    }
+  };
+
+  private handleShareMenuError = (error: any) => {
+    if (error) {
+      console.warn('[ShareIntentService] Share menu listener error', error);
+    }
+  };
 
   private parsePayloadFromEncodedString(encoded: string): ShareIntentPayload | null {
     const candidates = new Set<string>();

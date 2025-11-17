@@ -17,7 +17,19 @@
       "bundleIdentifier": "xyz.syncre.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "Syncre uses your approximate location to keep message timestamps accurate."
+        "NSLocationWhenInUseUsageDescription": "Syncre uses your approximate location to keep message timestamps accurate.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "syncre"
+            ]
+          }
+        ]
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.xyz.syncre.share"
+        ]
       }
     },
     "android": {
@@ -58,6 +70,16 @@
         {
           "icon": "./assets/logo.png",
           "color": "#2C82FF"
+        }
+      ],
+      [
+        "react-native-share-menu",
+        {
+          "iosShareExtension": {
+            "bundleIdentifier": "xyz.syncre.share",
+            "displayName": "Syncre",
+            "appGroupIdentifier": "group.xyz.syncre.share"
+          }
         }
       ]
     ],
