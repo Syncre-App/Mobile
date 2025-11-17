@@ -25,6 +25,7 @@ import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
+import { spacing } from '../theme/designSystem';
 
 interface User {
   id: string;
@@ -50,11 +51,8 @@ const resolveExtension = (fileName?: string | null, mimeType?: string | null) =>
 
 export const EditProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const topInset = useMemo(() => {
-    const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0;
-    return Math.max(insets.top, statusBarHeight);
-  }, [insets.top]);
-  const containerPaddingTop = topInset > 0 ? Math.max(topInset - 8, 12) : 16;
+  const topInset = insets.top;
+  const containerPaddingTop = Math.max(topInset, spacing.lg);
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -247,7 +245,7 @@ export const EditProfileScreen: React.FC = () => {
 
   if (initialLoading) {
     return (
-      <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]}>
+      <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]} edges={['top', 'left', 'right']}>
         <AppBackground />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2C82FF" />
@@ -258,7 +256,7 @@ export const EditProfileScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]}>
+    <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <AppBackground />
 

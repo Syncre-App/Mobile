@@ -19,10 +19,12 @@ interface User {
 
 interface FriendSearchWidgetProps {
   onFriendUpdated: () => void;
+  showHeader?: boolean;
 }
 
 export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
   onFriendUpdated,
+  showHeader = true,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -182,9 +184,13 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>Connect</Text>
-      <Text style={styles.title}>Add a friend</Text>
+    <View style={[styles.container, !showHeader && styles.containerCompact]}>
+      {showHeader ? (
+        <>
+          <Text style={styles.label}>Connect</Text>
+          <Text style={styles.title}>Add a friend</Text>
+        </>
+      ) : null}
       <TransparentField
         placeholder="Search users by username or email"
         value={searchQuery}
@@ -225,6 +231,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.maxContentWidth,
     alignSelf: 'center',
+  },
+  containerCompact: {
+    marginBottom: spacing.md,
   },
   searchInput: {
     marginBottom: spacing.sm,

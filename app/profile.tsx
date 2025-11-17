@@ -21,7 +21,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const appVersion = UpdateService.getCurrentVersion();
   const insets = useSafeAreaInsets();
-  const topInset = Math.max(insets.top, StatusBar.currentHeight || 0);
+  const topInset = insets.top;
   const horizontalInset = Math.max(insets.left, insets.right, 16);
 
   const handleBack = () => {
@@ -99,11 +99,11 @@ export default function ProfileScreen() {
       style={[
         styles.container,
         {
-          paddingTop: topInset + 12,
+          paddingTop: Math.max(topInset, 12),
           paddingHorizontal: horizontalInset,
         },
       ]}
-      edges={['left', 'right']}
+      edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <AppBackground />

@@ -924,25 +924,29 @@ export const HomeScreen: React.FC = () => {
               </GlassCard>
             </View>
           )}
-          <View style={styles.section}>
-            <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
-          </View>
-
-          {(incomingRequests.length > 0 || outgoingRequests.length > 0) && (
-            <View style={styles.section}>
-              <FriendRequestsWidget
-                incoming={incomingRequests}
-                outgoing={outgoingRequests}
-                onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
-                onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
-                processingId={requestProcessingId}
-              />
+          <View style={styles.mainColumn}>
+            <View style={styles.searchSection}>
+              <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} showHeader={false} />
             </View>
-          )}
 
-          <View style={[styles.section, styles.chatSection]}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Chats</Text>
+            <View style={styles.headingWrap}>
+              <Text style={styles.chatsHeading}>Chats</Text>
+              <View style={styles.headingUnderline} />
+            </View>
+
+            {(incomingRequests.length > 0 || outgoingRequests.length > 0) && (
+              <View style={styles.section}>
+                <FriendRequestsWidget
+                  incoming={incomingRequests}
+                  outgoing={outgoingRequests}
+                  onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
+                  onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
+                  processingId={requestProcessingId}
+                />
+              </View>
+            )}
+
+            <View style={[styles.section, styles.chatSection]}>
               {totalUnreadChats > 0 && (
                 <View style={styles.sectionBadge}>
                   <Text style={styles.sectionBadgeText}>
@@ -950,18 +954,18 @@ export const HomeScreen: React.FC = () => {
                   </Text>
                 </View>
               )}
+              <ChatListWidget
+                chats={chats}
+                isLoading={chatsLoading}
+                onRefresh={handleChatRefresh}
+                userStatuses={userStatuses}
+                onRemoveFriend={handleRemoveFriend}
+                removingFriendId={removingFriendId}
+                unreadCounts={chatUnreadCounts}
+                onEditGroup={handleEditGroup}
+                onDeleteGroup={handleDeleteGroup}
+              />
             </View>
-            <ChatListWidget
-              chats={chats}
-              isLoading={chatsLoading}
-              onRefresh={handleChatRefresh}
-              userStatuses={userStatuses}
-              onRemoveFriend={handleRemoveFriend}
-              removingFriendId={removingFriendId}
-              unreadCounts={chatUnreadCounts}
-              onEditGroup={handleEditGroup}
-              onDeleteGroup={handleDeleteGroup}
-            />
           </View>
         </SafeAreaView>
       )}
@@ -977,6 +981,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: spacing.md,
+  },
+  mainColumn: {
+    flex: 1,
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -1146,21 +1156,33 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: spacing.lg,
   },
+  searchSection: {
+    marginBottom: spacing.lg,
+  },
+  headingWrap: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  chatsHeading: {
+    color: palette.text,
+    fontSize: 18,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    fontFamily: 'SpaceGrotesk-Medium',
+  },
+  headingUnderline: {
+    marginTop: spacing.xs,
+    width: 60,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
   chatSection: {
     flex: 1,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    color: palette.text,
-    fontSize: 24,
-    fontFamily: 'SpaceGrotesk-SemiBold',
-  },
   sectionBadge: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs / 1.5,
     borderRadius: radii.pill,

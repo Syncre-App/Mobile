@@ -11,7 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
@@ -21,6 +21,7 @@ import { palette, radii, spacing } from '../theme/designSystem';
 
 export const SettingsScreen: React.FC = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
   const [selectedLanguage, setSelectedLanguage] = useState('English');
@@ -99,7 +100,10 @@ export const SettingsScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { paddingTop: Math.max(insets.top, spacing.lg) }]}
+      edges={['top', 'left', 'right']}
+    >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       <AppBackground />

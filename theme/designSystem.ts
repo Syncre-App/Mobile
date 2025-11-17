@@ -24,7 +24,7 @@ export const gradients = {
   buttonPrimary: ['#2563EB', '#0EA5E9', '#8B5CF6'],
   buttonMuted: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)'],
   cardStroke: ['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.04)'],
-  avatarRing: ['#2563EB', '#0EA5E9', '#8B5CF6'],
+  avatarRing: ['#CBD5F5', '#94A3B8', '#64748B'],
 };
 
 export const radii = {
