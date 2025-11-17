@@ -177,12 +177,12 @@ const styles = StyleSheet.create({
   overlayPresence: {
     position: 'absolute',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: '#0B1630',
     zIndex: 2,
   },
   leadingPresence: {
     borderRadius: 999,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: '#0B1630',
   },
 });

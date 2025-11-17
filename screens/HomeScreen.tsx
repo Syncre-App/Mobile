@@ -804,7 +804,7 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <AppBackground />
       
       {isValidatingToken ? (
@@ -1074,9 +1074,9 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: 'rgba(15, 23, 42, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1101,11 +1101,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(15, 23, 42, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   profileAvatar: {
     shadowColor: '#000000',
@@ -1171,7 +1171,7 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginRight: spacing.xs,
-    backgroundColor: palette.accent,
+    backgroundColor: '#22C55E',
   },
   presenceText: {
     color: palette.text,

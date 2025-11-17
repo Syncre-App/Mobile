@@ -60,7 +60,7 @@ export default function Index() {
     return (
       <NotificationProvider>
         <NotificationBridge />
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: palette.background }}>
           <AppBackground />
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator size="large" color={palette.accent} />
@@ -73,7 +73,7 @@ export default function Index() {
   return (
     <NotificationProvider>
       <NotificationBridge />
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: palette.background }}>
         <AppBackground />
         <LoginScreen />
       </View>

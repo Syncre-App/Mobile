@@ -100,12 +100,12 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <StatusBar style="dark" backgroundColor="#FFFFFF" />
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#03040A' }}>
+      <StatusBar style="light" backgroundColor="#03040A" />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#FFFFFF' },
+          contentStyle: { backgroundColor: '#03040A' },
         }}
       />
     </GestureHandlerRootView>
