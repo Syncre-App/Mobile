@@ -1386,11 +1386,9 @@ const [messageActionContext, setMessageActionContext] = useState<{
   );
 
   const scrollToBottom = useCallback(() => {
-    const performScroll = () => {
+    requestAnimationFrame(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
-    };
-    requestAnimationFrame(performScroll);
-    setTimeout(performScroll, 160);
+    });
   }, []);
 
   const decoratedData = useMemo<ChatListItem[]>(() => {
@@ -3209,14 +3207,6 @@ const [messageActionContext, setMessageActionContext] = useState<{
     [hasMore, isLoadingMore, isRefreshing, loadEarlier, showScrollToBottomButton]
   );
 
-  const handleListContentSizeChange = useCallback(() => {
-    if (isNearBottomRef.current) {
-      scrollToBottom();
-    }
-  }, [scrollToBottom]);
-
-
-
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<{ index: number | null; item: ChatListItem }> }) => {
       if (!viewableItems.length) {
@@ -3460,6 +3450,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
       typingUserLabel,
       Boolean(chatDetails?.isGroup),
       directRecipient,
+      handleAttachmentTap,
+      handleOpenLink,
     ]
   );
 
@@ -3628,8 +3620,6 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
                       keyboardShouldPersistTaps="handled"
                       onScroll={handleScroll}
-                      onContentSizeChange={handleListContentSizeChange}
-
 
                       scrollEventThrottle={16}
 
