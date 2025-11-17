@@ -1386,7 +1386,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
-      flatListRef.current?.scrollToEnd({ animated: false });
+      flatListRef.current?.scrollToEnd({ animated: true });
     });
   }, []);
 
