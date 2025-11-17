@@ -668,17 +668,9 @@ useEffect(() => {
       : null;
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const hasAttachments = attachments.length > 0;
-  const defaultSeenReceipts = Array.isArray(message.seenBy) ? message.seenBy : [];
   const overrideSeenReceipts = Array.isArray(seenOverride) ? seenOverride : [];
-  const usingSeenOverride = overrideSeenReceipts.length > 0;
-  const activeSeenReceipts = usingSeenOverride ? overrideSeenReceipts : defaultSeenReceipts;
-  const shouldShowSeenAvatars = usingSeenOverride
-    ? activeSeenReceipts.length > 0
-    : isMine &&
-        showStatus &&
-        !message.isPlaceholder &&
-        message.status === 'seen' &&
-        (isGroupChat ? activeSeenReceipts.length > 0 : true);
+  const activeSeenReceipts = overrideSeenReceipts;
+  const shouldShowSeenAvatars = activeSeenReceipts.length > 0;
   const MAX_SEEN_AVATARS = 4;
   const displayedSeenReceipts = (() => {
     if (!shouldShowSeenAvatars) {
@@ -687,19 +679,7 @@ useEffect(() => {
     if (isGroupChat) {
       return activeSeenReceipts.slice(-MAX_SEEN_AVATARS);
     }
-    if (activeSeenReceipts.length) {
-      return activeSeenReceipts.slice(-1);
-    }
-    if (!usingSeenOverride && directRecipient) {
-      return [
-        {
-          userId: directRecipient.id,
-          username: directRecipient.username || 'Friend',
-          avatarUrl: directRecipient.profile_picture || null,
-        },
-      ];
-    }
-    return [];
+    return activeSeenReceipts.slice(-1);
   })();
   const unseenReceiptCount =
     shouldShowSeenAvatars && isGroupChat
