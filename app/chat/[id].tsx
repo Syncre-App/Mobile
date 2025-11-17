@@ -1386,9 +1386,11 @@ const [messageActionContext, setMessageActionContext] = useState<{
   );
 
   const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
+    const performScroll = () => {
       flatListRef.current?.scrollToEnd({ animated: true });
-    });
+    };
+    requestAnimationFrame(performScroll);
+    setTimeout(performScroll, 160);
   }, []);
 
   const decoratedData = useMemo<ChatListItem[]>(() => {
@@ -3207,6 +3209,12 @@ const [messageActionContext, setMessageActionContext] = useState<{
     [hasMore, isLoadingMore, isRefreshing, loadEarlier, showScrollToBottomButton]
   );
 
+  const handleListContentSizeChange = useCallback(() => {
+    if (isNearBottomRef.current) {
+      scrollToBottom();
+    }
+  }, [scrollToBottom]);
+
 
 
   const onViewableItemsChanged = useRef(
@@ -3619,9 +3627,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
 
                       keyboardShouldPersistTaps="handled"
-
-
                       onScroll={handleScroll}
+                      onContentSizeChange={handleListContentSizeChange}
 
 
                       scrollEventThrottle={16}
