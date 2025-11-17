@@ -226,13 +226,12 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingBottom: 32,
     paddingHorizontal: 16,
+    alignItems: 'stretch',
   },
   section: {
     marginBottom: 16,
     overflow: 'hidden',
     width: '100%',
-    maxWidth: 420,
-    alignSelf: 'center',
   },
   sectionHeader: {
     paddingHorizontal: 20,

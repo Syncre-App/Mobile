@@ -54,7 +54,7 @@ export const EditProfileScreen: React.FC = () => {
     const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0;
     return Math.max(insets.top, statusBarHeight);
   }, [insets.top]);
-  const containerPaddingTop = topInset > 0 ? topInset + (Platform.OS === 'android' ? 8 : 0) : 16;
+  const containerPaddingTop = topInset > 0 ? Math.max(topInset - 8, 12) : 16;
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -395,9 +395,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   card: {
-    alignSelf: 'center',
     width: '100%',
-    maxWidth: 420,
   },
   photoCard: {
     marginBottom: 24,

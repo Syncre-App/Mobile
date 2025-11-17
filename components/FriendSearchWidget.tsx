@@ -6,7 +6,7 @@ import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { layout, palette, radii, spacing } from '../theme/designSystem';
 import { TransparentField } from './TransparentField';
 import { UserAvatar } from './UserAvatar';
 
@@ -223,6 +223,8 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: spacing.lg,
     width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
   },
   searchInput: {
     marginBottom: spacing.sm,
