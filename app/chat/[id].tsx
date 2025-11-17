@@ -4933,7 +4933,6 @@ const styles = StyleSheet.create({
   attachmentModalCarouselContent: {
     paddingVertical: 8,
     alignItems: 'center',
-    gap: 12,
   },
   attachmentModalFile: {
     padding: 20,
@@ -4957,7 +4956,7 @@ const styles = StyleSheet.create({
     columnGap: 12,
   },
   attachmentPreviewSlide: {
-    width: Dimensions.get('window').width - 64,
+    width: Dimensions.get('window').width - 48,
     height: 260,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
