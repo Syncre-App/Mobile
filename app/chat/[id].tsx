@@ -4,6 +4,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -2630,10 +2631,11 @@ const [messageActionContext, setMessageActionContext] = useState<{
       const canEdit = message.senderId === currentUserId && !message.isDeleted;
       const canDelete = message.senderId === currentUserId && !message.isDeleted;
 
+      const replyAction = () => setReplyContext(buildReplyPayloadFromMessage(message));
       const actions: Array<{ label: string; onPress: () => void; destructive?: boolean }> = [
         {
           label: 'Reply',
-          onPress: () => setReplyContext(buildReplyPayloadFromMessage(message)),
+          onPress: replyAction,
         },
       ];
 
@@ -2644,13 +2646,18 @@ const [messageActionContext, setMessageActionContext] = useState<{
         });
       }
 
-  if (canDelete) {
-    actions.push({
-      label: 'Delete',
-      destructive: true,
-      onPress: () => confirmDeleteMessage(message),
-    });
-  }
+      if (canDelete) {
+        actions.push({
+          label: 'Delete',
+          destructive: true,
+          onPress: () => confirmDeleteMessage(message),
+        });
+      }
+
+      if (!canEdit && !canDelete) {
+        replyAction();
+        return;
+      }
 
       actions.push({ label: 'Cancel', onPress: () => {} });
       const anchorY = event?.nativeEvent?.pageY ?? windowHeight / 2;
@@ -4026,33 +4033,35 @@ const [messageActionContext, setMessageActionContext] = useState<{
             ]}
             pointerEvents="box-none"
           >
-            <View style={styles.messageActionSheet}>
-              <View style={styles.messageActionHeader}>
-                <Text style={styles.messageActionTitle}>Message</Text>
-                <Text style={styles.messageActionPreview} numberOfLines={2}>
-                  {messageActionContext.message.content || 'Attachment'}
-                </Text>
-              </View>
-              {messageActionContext.actions.map((action) => (
-                <Pressable
-                  key={`${messageActionContext.message.id}-${action.label}`}
-                  style={[
-                    styles.messageActionButton,
-                    action.destructive && styles.messageActionButtonDestructive,
-                  ]}
-                  onPress={() => handleMessageActionSelect(action)}
-                >
-                  <Text
-                    style={[
-                      styles.messageActionButtonText,
-                      action.destructive && styles.messageActionButtonTextDestructive,
-                    ]}
-                  >
-                    {action.label}
+            <BlurView intensity={55} tint="dark" style={styles.messageActionSheet}>
+              <View style={styles.messageActionSheetContent}>
+                <View style={styles.messageActionHeader}>
+                  <Text style={styles.messageActionTitle}>Message</Text>
+                  <Text style={styles.messageActionPreview} numberOfLines={2}>
+                    {messageActionContext.message.content || 'Attachment'}
                   </Text>
-                </Pressable>
-              ))}
-            </View>
+                </View>
+                {messageActionContext.actions.map((action) => (
+                  <Pressable
+                    key={`${messageActionContext.message.id}-${action.label}`}
+                    style={[
+                      styles.messageActionButton,
+                      action.destructive && styles.messageActionButtonDestructive,
+                    ]}
+                    onPress={() => handleMessageActionSelect(action)}
+                  >
+                    <Text
+                      style={[
+                        styles.messageActionButtonText,
+                        action.destructive && styles.messageActionButtonTextDestructive,
+                      ]}
+                    >
+                      {action.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </BlurView>
           </Animated.View>
         </Animated.View>
       ) : null}
@@ -5002,14 +5011,19 @@ const styles = StyleSheet.create({
   messageActionSheet: {
     width: 240,
     borderRadius: 24,
-    padding: 16,
-    backgroundColor: '#0B1023',
-    gap: 8,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.35,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 12,
+  },
+  messageActionSheetContent: {
+    padding: 16,
+    gap: 8,
+    backgroundColor: 'rgba(4, 8, 18, 0.65)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   messageActionHeader: {
     marginBottom: 8,
