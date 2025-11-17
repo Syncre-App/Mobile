@@ -512,6 +512,7 @@ interface MessageBubbleProps {
   onLinkPress?: (url: string) => void;
   isGroupChat: boolean;
   directRecipient?: ChatParticipant | null;
+  seenOverride?: SeenReceipt[] | null;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -533,6 +534,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onLinkPress,
   isGroupChat,
   directRecipient,
+  seenOverride = null,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -666,25 +668,29 @@ useEffect(() => {
       : null;
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const hasAttachments = attachments.length > 0;
-  const seenReceipts = Array.isArray(message.seenBy) ? message.seenBy : [];
-  const shouldShowSeenAvatars =
-    isMine &&
-    showStatus &&
-    !message.isPlaceholder &&
-    message.status === 'seen' &&
-    (isGroupChat ? seenReceipts.length > 0 : true);
+  const defaultSeenReceipts = Array.isArray(message.seenBy) ? message.seenBy : [];
+  const overrideSeenReceipts = Array.isArray(seenOverride) ? seenOverride : [];
+  const usingSeenOverride = overrideSeenReceipts.length > 0;
+  const activeSeenReceipts = usingSeenOverride ? overrideSeenReceipts : defaultSeenReceipts;
+  const shouldShowSeenAvatars = usingSeenOverride
+    ? activeSeenReceipts.length > 0
+    : isMine &&
+        showStatus &&
+        !message.isPlaceholder &&
+        message.status === 'seen' &&
+        (isGroupChat ? activeSeenReceipts.length > 0 : true);
   const MAX_SEEN_AVATARS = 4;
   const displayedSeenReceipts = (() => {
     if (!shouldShowSeenAvatars) {
       return [];
     }
     if (isGroupChat) {
-      return seenReceipts.slice(-MAX_SEEN_AVATARS);
+      return activeSeenReceipts.slice(-MAX_SEEN_AVATARS);
     }
-    if (seenReceipts.length) {
-      return seenReceipts.slice(-1);
+    if (activeSeenReceipts.length) {
+      return activeSeenReceipts.slice(-1);
     }
-    if (directRecipient) {
+    if (!usingSeenOverride && directRecipient) {
       return [
         {
           userId: directRecipient.id,
@@ -697,7 +703,7 @@ useEffect(() => {
   })();
   const unseenReceiptCount =
     shouldShowSeenAvatars && isGroupChat
-      ? Math.max(seenReceipts.length - displayedSeenReceipts.length, 0)
+      ? Math.max(activeSeenReceipts.length - displayedSeenReceipts.length, 0)
       : 0;
 
   return (
@@ -1385,7 +1391,10 @@ const [messageActionContext, setMessageActionContext] = useState<{
     []
   );
 
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback((force = false) => {
+    if (!force && !isNearBottomRef.current) {
+      return;
+    }
     requestAnimationFrame(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     });
@@ -1428,6 +1437,45 @@ const [messageActionContext, setMessageActionContext] = useState<{
     });
     return counts;
   }, [messages]);
+
+  const seenPlacementMap = useMemo(() => {
+    const placement = new Map<string, SeenReceipt[]>();
+    const latestByUser = new Map<
+      string,
+      { index: number; receipt: SeenReceipt; messageId: string }
+    >();
+    messages.forEach((msg, index) => {
+      (msg.seenBy || []).forEach((receipt) => {
+        if (!receipt?.userId || receipt.userId === currentUserId) {
+          return;
+        }
+        const existing = latestByUser.get(receipt.userId);
+        if (!existing || index > existing.index) {
+          latestByUser.set(receipt.userId, {
+            index,
+            receipt,
+            messageId: msg.id,
+          });
+        }
+      });
+    });
+    latestByUser.forEach(({ receipt, messageId }) => {
+      const list = placement.get(messageId);
+      if (list) {
+        list.push(receipt);
+      } else {
+        placement.set(messageId, [receipt]);
+      }
+    });
+    placement.forEach((list) => {
+      list.sort((a, b) => {
+        const at = a.seenAt ? Date.parse(a.seenAt) : 0;
+        const bt = b.seenAt ? Date.parse(b.seenAt) : 0;
+        return bt - at;
+      });
+    });
+    return placement;
+  }, [currentUserId, messages]);
 
   const scrollToMessageById = useCallback(
     (targetId: string) => {
@@ -1802,7 +1850,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
         nextCursorRef.current = response.data?.nextCursor || null;
         initialLoadCompleteRef.current = true;
         InteractionManager.runAfterInteractions(() => {
-          scrollToBottom();
+          scrollToBottom(true);
         });
       } catch (error) {
         console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
@@ -2713,7 +2761,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       return [...withoutPlaceholders, optimisticMessage];
     });
     InteractionManager.runAfterInteractions(() => {
-      scrollToBottom();
+      scrollToBottom(true);
     });
     setNewMessage('');
     setReplyContext(null);
@@ -3436,6 +3484,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
           onLinkPress={handleOpenLink}
           isGroupChat={Boolean(chatDetails?.isGroup)}
           directRecipient={directRecipient}
+          seenOverride={seenPlacementMap.get(messageItem.id) ?? null}
         />
       );
     },
@@ -3452,6 +3501,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       directRecipient,
       handleAttachmentTap,
       handleOpenLink,
+      seenPlacementMap,
     ]
   );
 
@@ -3664,15 +3714,9 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
 
                     {showScrollToBottomButton && (
-
-
                       <Pressable
-
-
                         style={styles.scrollToBottomButton}
-
-
-                        onPress={scrollToBottom}
+                        onPress={() => scrollToBottom(true)}
 
 
                         accessibilityRole="button"
