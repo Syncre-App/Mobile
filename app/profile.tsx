@@ -96,7 +96,7 @@ export default function ProfileScreen() {
       style={[
         styles.container,
         {
-          paddingTop: insets.top + 8,
+          paddingTop: Math.max(insets.top, 12),
         },
       ]}
       edges={['top', 'left', 'right']}

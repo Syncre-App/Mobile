@@ -52,7 +52,7 @@ const resolveExtension = (fileName?: string | null, mimeType?: string | null) =>
 export const EditProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const topInset = insets.top;
-  const containerPaddingTop = Math.max(topInset, spacing.lg);
+  const containerPaddingTop = Math.max(topInset, spacing.md);
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -261,7 +261,7 @@ export const EditProfileScreen: React.FC = () => {
       <AppBackground />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topInset > 0 ? 4 : 12 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(topInset - 4, 0) }]}>
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
