@@ -20,6 +20,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const appVersion = UpdateService.getCurrentVersion();
   const insets = useSafeAreaInsets();
+  const minimumTopPadding = 12;
+  const safeExtraTop = Math.max(minimumTopPadding - insets.top, 0);
 
   const handleBack = () => {
     router.back();
@@ -96,7 +98,7 @@ export default function ProfileScreen() {
       style={[
         styles.container,
         {
-          paddingTop: Math.max(insets.top, 12),
+          paddingTop: safeExtraTop,
         },
       ]}
       edges={['top', 'left', 'right']}

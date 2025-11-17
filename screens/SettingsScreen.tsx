@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
@@ -19,16 +19,20 @@ import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
 import { palette, radii, spacing } from '../theme/designSystem';
 
+const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
+
 export const SettingsScreen: React.FC = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const minTopPadding = spacing.lg;
+  const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
   const [selectedLanguage, setSelectedLanguage] = useState('English');
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
-  router.back();
+    router.back();
   };
 
   const handleClearCache = () => {
@@ -101,7 +105,7 @@ export const SettingsScreen: React.FC = () => {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: Math.max(insets.top, spacing.lg) }]}
+      style={[styles.container, { paddingTop: extraTopPadding }]}
       edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
@@ -119,7 +123,7 @@ export const SettingsScreen: React.FC = () => {
           <Text style={styles.headerTitle}>Settings</Text>
         </View>
 
-        <View style={styles.headerButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -230,9 +234,17 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   headerButton: {
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
     padding: spacing.sm,
     borderRadius: radii.md,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
   },
   headerTitle: {
     color: palette.text,
