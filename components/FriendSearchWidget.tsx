@@ -222,10 +222,11 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: spacing.lg,
-    paddingHorizontal: spacing.sm,
+    width: '100%',
   },
   searchInput: {
     marginBottom: spacing.sm,
+    alignSelf: 'stretch',
   },
   searchResults: {
     maxHeight: 220,
@@ -274,13 +275,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 4,
     marginBottom: spacing.xxs,
-    marginLeft: spacing.sm,
   },
   title: {
     color: palette.text,
     fontSize: 20,
     fontFamily: 'PlusJakartaSans-SemiBold',
     marginBottom: spacing.sm,
-    marginLeft: spacing.sm,
   },
 });
