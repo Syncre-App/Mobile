@@ -1,16 +1,16 @@
 import { StyleSheet } from 'react-native';
 
 export const palette = {
-  background: '#020203',
-  backgroundMuted: '#05060f',
-  surface: 'rgba(255, 255, 255, 0.03)',
-  surfaceStrong: 'rgba(15, 23, 42, 0.58)',
-  surfaceSoft: 'rgba(15, 23, 42, 0.38)',
-  border: 'rgba(148, 163, 184, 0.24)',
-  borderStrong: 'rgba(148, 163, 184, 0.35)',
-  text: '#F8FAFC',
-  textMuted: 'rgba(248, 250, 252, 0.65)',
-  textSubtle: 'rgba(226, 232, 240, 0.55)',
+  background: '#F8FAFC',
+  backgroundMuted: '#EEF2FF',
+  surface: 'rgba(255, 255, 255, 0.92)',
+  surfaceStrong: 'rgba(248, 250, 252, 0.9)',
+  surfaceSoft: 'rgba(226, 232, 240, 0.35)',
+  border: 'rgba(15, 23, 42, 0.08)',
+  borderStrong: 'rgba(15, 23, 42, 0.14)',
+  text: '#0F172A',
+  textMuted: 'rgba(15, 23, 42, 0.65)',
+  textSubtle: 'rgba(15, 23, 42, 0.45)',
   accent: '#2563EB',
   accentSecondary: '#0EA5E9',
   accentTertiary: '#7C3AED',
@@ -20,10 +20,10 @@ export const palette = {
 };
 
 export const gradients = {
-  backgroundBase: ['#05030b', '#03040f', '#020203'],
+  backgroundBase: ['#FFFFFF', '#F8FAFC', '#EEF2FF'],
   buttonPrimary: ['#2563EB', '#0EA5E9', '#8B5CF6'],
-  buttonMuted: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)'],
-  cardStroke: ['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.04)'],
+  buttonMuted: ['rgba(15,23,42,0.05)', 'rgba(15,23,42,0.02)'],
+  cardStroke: ['rgba(148,163,184,0.35)', 'rgba(148,163,184,0.05)'],
   avatarRing: ['#2563EB', '#0EA5E9', '#8B5CF6'],
 };
 
