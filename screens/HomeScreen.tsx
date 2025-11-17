@@ -862,7 +862,7 @@ export const HomeScreen: React.FC = () => {
             </View>
           </View>
 
-          <GlassCard variant="hero" padding={spacing.lg} style={styles.heroCard}>
+          <GlassCard variant="hero" padding={spacing.md} style={styles.heroCard}>
             <View style={styles.heroHeader}>
               <View style={styles.heroCopy}>
                 <Text style={styles.heroLabel}>Crystal clear</Text>
@@ -1037,12 +1037,12 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   brandBlock: {
     flex: 1,
-    maxWidth: 240,
+    maxWidth: 200,
   },
   overline: {
     color: palette.textSubtle,
@@ -1054,14 +1054,14 @@ const styles = StyleSheet.create({
   },
   brandTitle: {
     color: palette.text,
-    fontSize: 36,
-    letterSpacing: -0.5,
+    fontSize: 28,
+    letterSpacing: -0.3,
     fontFamily: 'SpaceGrotesk-SemiBold',
   },
   brandSubtitle: {
     color: palette.textMuted,
-    fontSize: 15,
-    marginTop: spacing.xs,
+    fontSize: 13,
+    marginTop: spacing.xxs,
     fontFamily: 'PlusJakartaSans-Regular',
   },
   headerActions: {
@@ -1117,7 +1117,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.maxContentWidth,
     alignSelf: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   heroHeader: {
     flexDirection: 'row',
@@ -1138,7 +1138,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: palette.text,
-    fontSize: 28,
+    fontSize: 24,
     fontFamily: 'SpaceGrotesk-SemiBold',
     letterSpacing: -0.4,
   },
@@ -1171,7 +1171,7 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginRight: spacing.xs,
-    backgroundColor: '#22C55E',
+    backgroundColor: palette.accent,
   },
   presenceText: {
     color: palette.text,
