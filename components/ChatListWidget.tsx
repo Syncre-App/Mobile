@@ -1,21 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
 import { UserStatus } from '../services/WebSocketService';
+import { palette, radii, spacing } from '../theme/designSystem';
 import { UserAvatar } from './UserAvatar';
 
 interface Chat {
@@ -279,11 +271,11 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const presenceValue = isGroupChat ? undefined : (isUserOnline ? 'online' : 'offline');
 
     return (
-      <TouchableOpacity 
-        onPress={() => !isRemoving && handleChatPress(chat)} 
+      <TouchableOpacity
+        onPress={() => !isRemoving && handleChatPress(chat)}
         onLongPress={() => !isRemoving && handleChatLongPress(chat)}
         style={styles.chatItem}
-        activeOpacity={0.6}
+        activeOpacity={0.75}
         disabled={isRemoving}
       >
         <View style={[styles.chatCard, hasUnread && styles.chatCardUnread]}>
@@ -298,7 +290,9 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
           <View style={styles.chatContent}>
             <View style={styles.chatTitleRow}>
-              <Text style={styles.chatName} numberOfLines={1}>{displayName}</Text>
+              <Text style={styles.chatName} numberOfLines={1}>
+                {displayName}
+              </Text>
               {hasUnread && (
                 <View style={styles.chatUnreadPill}>
                   <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
@@ -314,7 +308,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
           <View style={styles.rightColumn}>
             {isRemoving ? (
-              <ActivityIndicator size="small" color="#FF6B6B" />
+              <ActivityIndicator size="small" color={palette.error} />
             ) : (
               <Ionicons name="chevron-forward" size={16} color="rgba(255, 255, 255, 0.4)" />
             )}
@@ -327,7 +321,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="chatbubbles-outline" size={64} color="rgba(255, 255, 255, 0.3)" />
-  <Text style={styles.emptyStateTitle}>No chats yet</Text>
+      <Text style={styles.emptyStateTitle}>No chats yet</Text>
       <Text style={styles.emptyStateMessage}>
         Start by adding friends and begin conversations!
       </Text>
@@ -337,8 +331,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   if (isLoading && chats.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2C82FF" />
-  <Text style={styles.loadingText}>Loading chats...</Text>
+        <ActivityIndicator size="large" color={palette.accent} />
+        <Text style={styles.loadingText}>Loading chats...</Text>
       </View>
     );
   }
@@ -353,8 +347,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={handleRefresh}
-          tintColor="#2C82FF"
-          colors={['#2C82FF']}
+          tintColor={palette.accent}
+          colors={[palette.accent]}
         />
       }
       contentContainerStyle={styles.listContainer}
@@ -367,24 +361,33 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 const styles = StyleSheet.create({
   listContainer: {
     flexGrow: 1,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.xxl,
   },
   chatItem: {
-    marginBottom: 0,
+    marginBottom: spacing.sm,
   },
   chatCard: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    shadowColor: '#010103',
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
   chatCardUnread: {
-    backgroundColor: 'rgba(30, 132, 255, 0.08)',
+    borderColor: 'rgba(37, 99, 235, 0.35)',
+    backgroundColor: 'rgba(37, 99, 235, 0.15)',
   },
   avatarContainer: {
-    marginRight: 16,
+    marginRight: spacing.md,
   },
   chatContent: {
     flex: 1,
@@ -392,49 +395,49 @@ const styles = StyleSheet.create({
   chatTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.xs,
   },
   chatName: {
-    color: 'white',
+    color: palette.text,
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     marginBottom: 2,
   },
   chatSubtitle: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 13,
   },
   chatUnreadPill: {
-    backgroundColor: '#1E84FF',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    backgroundColor: palette.accent,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: radii.pill,
   },
   chatUnreadText: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans-Bold',
   },
   rightColumn: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: 12,
+    paddingLeft: spacing.sm,
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 100,
-    paddingHorizontal: 40,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xl,
   },
   emptyStateTitle: {
-    color: 'white',
+    color: palette.text,
     fontSize: 20,
-    fontWeight: '600',
-    marginTop: 24,
-    marginBottom: 8,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
   emptyStateMessage: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 22,
@@ -443,11 +446,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 100,
+    paddingVertical: spacing.xxl,
   },
   loadingText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: palette.textMuted,
     fontSize: 16,
-    marginTop: 16,
+    marginTop: spacing.sm,
   },
 });

@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,11 +16,13 @@ import {
 import * as Notifications from 'expo-notifications';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppBackground } from '../components/AppBackground';
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
 import { GlassCard } from '../components/GlassCard';
 import { UserAvatar } from '../components/UserAvatar';
+import { layout, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { ChatService } from '../services/ChatService';
 import { NotificationService } from '../services/NotificationService';
@@ -60,6 +61,22 @@ export const HomeScreen: React.FC = () => {
       return dateB - dateA;
     });
   }, [notifications]);
+
+  const onlineFriends = useMemo(() => {
+    return Object.values(userStatuses).filter((status) => {
+      const normalized = status ? String(status).toLowerCase() : '';
+      return normalized === 'online';
+    }).length;
+  }, [userStatuses]);
+
+  const heroStats = useMemo(
+    () => [
+      { label: 'Unread chats', value: totalUnreadChats },
+      { label: 'Requests', value: incomingRequests.length },
+      { label: 'Friends online', value: onlineFriends },
+    ],
+    [totalUnreadChats, incomingRequests.length, onlineFriends]
+  );
 
   const persistNotifications = useCallback((list: any[]) => {
     const minimized = list.map((notification: any) => ({
@@ -788,14 +805,11 @@ export const HomeScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
       
       {isValidatingToken ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2C82FF" />
+          <ActivityIndicator size="large" color={palette.accent} />
           <Text style={styles.loadingText}>Validating session...</Text>
         </View>
       ) : (
@@ -811,19 +825,22 @@ export const HomeScreen: React.FC = () => {
           ]}
           edges={['left', 'right']}
         >
-          {/* Simple header with profile */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Chats</Text>
+          <View style={styles.topBar}>
+            <View style={styles.brandBlock}>
+              <Text style={styles.overline}>Now</Text>
+              <Text style={styles.brandTitle}>Syncre</Text>
+              <Text style={styles.brandSubtitle}>Talk freely. Stay close.</Text>
+            </View>
             <View style={styles.headerActions}>
               <TouchableOpacity
                 style={styles.notificationButton}
                 onPress={handleNotificationsPress}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
                 <Ionicons
                   name={isNotificationsVisible ? 'notifications' : 'notifications-outline'}
                   size={22}
-                  color="#ffffff"
+                  color={palette.text}
                 />
                 {unreadCount > 0 && (
                   <View style={styles.notificationBadge}>
@@ -836,21 +853,38 @@ export const HomeScreen: React.FC = () => {
                 <UserAvatar
                   uri={user?.profile_picture}
                   name={user?.username || user?.name || user?.email}
-                  size={42}
+                  size={46}
                   presence={isOnline ? 'online' : 'offline'}
                   presencePlacement="overlay"
                   style={styles.profileAvatar}
                 />
-                {totalUnreadChats > 0 && (
-                  <View style={styles.profileBadge}>
-                    <Text style={styles.profileBadgeText}>
-                      {totalUnreadChats > 99 ? '99+' : totalUnreadChats}
-                    </Text>
-                  </View>
-                )}
               </TouchableOpacity>
             </View>
           </View>
+
+          <GlassCard variant="hero" padding={spacing.lg} style={styles.heroCard}>
+            <View style={styles.heroHeader}>
+              <View style={styles.heroCopy}>
+                <Text style={styles.heroLabel}>Crystal clear</Text>
+                <Text style={styles.heroTitle}>Your conversations</Text>
+                <Text style={styles.heroBody}>
+                  One calm space for media, messages, and calls across devices.
+                </Text>
+              </View>
+              <View style={[styles.presencePill, isOnline ? styles.presenceOnline : styles.presenceOffline]}>
+                <View style={styles.presenceDot} />
+                <Text style={styles.presenceText}>{isOnline ? 'Online' : 'Offline'}</Text>
+              </View>
+            </View>
+            <View style={styles.heroStatsRow}>
+              {heroStats.map((stat) => (
+                <View key={stat.label} style={styles.heroStat}>
+                  <Text style={styles.heroStatValue}>{stat.value}</Text>
+                  <Text style={styles.heroStatLabel}>{stat.label}</Text>
+                </View>
+              ))}
+            </View>
+          </GlassCard>
 
           {isNotificationsVisible && (
             <View style={styles.notificationsOverlay}>
@@ -935,22 +969,34 @@ export const HomeScreen: React.FC = () => {
               </GlassCard>
             </View>
           )}
+          <View style={styles.section}>
+            <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
+          </View>
 
-          {/* Friend Search */}
-          <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
+          {(incomingRequests.length > 0 || outgoingRequests.length > 0) && (
+            <View style={styles.section}>
+              <FriendRequestsWidget
+                incoming={incomingRequests}
+                outgoing={outgoingRequests}
+                onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
+                onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
+                processingId={requestProcessingId}
+              />
+            </View>
+          )}
 
-          {/* Friend Requests */}
-          <FriendRequestsWidget
-            incoming={incomingRequests}
-            outgoing={outgoingRequests}
-            onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
-            onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
-            processingId={requestProcessingId}
-          />
-
-          {/* Chat List */}
-          <View style={styles.chatSection}>
-            <ChatListWidget 
+          <View style={[styles.section, styles.chatSection]}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Chats</Text>
+              {totalUnreadChats > 0 && (
+                <View style={styles.sectionBadge}>
+                  <Text style={styles.sectionBadgeText}>
+                    {totalUnreadChats > 99 ? '99+' : totalUnreadChats}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <ChatListWidget
               chats={chats}
               isLoading={chatsLoading}
               onRefresh={handleChatRefresh}
@@ -971,13 +1017,11 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#03040A', // Dark theme to match login
+    backgroundColor: palette.background,
   },
   safeArea: {
     flex: 1,
-  },
-  scrollView: {
-    flex: 1,
+    paddingHorizontal: spacing.md,
   },
   loadingContainer: {
     flex: 1,
@@ -985,139 +1029,181 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#ffffff',
-    marginTop: 16,
+    color: palette.text,
+    marginTop: spacing.sm,
     fontSize: 16,
+    fontFamily: 'PlusJakartaSans-Medium',
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  brandBlock: {
+    flex: 1,
+    maxWidth: 240,
+  },
+  overline: {
+    color: palette.textSubtle,
+    textTransform: 'uppercase',
+    letterSpacing: 4,
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk-Medium',
+    marginBottom: spacing.xxs,
+  },
+  brandTitle: {
+    color: palette.text,
+    fontSize: 36,
+    letterSpacing: -0.5,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+  },
+  brandSubtitle: {
+    color: palette.textMuted,
+    fontSize: 15,
+    marginTop: spacing.xs,
+    fontFamily: 'PlusJakartaSans-Regular',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  headerCard: {
-    padding: 0,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-  },
-  titleContainer: {
-    flex: 1,
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#ffffff',
-    opacity: 0.8,
-  },
-
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  titleSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  moreButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileButton: {
-    position: 'relative',
-    padding: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
   },
   notificationButton: {
     position: 'relative',
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   notificationBadge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#FF6B6B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  notificationBadgeText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  profileBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
+    top: 6,
+    right: 6,
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#1E84FF',
+    backgroundColor: palette.error,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: spacing.xxs,
   },
-  profileBadgeText: {
-    color: '#ffffff',
+  notificationBadgeText: {
+    color: palette.text,
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans-Bold',
+  },
+  profileButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   profileAvatar: {
     shadowColor: '#000000',
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  heroCard: {
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  heroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  heroCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  heroLabel: {
+    color: palette.textSubtle,
+    letterSpacing: 4,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    fontFamily: 'SpaceGrotesk-Medium',
+  },
+  heroTitle: {
+    color: palette.text,
+    fontSize: 28,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    letterSpacing: -0.4,
+  },
+  heroBody: {
+    color: palette.textMuted,
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: 'PlusJakartaSans-Regular',
+    maxWidth: 280,
+  },
+  presencePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  presenceOnline: {
+    borderColor: 'rgba(34, 197, 94, 0.4)',
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+  },
+  presenceOffline: {
+    borderColor: 'rgba(251, 113, 133, 0.4)',
+    backgroundColor: 'rgba(251, 113, 133, 0.12)',
+  },
+  presenceDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: spacing.xs,
+    backgroundColor: palette.text,
+  },
+  presenceText: {
+    color: palette.text,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    fontSize: 13,
+  },
+  heroStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  heroStat: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+  },
+  heroStatValue: {
+    color: palette.text,
+    fontSize: 24,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+  },
+  heroStatLabel: {
+    color: palette.textSubtle,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginTop: spacing.xs,
+    fontFamily: 'SpaceGrotesk-Medium',
   },
   notificationsOverlay: {
     position: 'absolute',
-    top: 100,
-    right: 20,
+    top: 120,
+    right: spacing.lg,
     alignSelf: 'flex-end',
     paddingHorizontal: 0,
     zIndex: 30,
@@ -1131,7 +1217,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   notificationCloseButton: {
     width: 32,
@@ -1142,22 +1228,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   notificationsTitle: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   notificationsEmpty: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 14,
   },
   notificationItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    paddingVertical: 12,
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   notificationAvatar: {
     marginTop: 2,
@@ -1166,56 +1251,82 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notificationTextBlock: {
-    marginBottom: 6,
+    marginBottom: spacing.xs,
   },
   notificationItemTitle: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     marginBottom: 4,
   },
   notificationTimestamp: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: palette.textSubtle,
     fontSize: 12,
     marginBottom: 4,
   },
   notificationMessage: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: palette.textMuted,
     fontSize: 14,
   },
   notificationActions: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   notificationActionButton: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 18,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   notificationAccept: {
-    backgroundColor: '#2C82FF',
+    backgroundColor: palette.accent,
   },
   notificationDecline: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   notificationActionText: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   notificationDeclineText: {
-    color: '#FF6B6B',
+    color: palette.error,
+  },
+  section: {
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
   },
   chatSection: {
     flex: 1,
   },
-  section: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  sectionTitle: {
+    color: palette.text,
+    fontSize: 24,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+  },
+  sectionBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 1.5,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.3)',
+  },
+  sectionBadgeText: {
+    color: palette.accentSecondary,
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk-Medium',
   },
 });

@@ -1,4 +1,4 @@
-import { Stack, router } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +13,7 @@ import { ShareIntentService } from '../services/ShareIntentService';
 
 export default function RootLayout() {
   const [maintenance, setMaintenance] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const checkMaintenance = async () => {

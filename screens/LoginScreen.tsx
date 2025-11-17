@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
@@ -19,6 +20,7 @@ import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { IdentityService } from '../services/IdentityService';
 import { CryptoService } from '../services/CryptoService';
+import { palette, radii, spacing } from '../theme/designSystem';
 
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -98,21 +100,20 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <LinearGradient
-      colors={['#03040A', '#071026']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
+    <View style={styles.container}>
+      <AppBackground />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.logoContainer}>
+        <View style={styles.hero}>
           <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          <Text style={styles.overline}>Welcome back</Text>
+          <Text style={styles.heroTitle}>Talk freely.</Text>
+          <Text style={styles.heroSubtitle}>Stay close. Own your data.</Text>
         </View>
 
-        <GlassCard width={360} style={styles.card}>
+        <GlassCard width="100%" style={styles.card} variant="subtle" padding={spacing.lg}>
           <View style={styles.cardContent}>
-            <Text style={styles.title}>LOGIN</Text>
-            <LinearGradient colors={['#2C82FF', '#0EA5FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.underline} />
+            <Text style={styles.title}>Sign in to Syncre</Text>
+            <Text style={styles.subtitle}>Secure messaging that mirrors our web glow.</Text>
 
             <TransparentField
               placeholder="Email"
@@ -120,7 +121,7 @@ export const LoginScreen: React.FC = () => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              prefixIcon={<Ionicons name="mail" size={18} color="#fff7" />}
+              prefixIcon={<Ionicons name="mail" size={18} color={palette.textSubtle} />}
               style={styles.field}
             />
 
@@ -129,16 +130,21 @@ export const LoginScreen: React.FC = () => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={obscurePassword}
-              prefixIcon={<Ionicons name="lock-closed" size={18} color="#fff7" />}
-              suffixIcon={<Ionicons name={obscurePassword ? 'eye' : 'eye-off'} size={18} color="#fff7" />}
+              prefixIcon={<Ionicons name="lock-closed" size={18} color={palette.textSubtle} />}
+              suffixIcon={<Ionicons name={obscurePassword ? 'eye' : 'eye-off'} size={18} color={palette.textSubtle} />}
               onSuffixPress={() => setObscurePassword(!obscurePassword)}
               style={styles.field}
             />
 
-
             <View style={styles.row}>
               <View style={styles.rememberRow}>
-                <Switch value={remember} onValueChange={setRemember} trackColor={{ false: '#767577', true: '#2C82FF' }} thumbColor="#fff" ios_backgroundColor="#3e3e3e" />
+                <Switch
+                  value={remember}
+                  onValueChange={setRemember}
+                  trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
+                  thumbColor="#fff"
+                  ios_backgroundColor="rgba(255,255,255,0.15)"
+                />
                 <Text style={styles.rememberText}>Remember me</Text>
               </View>
               <TouchableOpacity>
@@ -146,43 +152,114 @@ export const LoginScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} onPress={handleLogin} activeOpacity={0.8} disabled={isLoading}>
-              <LinearGradient colors={isLoading ? ['#999', '#777'] : ['#2C82FF', '#0EA5FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.loginGradient}>
-                {isLoading ? <ActivityIndicator color="white" size="small" /> : <Text style={styles.loginButtonText}>LOGIN</Text>}
+            <TouchableOpacity
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+              onPress={handleLogin}
+              activeOpacity={0.9}
+              disabled={isLoading}
+            >
+              <LinearGradient
+                colors={isLoading ? ['#64748B', '#475569'] : ['#2563EB', '#0EA5E9', '#7C3AED']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.loginGradient}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Login</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => router.push('/register' as any)} style={styles.registerLink}>
-              <Text style={styles.registerText}>Don't have an account? <Text style={styles.registerTextHighlight}>Register</Text></Text>
+              <Text style={styles.registerText}>
+                Don&apos;t have an account? <Text style={styles.registerTextHighlight}>Register</Text>
+              </Text>
             </TouchableOpacity>
           </View>
         </GlassCard>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 };
 
 export default LoginScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 48 },
-  logoContainer: { marginBottom: 32, alignItems: 'center' },
-  logo: { width: 120, height: 120 },
-  card: { alignSelf: 'center' },
-  cardContent: { alignItems: 'center' },
-  title: { color: 'white', fontSize: 16, fontWeight: 'bold', letterSpacing: 2, marginTop: 10, marginBottom: 10 },
-  underline: { width: 60, height: 2, borderRadius: 1, marginBottom: 30 },
-  field: { marginBottom: 15 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 20 },
-  rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rememberText: { color: '#fff9', fontSize: 14 },
-  forgotText: { color: '#2C82FF', fontSize: 14, textDecorationLine: 'underline', textDecorationColor: '#fff7' },
-  loginButton: { width: '100%', marginBottom: 20 },
-  loginButtonDisabled: { opacity: 0.7 },
-  loginGradient: { paddingVertical: 14, borderRadius: 24, alignItems: 'center', shadowColor: '#2C82FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 5 },
-  loginButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  registerLink: { alignItems: 'center', paddingVertical: 8, marginTop: 4 },
-  registerText: { color: 'rgba(255, 255, 255, 0.7)', fontSize: 14 },
-  registerTextHighlight: { color: '#2C82FF', fontWeight: 'bold' },
+  container: { flex: 1, backgroundColor: palette.background },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xxl,
+    gap: spacing.lg,
+  },
+  hero: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  logo: { width: 96, height: 96, marginBottom: spacing.sm },
+  overline: {
+    color: palette.textSubtle,
+    fontFamily: 'SpaceGrotesk-Medium',
+    letterSpacing: 4,
+    textTransform: 'uppercase',
+    fontSize: 12,
+  },
+  heroTitle: {
+    color: palette.text,
+    fontSize: 34,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    color: palette.textMuted,
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans-Regular',
+  },
+  card: { width: '100%', maxWidth: 420 },
+  cardContent: { width: '100%' },
+  title: {
+    color: palette.text,
+    fontSize: 22,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    letterSpacing: -0.2,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  subtitle: {
+    color: palette.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  field: { marginBottom: spacing.md },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: spacing.lg,
+  },
+  rememberRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  rememberText: { color: palette.textMuted, fontSize: 14 },
+  forgotText: { color: palette.accentSecondary, fontSize: 14, textDecorationLine: 'underline' },
+  loginButton: { width: '100%', marginBottom: spacing.md },
+  loginButtonDisabled: { opacity: 0.75 },
+  loginGradient: {
+    paddingVertical: spacing.md,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    shadowColor: '#0EA5E9',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  loginButtonText: { color: '#fff', fontSize: 16, fontFamily: 'PlusJakartaSans-SemiBold' },
+  registerLink: { alignItems: 'center', paddingVertical: spacing.xs, marginTop: spacing.xs },
+  registerText: { color: palette.textMuted, fontSize: 14 },
+  registerTextHighlight: { color: palette.accentSecondary, fontFamily: 'PlusJakartaSans-SemiBold' },
 });

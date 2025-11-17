@@ -1,5 +1,14 @@
 import React from 'react';
-import { View, TextInput, StyleSheet, TouchableOpacity, ViewStyle, KeyboardTypeOptions } from 'react-native';
+import {
+  View,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  ViewStyle,
+  KeyboardTypeOptions,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { gradients, palette, radii, spacing } from '../theme/designSystem';
 
 interface TransparentFieldProps {
   value: string;
@@ -29,52 +38,63 @@ export const TransparentField: React.FC<TransparentFieldProps> = ({
   editable = true,
 }) => {
   return (
-    <View style={[styles.container, style]}>
-      {prefixIcon && <View style={styles.prefixIcon}>{prefixIcon}</View>}
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="rgba(255, 255, 255, 0.54)"
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        selectionColor="#2C82FF"
-        editable={editable}
-        selectTextOnFocus={editable}
-      />
-      {suffixIcon && (
-        <TouchableOpacity onPress={onSuffixPress} style={styles.suffixIcon}>
-          {suffixIcon}
-        </TouchableOpacity>
-      )}
+    <View style={style}>
+      <LinearGradient
+        colors={gradients.cardStroke}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradientBorder}
+      >
+        <View style={styles.container}>
+          {prefixIcon && <View style={styles.prefixIcon}>{prefixIcon}</View>}
+          <TextInput
+            style={styles.input}
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={placeholder}
+            placeholderTextColor={palette.textSubtle}
+            secureTextEntry={secureTextEntry}
+            keyboardType={keyboardType}
+            autoCapitalize={autoCapitalize}
+            selectionColor={palette.accent}
+            editable={editable}
+            selectTextOnFocus={editable}
+          />
+          {suffixIcon && (
+            <TouchableOpacity onPress={onSuffixPress} style={styles.suffixIcon}>
+              {suffixIcon}
+            </TouchableOpacity>
+          )}
+        </View>
+      </LinearGradient>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  gradientBorder: {
+    borderRadius: radii.lg,
+    padding: 1.4,
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: 'transparent',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   input: {
     flex: 1,
-    color: '#fff',
-    fontSize: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    color: palette.text,
+    fontSize: 15,
+    paddingVertical: spacing.sm,
+    fontFamily: 'PlusJakartaSans-Regular',
   },
   prefixIcon: {
-    marginRight: 8,
+    marginRight: spacing.sm,
   },
   suffixIcon: {
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
 });

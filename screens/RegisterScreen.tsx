@@ -12,11 +12,13 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppBackground } from '../components/AppBackground';
 import { notificationService } from '../services/NotificationService';
 
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
+import { palette, radii, spacing } from '../theme/designSystem';
 
 export const RegisterScreen: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -96,21 +98,14 @@ export const RegisterScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
 
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Neon Logo */}
-        <View style={styles.logoContainer}>
+        <View style={styles.hero}>
           <LinearGradient
             colors={['#0EA5FF', '#2C82FF']}
             start={{ x: 0.5, y: 0 }}
@@ -119,28 +114,18 @@ export const RegisterScreen: React.FC = () => {
           >
             <Ionicons name="menu" size={36} color="white" />
           </LinearGradient>
+          <Text style={styles.overline}>Create your handle</Text>
+          <Text style={styles.title}>Join the Syncre collective</Text>
+          <Text style={styles.subtitle}>Encryption-first chat across mobile & web.</Text>
         </View>
 
-        {/* Register Form */}
-        <GlassCard style={styles.formCard}>
-          <View style={styles.headerContainer}>
-            <Text style={styles.title}>REGISTER</Text>
-            <LinearGradient
-              colors={['#2C82FF', '#0EA5FF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.titleUnderline}
-            />
-          </View>
-
+        <GlassCard style={styles.formCard} variant="subtle" padding={spacing.lg}>
           <View style={styles.formContainer}>
             <TransparentField
               placeholder="Username"
               value={username}
               onChangeText={setUsername}
-              prefixIcon={
-                <Ionicons name="person" size={18} color="rgba(255, 255, 255, 0.7)" />
-              }
+              prefixIcon={<Ionicons name="person" size={18} color={palette.textSubtle} />}
               style={styles.inputField}
             />
 
@@ -150,9 +135,7 @@ export const RegisterScreen: React.FC = () => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              prefixIcon={
-                <Ionicons name="mail" size={18} color="rgba(255, 255, 255, 0.7)" />
-              }
+              prefixIcon={<Ionicons name="mail" size={18} color={palette.textSubtle} />}
               style={styles.inputField}
             />
 
@@ -161,9 +144,7 @@ export const RegisterScreen: React.FC = () => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              prefixIcon={
-                <Ionicons name="lock-closed" size={18} color="rgba(255, 255, 255, 0.7)" />
-              }
+              prefixIcon={<Ionicons name="lock-closed" size={18} color={palette.textSubtle} />}
               style={styles.inputField}
             />
 
@@ -172,17 +153,11 @@ export const RegisterScreen: React.FC = () => {
               value={password2}
               onChangeText={setPassword2}
               secureTextEntry
-              prefixIcon={
-                <Ionicons name="lock-closed" size={18} color="rgba(255, 255, 255, 0.7)" />
-              }
+              prefixIcon={<Ionicons name="lock-closed" size={18} color={palette.textSubtle} />}
               style={styles.inputField}
             />
 
-            <TouchableOpacity
-              onPress={handleRegister}
-              disabled={loading}
-              style={styles.registerButton}
-            >
+            <TouchableOpacity onPress={handleRegister} disabled={loading} style={styles.registerButton}>
               <LinearGradient
                 colors={['#2C82FF', '#0EA5FF']}
                 start={{ x: 0, y: 0 }}
@@ -192,7 +167,7 @@ export const RegisterScreen: React.FC = () => {
                 {loading ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={styles.registerButtonText}>REGISTER</Text>
+                  <Text style={styles.registerButtonText}>Register</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -213,12 +188,13 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 48,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xxl,
+    gap: spacing.lg,
   },
-  logoContainer: {
+  hero: {
     alignItems: 'center',
-    marginBottom: 24,
+    gap: spacing.sm,
   },
   logoGradient: {
     width: 84,
@@ -234,66 +210,69 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 18,
     elevation: 18,
+    marginBottom: spacing.sm,
+  },
+  overline: {
+    color: palette.textSubtle,
+    fontFamily: 'SpaceGrotesk-Medium',
+    letterSpacing: 4,
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  title: {
+    color: palette.text,
+    fontSize: 28,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  subtitle: {
+    color: palette.textMuted,
+    fontSize: 15,
+    textAlign: 'center',
   },
   formCard: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 420,
     alignSelf: 'center',
   },
-  headerContainer: {
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  title: {
-    color: 'white',
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  titleUnderline: {
-    width: 120,
-    height: 3,
-    borderRadius: 2,
-  },
   formContainer: {
-    paddingBottom: 10,
+    paddingBottom: spacing.xs,
   },
   inputField: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   registerButton: {
     width: '100%',
-    marginTop: 16,
-    marginBottom: 12,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
   },
   registerButtonGradient: {
-    paddingVertical: 14,
-    borderRadius: 24,
+    paddingVertical: spacing.md,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 46,
+    height: 48,
     shadowColor: '#2C82FF',
     shadowOffset: {
       width: 0,
-      height: 0,
+      height: 8,
     },
     shadowOpacity: 0.3,
-    shadowRadius: 14,
+    shadowRadius: 16,
     elevation: 14,
   },
   registerButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 16,
   },
   loginLink: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: spacing.xs,
   },
   loginLinkText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: palette.textMuted,
     fontSize: 14,
   },
 });

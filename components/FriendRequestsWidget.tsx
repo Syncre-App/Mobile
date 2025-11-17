@@ -1,13 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { palette, radii, spacing } from '../theme/designSystem';
 import { GlassCard } from './GlassCard';
 import { UserAvatar } from './UserAvatar';
 
@@ -94,8 +89,16 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
   );
 
   return (
-    <GlassCard width="100%" style={styles.card}>
-      <Text style={styles.title}>Friend Requests</Text>
+    <GlassCard width="100%" style={styles.card} variant="subtle" padding={spacing.lg}>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.label}>Social</Text>
+          <Text style={styles.title}>Friend requests</Text>
+        </View>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{incoming.length + outgoing.length}</Text>
+        </View>
+      </View>
 
       {incoming.length > 0 && (
         <View style={styles.section}>
@@ -116,81 +119,80 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   title: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
+    color: palette.text,
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    letterSpacing: -0.2,
   },
   section: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
+    color: palette.textSubtle,
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk-Medium',
+    marginBottom: spacing.sm,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 3,
   },
   requestRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-    gap: 12,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    gap: spacing.md,
   },
   pendingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   requestAvatar: {
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   requestInfo: {
     flex: 1,
   },
   requestName: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   requestEmail: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 13,
     marginTop: 2,
   },
   pendingText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 13,
     marginTop: 2,
   },
   requestActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.xs,
   },
   actionButton: {
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    minWidth: 84,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    minWidth: 88,
     alignItems: 'center',
     justifyContent: 'center',
   },
   acceptButton: {
-    backgroundColor: '#2C82FF',
+    backgroundColor: palette.accent,
   },
   rejectButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
@@ -198,11 +200,38 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   actionButtonText: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   rejectButtonText: {
-    color: '#ff6b6b',
+    color: palette.error,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  label: {
+    color: palette.textSubtle,
+    fontFamily: 'SpaceGrotesk-Medium',
+    fontSize: 12,
+    letterSpacing: 4,
+    textTransform: 'uppercase',
+    marginBottom: spacing.xxs,
+  },
+  badge: {
+    minWidth: 36,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 1.5,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: palette.accentSecondary,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 14,
   },
 });

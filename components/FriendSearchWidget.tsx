@@ -1,19 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
+import { palette, radii, spacing } from '../theme/designSystem';
 import { TransparentField } from './TransparentField';
 import { UserAvatar } from './UserAvatar';
 
@@ -190,15 +183,17 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
 
   return (
     <View style={styles.container}>
+      <Text style={styles.label}>Connect</Text>
+      <Text style={styles.title}>Add a friend</Text>
       <TransparentField
         placeholder="Search users by username or email"
         value={searchQuery}
         onChangeText={handleSearchChange}
         prefixIcon={
           isSearching ? (
-            <ActivityIndicator size="small" color="rgba(255, 255, 255, 0.7)" />
+            <ActivityIndicator size="small" color={palette.textSubtle} />
           ) : (
-            <Ionicons name="search" size={18} color="rgba(255, 255, 255, 0.7)" />
+            <Ionicons name="search" size={18} color={palette.textSubtle} />
           )
         }
         style={styles.searchInput}
@@ -226,49 +221,66 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 0,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.sm,
   },
   searchInput: {
-    marginBottom: 12,
-    paddingHorizontal: 16,
+    marginBottom: spacing.sm,
   },
   searchResults: {
-    maxHeight: 200,
-    paddingHorizontal: 16,
+    maxHeight: 220,
+    marginTop: spacing.xs,
   },
   searchResultItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginBottom: 8,
-    gap: 12,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    marginBottom: spacing.xs,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
   },
   avatarContainer: {
-    marginRight: 4,
+    marginRight: spacing.xs,
   },
   searchResultInfo: {
     flex: 1,
   },
   searchResultUsername: {
-    color: 'white',
+    color: palette.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   searchResultMeta: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: palette.textMuted,
     fontSize: 13,
     marginTop: 2,
   },
   noResults: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: spacing.md,
   },
   noResultsText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 14,
+  },
+  label: {
+    color: palette.textSubtle,
+    fontFamily: 'SpaceGrotesk-Medium',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 4,
+    marginBottom: spacing.xxs,
+    marginLeft: spacing.sm,
+  },
+  title: {
+    color: palette.text,
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    marginBottom: spacing.sm,
+    marginLeft: spacing.sm,
   },
 });

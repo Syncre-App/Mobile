@@ -71,16 +71,6 @@
           "icon": "./assets/logo.png",
           "color": "#2C82FF"
         }
-      ],
-      [
-        "react-native-share-menu",
-        {
-          "iosShareExtension": {
-            "bundleIdentifier": "xyz.syncre.share",
-            "displayName": "Syncre",
-            "appGroupIdentifier": "group.xyz.syncre.share"
-          }
-        }
       ]
     ],
     "experiments": {

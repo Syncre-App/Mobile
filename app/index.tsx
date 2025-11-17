@@ -1,12 +1,13 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import NotificationBridge from '../components/NotificationBridge';
 import { NotificationProvider } from '../components/NotificationCenter';
+import { AppBackground } from '../components/AppBackground';
 import { LoginScreen } from '../screens/LoginScreen';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+import { palette } from '../theme/designSystem';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
@@ -59,11 +60,12 @@ export default function Index() {
     return (
       <NotificationProvider>
         <NotificationBridge />
-        <LinearGradient colors={['#03040A', '#071026']} style={{ flex: 1 }}>
+        <View style={{ flex: 1 }}>
+          <AppBackground />
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color="#2C82FF" />
+            <ActivityIndicator size="large" color={palette.accent} />
           </View>
-        </LinearGradient>
+        </View>
       </NotificationProvider>
     );
   }
@@ -71,9 +73,10 @@ export default function Index() {
   return (
     <NotificationProvider>
       <NotificationBridge />
-      <LinearGradient colors={['#03040A', '#071026']} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <AppBackground />
         <LoginScreen />
-      </LinearGradient>
+      </View>
     </NotificationProvider>
   );
 }
