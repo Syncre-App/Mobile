@@ -266,7 +266,7 @@ export const EditProfileScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
-        <View style={styles.headerButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -275,7 +275,8 @@ export const EditProfileScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <GlassCard width="100%" style={[styles.card, styles.photoCard]}>
+        <View style={styles.contentColumn}>
+        <GlassCard width="100%" style={[styles.card, styles.photoCard]} variant="subtle" padding={spacing.lg}>
           <View style={styles.photoPickerWrapper}>
             <TouchableOpacity
               style={styles.photoPicker}
@@ -306,7 +307,7 @@ export const EditProfileScreen: React.FC = () => {
           <Text style={styles.photoHint}>PNG or JPG · max 5 MB</Text>
         </GlassCard>
 
-        <GlassCard width="100%" style={[styles.card, styles.infoCard]}>
+        <GlassCard width="100%" style={[styles.card, styles.infoCard]} variant="subtle">
           <View style={[styles.infoRow, styles.infoRowFirst]}>
             <Text style={styles.infoLabel}>Username</Text>
             <Text style={styles.infoValue}>{username || '—'}</Text>
@@ -317,7 +318,7 @@ export const EditProfileScreen: React.FC = () => {
           </View>
         </GlassCard>
 
-        <GlassCard width="100%" style={[styles.card, styles.bioCard]}>
+        <GlassCard width="100%" style={[styles.card, styles.bioCard]} variant="subtle">
           <BlurView intensity={40} tint="dark" style={styles.bioBlur}>
             <Text style={styles.bioTitle}>Bio editing is coming soon</Text>
             <Text style={styles.bioSubtitle}>We’re working on this feature, stay tuned!</Text>
@@ -348,6 +349,7 @@ export const EditProfileScreen: React.FC = () => {
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
         </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -376,9 +378,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerButton: {
+    width: 40,
+    height: 40,
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     color: 'white',
@@ -392,8 +402,15 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
+  contentColumn: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+  },
   card: {
     width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
   },
   photoCard: {
     marginBottom: 24,

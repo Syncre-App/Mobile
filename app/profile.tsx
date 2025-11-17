@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     Alert,
-    Platform,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -21,8 +20,6 @@ export default function ProfileScreen() {
   const router = useRouter();
   const appVersion = UpdateService.getCurrentVersion();
   const insets = useSafeAreaInsets();
-  const topInset = insets.top;
-  const horizontalInset = Math.max(insets.left, insets.right, 16);
 
   const handleBack = () => {
     router.back();
@@ -99,8 +96,7 @@ export default function ProfileScreen() {
       style={[
         styles.container,
         {
-          paddingTop: Math.max(topInset, 12),
-          paddingHorizontal: horizontalInset,
+          paddingTop: insets.top + 8,
         },
       ]}
       edges={['top', 'left', 'right']}
@@ -114,7 +110,7 @@ export default function ProfileScreen() {
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.headerButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -122,8 +118,9 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.contentColumn}>
         {/* Account Section */}
-        <GlassCard width="100%" style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Account</Text>
           </View>
@@ -157,7 +154,7 @@ export default function ProfileScreen() {
         </GlassCard>
 
         {/* About Section */}
-        <GlassCard width="100%" style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>About</Text>
           </View>
@@ -185,7 +182,7 @@ export default function ProfileScreen() {
         </GlassCard>
 
         {/* Logout Section */}
-        <GlassCard width="100%" style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           {renderSettingItem(
             'log-out',
             'Logout',
@@ -193,6 +190,7 @@ export default function ProfileScreen() {
             handleLogout
           )}
         </GlassCard>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -211,9 +209,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerButton: {
+    width: 40,
+    height: 40,
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     color: 'white',
@@ -228,10 +234,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'stretch',
   },
+  contentColumn: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+  },
   section: {
     marginBottom: 16,
     overflow: 'hidden',
     width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
   },
   sectionHeader: {
     paddingHorizontal: 20,

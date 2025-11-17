@@ -252,6 +252,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     overflow: 'hidden',
     width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
   sectionHeader: {
     paddingHorizontal: spacing.lg,

@@ -929,11 +929,6 @@ export const HomeScreen: React.FC = () => {
               <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} showHeader={false} />
             </View>
 
-            <View style={styles.headingWrap}>
-              <Text style={styles.chatsHeading}>Chats</Text>
-              <View style={styles.headingUnderline} />
-            </View>
-
             {(incomingRequests.length > 0 || outgoingRequests.length > 0) && (
               <View style={styles.section}>
                 <FriendRequestsWidget
@@ -947,13 +942,6 @@ export const HomeScreen: React.FC = () => {
             )}
 
             <View style={[styles.section, styles.chatSection]}>
-              {totalUnreadChats > 0 && (
-                <View style={styles.sectionBadge}>
-                  <Text style={styles.sectionBadgeText}>
-                    {totalUnreadChats > 99 ? '99+' : totalUnreadChats}
-                  </Text>
-                </View>
-              )}
               <ChatListWidget
                 chats={chats}
                 isLoading={chatsLoading}
@@ -1158,24 +1146,6 @@ const styles = StyleSheet.create({
   },
   searchSection: {
     marginBottom: spacing.lg,
-  },
-  headingWrap: {
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  chatsHeading: {
-    color: palette.text,
-    fontSize: 18,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    fontFamily: 'SpaceGrotesk-Medium',
-  },
-  headingUnderline: {
-    marginTop: spacing.xs,
-    width: 60,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
   chatSection: {
     flex: 1,
