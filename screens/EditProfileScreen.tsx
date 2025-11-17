@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
@@ -247,12 +248,7 @@ export const EditProfileScreen: React.FC = () => {
   if (initialLoading) {
     return (
       <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]}>
-        <LinearGradient
-          colors={['#03040A', '#071026']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
+        <AppBackground />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2C82FF" />
           <Text style={styles.loadingText}>Loading profile...</Text>
@@ -264,14 +260,7 @@ export const EditProfileScreen: React.FC = () => {
   return (
     <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: topInset > 0 ? 4 : 12 }]}>
@@ -369,6 +358,7 @@ export const EditProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#03040A',
   },
   loadingContainer: {
     flex: 1,

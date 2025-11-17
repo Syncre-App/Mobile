@@ -215,6 +215,7 @@ export const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: palette.background,
   },
   header: {
     flexDirection: 'row',
@@ -240,14 +241,13 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
-    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    alignItems: 'stretch',
   },
   section: {
     marginBottom: spacing.md,
     overflow: 'hidden',
-    alignSelf: 'center',
     width: '100%',
-    maxWidth: 440,
   },
   sectionHeader: {
     paddingHorizontal: spacing.lg,

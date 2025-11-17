@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
@@ -14,7 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
+import { AppBackground } from '../components/AppBackground';
 import { UpdateService } from '../services/UpdateService';
+import { palette } from '../theme/designSystem';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -100,20 +101,12 @@ export default function ProfileScreen() {
         {
           paddingTop: topInset + 12,
           paddingHorizontal: horizontalInset,
-          backgroundColor: '#03040A',
         },
       ]}
       edges={['left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
 
       {/* Header */}
       <View style={styles.header}>
@@ -208,6 +201,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: palette.background,
   },
   header: {
     flexDirection: 'row',

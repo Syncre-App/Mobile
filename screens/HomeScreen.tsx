@@ -62,22 +62,6 @@ export const HomeScreen: React.FC = () => {
     });
   }, [notifications]);
 
-  const onlineFriends = useMemo(() => {
-    return Object.values(userStatuses).filter((status) => {
-      const normalized = status ? String(status).toLowerCase() : '';
-      return normalized === 'online';
-    }).length;
-  }, [userStatuses]);
-
-  const heroStats = useMemo(
-    () => [
-      { label: 'Unread chats', value: totalUnreadChats },
-      { label: 'Requests', value: incomingRequests.length },
-      { label: 'Friends online', value: onlineFriends },
-    ],
-    [totalUnreadChats, incomingRequests.length, onlineFriends]
-  );
-
   const persistNotifications = useCallback((list: any[]) => {
     const minimized = list.map((notification: any) => ({
       id: notification.id,
@@ -826,11 +810,6 @@ export const HomeScreen: React.FC = () => {
           edges={['left', 'right']}
         >
           <View style={styles.topBar}>
-            <View style={styles.brandBlock}>
-              <Text style={styles.overline}>Now</Text>
-              <Text style={styles.brandTitle}>Syncre</Text>
-              <Text style={styles.brandSubtitle}>Talk freely. Stay close.</Text>
-            </View>
             <View style={styles.headerActions}>
               <TouchableOpacity
                 style={styles.notificationButton}
@@ -861,30 +840,6 @@ export const HomeScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-
-          <GlassCard variant="hero" padding={spacing.md} style={styles.heroCard}>
-            <View style={styles.heroHeader}>
-              <View style={styles.heroCopy}>
-                <Text style={styles.heroLabel}>Crystal clear</Text>
-                <Text style={styles.heroTitle}>Your conversations</Text>
-                <Text style={styles.heroBody}>
-                  One calm space for media, messages, and calls across devices.
-                </Text>
-              </View>
-              <View style={[styles.presencePill, isOnline ? styles.presenceOnline : styles.presenceOffline]}>
-                <View style={styles.presenceDot} />
-                <Text style={styles.presenceText}>{isOnline ? 'Online' : 'Offline'}</Text>
-              </View>
-            </View>
-            <View style={styles.heroStatsRow}>
-              {heroStats.map((stat) => (
-                <View key={stat.label} style={styles.heroStat}>
-                  <Text style={styles.heroStatValue}>{stat.value}</Text>
-                  <Text style={styles.heroStatLabel}>{stat.label}</Text>
-                </View>
-              ))}
-            </View>
-          </GlassCard>
 
           {isNotificationsVisible && (
             <View style={styles.notificationsOverlay}>
@@ -1036,33 +991,9 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     marginBottom: spacing.sm,
-  },
-  brandBlock: {
-    flex: 1,
-    maxWidth: 200,
-  },
-  overline: {
-    color: palette.textSubtle,
-    textTransform: 'uppercase',
-    letterSpacing: 4,
-    fontSize: 12,
-    fontFamily: 'SpaceGrotesk-Medium',
-    marginBottom: spacing.xxs,
-  },
-  brandTitle: {
-    color: palette.text,
-    fontSize: 28,
-    letterSpacing: -0.3,
-    fontFamily: 'SpaceGrotesk-SemiBold',
-  },
-  brandSubtitle: {
-    color: palette.textMuted,
-    fontSize: 13,
-    marginTop: spacing.xxs,
-    fontFamily: 'PlusJakartaSans-Regular',
   },
   headerActions: {
     flexDirection: 'row',
@@ -1112,93 +1043,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
-  },
-  heroCard: {
-    width: '100%',
-    maxWidth: layout.maxContentWidth,
-    alignSelf: 'center',
-    marginBottom: spacing.md,
-  },
-  heroHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  heroCopy: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  heroLabel: {
-    color: palette.textSubtle,
-    letterSpacing: 4,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    fontFamily: 'SpaceGrotesk-Medium',
-  },
-  heroTitle: {
-    color: palette.text,
-    fontSize: 24,
-    fontFamily: 'SpaceGrotesk-SemiBold',
-    letterSpacing: -0.4,
-  },
-  heroBody: {
-    color: palette.textMuted,
-    fontSize: 15,
-    lineHeight: 20,
-    fontFamily: 'PlusJakartaSans-Regular',
-    maxWidth: 280,
-  },
-  presencePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-  },
-  presenceOnline: {
-    borderColor: 'rgba(34, 197, 94, 0.4)',
-    backgroundColor: 'rgba(34, 197, 94, 0.12)',
-  },
-  presenceOffline: {
-    borderColor: 'rgba(251, 113, 133, 0.4)',
-    backgroundColor: 'rgba(251, 113, 133, 0.12)',
-  },
-  presenceDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: spacing.xs,
-    backgroundColor: palette.accent,
-  },
-  presenceText: {
-    color: palette.text,
-    fontFamily: 'PlusJakartaSans-SemiBold',
-    fontSize: 13,
-  },
-  heroStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  heroStat: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-  },
-  heroStatValue: {
-    color: palette.text,
-    fontSize: 24,
-    fontFamily: 'SpaceGrotesk-SemiBold',
-  },
-  heroStatLabel: {
-    color: palette.textSubtle,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginTop: spacing.xs,
-    fontFamily: 'SpaceGrotesk-Medium',
   },
   notificationsOverlay: {
     position: 'absolute',

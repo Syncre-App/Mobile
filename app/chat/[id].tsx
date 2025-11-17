@@ -4,7 +4,6 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,6 +21,7 @@ import { TimezoneService } from '../../services/TimezoneService';
 import { ChatService, type UploadableAsset } from '../../services/ChatService';
 import { GroupMemberPicker } from '../../components/GroupMemberPicker';
 import { UserAvatar } from '../../components/UserAvatar';
+import { AppBackground } from '../../components/AppBackground';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -3528,10 +3528,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
       <Stack.Screen options={{ title: receiverUsername }} />
 
       <View style={styles.header}>
