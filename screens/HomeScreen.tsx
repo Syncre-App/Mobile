@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,11 +16,13 @@ import {
 import * as Notifications from 'expo-notifications';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppBackground } from '../components/AppBackground';
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
 import { GlassCard } from '../components/GlassCard';
 import { UserAvatar } from '../components/UserAvatar';
+import { layout, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { ChatService } from '../services/ChatService';
 import { NotificationService } from '../services/NotificationService';
@@ -788,14 +789,11 @@ export const HomeScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
       
       {isValidatingToken ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2C82FF" />
+          <ActivityIndicator size="large" color={palette.accent} />
           <Text style={styles.loadingText}>Validating session...</Text>
         </View>
       ) : (
@@ -811,19 +809,17 @@ export const HomeScreen: React.FC = () => {
           ]}
           edges={['left', 'right']}
         >
-          {/* Simple header with profile */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Chats</Text>
+          <View style={styles.topBar}>
             <View style={styles.headerActions}>
               <TouchableOpacity
                 style={styles.notificationButton}
                 onPress={handleNotificationsPress}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
                 <Ionicons
                   name={isNotificationsVisible ? 'notifications' : 'notifications-outline'}
                   size={22}
-                  color="#ffffff"
+                  color={palette.text}
                 />
                 {unreadCount > 0 && (
                   <View style={styles.notificationBadge}>
@@ -836,18 +832,11 @@ export const HomeScreen: React.FC = () => {
                 <UserAvatar
                   uri={user?.profile_picture}
                   name={user?.username || user?.name || user?.email}
-                  size={42}
+                  size={46}
                   presence={isOnline ? 'online' : 'offline'}
                   presencePlacement="overlay"
                   style={styles.profileAvatar}
                 />
-                {totalUnreadChats > 0 && (
-                  <View style={styles.profileBadge}>
-                    <Text style={styles.profileBadgeText}>
-                      {totalUnreadChats > 99 ? '99+' : totalUnreadChats}
-                    </Text>
-                  </View>
-                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -935,32 +924,36 @@ export const HomeScreen: React.FC = () => {
               </GlassCard>
             </View>
           )}
+          <View style={styles.mainColumn}>
+            <View style={styles.searchSection}>
+              <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} showHeader={false} />
+            </View>
 
-          {/* Friend Search */}
-          <FriendSearchWidget onFriendUpdated={handleFriendStateChanged} />
+            {(incomingRequests.length > 0 || outgoingRequests.length > 0) && (
+              <View style={styles.section}>
+                <FriendRequestsWidget
+                  incoming={incomingRequests}
+                  outgoing={outgoingRequests}
+                  onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
+                  onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
+                  processingId={requestProcessingId}
+                />
+              </View>
+            )}
 
-          {/* Friend Requests */}
-          <FriendRequestsWidget
-            incoming={incomingRequests}
-            outgoing={outgoingRequests}
-            onAccept={(friendId) => handleRespondToRequest(friendId, 'accept')}
-            onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
-            processingId={requestProcessingId}
-          />
-
-          {/* Chat List */}
-          <View style={styles.chatSection}>
-            <ChatListWidget 
-              chats={chats}
-              isLoading={chatsLoading}
-              onRefresh={handleChatRefresh}
-              userStatuses={userStatuses}
-              onRemoveFriend={handleRemoveFriend}
-              removingFriendId={removingFriendId}
-              unreadCounts={chatUnreadCounts}
-              onEditGroup={handleEditGroup}
-              onDeleteGroup={handleDeleteGroup}
-            />
+            <View style={[styles.section, styles.chatSection]}>
+              <ChatListWidget
+                chats={chats}
+                isLoading={chatsLoading}
+                onRefresh={handleChatRefresh}
+                userStatuses={userStatuses}
+                onRemoveFriend={handleRemoveFriend}
+                removingFriendId={removingFriendId}
+                unreadCounts={chatUnreadCounts}
+                onEditGroup={handleEditGroup}
+                onDeleteGroup={handleDeleteGroup}
+              />
+            </View>
           </View>
         </SafeAreaView>
       )}
@@ -971,13 +964,17 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#03040A', // Dark theme to match login
+    backgroundColor: palette.background,
   },
   safeArea: {
     flex: 1,
+    paddingHorizontal: spacing.md,
   },
-  scrollView: {
+  mainColumn: {
     flex: 1,
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -985,139 +982,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#ffffff',
-    marginTop: 16,
+    color: palette.text,
+    marginTop: spacing.sm,
     fontSize: 16,
+    fontFamily: 'PlusJakartaSans-Medium',
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
+    marginBottom: spacing.sm,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  headerCard: {
-    padding: 0,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-  },
-  titleContainer: {
-    flex: 1,
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#ffffff',
-    opacity: 0.8,
-  },
-
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  titleSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  moreButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileButton: {
-    position: 'relative',
-    padding: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
   },
   notificationButton: {
     position: 'relative',
-    padding: 8,
-    borderRadius: 20,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   notificationBadge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#FF6B6B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  notificationBadgeText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  profileBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
+    top: 6,
+    right: 6,
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#1E84FF',
+    backgroundColor: palette.error,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: spacing.xxs,
   },
-  profileBadgeText: {
-    color: '#ffffff',
+  notificationBadgeText: {
+    color: '#fff',
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans-Bold',
+  },
+  profileButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   profileAvatar: {
     shadowColor: '#000000',
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
   },
   notificationsOverlay: {
     position: 'absolute',
-    top: 100,
-    right: 20,
+    top: 120,
+    right: spacing.lg,
     alignSelf: 'flex-end',
     paddingHorizontal: 0,
     zIndex: 30,
@@ -1131,7 +1059,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   notificationCloseButton: {
     width: 32,
@@ -1142,22 +1070,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   notificationsTitle: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   notificationsEmpty: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 14,
   },
   notificationItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    paddingVertical: 12,
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   notificationAvatar: {
     marginTop: 2,
@@ -1166,56 +1093,76 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notificationTextBlock: {
-    marginBottom: 6,
+    marginBottom: spacing.xs,
   },
   notificationItemTitle: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     marginBottom: 4,
   },
   notificationTimestamp: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: palette.textSubtle,
     fontSize: 12,
     marginBottom: 4,
   },
   notificationMessage: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: palette.textMuted,
     fontSize: 14,
   },
   notificationActions: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   notificationActionButton: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 18,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   notificationAccept: {
-    backgroundColor: '#2C82FF',
+    backgroundColor: palette.accent,
   },
   notificationDecline: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   notificationActionText: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   notificationDeclineText: {
-    color: '#FF6B6B',
+    color: palette.error,
+  },
+  section: {
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  searchSection: {
+    marginBottom: spacing.lg,
   },
   chatSection: {
     flex: 1,
   },
-  section: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  sectionBadge: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 1.5,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.3)',
+  },
+  sectionBadgeText: {
+    color: palette.accentSecondary,
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk-Medium',
   },
 });

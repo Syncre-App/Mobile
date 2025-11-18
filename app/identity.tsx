@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
+import { AppBackground } from '../components/AppBackground';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { CryptoService } from '../services/CryptoService';
@@ -143,7 +143,7 @@ export default function IdentityScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient colors={['#03040A', '#071026']} style={StyleSheet.absoluteFillObject} />
+      <AppBackground />
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

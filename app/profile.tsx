@@ -1,10 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     Alert,
-    Platform,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -14,14 +12,16 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
+import { AppBackground } from '../components/AppBackground';
 import { UpdateService } from '../services/UpdateService';
+import { palette } from '../theme/designSystem';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const appVersion = UpdateService.getCurrentVersion();
   const insets = useSafeAreaInsets();
-  const topInset = Math.max(insets.top, StatusBar.currentHeight || 0);
-  const horizontalInset = Math.max(insets.left, insets.right, 16);
+  const minimumTopPadding = 12;
+  const safeExtraTop = Math.max(minimumTopPadding - insets.top, 0);
 
   const handleBack = () => {
     router.back();
@@ -98,22 +98,13 @@ export default function ProfileScreen() {
       style={[
         styles.container,
         {
-          paddingTop: topInset + 12,
-          paddingHorizontal: horizontalInset,
-          backgroundColor: '#03040A',
+          paddingTop: safeExtraTop,
         },
       ]}
-      edges={['left', 'right']}
+      edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
 
       {/* Header */}
       <View style={styles.header}>
@@ -121,7 +112,7 @@ export default function ProfileScreen() {
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.headerButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -129,8 +120,9 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.contentColumn}>
         {/* Account Section */}
-        <GlassCard width="100%" style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Account</Text>
           </View>
@@ -164,7 +156,7 @@ export default function ProfileScreen() {
         </GlassCard>
 
         {/* About Section */}
-        <GlassCard width="100%" style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>About</Text>
           </View>
@@ -192,7 +184,7 @@ export default function ProfileScreen() {
         </GlassCard>
 
         {/* Logout Section */}
-        <GlassCard width="100%" style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           {renderSettingItem(
             'log-out',
             'Logout',
@@ -200,6 +192,7 @@ export default function ProfileScreen() {
             handleLogout
           )}
         </GlassCard>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -208,6 +201,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: palette.background,
   },
   header: {
     flexDirection: 'row',
@@ -217,9 +211,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerButton: {
+    width: 40,
+    height: 40,
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     color: 'white',
@@ -232,6 +234,12 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingBottom: 32,
     paddingHorizontal: 16,
+    alignItems: 'stretch',
+  },
+  contentColumn: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
   section: {
     marginBottom: 16,

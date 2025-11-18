@@ -1,30 +1,62 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { View, StyleSheet, ViewStyle, DimensionValue, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { gradients, palette, radii, shadows, tokens } from '../theme/designSystem';
 
 interface GlassCardProps {
-  children: React.ReactNode;
+  children: ReactNode;
   width?: DimensionValue;
   style?: StyleProp<ViewStyle>;
   intensity?: number;
+  variant?: 'default' | 'hero' | 'subtle';
+  padding?: number;
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({ 
-  children, 
-  width = 360, 
+export const GlassCard: React.FC<GlassCardProps> = ({
+  children,
+  width = 360,
   style,
-  intensity = 15
+  intensity = tokens.blur.card,
+  variant = 'default',
+  padding = 20,
 }) => {
+  const isHero = variant === 'hero';
+  const isSubtle = variant === 'subtle';
+
+  const borderColor = isHero
+    ? 'rgba(59, 130, 246, 0.45)'
+    : isSubtle
+    ? 'rgba(255, 255, 255, 0.12)'
+    : palette.border;
+
+  const gradientColors = isHero
+    ? ['rgba(37, 99, 235, 0.22)', 'rgba(99, 102, 241, 0.12)']
+    : ['rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.02)'];
+
   return (
-    <View style={[styles.container, { width }, style]}>
-      <BlurView intensity={intensity} style={styles.blur}>
+    <View
+      style={[
+        styles.container,
+        isHero && styles.heroShadow,
+        isSubtle && styles.subtleShadow,
+        { width, borderColor },
+        style,
+      ]}
+    >
+      <BlurView intensity={intensity} tint="dark" style={styles.blur}>
         <LinearGradient
-          colors={['rgba(255, 255, 255, 0.04)', 'rgba(255, 255, 255, 0.02)']}
+          colors={gradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.gradient}
+          style={[styles.gradient, { padding }]}
         >
+          <LinearGradient
+            colors={gradients.cardStroke}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.strokeOverlay}
+          />
           {children}
         </LinearGradient>
       </BlurView>
@@ -34,24 +66,33 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 18,
+    borderRadius: radii.xl,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 10,
+    borderWidth: 1.2,
+    backgroundColor: palette.surface,
+    ...shadows.card,
   },
   blur: {
     flex: 1,
   },
   gradient: {
     flex: 1,
-    padding: 18,
+    justifyContent: 'center',
+  },
+  strokeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.35,
+  },
+  heroShadow: {
+    shadowColor: '#1E2A78',
+    shadowOpacity: 0.55,
+    shadowRadius: 45,
+    shadowOffset: { width: 0, height: 25 },
+    elevation: 24,
+  },
+  subtleShadow: {
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
   },
 });

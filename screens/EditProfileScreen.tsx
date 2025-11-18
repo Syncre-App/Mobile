@@ -19,11 +19,13 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
+import { spacing } from '../theme/designSystem';
 
 interface User {
   id: string;
@@ -49,11 +51,9 @@ const resolveExtension = (fileName?: string | null, mimeType?: string | null) =>
 
 export const EditProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const topInset = useMemo(() => {
-    const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0;
-    return Math.max(insets.top, statusBarHeight);
-  }, [insets.top]);
-  const containerPaddingTop = topInset > 0 ? topInset + (Platform.OS === 'android' ? 8 : 0) : 16;
+  const topInset = insets.top;
+  const minimumTopPadding = spacing.md;
+  const containerPaddingTop = Math.max(minimumTopPadding - topInset, 0);
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -246,13 +246,8 @@ export const EditProfileScreen: React.FC = () => {
 
   if (initialLoading) {
     return (
-      <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]}>
-        <LinearGradient
-          colors={['#03040A', '#071026']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
+      <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]} edges={['top', 'left', 'right']}>
+        <AppBackground />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2C82FF" />
           <Text style={styles.loadingText}>Loading profile...</Text>
@@ -262,24 +257,17 @@ export const EditProfileScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]}>
+    <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topInset > 0 ? 4 : 12 }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
-        <View style={styles.headerButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -288,7 +276,8 @@ export const EditProfileScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <GlassCard width="100%" style={[styles.card, styles.photoCard]}>
+        <View style={styles.contentColumn}>
+        <GlassCard width="100%" style={[styles.card, styles.photoCard]} variant="subtle" padding={spacing.lg}>
           <View style={styles.photoPickerWrapper}>
             <TouchableOpacity
               style={styles.photoPicker}
@@ -319,7 +308,7 @@ export const EditProfileScreen: React.FC = () => {
           <Text style={styles.photoHint}>PNG or JPG · max 5 MB</Text>
         </GlassCard>
 
-        <GlassCard width="100%" style={[styles.card, styles.infoCard]}>
+        <GlassCard width="100%" style={[styles.card, styles.infoCard]} variant="subtle">
           <View style={[styles.infoRow, styles.infoRowFirst]}>
             <Text style={styles.infoLabel}>Username</Text>
             <Text style={styles.infoValue}>{username || '—'}</Text>
@@ -330,7 +319,7 @@ export const EditProfileScreen: React.FC = () => {
           </View>
         </GlassCard>
 
-        <GlassCard width="100%" style={[styles.card, styles.bioCard]}>
+        <GlassCard width="100%" style={[styles.card, styles.bioCard]} variant="subtle">
           <BlurView intensity={40} tint="dark" style={styles.bioBlur}>
             <Text style={styles.bioTitle}>Bio editing is coming soon</Text>
             <Text style={styles.bioSubtitle}>We’re working on this feature, stay tuned!</Text>
@@ -361,6 +350,7 @@ export const EditProfileScreen: React.FC = () => {
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
         </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -369,6 +359,7 @@ export const EditProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#03040A',
   },
   loadingContainer: {
     flex: 1,
@@ -388,9 +379,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerButton: {
+    width: 40,
+    height: 40,
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     color: 'white',
@@ -404,10 +403,15 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  card: {
+  contentColumn: {
+    width: '100%',
+    maxWidth: 440,
     alignSelf: 'center',
+  },
+  card: {
     width: '100%',
     maxWidth: 420,
+    alignSelf: 'center',
   },
   photoCard: {
     marginBottom: 24,

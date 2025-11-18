@@ -1,11 +1,7 @@
 import React, { useMemo } from 'react';
-import {
-  Image,
-  StyleSheet,
-  Text,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { Image, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { gradients, palette } from '../theme/designSystem';
 
 type Presence = 'online' | 'offline' | 'busy' | 'away' | null | undefined;
 type PresencePlacement = 'overlay' | 'left';
@@ -68,6 +64,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   const showPresence = Boolean(presence);
   const dotSize = Math.max(8, Math.round(size * 0.28));
   const offset = Math.max(2, Math.round(size * 0.12));
+  const ringWidth = Math.max(3, Math.round(size * 0.08));
+  const avatarSize = Math.max(0, size - ringWidth * 2);
 
   return (
     <View style={[styles.wrapper, style]}>
@@ -87,19 +85,39 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       ) : null}
 
       <View style={[styles.avatarFrame, { width: size, height: size }]}>
-        <View style={[styles.imageWrap, { borderRadius: size / 2 }]}>
-        {uri ? (
-          <Image
-            source={{ uri }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        ) : (
-            <View style={[styles.placeholder, { borderRadius: size / 2 }]}>
-              <Text style={[styles.initials, { fontSize: Math.max(12, size * 0.35) }]}>{initials}</Text>
-            </View>
-          )}
-        </View>
+        <LinearGradient
+          colors={gradients.avatarRing}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.ring,
+            {
+              borderRadius: size / 2,
+              padding: ringWidth,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.imageWrap,
+              {
+                borderRadius: avatarSize / 2,
+                width: avatarSize,
+                height: avatarSize,
+              },
+            ]}
+          >
+            {uri ? (
+              <Image source={{ uri }} style={styles.image} resizeMode="cover" />
+            ) : (
+              <View style={[styles.placeholder, { borderRadius: avatarSize / 2 }]}>
+                <Text style={[styles.initials, { fontSize: Math.max(12, avatarSize * 0.38) }]}>
+                  {initials}
+                </Text>
+              </View>
+            )}
+          </View>
+        </LinearGradient>
 
         {showPresence && presencePlacement === 'overlay' ? (
           <View
@@ -131,12 +149,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  imageWrap: {
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    zIndex: 1,
+  ring: {
+    alignItems: 'center',
+    justifyContent: 'center',
     width: '100%',
     height: '100%',
+  },
+  imageWrap: {
+    overflow: 'hidden',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    zIndex: 1,
   },
   image: {
     width: '100%',
@@ -146,11 +168,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   initials: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+    color: palette.text,
+    fontFamily: 'SpaceGrotesk-SemiBold',
   },
   overlayPresence: {
     position: 'absolute',

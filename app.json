@@ -2,7 +2,7 @@
   "expo": {
     "name": "syncre",
     "slug": "syncre",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "scheme": "syncre",
@@ -16,7 +16,20 @@
       "supportsTablet": true,
       "bundleIdentifier": "xyz.syncre.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Syncre uses your approximate location to keep message timestamps accurate.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "syncre"
+            ]
+          }
+        ]
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.xyz.syncre.share"
+        ]
       }
     },
     "android": {
@@ -27,7 +40,11 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.devbeni.syncre",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",

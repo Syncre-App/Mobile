@@ -12,11 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
+import { palette, radii, spacing } from '../theme/designSystem';
 
 export const VerifyScreen: React.FC = () => {
   const { email } = useLocalSearchParams();
@@ -81,26 +83,21 @@ export const VerifyScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
 
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <GlassCard style={styles.card}>
+        <View style={styles.hero}>
+          <Text style={styles.overline}>Almost there</Text>
+          <Text style={styles.title}>Verify your account</Text>
+          <Text style={styles.description}>We sent a code to {email}</Text>
+        </View>
+
+        <GlassCard style={styles.card} variant="subtle" padding={spacing.lg}>
           <View style={styles.content}>
-            <Text style={styles.title}>VERIFY</Text>
-            <Text style={styles.description}>
-              A verification code was sent to {email}
-            </Text>
             
             <TransparentField
               placeholder="Code"
@@ -142,48 +139,59 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 48,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xxl,
+    gap: spacing.lg,
+  },
+  hero: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  overline: {
+    color: palette.textSubtle,
+    fontFamily: 'SpaceGrotesk-Medium',
+    letterSpacing: 4,
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  title: {
+    color: palette.text,
+    fontWeight: '600',
+    fontSize: 24,
+    textAlign: 'center',
+    fontFamily: 'SpaceGrotesk-SemiBold',
+  },
+  description: {
+    color: palette.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    fontSize: 15,
   },
   card: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 420,
     alignSelf: 'center',
   },
   content: {
-    padding: 20,
-  },
-  title: {
-    color: 'white',
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  description: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    marginBottom: 12,
-    fontSize: 14,
+    gap: spacing.md,
   },
   inputField: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   verifyButton: {
     width: '100%',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   verifyButtonGradient: {
-    paddingVertical: 14,
-    borderRadius: 24,
+    paddingVertical: spacing.md,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 46,
+    height: 48,
   },
   verifyButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 16,
   },
 });
