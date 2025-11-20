@@ -159,7 +159,7 @@ export const LoginScreen: React.FC = () => {
               disabled={isLoading}
             >
               <LinearGradient
-                colors={isLoading ? ['#64748B', '#475569'] : ['#2563EB', '#0EA5E9', '#7C3AED']}
+                colors={isLoading ? ['#64748B', '#475569'] : ['#2563EB', '#0EA5E9']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.loginGradient}
