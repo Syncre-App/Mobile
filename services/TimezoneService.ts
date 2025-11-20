@@ -2,7 +2,13 @@ const DEFAULT_TIMEZONE = 'Europe/Budapest';
 
 let cachedTimezone: string | null = null;
 
+const hasIntl = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function';
+
 const detectTimezone = (): string => {
+  if (!hasIntl) {
+    return DEFAULT_TIMEZONE;
+  }
+
   try {
     const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (resolved && resolved !== 'Etc/Unknown') {
