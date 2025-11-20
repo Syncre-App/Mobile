@@ -384,6 +384,9 @@ const parseDate = (value: string): Date => {
   return date;
 };
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const hasIntlSupport = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function';
+
 const formatDateLabel = (date: Date): string => {
   const today = startOfDay(new Date());
   const target = startOfDay(date);
@@ -396,11 +399,18 @@ const formatDateLabel = (date: Date): string => {
     return 'Yesterday';
   }
 
+  const includeYear = today.getFullYear() !== date.getFullYear();
+  const fallback = `${MONTH_LABELS[date.getMonth()]} ${date.getDate()}${includeYear ? `, ${date.getFullYear()}` : ''}`;
+
+  if (!hasIntlSupport) {
+    return fallback;
+  }
+
   const options: Intl.DateTimeFormatOptions = {
     month: 'short',
     day: 'numeric',
   };
-  if (today.getFullYear() !== date.getFullYear()) {
+  if (includeYear) {
     options.year = 'numeric';
   }
   return new Intl.DateTimeFormat(undefined, options).format(date);
@@ -422,6 +432,14 @@ const formatStatusLabel = (status: MessageStatus): string => {
 };
 
 const formatTimestamp = (date: Date): string => {
+  if (!hasIntlSupport) {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const paddedHours = String(hours).padStart(2, '0');
+    const paddedMinutes = String(minutes).padStart(2, '0');
+    return `${paddedHours}:${paddedMinutes}`;
+  }
+
   const timeFormatter = new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
