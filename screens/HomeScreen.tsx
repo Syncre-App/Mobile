@@ -138,15 +138,15 @@ export const HomeScreen: React.FC = () => {
       console.error('Failed to load unread summary:', error);
     }
   }, []);
+  type UnreadMap = Record<string, number>;
+  const computeUnreadTotal = (map: UnreadMap) =>
+    Object.values(map).reduce((sum: number, val: number) => sum + val, 0);
+
   const updateLocalUnread = useCallback(
-    async (
-      updater:
-        | Record<string, number>
-        | ((prev: Record<string, number>) => Record<string, number>)
-    ) => {
+    async (updater: UnreadMap | ((prev: UnreadMap) => UnreadMap)) => {
       setChatUnreadCounts((prev) => {
-        const next = typeof updater === 'function' ? (updater as any)(prev) : updater;
-        const total = Object.values(next).reduce((sum, val) => sum + val, 0);
+        const next: UnreadMap = typeof updater === 'function' ? (updater as (p: UnreadMap) => UnreadMap)(prev) : updater;
+        const total = computeUnreadTotal(next);
         setTotalUnreadChats(total);
         Notifications.setBadgeCountAsync(total).catch((err) =>
           console.warn('[HomeScreen] Failed to sync badge from local update:', err)

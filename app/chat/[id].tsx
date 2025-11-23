@@ -1190,6 +1190,16 @@ const [messageActionContext, setMessageActionContext] = useState<{
     },
     [dismissMessageActions]
   );
+  const resolveActionIcon = useCallback((label: string): any => {
+    const normalized = label.toLowerCase();
+    if (normalized.includes('reply')) return 'return-down-back';
+    if (normalized.includes('edit')) return 'create-outline';
+    if (normalized.includes('delete')) return 'trash-outline';
+    if (normalized.includes('copy')) return 'copy-outline';
+    if (normalized.includes('forward')) return 'arrow-redo-outline';
+    if (normalized.includes('thread')) return 'chatbubble-ellipses-outline';
+    return 'ellipsis-horizontal';
+  }, []);
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
   const [chatDetails, setChatDetails] = useState<{
@@ -4085,13 +4095,13 @@ const [messageActionContext, setMessageActionContext] = useState<{
                   {
                     translateY: messageActionAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [-12, 0],
+                      outputRange: [-8, 0],
                     }),
                   },
                   {
                     scale: messageActionAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [0.92, 1],
+                      outputRange: [0.94, 1],
                     }),
                   },
                 ],
@@ -4099,27 +4109,30 @@ const [messageActionContext, setMessageActionContext] = useState<{
             ]}
             pointerEvents="box-none"
           >
-            <BlurView intensity={55} tint="dark" style={styles.messageActionSheet}>
-              <View style={styles.messageActionSheetContent}>
-                <View style={styles.messageActionHeader}>
-                  <Text style={styles.messageActionTitle}>Message</Text>
-                  <Text style={styles.messageActionPreview} numberOfLines={2}>
-                    {messageActionContext.message.content || 'Attachment'}
-                  </Text>
-                </View>
+            <View style={styles.messageActionArrow} />
+            <BlurView intensity={60} tint="dark" style={styles.messageActionBubble}>
+              <Text style={styles.messageActionPreview} numberOfLines={2}>
+                {messageActionContext.message.content || 'Attachment'}
+              </Text>
+              <View style={styles.messageActionChipRow}>
                 {messageActionContext.actions.map((action) => (
                   <Pressable
                     key={`${messageActionContext.message.id}-${action.label}`}
                     style={[
-                      styles.messageActionButton,
-                      action.destructive && styles.messageActionButtonDestructive,
+                      styles.messageActionChip,
+                      action.destructive && styles.messageActionChipDestructive,
                     ]}
                     onPress={() => handleMessageActionSelect(action)}
                   >
+                    <Ionicons
+                      name={resolveActionIcon(action.label) as any}
+                      size={16}
+                      color={action.destructive ? '#ffb4b4' : '#e7ecff'}
+                    />
                     <Text
                       style={[
-                        styles.messageActionButtonText,
-                        action.destructive && styles.messageActionButtonTextDestructive,
+                        styles.messageActionChipText,
+                        action.destructive && styles.messageActionChipTextDestructive,
                       ]}
                     >
                       {action.label}
@@ -5091,54 +5104,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
   },
-  messageActionSheet: {
-    width: 240,
-    borderRadius: 24,
-    overflow: 'hidden',
+  messageActionPreview: {
+    color: '#ffffff',
+    fontSize: 12,
+    marginBottom: 10,
+  },
+  messageActionBubble: {
+    width: 260,
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(4, 8, 18, 0.78)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#000',
     shadowOpacity: 0.35,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 12,
   },
-  messageActionSheetContent: {
-    padding: 16,
-    gap: 8,
-    backgroundColor: 'rgba(4, 8, 18, 0.65)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+  messageActionArrow: {
+    position: 'absolute',
+    top: -6,
+    alignSelf: 'center',
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: 'rgba(4, 8, 18, 0.78)',
+    transform: [{ rotate: '45deg' }],
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  messageActionHeader: {
-    marginBottom: 8,
+  messageActionChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  messageActionTitle: {
-    color: '#7C8AA4',
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  messageActionPreview: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  messageActionButton: {
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+  messageActionChip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  messageActionButtonDestructive: {
-    backgroundColor: 'rgba(255, 92, 92, 0.12)',
+  messageActionChipDestructive: {
+    backgroundColor: 'rgba(255, 92, 92, 0.14)',
   },
-  messageActionButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  messageActionChipText: {
+    color: '#e7ecff',
     fontWeight: '600',
+    fontSize: 13,
   },
-  messageActionButtonTextDestructive: {
-    color: '#FF5C5C',
+  messageActionChipTextDestructive: {
+    color: '#ffb4b4',
   },
   attachmentSheet: {
     position: 'absolute',
