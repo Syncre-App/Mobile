@@ -8,6 +8,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { Video, ResizeMode } from 'expo-av';
 import { useAuth } from '../../hooks/useAuth';
@@ -458,6 +459,7 @@ const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
 const SWIPE_REPLY_THRESHOLD = 18;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
+const QUICK_REACTIONS = ['❤️', '👍', '👎', '😂', '‼️', '❓', '😮', '🎉'];
 
 
 const layoutNext = () => {
@@ -1095,19 +1097,31 @@ const [messageActionContext, setMessageActionContext] = useState<{
     message: Message;
     actions: Array<{ label: string; onPress: () => void; destructive?: boolean }>;
     anchorY: number;
+    anchorX: number;
   } | null>(null);
   const messageActionAnim = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
-  const messageActionAnchorTop = useMemo(() => {
+  const ACTION_CARD_WIDTH = 280;
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+  const messageActionAnchor = useMemo(() => {
     if (!messageActionContext) {
-      return 0;
+      return { top: 0, left: SCREEN_WIDTH / 2 - ACTION_CARD_WIDTH / 2 };
     }
-    const offset = messageActionContext.anchorY - 120;
-    const clamped = Math.max(offset, 80);
-    return Math.min(clamped, windowHeight - 220);
-  }, [messageActionContext, windowHeight]);
+    const rawTop = messageActionContext.anchorY + 12;
+    const top = Math.max(Math.min(rawTop, windowHeight - 260), 72);
+    const rawLeft = messageActionContext.anchorX - ACTION_CARD_WIDTH / 2;
+    const left = Math.max(12, Math.min(rawLeft, SCREEN_WIDTH - ACTION_CARD_WIDTH - 12));
+    return { top, left };
+  }, [ACTION_CARD_WIDTH, SCREEN_WIDTH, messageActionContext, windowHeight]);
+  const messageActionArrowLeft = useMemo(() => {
+    if (!messageActionContext) {
+      return ACTION_CARD_WIDTH / 2 - 6;
+    }
+    const offset = messageActionContext.anchorX - messageActionAnchor.left - 6;
+    return Math.max(14, Math.min(offset, ACTION_CARD_WIDTH - 26));
+  }, [ACTION_CARD_WIDTH, messageActionAnchor.left, messageActionContext]);
 
   const dismissMessageActions = useCallback(
     (onFinished?: () => void) => {
@@ -1190,12 +1204,26 @@ const [messageActionContext, setMessageActionContext] = useState<{
     },
     [dismissMessageActions]
   );
+  const handleQuickReaction = useCallback(
+    async (emoji: string) => {
+      try {
+        await Haptics.selectionAsync();
+      } catch {
+        // ignore haptic failures
+      }
+      setNewMessage((prev) => (prev ? `${prev} ${emoji}` : emoji));
+      requestAnimationFrame(() => composerRef.current?.focus());
+      dismissMessageActions();
+    },
+    [dismissMessageActions]
+  );
   const resolveActionIcon = useCallback((label: string): any => {
     const normalized = label.toLowerCase();
     if (normalized.includes('reply')) return 'return-down-back';
     if (normalized.includes('edit')) return 'create-outline';
     if (normalized.includes('delete')) return 'trash-outline';
     if (normalized.includes('copy')) return 'copy-outline';
+    if (normalized.includes('link')) return 'link-outline';
     if (normalized.includes('forward')) return 'arrow-redo-outline';
     if (normalized.includes('thread')) return 'chatbubble-ellipses-outline';
     return 'ellipsis-horizontal';
@@ -2676,8 +2704,17 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
   const handleShareAttachment = useCallback(
     async (attachment?: MessageAttachment | null) => {
-      const target = attachment?.publicDownloadUrl || attachment?.downloadUrl;
-      if (!attachment || !target) {
+      if (!attachment) {
+        NotificationService.show('error', 'Share link is not available for this file');
+        return;
+      }
+      const target =
+        attachment.publicDownloadUrl ||
+        attachment.downloadUrl ||
+        attachment.publicViewUrl ||
+        attachment.previewUrl ||
+        attachment.localUri;
+      if (!target) {
         NotificationService.show('error', 'Share link is not available for this file');
         return;
       }
@@ -2695,6 +2732,45 @@ const [messageActionContext, setMessageActionContext] = useState<{
     []
   );
 
+  const handleCopyMessage = useCallback(async (message: Message) => {
+    const text = message.content || '';
+    if (!text) {
+      NotificationService.show('info', 'Nothing to copy');
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(text);
+      NotificationService.show('success', 'Copied');
+    } catch (error) {
+      console.error('Failed to copy text', error);
+      NotificationService.show('error', 'Unable to copy');
+    }
+  }, []);
+
+  const handleCopyAttachmentLink = useCallback(async (attachment?: MessageAttachment | null) => {
+    if (!attachment) {
+      NotificationService.show('info', 'No attachment to copy');
+      return;
+    }
+    const target =
+      attachment.publicDownloadUrl ||
+      attachment.downloadUrl ||
+      attachment.publicViewUrl ||
+      attachment.previewUrl ||
+      attachment.localUri;
+    if (!target) {
+      NotificationService.show('error', 'Link not available for this file');
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(target);
+      NotificationService.show('success', 'Link copied');
+    } catch (error) {
+      console.error('Failed to copy attachment link', error);
+      NotificationService.show('error', 'Unable to copy link');
+    }
+  }, []);
+
   const handleBubbleLongPress = useCallback(
     (message: Message, event?: GestureResponderEvent) => {
       if (message.isPlaceholder) {
@@ -2706,6 +2782,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
       const canEdit = message.senderId === currentUserId && !message.isDeleted;
       const canDelete = message.senderId === currentUserId && !message.isDeleted;
+      const primaryAttachment = (message.attachments || [])[0];
 
       const replyAction = () => setReplyContext(buildReplyPayloadFromMessage(message));
       const actions: Array<{ label: string; onPress: () => void; destructive?: boolean }> = [
@@ -2714,6 +2791,24 @@ const [messageActionContext, setMessageActionContext] = useState<{
           onPress: replyAction,
         },
       ];
+
+      if (message.content) {
+        actions.push({
+          label: 'Copy',
+          onPress: () => handleCopyMessage(message),
+        });
+      }
+
+      if (primaryAttachment) {
+        actions.push({
+          label: 'Copy link',
+          onPress: () => handleCopyAttachmentLink(primaryAttachment),
+        });
+        actions.push({
+          label: 'Share',
+          onPress: () => handleShareAttachment(primaryAttachment),
+        });
+      }
 
       if (canEdit) {
         actions.push({
@@ -2731,15 +2826,25 @@ const [messageActionContext, setMessageActionContext] = useState<{
       }
 
       if (!canEdit && !canDelete) {
-        replyAction();
-        return;
+        actions.push({ label: 'Cancel', onPress: () => {} });
+      } else {
+        actions.push({ label: 'Cancel', onPress: () => {} });
       }
-
-      actions.push({ label: 'Cancel', onPress: () => {} });
       const anchorY = event?.nativeEvent?.pageY ?? windowHeight / 2;
-      setMessageActionContext({ message, actions, anchorY });
+      const anchorX = event?.nativeEvent?.pageX ?? SCREEN_WIDTH / 2;
+      setMessageActionContext({ message, actions, anchorY, anchorX });
     },
-    [buildReplyPayloadFromMessage, confirmDeleteMessage, currentUserId, startEditMessage, windowHeight]
+    [
+      buildReplyPayloadFromMessage,
+      confirmDeleteMessage,
+      currentUserId,
+      handleCopyAttachmentLink,
+      handleCopyMessage,
+      handleShareAttachment,
+      startEditMessage,
+      windowHeight,
+      SCREEN_WIDTH,
+    ]
   );
 
   const handleSendMessage = useCallback(async () => {
@@ -3248,9 +3353,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
   const handleContentSizeChange = useCallback(
     (_: number, height: number) => {
       contentHeightRef.current = height;
-      const layoutHeight = listLayoutHeightRef.current;
-      const hasScrollableContent = height > layoutHeight + 16;
-      if (!initialLoadCompleteRef.current || isNearBottomRef.current || !hasScrollableContent) {
+      if (!initialLoadCompleteRef.current || isNearBottomRef.current) {
         requestAnimationFrame(() => scrollToBottom(true));
       }
     },
@@ -4089,7 +4192,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
             style={[
               styles.messageActionSheetContainer,
               {
-                top: messageActionAnchorTop,
+                top: messageActionAnchor.top,
+                left: messageActionAnchor.left,
                 opacity: messageActionAnim,
                 transform: [
                   {
@@ -4109,12 +4213,27 @@ const [messageActionContext, setMessageActionContext] = useState<{
             ]}
             pointerEvents="box-none"
           >
-            <View style={styles.messageActionArrow} />
+            <View style={[styles.messageActionArrow, { left: messageActionArrowLeft }]} />
             <BlurView intensity={60} tint="dark" style={styles.messageActionBubble}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.quickReactionRow}
+              >
+                {QUICK_REACTIONS.map((emoji) => (
+                  <Pressable
+                    key={`reaction-${emoji}`}
+                    onPress={() => handleQuickReaction(emoji)}
+                    style={styles.quickReaction}
+                  >
+                    <Text style={styles.quickReactionText}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
               <Text style={styles.messageActionPreview} numberOfLines={2}>
                 {messageActionContext.message.content || 'Attachment'}
               </Text>
-              <View style={styles.messageActionChipRow}>
+              <View style={styles.messageActionChipColumn}>
                 {messageActionContext.actions.map((action) => (
                   <Pressable
                     key={`${messageActionContext.message.id}-${action.label}`}
@@ -5099,10 +5218,8 @@ const styles = StyleSheet.create({
   },
   messageActionSheetContainer: {
     position: 'absolute',
-    left: 0,
-    right: 0,
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
   },
   messageActionPreview: {
     color: '#ffffff',
@@ -5110,9 +5227,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   messageActionBubble: {
-    width: 260,
+    width: 280,
     borderRadius: 20,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     backgroundColor: 'rgba(4, 8, 18, 0.78)',
     borderWidth: StyleSheet.hairlineWidth,
@@ -5126,7 +5243,6 @@ const styles = StyleSheet.create({
   messageActionArrow: {
     position: 'absolute',
     top: -6,
-    alignSelf: 'center',
     width: 12,
     height: 12,
     borderRadius: 3,
@@ -5136,19 +5252,19 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  messageActionChipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  messageActionChipColumn: {
+    flexDirection: 'column',
+    gap: 8,
   },
   messageActionChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.08)',
+    minWidth: 0,
   },
   messageActionChipDestructive: {
     backgroundColor: 'rgba(255, 92, 92, 0.14)',
@@ -5160,6 +5276,23 @@ const styles = StyleSheet.create({
   },
   messageActionChipTextDestructive: {
     color: '#ffb4b4',
+  },
+  quickReactionRow: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  quickReaction: {
+    minWidth: 42,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 2,
+  },
+  quickReactionText: {
+    fontSize: 18,
   },
   attachmentSheet: {
     position: 'absolute',
