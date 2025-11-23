@@ -1097,19 +1097,27 @@ const [messageActionContext, setMessageActionContext] = useState<{
     actions: Array<{ label: string; onPress: () => void; destructive?: boolean }>;
     anchorY: number;
     anchorX: number;
+    above?: boolean;
   } | null>(null);
+const [contextTargetId, setContextTargetId] = useState<string | null>(null);
   const messageActionAnim = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
   const ACTION_CARD_WIDTH = 280;
+  const ACTION_CARD_HEIGHT = 240;
   const SCREEN_WIDTH = Dimensions.get('window').width;
   const messageActionAnchor = useMemo(() => {
     if (!messageActionContext) {
       return { top: 0, left: SCREEN_WIDTH / 2 - ACTION_CARD_WIDTH / 2 };
     }
-    const rawTop = messageActionContext.anchorY + 12;
-    const top = Math.max(Math.min(rawTop, windowHeight - 260), 72);
+    const placeAbove = messageActionContext.above ?? messageActionContext.anchorY > windowHeight * 0.55;
+    let rawTop = placeAbove
+      ? messageActionContext.anchorY - ACTION_CARD_HEIGHT - 12
+      : messageActionContext.anchorY + 12;
+    rawTop = Math.max(rawTop, 52);
+    const maxTop = windowHeight - ACTION_CARD_HEIGHT - 32;
+    const top = Math.min(rawTop, maxTop);
     const rawLeft = messageActionContext.anchorX - ACTION_CARD_WIDTH / 2;
     const left = Math.max(12, Math.min(rawLeft, SCREEN_WIDTH - ACTION_CARD_WIDTH - 12));
     return { top, left };
@@ -1121,6 +1129,13 @@ const [messageActionContext, setMessageActionContext] = useState<{
     const offset = messageActionContext.anchorX - messageActionAnchor.left - 6;
     return Math.max(14, Math.min(offset, ACTION_CARD_WIDTH - 26));
   }, [ACTION_CARD_WIDTH, messageActionAnchor.left, messageActionContext]);
+  const messageActionArrowTop = useMemo(() => {
+    if (!messageActionContext) {
+      return -6;
+    }
+    const placeAbove = messageActionContext.above ?? messageActionContext.anchorY > windowHeight * 0.55;
+    return placeAbove ? ACTION_CARD_HEIGHT - 6 : -6;
+  }, [ACTION_CARD_HEIGHT, messageActionContext, windowHeight]);
 
   const dismissMessageActions = useCallback(
     (onFinished?: () => void) => {
@@ -1134,6 +1149,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
         useNativeDriver: true,
       }).start(() => {
         setMessageActionContext(null);
+        setContextTargetId(null);
         onFinished?.();
       });
     },
@@ -2818,7 +2834,9 @@ const [messageActionContext, setMessageActionContext] = useState<{
       }
       const anchorY = event?.nativeEvent?.pageY ?? windowHeight / 2;
       const anchorX = event?.nativeEvent?.pageX ?? SCREEN_WIDTH / 2;
-      setMessageActionContext({ message, actions, anchorY, anchorX });
+      const above = anchorY > windowHeight * 0.55;
+      setContextTargetId(message.id);
+      setMessageActionContext({ message, actions, anchorY, anchorX, above });
     },
     [
       buildReplyPayloadFromMessage,
@@ -3605,7 +3623,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
             if (messageItem.isPlaceholder) return;
             setReplyContext(buildReplyPayloadFromMessage(messageItem));
           }}
-          isHighlighted={highlightedMessageId === messageItem.id}
+          isHighlighted={highlightedMessageId === messageItem.id || contextTargetId === messageItem.id}
           replyCount={replyCount}
           onOpenThread={(messageId) => setThreadRootId(messageId)}
           showSenderMetadata={Boolean(chatDetails?.isGroup)}
@@ -4001,43 +4019,46 @@ const [messageActionContext, setMessageActionContext] = useState<{
       >
         <View style={styles.threadModalOverlay}>
           <View style={styles.threadModalCard}>
-            <View style={styles.threadModalHeader}>
-              <Text style={styles.threadModalTitle}>
-                {threadMessages.length > 1
-                  ? `${threadMessages.length - 1} ${threadMessages.length - 1 === 1 ? 'Reply' : 'Replies'}`
-                  : 'Thread'}
-              </Text>
-              <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
-                <Ionicons name="close" size={20} color="#ffffff" />
+            <BlurView intensity={65} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <View style={styles.threadModalBody}>
+              <View style={styles.threadModalHeader}>
+                <Text style={styles.threadModalTitle}>
+                  {threadMessages.length > 1
+                    ? `${threadMessages.length - 1} ${threadMessages.length - 1 === 1 ? 'Reply' : 'Replies'}`
+                    : 'Thread'}
+                </Text>
+                <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
+                  <Ionicons name="close" size={20} color="#ffffff" />
+                </Pressable>
+              </View>
+              <ScrollView contentContainerStyle={styles.threadModalScroll}>
+                {threadMessages.length ? (
+                  threadMessages.map((threadMessage, index) => (
+                    <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
+                      <View style={styles.threadMessageHeader}>
+                        <Text style={styles.threadMessageAuthor}>
+                          {getReplyLabel(threadMessage.senderId)}
+                        </Text>
+                        <Text style={styles.threadMessageTimestamp}>
+                          {formatTimestamp(parseDate(threadMessage.timestamp))}
+                        </Text>
+                      </View>
+                      <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
+                      {index === 0 && (
+                        <Text style={styles.threadMessageBadge}>Original message</Text>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.threadEmptyText}>
+                    Original message is not available in this history.
+                  </Text>
+                )}
+              </ScrollView>
+              <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
+                <Text style={styles.threadJumpButtonText}>View in chat</Text>
               </Pressable>
             </View>
-            <ScrollView contentContainerStyle={styles.threadModalScroll}>
-              {threadMessages.length ? (
-                threadMessages.map((threadMessage, index) => (
-                  <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
-                    <View style={styles.threadMessageHeader}>
-                      <Text style={styles.threadMessageAuthor}>
-                        {getReplyLabel(threadMessage.senderId)}
-                      </Text>
-                      <Text style={styles.threadMessageTimestamp}>
-                        {formatTimestamp(parseDate(threadMessage.timestamp))}
-                      </Text>
-                    </View>
-                    <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
-                    {index === 0 && (
-                      <Text style={styles.threadMessageBadge}>Original message</Text>
-                    )}
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.threadEmptyText}>
-                  Original message is not available in this history.
-                </Text>
-              )}
-            </ScrollView>
-            <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
-              <Text style={styles.threadJumpButtonText}>View in chat</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -4199,8 +4220,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
             ]}
             pointerEvents="box-none"
           >
-            <View style={[styles.messageActionArrow, { left: messageActionArrowLeft }]} />
-            <BlurView intensity={80} tint="dark" style={styles.messageActionBubble}>
+            <View style={[styles.messageActionArrow, { left: messageActionArrowLeft, top: messageActionArrowTop }]} />
+            <View style={styles.messageActionBubble}>
               <Text style={styles.messageActionPreview} numberOfLines={2}>
                 {messageActionContext.message.content || 'Attachment'}
               </Text>
@@ -4208,9 +4229,10 @@ const [messageActionContext, setMessageActionContext] = useState<{
                 {messageActionContext.actions.map((action) => (
                   <Pressable
                     key={`${messageActionContext.message.id}-${action.label}`}
-                    style={[
-                      styles.messageActionChip,
-                      action.destructive && styles.messageActionChipDestructive,
+                    style={({ pressed }) => [
+                      styles.messageActionRow,
+                      action.destructive && styles.messageActionRowDestructive,
+                      pressed && styles.messageActionRowPressed,
                     ]}
                     onPress={() => handleMessageActionSelect(action)}
                   >
@@ -4221,8 +4243,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
                     />
                     <Text
                       style={[
-                        styles.messageActionChipText,
-                        action.destructive && styles.messageActionChipTextDestructive,
+                        styles.messageActionRowText,
+                        action.destructive && styles.messageActionRowTextDestructive,
                       ]}
                     >
                       {action.label}
@@ -4230,7 +4252,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
                   </Pressable>
                 ))}
               </View>
-            </BlurView>
+            </View>
           </Animated.View>
         </Animated.View>
       ) : null}
@@ -4468,7 +4490,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
-    backgroundColor: 'rgba(44, 130, 255, 0.2)',
+    backgroundColor: 'rgba(44, 130, 255, 0.16)',
   },
   replyChip: {
     flexDirection: 'row',
@@ -4687,21 +4709,30 @@ const styles = StyleSheet.create({
   },
   threadModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
   threadModalCard: {
-    backgroundColor: '#101526',
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 22,
+    overflow: 'hidden',
     maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
   },
   threadModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  threadModalBody: {
+    padding: 16,
+    backgroundColor: 'rgba(10, 14, 28, 0.72)',
   },
   threadModalTitle: {
     color: '#ffffff',
@@ -4715,7 +4746,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   threadMessageCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: 14,
     padding: 12,
     marginBottom: 12,
@@ -5181,7 +5212,7 @@ const styles = StyleSheet.create({
   },
   messageActionOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
   },
   messageActionBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -5194,21 +5225,22 @@ const styles = StyleSheet.create({
   },
   messageActionPreview: {
     color: '#ffffff',
-    fontSize: 12,
-    marginBottom: 10,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 12,
   },
   messageActionBubble: {
     width: 280,
-    borderRadius: 24,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    backgroundColor: 'rgba(4, 8, 18, 0.78)',
+    borderRadius: 22,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(14, 16, 25, 0.88)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
     elevation: 12,
   },
   messageActionArrow: {
@@ -5217,36 +5249,38 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 3,
-    backgroundColor: 'rgba(4, 8, 18, 0.78)',
+    backgroundColor: 'rgba(12, 14, 22, 0.82)',
     transform: [{ rotate: '45deg' }],
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderColor: 'transparent',
   },
   messageActionChipColumn: {
     flexDirection: 'column',
     gap: 8,
   },
-  messageActionChip: {
+  messageActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    minWidth: 0,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  messageActionChipDestructive: {
-    backgroundColor: 'rgba(255, 92, 92, 0.14)',
+  messageActionRowPressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  messageActionChipText: {
-    color: '#e7ecff',
+  messageActionRowDestructive: {
+    backgroundColor: 'rgba(255, 82, 82, 0.12)',
+  },
+  messageActionRowText: {
+    color: '#eef1ff',
     fontWeight: '600',
     fontSize: 13,
   },
-  messageActionChipTextDestructive: {
-    color: '#ffb4b4',
+  messageActionRowTextDestructive: {
+    color: '#ffd6d6',
   },
   quickReactionRow: {
     paddingVertical: 0,
