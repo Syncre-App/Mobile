@@ -448,6 +448,11 @@ const formatTimestamp = (date: Date): string => {
   return timeFormatter.format(date);
 };
 
+const sortMessagesChronologically = (list: Message[]): Message[] =>
+  list
+    .slice()
+    .sort((a, b) => parseDate(a.timestamp).getTime() - parseDate(b.timestamp).getTime());
+
 const MESSAGE_CHAR_LIMIT = 5000;
 const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
 const SWIPE_REPLY_THRESHOLD = 18;
@@ -1027,6 +1032,8 @@ const ChatScreen: React.FC = () => {
 
   const wsService = useMemo(() => WebSocketService.getInstance(), []);
   const flatListRef = useRef<FlatList<ChatListItem>>(null);
+  const listLayoutHeightRef = useRef(0);
+  const contentHeightRef = useRef(0);
   const composerLimitWarningRef = useRef(false);
 
   const receiverNameRef = useRef('Loading…');
@@ -1838,8 +1845,9 @@ const [messageActionContext, setMessageActionContext] = useState<{
           timezone: responseTimezone,
         });
         const cleaned = transformed.filter(Boolean);
+        const sorted = sortMessagesChronologically(cleaned);
 
-        setMessagesAnimated(() => cleaned);
+        setMessagesAnimated(() => sorted);
         if (missingEnvelopeRef.current) {
           requestReencrypt('missing_history');
         }
@@ -2150,7 +2158,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
         const transformed = await transformMessages(rawMessages, otherUserIdRef.current, token, {
           timezone: responseTimezone,
         });
-        const cleaned = transformed.filter(Boolean);
+        const cleaned = sortMessagesChronologically(transformed.filter(Boolean));
 
         setMessagesWithoutAnimation((prev) => {
           const existingIds = new Set(prev.map((msg) => msg.id));
@@ -2158,7 +2166,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
           if (!filtered.length) {
             return prev;
           }
-          return [...filtered, ...prev];
+          const merged = [...filtered, ...prev];
+          return sortMessagesChronologically(merged);
         });
 
         setHasMore(response.data?.hasMore ?? false);
@@ -3026,7 +3035,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
               if (exists) {
                 return withoutPlaceholders;
               }
-              return [...withoutPlaceholders, newEntry];
+              return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
             });
             scrollToBottom();
           } catch (error) {
@@ -3065,7 +3074,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
             if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
               return withoutPlaceholders;
             }
-            return [...withoutPlaceholders, newEntry];
+            return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
           });
           scrollToBottom();
           return;
@@ -3210,6 +3219,22 @@ const [messageActionContext, setMessageActionContext] = useState<{
       isNearTopRef.current = false;
     });
   }, [hasMore, isLoadingMore, isRefreshing, loadEarlier]);
+
+  const handleListLayout = useCallback((event: any) => {
+    listLayoutHeightRef.current = event.nativeEvent.layout.height;
+  }, []);
+
+  const handleContentSizeChange = useCallback(
+    (_: number, height: number) => {
+      contentHeightRef.current = height;
+      const layoutHeight = listLayoutHeightRef.current;
+      const hasScrollableContent = height > layoutHeight + 16;
+      if (!initialLoadCompleteRef.current || isNearBottomRef.current || !hasScrollableContent) {
+        requestAnimationFrame(() => scrollToBottom(true));
+      }
+    },
+    [scrollToBottom]
+  );
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -3643,71 +3668,31 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
 
                     <FlatList
-
-
                       ref={flatListRef}
-
-
                       data={decoratedData}
-
-
                       extraData={isRemoteTyping}
-
-
                       keyExtractor={(item) => item.id}
-
-
                       renderItem={renderChatItem}
-
-
                       contentContainerStyle={styles.messageList}
-
-
                       ListHeaderComponent={listHeader}
-
-
-                      keyboardShouldPersistTaps="handled"
+                      keyboardShouldPersistTaps="always"
+                      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                      onLayout={handleListLayout}
+                      onContentSizeChange={handleContentSizeChange}
+                      maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 60 }}
                       onScroll={handleScroll}
-
                       scrollEventThrottle={16}
-
-
                       onViewableItemsChanged={onViewableItemsChanged}
-
-
                       viewabilityConfig={viewabilityConfigRef.current}
-
-
-
-
-
                       refreshControl={
-
-
                         <RefreshControl
-
-
                           tintColor="#2C82FF"
-
-
                           titleColor="#2C82FF"
-
-
                           progressViewOffset={80}
-
-
                           refreshing={isRefreshing}
-
-
                           onRefresh={handleRefresh}
-
-
                         />
-
-
                       }
-
-
                     />
 
 
@@ -3953,63 +3938,86 @@ const [messageActionContext, setMessageActionContext] = useState<{
         onRequestClose={handleClosePreview}
       >
         <View style={styles.attachmentModalOverlay}>
-          <View style={styles.attachmentModalCard}>
-            <View style={styles.attachmentModalHeader}>
+          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFillObject} />
+          <View
+            style={[
+              styles.attachmentModalTopBar,
+              {
+                paddingTop:
+                  Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0) + 6,
+              },
+            ]}
+          >
+            <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
+              <Ionicons name="chevron-down" size={22} color="#ffffff" />
+            </Pressable>
+            <View style={styles.attachmentModalTitleWrap}>
               <Text style={styles.attachmentModalTitle} numberOfLines={1}>
                 {currentPreviewAttachment?.name || 'Attachment'}
               </Text>
-              <Pressable onPress={handleClosePreview}>
-                <Ionicons name="close" size={18} color="#ffffff" />
-              </Pressable>
+              {currentPreviewAttachment?.fileSize ? (
+                <Text style={styles.attachmentModalFileMeta}>
+                  {formatBytes(currentPreviewAttachment.fileSize)}
+                </Text>
+              ) : null}
             </View>
-            <FlatList
-              style={styles.attachmentModalCarousel}
-              contentContainerStyle={styles.attachmentModalCarouselContent}
-              ref={previewListRef}
-              data={previewContext?.attachments || []}
-              keyExtractor={(item) => item.id}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <View style={styles.attachmentPreviewSlide}>
-                  {item.isImage && (item.previewUrl || item.publicViewUrl || item.localUri) ? (
-                    <Image
-                      source={{ uri: item.previewUrl || item.publicViewUrl || item.localUri }}
-                      style={StyleSheet.absoluteFillObject}
-                      contentFit="contain"
-                    />
-                  ) : item.isVideo && resolveAttachmentUri(item) ? (
-                    <Video
-                      source={{ uri: resolveAttachmentUri(item)! }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode={ResizeMode.CONTAIN}
-                      useNativeControls
-                      shouldPlay={false}
-                    />
-                  ) : (
-                    <View style={styles.attachmentModalFile}>
-                      <Ionicons name="document-text-outline" size={28} color="#ffffff" />
-                      <Text style={styles.attachmentModalFileName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text style={styles.attachmentModalFileMeta}>
-                        {formatBytes(item.fileSize || 0)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-              onMomentumScrollEnd={({ nativeEvent }) => {
-                if (!previewContext) return;
-                const width = nativeEvent.layoutMeasurement.width;
-                if (!width) return;
-                const index = Math.round(nativeEvent.contentOffset.x / width);
-                setPreviewIndex(
-                  Math.min(Math.max(index, 0), (previewContext.attachments.length || 1) - 1)
-                );
-              }}
-            />
+            <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
+              <Ionicons name="close" size={18} color="#ffffff" />
+            </Pressable>
+          </View>
+          <FlatList
+            style={styles.attachmentModalCarousel}
+            contentContainerStyle={styles.attachmentModalCarouselContent}
+            ref={previewListRef}
+            data={previewContext?.attachments || []}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <View style={styles.attachmentPreviewSlide}>
+                {item.isImage && (item.previewUrl || item.publicViewUrl || item.localUri) ? (
+                  <Image
+                    source={{ uri: item.previewUrl || item.publicViewUrl || item.localUri }}
+                    style={StyleSheet.absoluteFillObject}
+                    contentFit="contain"
+                  />
+                ) : item.isVideo && resolveAttachmentUri(item) ? (
+                  <Video
+                    source={{ uri: resolveAttachmentUri(item)! }}
+                    style={StyleSheet.absoluteFillObject}
+                    resizeMode={ResizeMode.CONTAIN}
+                    useNativeControls
+                    shouldPlay={false}
+                  />
+                ) : (
+                  <View style={styles.attachmentModalFile}>
+                    <Ionicons name="document-text-outline" size={28} color="#ffffff" />
+                    <Text style={styles.attachmentModalFileName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.attachmentModalFileMeta}>
+                      {formatBytes(item.fileSize || 0)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+            onMomentumScrollEnd={({ nativeEvent }) => {
+              if (!previewContext) return;
+              const width = nativeEvent.layoutMeasurement.width;
+              if (!width) return;
+              const index = Math.round(nativeEvent.contentOffset.x / width);
+              setPreviewIndex(
+                Math.min(Math.max(index, 0), (previewContext.attachments.length || 1) - 1)
+              );
+            }}
+          />
+          <BlurView
+            intensity={50}
+            tint="dark"
+            style={[styles.attachmentModalFooter, { paddingBottom: Math.max(insets.bottom, 10) + 8 }]}
+          >
             <View style={styles.attachmentModalFileMetaRow}>
               <Text style={styles.attachmentModalFileName} numberOfLines={1}>
                 {currentPreviewAttachment?.name || 'Attachment'}
@@ -4036,7 +4044,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
                 <Text style={styles.attachmentModalButtonText}>Share</Text>
               </Pressable>
             </View>
-          </View>
+          </BlurView>
         </View>
       </Modal>
       {messageActionContext ? (
@@ -4944,42 +4952,41 @@ const styles = StyleSheet.create({
   },
   attachmentModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    backgroundColor: 'rgba(3, 4, 10, 0.65)',
+    justifyContent: 'space-between',
   },
-  attachmentModalCard: {
-    width: '100%',
-    borderRadius: 24,
-    backgroundColor: '#101425',
-    padding: 16,
-  },
-  attachmentModalHeader: {
+  attachmentModalTopBar: {
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: 12,
+  },
+  attachmentModalIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentModalTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
   },
   attachmentModalTitle: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    flex: 1,
-    marginRight: 12,
-  },
-  attachmentModalImage: {
-    width: '100%',
-    height: 240,
-    borderRadius: 16,
-    marginBottom: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    textAlign: 'center',
   },
   attachmentModalCarousel: {
-    marginBottom: 12,
+    flex: 1,
   },
   attachmentModalCarouselContent: {
-    paddingVertical: 8,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     alignItems: 'center',
   },
   attachmentModalFile: {
@@ -5004,12 +5011,20 @@ const styles = StyleSheet.create({
     columnGap: 12,
   },
   attachmentPreviewSlide: {
-    width: Dimensions.get('window').width - 48,
-    height: 260,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    width: Dimensions.get('window').width - 24,
+    height: Dimensions.get('window').height * 0.65,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginBottom: 12,
     alignSelf: 'center',
+    overflow: 'hidden',
+  },
+  attachmentModalFooter: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    backgroundColor: 'rgba(16, 20, 37, 0.35)',
     overflow: 'hidden',
   },
   attachmentModalFileMetaRow: {

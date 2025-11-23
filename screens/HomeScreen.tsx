@@ -683,9 +683,10 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     const unsubscribe = PushService.addNotificationListeners(() => {
       loadNotifications();
+      loadUnreadSummary();
     });
     return unsubscribe;
-  }, [loadNotifications]);
+  }, [loadNotifications, loadUnreadSummary]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('unread:refresh', () => {
