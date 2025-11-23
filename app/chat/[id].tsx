@@ -459,7 +459,6 @@ const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
 const SWIPE_REPLY_THRESHOLD = 18;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
-const QUICK_REACTIONS = ['❤️', '👍', '👎', '😂', '‼️', '❓', '😮', '🎉'];
 
 
 const layoutNext = () => {
@@ -1201,19 +1200,6 @@ const [messageActionContext, setMessageActionContext] = useState<{
           action.onPress?.();
         });
       });
-    },
-    [dismissMessageActions]
-  );
-  const handleQuickReaction = useCallback(
-    async (emoji: string) => {
-      try {
-        await Haptics.selectionAsync();
-      } catch {
-        // ignore haptic failures
-      }
-      setNewMessage((prev) => (prev ? `${prev} ${emoji}` : emoji));
-      requestAnimationFrame(() => composerRef.current?.focus());
-      dismissMessageActions();
     },
     [dismissMessageActions]
   );
@@ -4214,22 +4200,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
             pointerEvents="box-none"
           >
             <View style={[styles.messageActionArrow, { left: messageActionArrowLeft }]} />
-            <BlurView intensity={60} tint="dark" style={styles.messageActionBubble}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.quickReactionRow}
-              >
-                {QUICK_REACTIONS.map((emoji) => (
-                  <Pressable
-                    key={`reaction-${emoji}`}
-                    onPress={() => handleQuickReaction(emoji)}
-                    style={styles.quickReaction}
-                  >
-                    <Text style={styles.quickReactionText}>{emoji}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+            <BlurView intensity={80} tint="dark" style={styles.messageActionBubble}>
               <Text style={styles.messageActionPreview} numberOfLines={2}>
                 {messageActionContext.message.content || 'Attachment'}
               </Text>
@@ -5228,12 +5199,12 @@ const styles = StyleSheet.create({
   },
   messageActionBubble: {
     width: 280,
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     backgroundColor: 'rgba(4, 8, 18, 0.78)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     shadowColor: '#000',
     shadowOpacity: 0.35,
     shadowRadius: 18,
@@ -5262,8 +5233,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     minWidth: 0,
   },
   messageActionChipDestructive: {
@@ -5278,21 +5249,8 @@ const styles = StyleSheet.create({
     color: '#ffb4b4',
   },
   quickReactionRow: {
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    gap: 8,
-  },
-  quickReaction: {
-    minWidth: 42,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 2,
-  },
-  quickReactionText: {
-    fontSize: 18,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   attachmentSheet: {
     position: 'absolute',
