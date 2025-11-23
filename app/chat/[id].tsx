@@ -1077,6 +1077,19 @@ const ChatScreen: React.FC = () => {
 const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
 const previewListRef = useRef<FlatList<MessageAttachment>>(null);
 const [previewIndex, setPreviewIndex] = useState(0);
+const handleClosePreview = useCallback(() => setPreviewContext(null), []);
+const previewPanResponder = useMemo(
+  () =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 80) {
+          handleClosePreview();
+        }
+      },
+    }),
+  [handleClosePreview]
+);
 const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 const [messageActionContext, setMessageActionContext] = useState<{
     message: Message;
@@ -1157,8 +1170,6 @@ const [messageActionContext, setMessageActionContext] = useState<{
   const currentPreviewAttachment = previewContext
     ? previewContext.attachments[Math.min(previewIndex, previewContext.attachments.length - 1)]
     : null;
-  const handleClosePreview = useCallback(() => setPreviewContext(null), []);
-
   const closeAttachmentSheet = useCallback(() => {
     Animated.timing(attachmentSheetAnim, {
       toValue: 0,
@@ -3937,7 +3948,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
         animationType="fade"
         onRequestClose={handleClosePreview}
       >
-        <View style={styles.attachmentModalOverlay}>
+        <View style={styles.attachmentModalOverlay} {...previewPanResponder.panHandlers}>
           <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFillObject} />
           <View
             style={[
@@ -3977,11 +3988,19 @@ const [messageActionContext, setMessageActionContext] = useState<{
             renderItem={({ item }) => (
               <View style={styles.attachmentPreviewSlide}>
                 {item.isImage && (item.previewUrl || item.publicViewUrl || item.localUri) ? (
-                  <Image
-                    source={{ uri: item.previewUrl || item.publicViewUrl || item.localUri }}
+                  <ScrollView
                     style={StyleSheet.absoluteFillObject}
-                    contentFit="contain"
-                  />
+                    contentContainerStyle={styles.attachmentZoomContainer}
+                    minimumZoomScale={1}
+                    maximumZoomScale={3}
+                    centerContent
+                  >
+                    <Image
+                      source={{ uri: item.previewUrl || item.publicViewUrl || item.localUri }}
+                      style={styles.attachmentZoomImage}
+                      contentFit="contain"
+                    />
+                  </ScrollView>
                 ) : item.isVideo && resolveAttachmentUri(item) ? (
                   <Video
                     source={{ uri: resolveAttachmentUri(item)! }}
@@ -5018,6 +5037,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     alignSelf: 'center',
     overflow: 'hidden',
+  },
+  attachmentZoomContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 12,
+  },
+  attachmentZoomImage: {
+    width: '100%',
+    height: '100%',
   },
   attachmentModalFooter: {
     paddingHorizontal: 16,

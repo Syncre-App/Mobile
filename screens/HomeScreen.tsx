@@ -47,6 +47,7 @@ export const HomeScreen: React.FC = () => {
   const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
   const [chatUnreadCounts, setChatUnreadCounts] = useState<Record<string, number>>({});
   const [totalUnreadChats, setTotalUnreadChats] = useState(0);
@@ -137,6 +138,24 @@ export const HomeScreen: React.FC = () => {
       console.error('Failed to load unread summary:', error);
     }
   }, []);
+  const updateLocalUnread = useCallback(
+    async (
+      updater:
+        | Record<string, number>
+        | ((prev: Record<string, number>) => Record<string, number>)
+    ) => {
+      setChatUnreadCounts((prev) => {
+        const next = typeof updater === 'function' ? (updater as any)(prev) : updater;
+        const total = Object.values(next).reduce((sum, val) => sum + val, 0);
+        setTotalUnreadChats(total);
+        Notifications.setBadgeCountAsync(total).catch((err) =>
+          console.warn('[HomeScreen] Failed to sync badge from local update:', err)
+        );
+        return next;
+      });
+    },
+    []
+  );
 
   const persistUserProfiles = useCallback(() => {
     const snapshot = UserCacheService.getAllUsers();
@@ -298,6 +317,7 @@ export const HomeScreen: React.FC = () => {
   }, [cacheUsers]);
 
   const loadNotifications = useCallback(async () => {
+    setNotificationsLoading(true);
     const buildFallbackNotifications = () => {
       const incoming = incomingRequestsRef.current.map((item: any) => ({
         id: `incoming-${item?.id}`,
@@ -372,6 +392,8 @@ export const HomeScreen: React.FC = () => {
       await ensureNotificationUsers(fallback, token);
       setNotifications(fallback);
       persistNotifications(fallback);
+    } finally {
+      setNotificationsLoading(false);
     }
   }, [ensureNotificationUsers, persistNotifications, cacheUsers]);
 
@@ -552,6 +574,37 @@ export const HomeScreen: React.FC = () => {
   const handleProfilePress = () => {
     router.push('/profile');
   };
+
+  const handleMarkChatRead = useCallback(
+    async (chatId: string) => {
+      if (!chatId) return;
+      updateLocalUnread((prev) => {
+        const next = { ...prev };
+        delete next[chatId];
+        return next;
+      });
+      try {
+        const token = await StorageService.getAuthToken();
+        if (token) {
+          await ApiService.post(`/chat/${chatId}/seen`, {}, token);
+        }
+      } catch (error) {
+        console.warn('[HomeScreen] Failed to mark chat as read:', error);
+      }
+    },
+    [updateLocalUnread]
+  );
+
+  const handleMarkChatUnread = useCallback(
+    (chatId: string) => {
+      if (!chatId) return;
+      updateLocalUnread((prev) => ({
+        ...prev,
+        [chatId]: (prev[chatId] || 0) + 1,
+      }));
+    },
+    [updateLocalUnread]
+  );
 
   const handleFriendStateChanged = useCallback(async () => {
     await Promise.all([loadFriendData(), loadChats(), loadNotifications(), loadUnreadSummary()]);
@@ -855,7 +908,19 @@ export const HomeScreen: React.FC = () => {
                     <Ionicons name="close" size={18} color="#ffffff" />
                   </TouchableOpacity>
                 </View>
-                {sortedNotifications.length === 0 ? (
+                {notificationsLoading ? (
+                  <View style={styles.notificationSkeletons}>
+                    {[0, 1, 2].map((key) => (
+                      <View key={`notif-skel-${key}`} style={styles.notificationSkeletonRow}>
+                        <View style={styles.notificationSkeletonAvatar} />
+                        <View style={styles.notificationSkeletonBody}>
+                          <View style={styles.notificationSkeletonLineWide} />
+                          <View style={styles.notificationSkeletonLine} />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : sortedNotifications.length === 0 ? (
                   <Text style={styles.notificationsEmpty}>You are all caught up</Text>
                 ) : (
                   sortedNotifications.map((notification) => {
@@ -953,6 +1018,8 @@ export const HomeScreen: React.FC = () => {
                 unreadCounts={chatUnreadCounts}
                 onEditGroup={handleEditGroup}
                 onDeleteGroup={handleDeleteGroup}
+                onMarkRead={handleMarkChatRead}
+                onMarkUnread={handleMarkChatUnread}
               />
             </View>
           </View>
@@ -1026,6 +1093,37 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontFamily: 'PlusJakartaSans-Bold',
+  },
+  notificationSkeletons: {
+    gap: spacing.sm,
+  },
+  notificationSkeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  notificationSkeletonAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  notificationSkeletonBody: {
+    flex: 1,
+    gap: 6,
+  },
+  notificationSkeletonLineWide: {
+    height: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    width: '80%',
+  },
+  notificationSkeletonLine: {
+    height: 11,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    width: '60%',
   },
   profileButton: {
     width: 48,
