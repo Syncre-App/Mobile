@@ -1074,6 +1074,7 @@ const ChatScreen: React.FC = () => {
   const initialLoadCompleteRef = useRef(false);
   const isNearTopRef = useRef(false);
   const isNearBottomRef = useRef(true);
+  const postSendRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [attachmentPickerBusy, setAttachmentPickerBusy] = useState(false);
 const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
@@ -2275,6 +2276,39 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     [chatId, wsService]
   );
 
+  const ensureWebSocketReady = useCallback(
+    async (timeoutMs = 2000) => {
+      const waitUntilReady = () =>
+        new Promise<boolean>((resolve) => {
+          const start = Date.now();
+          const poll = () => {
+            const open = wsService.connected && wsService.socket?.readyState === WebSocket.OPEN;
+            if (open) {
+              resolve(true);
+              return;
+            }
+            if (Date.now() - start >= timeoutMs) {
+              resolve(false);
+              return;
+            }
+            setTimeout(poll, 100);
+          };
+          poll();
+        });
+
+      try {
+        if (!wsService.connected || wsService.socket?.readyState !== WebSocket.OPEN) {
+          await wsService.connect();
+        }
+        return await waitUntilReady();
+      } catch (error) {
+        console.error('Failed to ensure WebSocket ready for chat:', error);
+        return false;
+      }
+    },
+    [wsService]
+  );
+
   const uploadSingleAttachment = useCallback(
     async (file: UploadableAsset) => {
       if (!chatId) {
@@ -2858,6 +2892,12 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       return;
     }
 
+    const isSocketReady = await ensureWebSocketReady();
+    if (!isSocketReady) {
+      NotificationService.show('error', 'Nem sikerült csatlakozni a chat szerverhez. Próbáld újra.');
+      return;
+    }
+
     const trimmedMessage = newMessage.trim();
     if (!trimmedMessage && pendingAttachments.length === 0) {
       return;
@@ -2952,6 +2992,15 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         replyMetadata: normalizedReply,
         attachments: attachmentIds,
       });
+
+      if (postSendRefreshTimeoutRef.current) {
+        clearTimeout(postSendRefreshTimeoutRef.current);
+      }
+      postSendRefreshTimeoutRef.current = setTimeout(() => {
+        refreshMessages().catch((error) =>
+          console.error('Failed to refresh chat after sending message:', error)
+        );
+      }, 1200);
     } catch (error) {
       console.error(`Error sending encrypted message to chat ${chatId}:`, error);
       NotificationService.show('error', 'Failed to send message. Please try again.');
@@ -2975,6 +3024,8 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     newMessage,
     pendingAttachments,
     replyContext,
+    refreshMessages,
+    ensureWebSocketReady,
     resolveReplyMetadata,
     scrollToBottom,
     setMessagesAnimated,
@@ -3493,6 +3544,14 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       }
     };
   }, [ensureTypingStopped, handleIncomingMessage, wsService]);
+
+  useEffect(() => {
+    return () => {
+      if (postSendRefreshTimeoutRef.current) {
+        clearTimeout(postSendRefreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('chat:envelopes_appended', (event: any) => {
