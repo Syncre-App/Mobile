@@ -1777,11 +1777,15 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           }
 
           const applyReceipt = (target: Message): Message => {
+            const deliveredAt = status === 'delivered' && timestamp ? timestamp : target.deliveredAt;
+            const seenAtValue = status === 'seen' && timestamp ? timestamp : target.seenAt;
+
             if (status !== 'seen' || !receipt?.userId) {
               return {
                 ...target,
                 status,
-                timestamp: timestamp ?? target.timestamp,
+                deliveredAt,
+                seenAt: seenAtValue ?? target.seenAt,
               };
             }
             const existing = Array.isArray(target.seenBy) ? target.seenBy : [];
@@ -1790,7 +1794,8 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             return {
               ...target,
               status,
-              timestamp: timestamp ?? target.timestamp,
+              deliveredAt,
+              seenAt: seenAtValue ?? target.seenAt,
               seenBy: mergedReceipts,
             };
           };
