@@ -315,6 +315,23 @@ const decodeMessagePayload = (raw: string): { text: string; replyTo?: ReplyMetad
   return { text: raw };
 };
 
+const resolveContentText = (
+  decoded: { text: string },
+  preview?: string | null,
+  hasAttachments = false
+): string => {
+  if (decoded.text && decoded.text.trim().length) {
+    return decoded.text;
+  }
+  if (!hasAttachments) {
+    const trimmedPreview = typeof preview === 'string' ? preview.trim() : '';
+    if (trimmedPreview.length) {
+      return trimmedPreview;
+    }
+  }
+  return decoded.text || '';
+};
+
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
 const normalizeTimestampValue = (value?: string): string | undefined => {
@@ -1656,6 +1673,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         }
 
         const decodedPayload = decodeMessagePayload(content ?? '');
+        const contentText = resolveContentText(decodedPayload, preview, attachments.length > 0);
         const serverReply = resolveReplyMetadata((raw as any)?.reply);
         const replyTo = isDeleted
           ? undefined
@@ -1669,7 +1687,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           receiverId: String(receiverId),
           senderName: senderProfile.name,
           senderAvatar: senderProfile.avatar,
-          content: decodedPayload.text,
+          content: contentText,
           timestamp: String(local),
           utcTimestamp: utc,
           timezone,
@@ -3239,13 +3257,14 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
             const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
             const attachments = mapServerAttachments(payload.attachments);
+            const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
             const newEntry: Message = {
               id: String(payload.messageId ?? payload.id ?? Date.now()),
               senderId: String(payload.senderId ?? ''),
               receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
               senderName: senderProfile.name,
               senderAvatar: senderProfile.avatar,
-              content: decodedPayload.text,
+              content: contentText,
               timestamp: local,
               utcTimestamp: utc,
               timezone,
@@ -3335,13 +3354,14 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
             const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
             const attachments = mapServerAttachments(payload.attachments);
+            const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
         const newEntry: Message = {
           id: String(payload.messageId ?? payload.id ?? Date.now()),
           senderId: String(payload.senderId ?? ''),
           receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
           senderName: senderProfile.name,
           senderAvatar: senderProfile.avatar,
-          content: decodedPayload.text,
+          content: contentText,
           timestamp: local,
           utcTimestamp: utc,
           timezone,
@@ -3377,13 +3397,14 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
           const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
           const attachments = mapServerAttachments(payload.attachments);
+          const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
             senderId: String(payload.senderId ?? ''),
             receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
             senderName: senderProfile.name,
             senderAvatar: senderProfile.avatar,
-            content: decodedPayload.text,
+            content: contentText,
             timestamp: local,
             utcTimestamp: utc,
             timezone,
