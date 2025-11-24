@@ -183,10 +183,6 @@ export class WebSocketService {
   }
 
   private handleMessage(message: WebSocketMessage): void {
-    if (message.type !== 'typing' && message.type !== 'stop-typing') {
-      this.messageListeners.forEach(listener => listener(message));
-    }
-
     switch (message.type) {
       case 'pong':
         break;
