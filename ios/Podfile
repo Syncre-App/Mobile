@@ -59,6 +59,8 @@ target 'syncre' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        # React Native 0.81 uses std::shared_mutex; ensure all pods compile with C++17.
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
       end
     end
   end
