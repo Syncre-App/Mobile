@@ -1036,6 +1036,7 @@ const ChatScreen: React.FC = () => {
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
   const composerLimitWarningRef = useRef(false);
+  const initialScrollDoneRef = useRef(false);
 
   const receiverNameRef = useRef('Loading…');
   const otherUserIdRef = useRef<string | null>(null);
@@ -1447,12 +1448,13 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     []
   );
 
-  const scrollToBottom = useCallback((force = false) => {
+  // Keep autoscroll snappy; only animate when explicitly requested (e.g., user taps the CTA)
+  const scrollToBottom = useCallback((force = false, animated = false) => {
     if (!force && !isNearBottomRef.current) {
       return;
     }
     requestAnimationFrame(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
+      flatListRef.current?.scrollToEnd({ animated });
     });
   }, []);
 
@@ -1907,7 +1909,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         nextCursorRef.current = response.data?.nextCursor || null;
         initialLoadCompleteRef.current = true;
         InteractionManager.runAfterInteractions(() => {
-          scrollToBottom(true);
+          scrollToBottom(true, false);
         });
       } catch (error) {
         console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
@@ -2898,7 +2900,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       return [...withoutPlaceholders, optimisticMessage];
     });
     InteractionManager.runAfterInteractions(() => {
-      scrollToBottom(true);
+      scrollToBottom(true, false);
     });
     setNewMessage('');
     setReplyContext(null);
@@ -3357,6 +3359,13 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
   const handleContentSizeChange = useCallback(
     (_: number, height: number) => {
       contentHeightRef.current = height;
+      if (initialLoadCompleteRef.current && !initialScrollDoneRef.current) {
+        initialScrollDoneRef.current = true;
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        });
+        return;
+      }
       if (!initialLoadCompleteRef.current || isNearBottomRef.current) {
         requestAnimationFrame(() => scrollToBottom(true));
       }
@@ -3444,6 +3453,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       return;
     }
     initialLoadCompleteRef.current = false;
+    initialScrollDoneRef.current = false;
     loadChatDetails();
   }, [user?.id, chatId, loadChatDetails]);
 
@@ -3807,7 +3817,6 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
                       keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                       onLayout={handleListLayout}
                       onContentSizeChange={handleContentSizeChange}
-                      maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 60 }}
                       onScroll={handleScroll}
                       scrollEventThrottle={16}
                       onViewableItemsChanged={onViewableItemsChanged}
@@ -3827,7 +3836,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
                     {showScrollToBottomButton && (
                       <Pressable
                         style={styles.scrollToBottomButton}
-                        onPress={() => scrollToBottom(true)}
+                        onPress={() => scrollToBottom(true, true)}
 
 
                         accessibilityRole="button"
