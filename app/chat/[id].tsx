@@ -1589,6 +1589,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         if (!senderId) {
           continue;
         }
+        let decryptFailed = false;
 
         const receiverId =
           raw.receiverId ??
@@ -1624,6 +1625,9 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             content = decrypted;
           } else {
             console.warn(`Decryption failed for historical message ${raw.id}.`);
+            content = '[Encrypted message could not be decrypted]';
+            decryptFailed = true;
+            missingEnvelope = true;
           }
         } else {
           content = raw.content ?? '';
@@ -1633,8 +1637,9 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           if (isDeleted) {
             content = buildDeletedLabel(deletedByName || resolveSenderProfile(String(senderId)).name);
           } else {
+            content = '[Message unavailable]';
             missingEnvelope = true;
-            continue;
+            decryptFailed = true;
           }
         }
 
@@ -1678,7 +1683,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           deletedLabel: isDeleted ? buildDeletedLabel(deletedByName || senderProfile.name) : null,
           isEdited: Boolean(editedAt),
           editedAt: editedAt ?? undefined,
-          isPlaceholder: Boolean(isDeleted),
+          isPlaceholder: Boolean(isDeleted || decryptFailed),
           seenBy,
         });
       }
@@ -3170,18 +3175,51 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             return;
           }
 
-          try {
-            const token = authTokenRef.current ?? (await StorageService.getAuthToken());
-            authTokenRef.current = token || null;
-            const decrypted = await CryptoService.decryptMessage({
-              chatId: targetChatId,
-              envelopes,
-              senderId: payload.senderId ?? payload.userId ?? null,
-              currentUserId,
-              token: token || undefined,
-            });
+        try {
+          const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+          authTokenRef.current = token || null;
+          const decrypted = await CryptoService.decryptMessage({
+            chatId: targetChatId,
+            envelopes,
+            senderId: payload.senderId ?? payload.userId ?? null,
+            currentUserId,
+            token: token || undefined,
+          });
           if (!decrypted) {
             console.warn('Decryption failed for sent message envelope.');
+            const { local, utc, timezone } = resolveMessageTimestamps(
+              payload,
+              payload.timezone || TimezoneService.getTimezone()
+            );
+            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const newEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
+              content: '[Encrypted message could not be decrypted]',
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
+              replyTo: undefined,
+              attachments: [],
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
+              status: 'sent',
+              isPlaceholder: true,
+            };
+            setMessagesAnimated((prev) => {
+              const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
+              if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+                return withoutPlaceholders;
+              }
+              const cleaned = withoutPlaceholders.filter(
+                (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
+              );
+              return sortMessagesChronologically([...cleaned, newEntry]);
+            });
+            requestReencrypt('live_decrypt_failed');
             return;
           }
 
@@ -3223,6 +3261,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             });
           } catch (error) {
             console.error('Failed to decrypt sent message envelope:', error);
+            requestReencrypt('live_decrypt_failed');
           }
           return;
         }
@@ -3244,6 +3283,35 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             });
             if (!decrypted) {
               console.warn('Decryption failed for incoming message envelope.');
+              const { local, utc, timezone } = resolveMessageTimestamps(
+                payload,
+                payload.timezone || TimezoneService.getTimezone()
+              );
+              const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+              const fallbackEntry: Message = {
+                id: String(payload.messageId ?? payload.id ?? Date.now()),
+                senderId: String(payload.senderId ?? ''),
+                receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+                senderName: senderProfile.name,
+                senderAvatar: senderProfile.avatar,
+                content: '[Encrypted message could not be decrypted]',
+                timestamp: local,
+                utcTimestamp: utc,
+                timezone,
+                replyTo: undefined,
+                attachments: [],
+                isEdited: Boolean(payload.editedAt),
+                editedAt: payload.editedAt ?? undefined,
+                isPlaceholder: true,
+              };
+              setMessagesAnimated((prev) => {
+                const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
+                if (withoutPlaceholders.some((msg) => msg.id === fallbackEntry.id)) {
+                  return withoutPlaceholders;
+                }
+                return sortMessagesChronologically([...withoutPlaceholders, fallbackEntry]);
+              });
+              requestReencrypt('live_decrypt_failed');
               return;
             }
 
@@ -3449,6 +3517,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       updateOutgoingStatus,
       resolveSenderProfile,
       applyChatUpdate,
+      requestReencrypt,
     ]
   );
 

@@ -23,6 +23,7 @@ export class WebSocketService {
   private userStatuses: UserStatus = {};
   private isConnected = false;
   private isConnecting = false;
+  private isAuthenticated = false;
   private currentToken: string | null = null;
   private reconnectInterval: number | null = null;
   private pingInterval: number | null = null;
@@ -89,28 +90,12 @@ export class WebSocketService {
       
       this.ws.onopen = () => {
         console.log('🌐 WebSocket connected');
-        this.isConnected = true;
-        this.isConnecting = false;
-        this.reconnectAttempts = 0;
-        this.notifyConnectionStatusListeners(true);
-        
+        this.isAuthenticated = false;
         // Send authentication immediately as per API documentation
         // Must authenticate within 5 seconds or connection will close with code 4001
         if (this.currentToken) {
           this.sendAuthRaw(this.currentToken);
         }
-        
-        // Start ping/pong after auth
-        this.startPingPong();
-        // Flush shortly after auth to ensure auth reaches server first
-        if (this.authFlushTimer) {
-          clearTimeout(this.authFlushTimer);
-        }
-        this.authFlushTimer = setTimeout(() => {
-          this.flushPendingMessages();
-        }, 150) as unknown as number;
-        // Rejoin any chats we were in before reconnect so server resumes delivering live events
-        this.rejoinChats();
       };
 
       this.ws.onmessage = (event) => {
@@ -129,6 +114,7 @@ export class WebSocketService {
         console.log('🌐 WebSocket disconnected', event?.code, event?.reason);
         this.isConnected = false;
         this.isConnecting = false;
+        this.isAuthenticated = false;
         this.cleanup();
         this.notifyConnectionStatusListeners(false);
         
@@ -142,6 +128,7 @@ export class WebSocketService {
         console.error('❌ WebSocket error:', error);
         this.isConnected = false;
         this.isConnecting = false;
+        this.isAuthenticated = false;
         this.notifyConnectionStatusListeners(false);
       };
 
@@ -162,6 +149,7 @@ export class WebSocketService {
     
     this.isConnected = false;
     this.isConnecting = false;
+    this.isAuthenticated = false;
     this.currentToken = null;
     this.notifyConnectionStatusListeners(false);
   }
@@ -237,6 +225,29 @@ export class WebSocketService {
 
   private handleMessage(message: WebSocketMessage): void {
     switch (message.type) {
+      case 'auth_success':
+        this.isConnected = true;
+        this.isConnecting = false;
+        this.isAuthenticated = true;
+        this.reconnectAttempts = 0;
+        this.notifyConnectionStatusListeners(true);
+        this.startPingPong();
+        if (this.authFlushTimer) {
+          clearTimeout(this.authFlushTimer);
+        }
+        this.authFlushTimer = setTimeout(() => {
+          this.flushPendingMessages();
+          this.rejoinChats();
+        }, 100) as unknown as number;
+        break;
+      case 'error':
+        console.error('❌ WebSocket server error:', message);
+        if (/auth/i.test(message.message || '') || /token/i.test(message.message || '')) {
+          this.isConnected = false;
+          this.isAuthenticated = false;
+          this.notifyConnectionStatusListeners(false);
+        }
+        break;
       case 'pong':
         break;
       case 'user_status_update':
@@ -444,9 +455,8 @@ export class WebSocketService {
 
   // Request fresh status for all friends
   refreshFriendsStatus(): void {
-    this.send({
-      type: 'request_friends_status'
-    });
+    // Disabled until the backend supports this message type
+    // this.send({ type: 'request_friends_status' });
   }
 
   addConnectionStatusListener(listener: (isConnected: boolean) => void): () => void {
