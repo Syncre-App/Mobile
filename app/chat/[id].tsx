@@ -1074,10 +1074,9 @@ const ChatScreen: React.FC = () => {
   const initialLoadCompleteRef = useRef(false);
   const isNearTopRef = useRef(false);
   const isNearBottomRef = useRef(true);
-  const postSendRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [attachmentPickerBusy, setAttachmentPickerBusy] = useState(false);
-const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
+  const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
 const previewListRef = useRef<FlatList<MessageAttachment>>(null);
 const [previewIndex, setPreviewIndex] = useState(0);
 const handleClosePreview = useCallback(() => setPreviewContext(null), []);
@@ -1901,7 +1900,13 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         const cleaned = transformed.filter(Boolean);
         const sorted = sortMessagesChronologically(cleaned);
 
-        setMessagesAnimated(() => sorted);
+        setMessagesAnimated((prev) => {
+          const existingIds = new Set(sorted.map((msg) => msg.id));
+          const localSending = prev.filter(
+            (msg) => msg.status === 'sending' && !existingIds.has(msg.id)
+          );
+          return sortMessagesChronologically([...sorted, ...localSending]);
+        });
         if (missingEnvelopeRef.current) {
           requestReencrypt('missing_history');
         }
@@ -1914,7 +1919,12 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         });
       } catch (error) {
         console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
-        setMessagesAnimated(() => generatePlaceholderMessages(displayName));
+        setMessagesAnimated((prev) => {
+          if (prev.length) {
+            return prev;
+          }
+          return generatePlaceholderMessages(displayName);
+        });
         setHasMore(false);
         nextCursorRef.current = null;
         lastSeenMessageIdRef.current = null;
@@ -2993,14 +3003,6 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         attachments: attachmentIds,
       });
 
-      if (postSendRefreshTimeoutRef.current) {
-        clearTimeout(postSendRefreshTimeoutRef.current);
-      }
-      postSendRefreshTimeoutRef.current = setTimeout(() => {
-        refreshMessages().catch((error) =>
-          console.error('Failed to refresh chat after sending message:', error)
-        );
-      }, 1200);
     } catch (error) {
       console.error(`Error sending encrypted message to chat ${chatId}:`, error);
       NotificationService.show('error', 'Failed to send message. Please try again.');
@@ -3024,7 +3026,6 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     newMessage,
     pendingAttachments,
     replyContext,
-    refreshMessages,
     ensureWebSocketReady,
     resolveReplyMetadata,
     scrollToBottom,
@@ -3163,6 +3164,66 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             messageId: payload.messageId ?? payload.id,
             createdAt: ackTimestamps.local,
           });
+
+          const envelopes = Array.isArray(payload.envelopes) ? payload.envelopes : [];
+          if (!envelopes.length) {
+            return;
+          }
+
+          try {
+            const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+            authTokenRef.current = token || null;
+            const decrypted = await CryptoService.decryptMessage({
+              chatId: targetChatId,
+              envelopes,
+              senderId: payload.senderId ?? payload.userId ?? null,
+              currentUserId,
+              token: token || undefined,
+            });
+          if (!decrypted) {
+            console.warn('Decryption failed for sent message envelope.');
+            return;
+          }
+
+            const { local, utc, timezone } = resolveMessageTimestamps(
+              payload,
+              payload.timezone || TimezoneService.getTimezone()
+            );
+            const decodedPayload = decodeMessagePayload(decrypted);
+            const serverReply = resolveReplyMetadata(payload.reply);
+            const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
+            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const attachments = mapServerAttachments(payload.attachments);
+            const newEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
+              content: decodedPayload.text,
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
+              replyTo,
+              attachments,
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
+              status: 'sent',
+            };
+
+            setMessagesAnimated((prev) => {
+              const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
+              if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+                return withoutPlaceholders;
+              }
+              const cleaned = withoutPlaceholders.filter(
+                (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
+              );
+              return sortMessagesChronologically([...cleaned, newEntry]);
+            });
+          } catch (error) {
+            console.error('Failed to decrypt sent message envelope:', error);
+          }
           return;
         }
         case 'message_envelope': {
@@ -3223,6 +3284,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             scrollToBottom();
           } catch (error) {
             console.error('Failed to decrypt incoming message envelope:', error);
+            refreshMessages();
           }
           return;
         }
@@ -3544,14 +3606,6 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       }
     };
   }, [ensureTypingStopped, handleIncomingMessage, wsService]);
-
-  useEffect(() => {
-    return () => {
-      if (postSendRefreshTimeoutRef.current) {
-        clearTimeout(postSendRefreshTimeoutRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('chat:envelopes_appended', (event: any) => {
