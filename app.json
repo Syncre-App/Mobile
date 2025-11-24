@@ -8,6 +8,7 @@
     "scheme": "syncre",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "jsEngine": "jsc",
     "notification": {
       "icon": "./assets/logo.png",
       "color": "#2C82FF"
@@ -75,7 +76,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "router": {},
