@@ -315,6 +315,23 @@ const decodeMessagePayload = (raw: string): { text: string; replyTo?: ReplyMetad
   return { text: raw };
 };
 
+const resolveContentText = (
+  decoded: { text: string },
+  preview?: string | null,
+  hasAttachments = false
+): string => {
+  if (decoded.text && decoded.text.trim().length) {
+    return decoded.text;
+  }
+  if (!hasAttachments) {
+    const trimmedPreview = typeof preview === 'string' ? preview.trim() : '';
+    if (trimmedPreview.length) {
+      return trimmedPreview;
+    }
+  }
+  return decoded.text || '';
+};
+
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
 const normalizeTimestampValue = (value?: string): string | undefined => {
@@ -1036,6 +1053,7 @@ const ChatScreen: React.FC = () => {
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
   const composerLimitWarningRef = useRef(false);
+  const initialScrollDoneRef = useRef(false);
 
   const receiverNameRef = useRef('Loading…');
   const otherUserIdRef = useRef<string | null>(null);
@@ -1075,7 +1093,7 @@ const ChatScreen: React.FC = () => {
   const isNearBottomRef = useRef(true);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [attachmentPickerBusy, setAttachmentPickerBusy] = useState(false);
-const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
+  const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
 const previewListRef = useRef<FlatList<MessageAttachment>>(null);
 const [previewIndex, setPreviewIndex] = useState(0);
 const handleClosePreview = useCallback(() => setPreviewContext(null), []);
@@ -1447,12 +1465,13 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     []
   );
 
-  const scrollToBottom = useCallback((force = false) => {
+  // Keep autoscroll snappy; only animate when explicitly requested (e.g., user taps the CTA)
+  const scrollToBottom = useCallback((force = false, animated = false) => {
     if (!force && !isNearBottomRef.current) {
       return;
     }
     requestAnimationFrame(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
+      flatListRef.current?.scrollToEnd({ animated });
     });
   }, []);
 
@@ -1587,6 +1606,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         if (!senderId) {
           continue;
         }
+        let decryptFailed = false;
 
         const receiverId =
           raw.receiverId ??
@@ -1595,6 +1615,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           (participantIdsRef.current.find((pid) => pid !== String(senderId)) ?? '');
 
         const { local, utc, timezone } = resolveMessageTimestamps(raw, timezoneFallback);
+        const preview = typeof raw.preview === 'string' ? raw.preview : undefined;
         const deliveredAt = resolveDeliveryTimestamp(raw);
         const seenAt = resolveSeenTimestamp(raw);
 
@@ -1622,17 +1643,21 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             content = decrypted;
           } else {
             console.warn(`Decryption failed for historical message ${raw.id}.`);
+            content = '[Encrypted message could not be decrypted]';
+            decryptFailed = true;
+            missingEnvelope = true;
           }
         } else {
-          content = raw.content ?? '';
+          content = raw.content ?? preview ?? '';
         }
 
         if (content == null) {
           if (isDeleted) {
             content = buildDeletedLabel(deletedByName || resolveSenderProfile(String(senderId)).name);
           } else {
+            content = preview || '[Message unavailable]';
             missingEnvelope = true;
-            continue;
+            decryptFailed = true;
           }
         }
 
@@ -1647,7 +1672,8 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           }
         }
 
-        const decodedPayload = decodeMessagePayload(content);
+        const decodedPayload = decodeMessagePayload(content ?? '');
+        const contentText = resolveContentText(decodedPayload, preview, attachments.length > 0);
         const serverReply = resolveReplyMetadata((raw as any)?.reply);
         const replyTo = isDeleted
           ? undefined
@@ -1661,7 +1687,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           receiverId: String(receiverId),
           senderName: senderProfile.name,
           senderAvatar: senderProfile.avatar,
-          content: decodedPayload.text,
+          content: contentText,
           timestamp: String(local),
           utcTimestamp: utc,
           timezone,
@@ -1751,11 +1777,15 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           }
 
           const applyReceipt = (target: Message): Message => {
+            const deliveredAt = status === 'delivered' && timestamp ? timestamp : target.deliveredAt;
+            const seenAtValue = status === 'seen' && timestamp ? timestamp : target.seenAt;
+
             if (status !== 'seen' || !receipt?.userId) {
               return {
                 ...target,
                 status,
-                timestamp: timestamp ?? target.timestamp,
+                deliveredAt,
+                seenAt: seenAtValue ?? target.seenAt,
               };
             }
             const existing = Array.isArray(target.seenBy) ? target.seenBy : [];
@@ -1764,7 +1794,8 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             return {
               ...target,
               status,
-              timestamp: timestamp ?? target.timestamp,
+              deliveredAt,
+              seenAt: seenAtValue ?? target.seenAt,
               seenBy: mergedReceipts,
             };
           };
@@ -1898,7 +1929,13 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         const cleaned = transformed.filter(Boolean);
         const sorted = sortMessagesChronologically(cleaned);
 
-        setMessagesAnimated(() => sorted);
+        setMessagesAnimated((prev) => {
+          const existingIds = new Set(sorted.map((msg) => msg.id));
+          const localSending = prev.filter(
+            (msg) => msg.status === 'sending' && !existingIds.has(msg.id)
+          );
+          return sortMessagesChronologically([...sorted, ...localSending]);
+        });
         if (missingEnvelopeRef.current) {
           requestReencrypt('missing_history');
         }
@@ -1907,11 +1944,16 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         nextCursorRef.current = response.data?.nextCursor || null;
         initialLoadCompleteRef.current = true;
         InteractionManager.runAfterInteractions(() => {
-          scrollToBottom(true);
+          scrollToBottom(true, false);
         });
       } catch (error) {
         console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
-        setMessagesAnimated(() => generatePlaceholderMessages(displayName));
+        setMessagesAnimated((prev) => {
+          if (prev.length) {
+            return prev;
+          }
+          return generatePlaceholderMessages(displayName);
+        });
         setHasMore(false);
         nextCursorRef.current = null;
         lastSeenMessageIdRef.current = null;
@@ -2271,6 +2313,39 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       }, 1500);
     },
     [chatId, wsService]
+  );
+
+  const ensureWebSocketReady = useCallback(
+    async (timeoutMs = 2000) => {
+      const waitUntilReady = () =>
+        new Promise<boolean>((resolve) => {
+          const start = Date.now();
+          const poll = () => {
+            const open = wsService.connected && wsService.socket?.readyState === WebSocket.OPEN;
+            if (open) {
+              resolve(true);
+              return;
+            }
+            if (Date.now() - start >= timeoutMs) {
+              resolve(false);
+              return;
+            }
+            setTimeout(poll, 100);
+          };
+          poll();
+        });
+
+      try {
+        if (!wsService.connected || wsService.socket?.readyState !== WebSocket.OPEN) {
+          await wsService.connect();
+        }
+        return await waitUntilReady();
+      } catch (error) {
+        console.error('Failed to ensure WebSocket ready for chat:', error);
+        return false;
+      }
+    },
+    [wsService]
   );
 
   const uploadSingleAttachment = useCallback(
@@ -2856,6 +2931,12 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       return;
     }
 
+    const isSocketReady = await ensureWebSocketReady();
+    if (!isSocketReady) {
+      NotificationService.show('error', 'Nem sikerült csatlakozni a chat szerverhez. Próbáld újra.');
+      return;
+    }
+
     const trimmedMessage = newMessage.trim();
     if (!trimmedMessage && pendingAttachments.length === 0) {
       return;
@@ -2898,7 +2979,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       return [...withoutPlaceholders, optimisticMessage];
     });
     InteractionManager.runAfterInteractions(() => {
-      scrollToBottom(true);
+      scrollToBottom(true, false);
     });
     setNewMessage('');
     setReplyContext(null);
@@ -2933,6 +3014,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         throw new Error('No chat recipients available');
       }
 
+      const previewText = trimmedMessage.slice(0, 300);
       const encryptedPayload = await CryptoService.buildEncryptedPayload({
         chatId,
         message: encodedPayload,
@@ -2949,7 +3031,9 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         messageType: 'e2ee',
         replyMetadata: normalizedReply,
         attachments: attachmentIds,
+        preview: previewText,
       });
+
     } catch (error) {
       console.error(`Error sending encrypted message to chat ${chatId}:`, error);
       NotificationService.show('error', 'Failed to send message. Please try again.');
@@ -2973,6 +3057,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     newMessage,
     pendingAttachments,
     replyContext,
+    ensureWebSocketReady,
     resolveReplyMetadata,
     scrollToBottom,
     setMessagesAnimated,
@@ -3110,6 +3195,105 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             messageId: payload.messageId ?? payload.id,
             createdAt: ackTimestamps.local,
           });
+
+          const envelopes = Array.isArray(payload.envelopes) ? payload.envelopes : [];
+          if (!envelopes.length) {
+            return;
+          }
+
+        try {
+          const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+          authTokenRef.current = token || null;
+          const decrypted = await CryptoService.decryptMessage({
+            chatId: targetChatId,
+            envelopes,
+            senderId: payload.senderId ?? payload.userId ?? null,
+            currentUserId,
+            token: token || undefined,
+          });
+          if (!decrypted) {
+            console.warn('Decryption failed for sent message envelope.');
+            const { local, utc, timezone } = resolveMessageTimestamps(
+              payload,
+              payload.timezone || TimezoneService.getTimezone()
+            );
+            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const fallbackContent =
+              typeof payload.preview === 'string' && payload.preview.trim().length
+                ? payload.preview
+                : '[Encrypted message could not be decrypted]';
+            const newEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
+              content: fallbackContent,
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
+              replyTo: undefined,
+              attachments: [],
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
+              status: 'sent',
+              isPlaceholder: false,
+            };
+            setMessagesAnimated((prev) => {
+              const cleaned = prev.filter((msg) => !msg.isDeleted);
+              if (cleaned.some((msg) => msg.id === newEntry.id)) {
+                return cleaned;
+              }
+              const updated = cleaned.filter(
+                (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
+              );
+              return sortMessagesChronologically([...updated, newEntry]);
+            });
+            requestReencrypt('live_decrypt_failed');
+            return;
+          }
+
+            const { local, utc, timezone } = resolveMessageTimestamps(
+              payload,
+              payload.timezone || TimezoneService.getTimezone()
+            );
+            const decodedPayload = decodeMessagePayload(decrypted);
+            const serverReply = resolveReplyMetadata(payload.reply);
+            const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
+            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const attachments = mapServerAttachments(payload.attachments);
+            const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
+            const newEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
+              content: contentText,
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
+              replyTo,
+              attachments,
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
+              status: 'sent',
+            };
+
+            setMessagesAnimated((prev) => {
+              const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
+              if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+                return withoutPlaceholders;
+              }
+              const cleaned = withoutPlaceholders.filter(
+                (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
+              );
+              return sortMessagesChronologically([...cleaned, newEntry]);
+            });
+          } catch (error) {
+            console.error('Failed to decrypt sent message envelope:', error);
+            requestReencrypt('live_decrypt_failed');
+          }
           return;
         }
         case 'message_envelope': {
@@ -3121,17 +3305,50 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           try {
             const token = authTokenRef.current ?? (await StorageService.getAuthToken());
             authTokenRef.current = token || null;
-            const decrypted = await CryptoService.decryptMessage({
-              chatId: targetChatId,
-              envelopes,
-              senderId: payload.senderId ?? payload.userId ?? null,
-              currentUserId,
-              token: token || undefined,
+          const decrypted = await CryptoService.decryptMessage({
+            chatId: targetChatId,
+            envelopes,
+            senderId: payload.senderId ?? payload.userId ?? null,
+            currentUserId,
+            token: token || undefined,
+          });
+          if (!decrypted) {
+            console.warn('Decryption failed for incoming message envelope.');
+            const { local, utc, timezone } = resolveMessageTimestamps(
+              payload,
+              payload.timezone || TimezoneService.getTimezone()
+            );
+            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const fallbackContent =
+              typeof payload.preview === 'string' && payload.preview.trim().length
+                ? payload.preview
+                : '[Encrypted message could not be decrypted]';
+            const fallbackEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
+              content: fallbackContent,
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
+              replyTo: undefined,
+              attachments: [],
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
+              isPlaceholder: false,
+            };
+            setMessagesAnimated((prev) => {
+              const cleaned = prev.filter((msg) => !msg.isDeleted);
+              if (cleaned.some((msg) => msg.id === fallbackEntry.id)) {
+                return cleaned;
+              }
+              return sortMessagesChronologically([...cleaned, fallbackEntry]);
             });
-            if (!decrypted) {
-              console.warn('Decryption failed for incoming message envelope.');
-              return;
-            }
+            requestReencrypt('live_decrypt_failed');
+            return;
+          }
 
             const { local, utc, timezone } = resolveMessageTimestamps(
               payload,
@@ -3142,13 +3359,14 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
             const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
             const attachments = mapServerAttachments(payload.attachments);
+            const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
         const newEntry: Message = {
           id: String(payload.messageId ?? payload.id ?? Date.now()),
           senderId: String(payload.senderId ?? ''),
           receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
           senderName: senderProfile.name,
           senderAvatar: senderProfile.avatar,
-          content: decodedPayload.text,
+          content: contentText,
           timestamp: local,
           utcTimestamp: utc,
           timezone,
@@ -3170,6 +3388,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             scrollToBottom();
           } catch (error) {
             console.error('Failed to decrypt incoming message envelope:', error);
+            refreshMessages();
           }
           return;
         }
@@ -3183,13 +3402,14 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
           const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
           const attachments = mapServerAttachments(payload.attachments);
+          const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
             senderId: String(payload.senderId ?? ''),
             receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
             senderName: senderProfile.name,
             senderAvatar: senderProfile.avatar,
-            content: decodedPayload.text,
+            content: contentText,
             timestamp: local,
             utcTimestamp: utc,
             timezone,
@@ -3334,6 +3554,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       updateOutgoingStatus,
       resolveSenderProfile,
       applyChatUpdate,
+      requestReencrypt,
     ]
   );
 
@@ -3357,6 +3578,13 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
   const handleContentSizeChange = useCallback(
     (_: number, height: number) => {
       contentHeightRef.current = height;
+      if (initialLoadCompleteRef.current && !initialScrollDoneRef.current) {
+        initialScrollDoneRef.current = true;
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        });
+        return;
+      }
       if (!initialLoadCompleteRef.current || isNearBottomRef.current) {
         requestAnimationFrame(() => scrollToBottom(true));
       }
@@ -3444,6 +3672,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       return;
     }
     initialLoadCompleteRef.current = false;
+    initialScrollDoneRef.current = false;
     loadChatDetails();
   }, [user?.id, chatId, loadChatDetails]);
 
@@ -3807,7 +4036,6 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
                       keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                       onLayout={handleListLayout}
                       onContentSizeChange={handleContentSizeChange}
-                      maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 60 }}
                       onScroll={handleScroll}
                       scrollEventThrottle={16}
                       onViewableItemsChanged={onViewableItemsChanged}
@@ -3827,7 +4055,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
                     {showScrollToBottomButton && (
                       <Pressable
                         style={styles.scrollToBottomButton}
-                        onPress={() => scrollToBottom(true)}
+                        onPress={() => scrollToBottom(true, true)}
 
 
                         accessibilityRole="button"

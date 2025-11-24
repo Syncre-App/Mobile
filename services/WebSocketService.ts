@@ -22,9 +22,12 @@ export class WebSocketService {
   private statusListeners: ((statuses: UserStatus) => void)[] = [];
   private userStatuses: UserStatus = {};
   private isConnected = false;
+  private isConnecting = false;
+  private isAuthenticated = false;
   private currentToken: string | null = null;
   private reconnectInterval: number | null = null;
   private pingInterval: number | null = null;
+  private authFlushTimer: number | null = null;
   private maxReconnectAttempts = 5;
   private reconnectAttempts = 0;
   private joinedChats: Map<string, string | undefined> = new Map();
@@ -49,10 +52,14 @@ export class WebSocketService {
   }
 
   async connect(): Promise<void> {
-    if (this.isConnected) {
-      console.log('🌐 WebSocket already connected');
+    if (this.isConnected || this.isConnecting) {
+      if (this.isConnected) {
+        console.log('🌐 WebSocket already connected');
+      }
       return;
     }
+
+    this.isConnecting = true;
 
     try {
       console.log('🌐 Connecting to WebSocket...');
@@ -63,6 +70,7 @@ export class WebSocketService {
       
       if (!token) {
         console.log('❌ No auth token found for WebSocket');
+        this.isConnecting = false;
         return;
       }
 
@@ -82,24 +90,12 @@ export class WebSocketService {
       
       this.ws.onopen = () => {
         console.log('🌐 WebSocket connected');
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        this.notifyConnectionStatusListeners(true);
-        
+        this.isAuthenticated = false;
         // Send authentication immediately as per API documentation
         // Must authenticate within 5 seconds or connection will close with code 4001
         if (this.currentToken) {
-          this.send({
-            type: 'auth',
-            token: this.currentToken,  // Send as top-level property, not in data
-            timezone: TimezoneService.getTimezone(),
-          });
-          console.log('🌐 Sent auth message with token');
+          this.sendAuthRaw(this.currentToken);
         }
-        
-        // Start ping/pong after auth
-        this.startPingPong();
-        this.flushPendingMessages();
       };
 
       this.ws.onmessage = (event) => {
@@ -114,9 +110,11 @@ export class WebSocketService {
         }
       };
 
-      this.ws.onclose = () => {
-        console.log('🌐 WebSocket disconnected');
+      this.ws.onclose = (event) => {
+        console.log('🌐 WebSocket disconnected', event?.code, event?.reason);
         this.isConnected = false;
+        this.isConnecting = false;
+        this.isAuthenticated = false;
         this.cleanup();
         this.notifyConnectionStatusListeners(false);
         
@@ -129,11 +127,14 @@ export class WebSocketService {
       this.ws.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
         this.isConnected = false;
+        this.isConnecting = false;
+        this.isAuthenticated = false;
         this.notifyConnectionStatusListeners(false);
       };
 
     } catch (error) {
       console.error('❌ Failed to connect to WebSocket:', error);
+      this.isConnecting = false;
     }
   }
 
@@ -147,7 +148,10 @@ export class WebSocketService {
     }
     
     this.isConnected = false;
+    this.isConnecting = false;
+    this.isAuthenticated = false;
     this.currentToken = null;
+    this.notifyConnectionStatusListeners(false);
   }
 
   private cleanup(): void {
@@ -159,6 +163,11 @@ export class WebSocketService {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
+    }
+
+    if (this.authFlushTimer) {
+      clearTimeout(this.authFlushTimer);
+      this.authFlushTimer = null;
     }
   }
 
@@ -174,6 +183,38 @@ export class WebSocketService {
     }, delay) as unknown as number;
   }
 
+  private sendAuth(token: string): void {
+    const authPayload: WebSocketMessage = {
+      type: 'auth',
+      token,
+      data: { token },
+      timezone: TimezoneService.getTimezone(),
+    };
+    this.send(authPayload);
+    console.log('🌐 Sent auth message with token payload');
+  }
+
+  // Send without queuing, used immediately on open to avoid auth timeout
+  private sendAuthRaw(token: string): void {
+    const payload = {
+      type: 'auth',
+      token,
+      data: { token },
+      timezone: TimezoneService.getTimezone(),
+    };
+    try {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify(payload));
+        console.log('🌐 Sent auth message with token payload (raw)');
+      } else {
+        this.sendAuth(token);
+      }
+    } catch (error) {
+      console.error('❌ Failed to send raw auth payload:', error);
+      this.sendAuth(token);
+    }
+  }
+
   private startPingPong(): void {
     this.pingInterval = setInterval(() => {
       if (this.isConnected && this.ws) {
@@ -183,11 +224,30 @@ export class WebSocketService {
   }
 
   private handleMessage(message: WebSocketMessage): void {
-    if (message.type !== 'typing' && message.type !== 'stop-typing') {
-      this.messageListeners.forEach(listener => listener(message));
-    }
-
     switch (message.type) {
+      case 'auth_success':
+        this.isConnected = true;
+        this.isConnecting = false;
+        this.isAuthenticated = true;
+        this.reconnectAttempts = 0;
+        this.notifyConnectionStatusListeners(true);
+        this.startPingPong();
+        if (this.authFlushTimer) {
+          clearTimeout(this.authFlushTimer);
+        }
+        this.authFlushTimer = setTimeout(() => {
+          this.flushPendingMessages();
+          this.rejoinChats();
+        }, 100) as unknown as number;
+        break;
+      case 'error':
+        console.error('❌ WebSocket server error:', message);
+        if (/auth/i.test(message.message || '') || /token/i.test(message.message || '')) {
+          this.isConnected = false;
+          this.isAuthenticated = false;
+          this.notifyConnectionStatusListeners(false);
+        }
+        break;
       case 'pong':
         break;
       case 'user_status_update':
@@ -259,6 +319,10 @@ export class WebSocketService {
   }
 
   send(message: WebSocketMessage): void {
+    if (!this.isConnected && !this.isConnecting) {
+      // Best-effort connect so queued messages can flush
+      this.connect().catch((error) => console.error('❌ WebSocket connect failed during send:', error));
+    }
     const payload = this.enrichWithTimezone(message);
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.isConnected) {
       this.ws.send(JSON.stringify(payload));
@@ -293,6 +357,15 @@ export class WebSocketService {
     }
     this.joinedChats.delete(chatId);
     this.send({ type: 'chat_leave', chatId });
+  }
+
+  private rejoinChats(): void {
+    if (!this.joinedChats.size) {
+      return;
+    }
+    this.joinedChats.forEach((deviceId, chatId) => {
+      this.send({ type: 'chat_join', chatId, deviceId });
+    });
   }
 
   private handleTyping(message: WebSocketMessage) {
@@ -382,9 +455,8 @@ export class WebSocketService {
 
   // Request fresh status for all friends
   refreshFriendsStatus(): void {
-    this.send({
-      type: 'request_friends_status'
-    });
+    // Disabled until the backend supports this message type
+    // this.send({ type: 'request_friends_status' });
   }
 
   addConnectionStatusListener(listener: (isConnected: boolean) => void): () => void {

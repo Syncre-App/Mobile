@@ -511,7 +511,6 @@ export const HomeScreen: React.FC = () => {
 
     applyStatuses(wsInstance.getUserStatuses());
     const unsubscribe = wsInstance.addStatusListener(applyStatuses);
-    wsInstance.refreshFriendsStatus();
 
     return () => {
       if (unsubscribe) {
