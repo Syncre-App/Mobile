@@ -218,6 +218,8 @@ PODS:
     - ExpoModulesCore
   - ExpoBlur (15.0.7):
     - ExpoModulesCore
+  - ExpoClipboard (8.0.7):
+    - ExpoModulesCore
   - ExpoCrypto (15.0.7):
     - ExpoModulesCore
   - ExpoDevice (8.0.9):
@@ -2367,6 +2369,7 @@ DEPENDENCIES:
   - "expo-dev-menu-interface (from `../node_modules/.pnpm/expo-dev-menu-interface@2.0.0_expo@54.0.23/node_modules/expo-dev-menu-interface/ios`)"
   - "ExpoAsset (from `../node_modules/.pnpm/expo-asset@12.0.9_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-asset/ios`)"
   - "ExpoBlur (from `../node_modules/.pnpm/expo-blur@15.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-blur/ios`)"
+  - "ExpoClipboard (from `../node_modules/.pnpm/expo-clipboard@8.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-clipboard/ios`)"
   - "ExpoCrypto (from `../node_modules/.pnpm/expo-crypto@15.0.7_expo@54.0.23/node_modules/expo-crypto/ios`)"
   - "ExpoDevice (from `../node_modules/.pnpm/expo-device@8.0.9_expo@54.0.23/node_modules/expo-device/ios`)"
   - "ExpoDocumentPicker (from `../node_modules/.pnpm/expo-document-picker@14.0.7_expo@54.0.23/node_modules/expo-document-picker/ios`)"
@@ -2511,6 +2514,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/expo-asset@12.0.9_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-asset/ios"
   ExpoBlur:
     :path: "../node_modules/.pnpm/expo-blur@15.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-blur/ios"
+  ExpoClipboard:
+    :path: "../node_modules/.pnpm/expo-clipboard@8.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-clipboard/ios"
   ExpoCrypto:
     :path: "../node_modules/.pnpm/expo-crypto@15.0.7_expo@54.0.23/node_modules/expo-crypto/ios"
   ExpoDevice:
@@ -2728,6 +2733,7 @@ SPEC CHECKSUMS:
   expo-dev-menu-interface: 600df12ea01efecdd822daaf13cc0ac091775533
   ExpoAsset: 9ba6fbd677fb8e241a3899ac00fa735bc911eadf
   ExpoBlur: 2dd8f64aa31f5d405652c21d3deb2d2588b1852f
+  ExpoClipboard: af650d14765f19c60ce2a1eaf9dfe6445eff7365
   ExpoCrypto: c1fbce112d1b6b79652bbe380b4fd4cc91676595
   ExpoDevice: 148accb4071873d19fba80a2506c58ffa433d620
   ExpoDocumentPicker: 2200eefc2817f19315fa18f0147e0b80ece86926
