@@ -1068,6 +1068,7 @@ const ChatScreen: React.FC = () => {
   const markSeenInFlightRef = useRef(false);
   const missingEnvelopeRef = useRef(false);
   const reencryptRequestedRef = useRef(false);
+  const pendingRefreshRef = useRef(false);
   const requestReencrypt = useCallback(
     (reason: string) => {
       if (!chatId) {
@@ -2011,6 +2012,18 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     authTokenRef.current = token;
     await loadMessagesForChat(token, chatId, receiverNameRef.current, otherUserIdRef.current);
   }, [chatId, loadMessagesForChat]);
+
+  const scheduleRefreshMessages = useCallback(() => {
+    if (pendingRefreshRef.current) {
+      return;
+    }
+    pendingRefreshRef.current = true;
+    setTimeout(() => {
+      refreshMessages().finally(() => {
+        pendingRefreshRef.current = false;
+      });
+    }, 250);
+  }, [refreshMessages]);
 
   const ensureFriendRoster = useCallback(async () => {
     setIsFriendRosterLoading(true);
@@ -3424,6 +3437,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
               return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
             });
             scrollToBottom();
+            scheduleRefreshMessages();
           } catch (error) {
             console.error('Failed to decrypt incoming message envelope:', error);
             refreshMessages();
@@ -3465,6 +3479,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
           });
           scrollToBottom();
+          scheduleRefreshMessages();
           return;
         }
         case 'message_deleted': {
@@ -3593,6 +3608,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       resolveSenderProfile,
       applyChatUpdate,
       requestReencrypt,
+      scheduleRefreshMessages,
     ]
   );
 
