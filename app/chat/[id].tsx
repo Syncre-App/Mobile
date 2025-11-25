@@ -233,6 +233,20 @@ const findEmbeddableLink = (text: string): { type: 'image' | 'video'; url: strin
   return null;
 };
 
+const clampFutureTimestamp = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return value;
+  }
+  const now = Date.now();
+  const maxFutureSkew = 5 * 60 * 1000; // 5 minutes
+  if (parsed > now + maxFutureSkew) {
+    return new Date(now).toISOString();
+  }
+  return value;
+};
+
 const buildDeletedLabel = (username?: string | null) => {
   if (!username) {
     return 'Message deleted';
@@ -385,7 +399,9 @@ const resolveMessageTimestamps = (
     ]) ?? local;
 
   const timezone = source?.timezone || fallbackTimezone;
-  return { local, utc, timezone };
+  const clampedLocal = clampFutureTimestamp(local) || local;
+  const clampedUtc = clampFutureTimestamp(utc) || utc;
+  return { local: clampedLocal, utc: clampedUtc, timezone };
 };
 
 const resolveDeliveryTimestamp = (source: Record<string, any>): string | undefined =>
@@ -1616,6 +1632,8 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           (participantIdsRef.current.find((pid) => pid !== String(senderId)) ?? '');
 
         const { local, utc, timezone } = resolveMessageTimestamps(raw, timezoneFallback);
+        const clampedLocal = clampFutureTimestamp(local) || local;
+        const clampedUtc = clampFutureTimestamp(utc) || utc;
         const preview = typeof raw.preview === 'string' ? raw.preview : undefined;
         const deliveredAt = resolveDeliveryTimestamp(raw);
         const seenAt = resolveSeenTimestamp(raw);
@@ -2000,18 +2018,18 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     [generatePlaceholderMessages, scrollToBottom, setMessagesAnimated, transformMessages, requestReencrypt]
   );
   
-  const refreshMessages = useCallback(async () => {
-    if (!chatId) {
-      return;
-    }
+const refreshMessages = useCallback(async () => {
+  if (!chatId) {
+    return;
+  }
 
     const token = authTokenRef.current ?? (await StorageService.getAuthToken());
     if (!token) {
       return;
     }
-    authTokenRef.current = token;
-    await loadMessagesForChat(token, chatId, receiverNameRef.current, otherUserIdRef.current);
-  }, [chatId, loadMessagesForChat]);
+  authTokenRef.current = token;
+  await loadMessagesForChat(token, chatId, receiverNameRef.current, otherUserIdRef.current);
+}, [chatId, loadMessagesForChat]);
 
   const scheduleRefreshMessages = useCallback(() => {
     if (pendingRefreshRef.current) {
@@ -3252,57 +3270,57 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             return;
           }
 
-        try {
-          const token = authTokenRef.current ?? (await StorageService.getAuthToken());
-          authTokenRef.current = token || null;
-          const decrypted = await CryptoService.decryptMessage({
-            chatId: targetChatId,
-            envelopes,
-            senderId: payload.senderId ?? payload.userId ?? null,
-            currentUserId,
-            token: token || undefined,
-          });
-          if (!decrypted) {
-            console.warn('Decryption failed for sent message envelope.');
-            const { local, utc, timezone } = resolveMessageTimestamps(
-              payload,
-              payload.timezone || TimezoneService.getTimezone()
-            );
-            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
-            const fallbackContent =
-              typeof payload.preview === 'string' && payload.preview.trim().length
-                ? payload.preview
-                : '[Encrypted message could not be decrypted]';
-            const newEntry: Message = {
-              id: String(payload.messageId ?? payload.id ?? Date.now()),
-              senderId: String(payload.senderId ?? ''),
-              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-              senderName: senderProfile.name,
-              senderAvatar: senderProfile.avatar,
-              content: fallbackContent,
-              timestamp: local,
-              utcTimestamp: utc,
-              timezone,
-              replyTo: undefined,
-              attachments: [],
-              isEdited: Boolean(payload.editedAt),
-              editedAt: payload.editedAt ?? undefined,
-              status: 'sent',
-              isPlaceholder: false,
-            };
-            setMessagesAnimated((prev) => {
-              const cleaned = prev.filter((msg) => !msg.isDeleted);
-              if (cleaned.some((msg) => msg.id === newEntry.id)) {
-                return cleaned;
-              }
-              const updated = cleaned.filter(
-                (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
-              );
-              return sortMessagesChronologically([...updated, newEntry]);
+          try {
+            const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+            authTokenRef.current = token || null;
+            const decrypted = await CryptoService.decryptMessage({
+              chatId: targetChatId,
+              envelopes,
+              senderId: payload.senderId ?? payload.userId ?? null,
+              currentUserId,
+              token: token || undefined,
             });
-            requestReencrypt('live_decrypt_failed');
-            return;
-          }
+            if (!decrypted) {
+              console.warn('Decryption failed for sent message envelope.');
+              const { local, utc, timezone } = resolveMessageTimestamps(
+                payload,
+                payload.timezone || TimezoneService.getTimezone()
+              );
+              const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+              const fallbackContent =
+                typeof payload.preview === 'string' && payload.preview.trim().length
+                  ? payload.preview
+                  : '[Encrypted message could not be decrypted]';
+              const newEntry: Message = {
+                id: String(payload.messageId ?? payload.id ?? Date.now()),
+                senderId: String(payload.senderId ?? ''),
+                receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+                senderName: senderProfile.name,
+                senderAvatar: senderProfile.avatar,
+                content: fallbackContent,
+                timestamp: local,
+                utcTimestamp: utc,
+                timezone,
+                replyTo: undefined,
+                attachments: [],
+                isEdited: Boolean(payload.editedAt),
+                editedAt: payload.editedAt ?? undefined,
+                status: 'sent',
+                isPlaceholder: false,
+              };
+              setMessagesAnimated((prev) => {
+                const cleaned = prev.filter((msg) => !msg.isDeleted);
+                if (cleaned.some((msg) => msg.id === newEntry.id)) {
+                  return cleaned;
+                }
+                const updated = cleaned.filter(
+                  (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
+                );
+                return sortMessagesChronologically([...updated, newEntry]);
+              });
+              requestReencrypt('live_decrypt_failed');
+              return;
+            }
 
             const { local, utc, timezone } = resolveMessageTimestamps(
               payload,
@@ -3356,50 +3374,50 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           try {
             const token = authTokenRef.current ?? (await StorageService.getAuthToken());
             authTokenRef.current = token || null;
-          const decrypted = await CryptoService.decryptMessage({
-            chatId: targetChatId,
-            envelopes,
-            senderId: payload.senderId ?? payload.userId ?? null,
-            currentUserId,
-            token: token || undefined,
-          });
-          if (!decrypted) {
-            console.warn('Decryption failed for incoming message envelope.');
-            const { local, utc, timezone } = resolveMessageTimestamps(
-              payload,
-              payload.timezone || TimezoneService.getTimezone()
-            );
-            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
-            const fallbackContent =
-              typeof payload.preview === 'string' && payload.preview.trim().length
-                ? payload.preview
-                : '[Encrypted message could not be decrypted]';
-            const fallbackEntry: Message = {
-              id: String(payload.messageId ?? payload.id ?? Date.now()),
-              senderId: String(payload.senderId ?? ''),
-              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-              senderName: senderProfile.name,
-              senderAvatar: senderProfile.avatar,
-              content: fallbackContent,
-              timestamp: local,
-              utcTimestamp: utc,
-              timezone,
-              replyTo: undefined,
-              attachments: [],
-              isEdited: Boolean(payload.editedAt),
-              editedAt: payload.editedAt ?? undefined,
-              isPlaceholder: false,
-            };
-            setMessagesAnimated((prev) => {
-              const cleaned = prev.filter((msg) => !msg.isDeleted);
-              if (cleaned.some((msg) => msg.id === fallbackEntry.id)) {
-                return cleaned;
-              }
-              return sortMessagesChronologically([...cleaned, fallbackEntry]);
+            const decrypted = await CryptoService.decryptMessage({
+              chatId: targetChatId,
+              envelopes,
+              senderId: payload.senderId ?? payload.userId ?? null,
+              currentUserId,
+              token: token || undefined,
             });
-            requestReencrypt('live_decrypt_failed');
-            return;
-          }
+            if (!decrypted) {
+              console.warn('Decryption failed for incoming message envelope.');
+              const { local, utc, timezone } = resolveMessageTimestamps(
+                payload,
+                payload.timezone || TimezoneService.getTimezone()
+              );
+              const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+              const fallbackContent =
+                typeof payload.preview === 'string' && payload.preview.trim().length
+                  ? payload.preview
+                  : '[Encrypted message could not be decrypted]';
+              const fallbackEntry: Message = {
+                id: String(payload.messageId ?? payload.id ?? Date.now()),
+                senderId: String(payload.senderId ?? ''),
+                receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+                senderName: senderProfile.name,
+                senderAvatar: senderProfile.avatar,
+                content: fallbackContent,
+                timestamp: local,
+                utcTimestamp: utc,
+                timezone,
+                replyTo: undefined,
+                attachments: [],
+                isEdited: Boolean(payload.editedAt),
+                editedAt: payload.editedAt ?? undefined,
+                isPlaceholder: false,
+              };
+              setMessagesAnimated((prev) => {
+                const cleaned = prev.filter((msg) => !msg.isDeleted);
+                if (cleaned.some((msg) => msg.id === fallbackEntry.id)) {
+                  return cleaned;
+                }
+                return sortMessagesChronologically([...cleaned, fallbackEntry]);
+              });
+              requestReencrypt('live_decrypt_failed');
+              return;
+            }
 
             const { local, utc, timezone } = resolveMessageTimestamps(
               payload,
@@ -3411,22 +3429,22 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
             const attachments = mapServerAttachments(payload.attachments);
             const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
-        const newEntry: Message = {
-          id: String(payload.messageId ?? payload.id ?? Date.now()),
-          senderId: String(payload.senderId ?? ''),
-          receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-          senderName: senderProfile.name,
-          senderAvatar: senderProfile.avatar,
-          content: contentText,
-          timestamp: local,
-          utcTimestamp: utc,
-          timezone,
-          replyTo,
-          attachments,
-          isEdited: Boolean(payload.editedAt),
-          editedAt: payload.editedAt ?? undefined,
-          seenBy: [],
-        };
+            const newEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
+              content: contentText,
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
+              replyTo,
+              attachments,
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
+              seenBy: [],
+            };
 
             setMessagesAnimated((prev) => {
               const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
