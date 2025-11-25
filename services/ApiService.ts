@@ -122,7 +122,19 @@ export class ApiService {
 
   static async getUserById(userId: string, token: string): Promise<ApiResponse<any>> {
     const cachedUser = UserCacheService.getUser(userId);
+    const shouldRevalidate = UserCacheService.isStale(userId);
+
     if (cachedUser) {
+      // Return cached immediately; refresh in background if stale to keep names/avatars current
+      if (shouldRevalidate) {
+        this.get(`/user/${userId}`, token)
+          .then((response) => {
+            if (response.success && response.data) {
+              UserCacheService.addUser(response.data);
+            }
+          })
+          .catch((err) => console.warn('[ApiService] Background user refresh failed:', err));
+      }
       return {
         success: true,
         data: cachedUser,
@@ -134,6 +146,7 @@ export class ApiService {
     if (response.success && response.data) {
       UserCacheService.addUser(response.data);
     }
+
     return response;
   }
 

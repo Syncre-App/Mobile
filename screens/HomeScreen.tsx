@@ -157,22 +157,6 @@ export const HomeScreen: React.FC = () => {
     []
   );
 
-  const persistUserProfiles = useCallback(() => {
-    const snapshot = UserCacheService.getAllUsers();
-    const record = snapshot.reduce((acc: Record<string, any>, user: any) => {
-      const id = user.id?.toString?.() ?? String(user.id);
-      acc[id] = {
-        id,
-        username: user.username || '',
-        email: user.email || '',
-        profile_picture: user.profile_picture || null,
-        status: user.status || null,
-      };
-      return acc;
-    }, {} as Record<string, any>);
-    StorageService.setObject('user_cache', record).catch(() => {});
-  }, []);
-
   const cacheUsers = useCallback(
     (users: any[], opts: { updateStatus?: boolean } = { updateStatus: true }) => {
       if (!users?.length) return;
@@ -199,10 +183,8 @@ export const HomeScreen: React.FC = () => {
           return next;
         });
       }
-
-      persistUserProfiles();
     },
-    [persistUserProfiles]
+    []
   );
 
   const ensureNotificationUsers = useCallback(async (items: any[], token?: string | null) => {
@@ -475,24 +457,19 @@ export const HomeScreen: React.FC = () => {
 
   useEffect(() => {
     const hydrateUserCache = async () => {
-      const stored = await StorageService.getObject<Record<string, any>>('user_cache');
-      if (stored) {
-        const users = Object.values(stored).map((user: any) => ({
-          ...user,
-          id: user.id?.toString?.() ?? String(user.id),
-        }));
-        if (users.length) {
-          cacheUsers(users, { updateStatus: false });
-          setUserStatuses((prev: any) => {
-            const next = { ...prev };
-            users.forEach((user: any) => {
-              if (user.status) {
-                next[user.id] = user.status;
-              }
-            });
-            return next;
+      await UserCacheService.hydrate();
+      const users = UserCacheService.getAllUsers();
+      if (users.length) {
+        cacheUsers(users, { updateStatus: false });
+        setUserStatuses((prev: any) => {
+          const next = { ...prev };
+          users.forEach((user: any) => {
+            if (user.status) {
+              next[user.id] = user.status;
+            }
           });
-        }
+          return next;
+        });
       }
     };
 
