@@ -346,6 +346,17 @@ const resolveContentText = (
   return decoded.text || '';
 };
 
+const resolveDecryptFallbackText = (
+  preview: string | null | undefined,
+  attachments: MessageAttachment[]
+): string => {
+  if (attachments.length > 0) {
+    return '';
+  }
+  const trimmedPreview = typeof preview === 'string' ? preview.trim() : '';
+  return trimmedPreview;
+};
+
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
 const normalizeTimestampValue = (value?: string): string | undefined => {
@@ -1660,7 +1671,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
             content = decrypted;
           } else {
             console.warn(`Decryption failed for historical message ${raw.id}.`);
-            content = '[Encrypted message could not be decrypted]';
+            content = resolveDecryptFallbackText(preview, attachments);
             decryptFailed = true;
             missingEnvelope = true;
           }
@@ -3285,10 +3296,8 @@ const refreshMessages = useCallback(async () => {
                 payload.timezone || TimezoneService.getTimezone()
               );
               const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
-              const fallbackContent =
-                typeof payload.preview === 'string' && payload.preview.trim().length
-                  ? payload.preview
-                  : '[Encrypted message could not be decrypted]';
+              const attachments = mapServerAttachments(payload.attachments);
+              const fallbackContent = resolveDecryptFallbackText(payload.preview, attachments);
               const newEntry: Message = {
                 id: String(payload.messageId ?? payload.id ?? Date.now()),
                 senderId: String(payload.senderId ?? ''),
@@ -3300,7 +3309,7 @@ const refreshMessages = useCallback(async () => {
                 utcTimestamp: utc,
                 timezone,
                 replyTo: undefined,
-                attachments: [],
+                attachments,
                 isEdited: Boolean(payload.editedAt),
                 editedAt: payload.editedAt ?? undefined,
                 status: 'sent',
@@ -3386,10 +3395,8 @@ const refreshMessages = useCallback(async () => {
                 payload.timezone || TimezoneService.getTimezone()
               );
               const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
-              const fallbackContent =
-                typeof payload.preview === 'string' && payload.preview.trim().length
-                  ? payload.preview
-                  : '[Encrypted message could not be decrypted]';
+              const attachments = mapServerAttachments(payload.attachments);
+              const fallbackContent = resolveDecryptFallbackText(payload.preview, attachments);
               const fallbackEntry: Message = {
                 id: String(payload.messageId ?? payload.id ?? Date.now()),
                 senderId: String(payload.senderId ?? ''),
@@ -3401,7 +3408,7 @@ const refreshMessages = useCallback(async () => {
                 utcTimestamp: utc,
                 timezone,
                 replyTo: undefined,
-                attachments: [],
+                attachments,
                 isEdited: Boolean(payload.editedAt),
                 editedAt: payload.editedAt ?? undefined,
                 isPlaceholder: false,
