@@ -1632,8 +1632,6 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           (participantIdsRef.current.find((pid) => pid !== String(senderId)) ?? '');
 
         const { local, utc, timezone } = resolveMessageTimestamps(raw, timezoneFallback);
-        const clampedLocal = clampFutureTimestamp(local) || local;
-        const clampedUtc = clampFutureTimestamp(utc) || utc;
         const preview = typeof raw.preview === 'string' ? raw.preview : undefined;
         const deliveredAt = resolveDeliveryTimestamp(raw);
         const seenAt = resolveSeenTimestamp(raw);
