@@ -1821,33 +1821,69 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
   );
 
   const applyAckToLatestMessage = useCallback(
-    (incoming: { messageId?: string | number; createdAt?: string }) => {
+    (incoming: { messageId?: string | number; createdAt?: string; preview?: string; attachments?: any[] }) => {
       if (!currentUserId || !incoming?.messageId) {
         return;
       }
       const messageId = String(incoming.messageId);
+      const previewText = typeof incoming.preview === 'string' ? incoming.preview : '';
+      const attachmentIds =
+        Array.isArray(incoming.attachments) && incoming.attachments.length
+          ? incoming.attachments
+              .map((entry) => entry?.id ?? entry?.attachmentId ?? entry)
+              .filter((id) => id != null)
+              .map((id) => String(id))
+          : [];
+      const normalizePreview = (value: string) => value.trim().slice(0, 300);
+      const incomingPreview = normalizePreview(previewText);
 
       setMessagesAnimated((prev) => {
-        const next = [...prev];
-        let updated = false;
-        for (let i = next.length - 1; i >= 0; i -= 1) {
-          const message = next[i];
-          if (message.senderId === currentUserId && !message.isPlaceholder) {
-            next[i] = {
-              ...message,
-              id: messageId,
-              status: 'sent',
-              timestamp: incoming.createdAt ?? message.timestamp,
-            };
-            updated = true;
-            break;
-          }
-        }
+        const candidates = prev
+          .map((msg, index) => ({ msg, index }))
+          .filter(
+            ({ msg }) => msg.senderId === currentUserId && msg.status === 'sending' && !msg.isPlaceholder
+          );
 
-        if (!updated) {
+        if (!candidates.length) {
           return prev;
         }
 
+        const matched = candidates.find(({ msg }) => {
+          const localPreview = normalizePreview(msg.content || '');
+          const previewMatches =
+            !incomingPreview.length ||
+            localPreview.startsWith(incomingPreview) ||
+            incomingPreview.startsWith(localPreview);
+
+          if (!previewMatches) {
+            return false;
+          }
+
+          if (!attachmentIds.length) {
+            return true;
+          }
+
+          const localAttachmentIds = (msg.attachments || [])
+            .map((attachment) => attachment.id)
+            .filter(Boolean)
+            .map((id) => String(id));
+
+          return attachmentIds.every((id) => localAttachmentIds.includes(id));
+        });
+
+        const targetIndex = matched?.index ?? candidates[0].index;
+        const target = prev[targetIndex];
+        if (!target) {
+          return prev;
+        }
+
+        const next = [...prev];
+        next[targetIndex] = {
+          ...target,
+          id: messageId,
+          status: 'sent',
+          timestamp: incoming.createdAt ?? target.timestamp,
+        };
         return next;
       });
     },
@@ -3194,6 +3230,8 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           applyAckToLatestMessage({
             messageId: payload.messageId ?? payload.id,
             createdAt: ackTimestamps.local,
+            preview: payload.preview,
+            attachments: payload.attachments,
           });
 
           const envelopes = Array.isArray(payload.envelopes) ? payload.envelopes : [];
