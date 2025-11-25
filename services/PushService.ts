@@ -15,7 +15,7 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: false,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
     shouldShowBanner: true,
     shouldShowList: true,
   }),
@@ -135,10 +135,23 @@ export const PushService = {
   addNotificationListeners(onReceive?: (notification: Notifications.Notification) => void) {
     const subs: Notifications.Subscription[] = [];
 
-    if (onReceive) {
-      const listener = Notifications.addNotificationReceivedListener(onReceive);
-      subs.push(listener);
-    }
+    const listener = Notifications.addNotificationReceivedListener(async (notification) => {
+      try {
+        const providedBadge = notification.request?.content?.badge;
+        if (typeof providedBadge === 'number') {
+          await Notifications.setBadgeCountAsync(providedBadge);
+        } else {
+          const current = await Notifications.getBadgeCountAsync();
+          await Notifications.setBadgeCountAsync(current + 1);
+        }
+      } catch (error) {
+        console.warn('[PushService] Failed to sync badge count from notification:', error);
+      }
+      if (onReceive) {
+        onReceive(notification);
+      }
+    });
+    subs.push(listener);
 
     return () => subs.forEach((sub) => sub.remove());
   },
