@@ -14,7 +14,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppBackground } from '../components/AppBackground';
 import { notificationService } from '../services/NotificationService';
-
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
@@ -106,14 +105,6 @@ export const RegisterScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <LinearGradient
-            colors={['#0EA5FF', '#2C82FF']}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={styles.logoGradient}
-          >
-            <Ionicons name="menu" size={36} color="white" />
-          </LinearGradient>
           <Text style={styles.overline}>Create your handle</Text>
           <Text style={styles.title}>Join the Syncre collective</Text>
           <Text style={styles.subtitle}>Encryption-first chat across mobile & web.</Text>

@@ -104,7 +104,6 @@ export const LoginScreen: React.FC = () => {
       <AppBackground />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.overline}>Welcome back</Text>
           <Text style={styles.heroTitle}>Talk freely.</Text>
           <Text style={styles.heroSubtitle}>Stay close. Own your data.</Text>
