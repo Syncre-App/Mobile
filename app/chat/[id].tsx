@@ -8,6 +8,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { Video, ResizeMode } from 'expo-av';
 import { useAuth } from '../../hooks/useAuth';
@@ -314,6 +315,23 @@ const decodeMessagePayload = (raw: string): { text: string; replyTo?: ReplyMetad
   return { text: raw };
 };
 
+const resolveContentText = (
+  decoded: { text: string },
+  preview?: string | null,
+  hasAttachments = false
+): string => {
+  if (decoded.text && decoded.text.trim().length) {
+    return decoded.text;
+  }
+  if (!hasAttachments) {
+    const trimmedPreview = typeof preview === 'string' ? preview.trim() : '';
+    if (trimmedPreview.length) {
+      return trimmedPreview;
+    }
+  }
+  return decoded.text || '';
+};
+
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
 const normalizeTimestampValue = (value?: string): string | undefined => {
@@ -384,6 +402,9 @@ const parseDate = (value: string): Date => {
   return date;
 };
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const hasIntlSupport = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function';
+
 const formatDateLabel = (date: Date): string => {
   const today = startOfDay(new Date());
   const target = startOfDay(date);
@@ -396,11 +417,18 @@ const formatDateLabel = (date: Date): string => {
     return 'Yesterday';
   }
 
+  const includeYear = today.getFullYear() !== date.getFullYear();
+  const fallback = `${MONTH_LABELS[date.getMonth()]} ${date.getDate()}${includeYear ? `, ${date.getFullYear()}` : ''}`;
+
+  if (!hasIntlSupport) {
+    return fallback;
+  }
+
   const options: Intl.DateTimeFormatOptions = {
     month: 'short',
     day: 'numeric',
   };
-  if (today.getFullYear() !== date.getFullYear()) {
+  if (includeYear) {
     options.year = 'numeric';
   }
   return new Intl.DateTimeFormat(undefined, options).format(date);
@@ -422,6 +450,14 @@ const formatStatusLabel = (status: MessageStatus): string => {
 };
 
 const formatTimestamp = (date: Date): string => {
+  if (!hasIntlSupport) {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const paddedHours = String(hours).padStart(2, '0');
+    const paddedMinutes = String(minutes).padStart(2, '0');
+    return `${paddedHours}:${paddedMinutes}`;
+  }
+
   const timeFormatter = new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
@@ -429,6 +465,11 @@ const formatTimestamp = (date: Date): string => {
 
   return timeFormatter.format(date);
 };
+
+const sortMessagesChronologically = (list: Message[]): Message[] =>
+  list
+    .slice()
+    .sort((a, b) => parseDate(a.timestamp).getTime() - parseDate(b.timestamp).getTime());
 
 const MESSAGE_CHAR_LIMIT = 5000;
 const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
@@ -1009,7 +1050,10 @@ const ChatScreen: React.FC = () => {
 
   const wsService = useMemo(() => WebSocketService.getInstance(), []);
   const flatListRef = useRef<FlatList<ChatListItem>>(null);
+  const listLayoutHeightRef = useRef(0);
+  const contentHeightRef = useRef(0);
   const composerLimitWarningRef = useRef(false);
+  const initialScrollDoneRef = useRef(false);
 
   const receiverNameRef = useRef('Loading…');
   const otherUserIdRef = useRef<string | null>(null);
@@ -1049,27 +1093,67 @@ const ChatScreen: React.FC = () => {
   const isNearBottomRef = useRef(true);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [attachmentPickerBusy, setAttachmentPickerBusy] = useState(false);
-const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
+  const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
 const previewListRef = useRef<FlatList<MessageAttachment>>(null);
 const [previewIndex, setPreviewIndex] = useState(0);
+const handleClosePreview = useCallback(() => setPreviewContext(null), []);
+const previewPanResponder = useMemo(
+  () =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 80) {
+          handleClosePreview();
+        }
+      },
+    }),
+  [handleClosePreview]
+);
 const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 const [messageActionContext, setMessageActionContext] = useState<{
     message: Message;
     actions: Array<{ label: string; onPress: () => void; destructive?: boolean }>;
     anchorY: number;
+    anchorX: number;
+    above?: boolean;
   } | null>(null);
+const [contextTargetId, setContextTargetId] = useState<string | null>(null);
   const messageActionAnim = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
-  const messageActionAnchorTop = useMemo(() => {
+  const ACTION_CARD_WIDTH = 280;
+  const ACTION_CARD_HEIGHT = 240;
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+  const messageActionAnchor = useMemo(() => {
     if (!messageActionContext) {
-      return 0;
+      return { top: 0, left: SCREEN_WIDTH / 2 - ACTION_CARD_WIDTH / 2 };
     }
-    const offset = messageActionContext.anchorY - 120;
-    const clamped = Math.max(offset, 80);
-    return Math.min(clamped, windowHeight - 220);
-  }, [messageActionContext, windowHeight]);
+    const placeAbove = messageActionContext.above ?? messageActionContext.anchorY > windowHeight * 0.55;
+    let rawTop = placeAbove
+      ? messageActionContext.anchorY - ACTION_CARD_HEIGHT - 12
+      : messageActionContext.anchorY + 12;
+    rawTop = Math.max(rawTop, 52);
+    const maxTop = windowHeight - ACTION_CARD_HEIGHT - 32;
+    const top = Math.min(rawTop, maxTop);
+    const rawLeft = messageActionContext.anchorX - ACTION_CARD_WIDTH / 2;
+    const left = Math.max(12, Math.min(rawLeft, SCREEN_WIDTH - ACTION_CARD_WIDTH - 12));
+    return { top, left };
+  }, [ACTION_CARD_WIDTH, SCREEN_WIDTH, messageActionContext, windowHeight]);
+  const messageActionArrowLeft = useMemo(() => {
+    if (!messageActionContext) {
+      return ACTION_CARD_WIDTH / 2 - 6;
+    }
+    const offset = messageActionContext.anchorX - messageActionAnchor.left - 6;
+    return Math.max(14, Math.min(offset, ACTION_CARD_WIDTH - 26));
+  }, [ACTION_CARD_WIDTH, messageActionAnchor.left, messageActionContext]);
+  const messageActionArrowTop = useMemo(() => {
+    if (!messageActionContext) {
+      return -6;
+    }
+    const placeAbove = messageActionContext.above ?? messageActionContext.anchorY > windowHeight * 0.55;
+    return placeAbove ? ACTION_CARD_HEIGHT - 6 : -6;
+  }, [ACTION_CARD_HEIGHT, messageActionContext, windowHeight]);
 
   const dismissMessageActions = useCallback(
     (onFinished?: () => void) => {
@@ -1083,6 +1167,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
         useNativeDriver: true,
       }).start(() => {
         setMessageActionContext(null);
+        setContextTargetId(null);
         onFinished?.();
       });
     },
@@ -1132,8 +1217,6 @@ const [messageActionContext, setMessageActionContext] = useState<{
   const currentPreviewAttachment = previewContext
     ? previewContext.attachments[Math.min(previewIndex, previewContext.attachments.length - 1)]
     : null;
-  const handleClosePreview = useCallback(() => setPreviewContext(null), []);
-
   const closeAttachmentSheet = useCallback(() => {
     Animated.timing(attachmentSheetAnim, {
       toValue: 0,
@@ -1154,6 +1237,17 @@ const [messageActionContext, setMessageActionContext] = useState<{
     },
     [dismissMessageActions]
   );
+  const resolveActionIcon = useCallback((label: string): any => {
+    const normalized = label.toLowerCase();
+    if (normalized.includes('reply')) return 'return-down-back';
+    if (normalized.includes('edit')) return 'create-outline';
+    if (normalized.includes('delete')) return 'trash-outline';
+    if (normalized.includes('copy')) return 'copy-outline';
+    if (normalized.includes('link')) return 'link-outline';
+    if (normalized.includes('forward')) return 'arrow-redo-outline';
+    if (normalized.includes('thread')) return 'chatbubble-ellipses-outline';
+    return 'ellipsis-horizontal';
+  }, []);
 
   const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
   const [chatDetails, setChatDetails] = useState<{
@@ -1371,12 +1465,13 @@ const [messageActionContext, setMessageActionContext] = useState<{
     []
   );
 
-  const scrollToBottom = useCallback((force = false) => {
+  // Keep autoscroll snappy; only animate when explicitly requested (e.g., user taps the CTA)
+  const scrollToBottom = useCallback((force = false, animated = false) => {
     if (!force && !isNearBottomRef.current) {
       return;
     }
     requestAnimationFrame(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
+      flatListRef.current?.scrollToEnd({ animated });
     });
   }, []);
 
@@ -1511,6 +1606,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
         if (!senderId) {
           continue;
         }
+        let decryptFailed = false;
 
         const receiverId =
           raw.receiverId ??
@@ -1519,6 +1615,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
           (participantIdsRef.current.find((pid) => pid !== String(senderId)) ?? '');
 
         const { local, utc, timezone } = resolveMessageTimestamps(raw, timezoneFallback);
+        const preview = typeof raw.preview === 'string' ? raw.preview : undefined;
         const deliveredAt = resolveDeliveryTimestamp(raw);
         const seenAt = resolveSeenTimestamp(raw);
 
@@ -1546,17 +1643,21 @@ const [messageActionContext, setMessageActionContext] = useState<{
             content = decrypted;
           } else {
             console.warn(`Decryption failed for historical message ${raw.id}.`);
+            content = '[Encrypted message could not be decrypted]';
+            decryptFailed = true;
+            missingEnvelope = true;
           }
         } else {
-          content = raw.content ?? '';
+          content = raw.content ?? preview ?? '';
         }
 
         if (content == null) {
           if (isDeleted) {
             content = buildDeletedLabel(deletedByName || resolveSenderProfile(String(senderId)).name);
           } else {
+            content = preview || '[Message unavailable]';
             missingEnvelope = true;
-            continue;
+            decryptFailed = true;
           }
         }
 
@@ -1571,7 +1672,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
           }
         }
 
-        const decodedPayload = decodeMessagePayload(content);
+        const decodedPayload = decodeMessagePayload(content ?? '');
+        const contentText = resolveContentText(decodedPayload, preview, attachments.length > 0);
         const serverReply = resolveReplyMetadata((raw as any)?.reply);
         const replyTo = isDeleted
           ? undefined
@@ -1585,7 +1687,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
           receiverId: String(receiverId),
           senderName: senderProfile.name,
           senderAvatar: senderProfile.avatar,
-          content: decodedPayload.text,
+          content: contentText,
           timestamp: String(local),
           utcTimestamp: utc,
           timezone,
@@ -1675,11 +1777,15 @@ const [messageActionContext, setMessageActionContext] = useState<{
           }
 
           const applyReceipt = (target: Message): Message => {
+            const deliveredAt = status === 'delivered' && timestamp ? timestamp : target.deliveredAt;
+            const seenAtValue = status === 'seen' && timestamp ? timestamp : target.seenAt;
+
             if (status !== 'seen' || !receipt?.userId) {
               return {
                 ...target,
                 status,
-                timestamp: timestamp ?? target.timestamp,
+                deliveredAt,
+                seenAt: seenAtValue ?? target.seenAt,
               };
             }
             const existing = Array.isArray(target.seenBy) ? target.seenBy : [];
@@ -1688,7 +1794,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
             return {
               ...target,
               status,
-              timestamp: timestamp ?? target.timestamp,
+              deliveredAt,
+              seenAt: seenAtValue ?? target.seenAt,
               seenBy: mergedReceipts,
             };
           };
@@ -1820,8 +1927,15 @@ const [messageActionContext, setMessageActionContext] = useState<{
           timezone: responseTimezone,
         });
         const cleaned = transformed.filter(Boolean);
+        const sorted = sortMessagesChronologically(cleaned);
 
-        setMessagesAnimated(() => cleaned);
+        setMessagesAnimated((prev) => {
+          const existingIds = new Set(sorted.map((msg) => msg.id));
+          const localSending = prev.filter(
+            (msg) => msg.status === 'sending' && !existingIds.has(msg.id)
+          );
+          return sortMessagesChronologically([...sorted, ...localSending]);
+        });
         if (missingEnvelopeRef.current) {
           requestReencrypt('missing_history');
         }
@@ -1830,11 +1944,16 @@ const [messageActionContext, setMessageActionContext] = useState<{
         nextCursorRef.current = response.data?.nextCursor || null;
         initialLoadCompleteRef.current = true;
         InteractionManager.runAfterInteractions(() => {
-          scrollToBottom(true);
+          scrollToBottom(true, false);
         });
       } catch (error) {
         console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
-        setMessagesAnimated(() => generatePlaceholderMessages(displayName));
+        setMessagesAnimated((prev) => {
+          if (prev.length) {
+            return prev;
+          }
+          return generatePlaceholderMessages(displayName);
+        });
         setHasMore(false);
         nextCursorRef.current = null;
         lastSeenMessageIdRef.current = null;
@@ -2132,7 +2251,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
         const transformed = await transformMessages(rawMessages, otherUserIdRef.current, token, {
           timezone: responseTimezone,
         });
-        const cleaned = transformed.filter(Boolean);
+        const cleaned = sortMessagesChronologically(transformed.filter(Boolean));
 
         setMessagesWithoutAnimation((prev) => {
           const existingIds = new Set(prev.map((msg) => msg.id));
@@ -2140,7 +2259,8 @@ const [messageActionContext, setMessageActionContext] = useState<{
           if (!filtered.length) {
             return prev;
           }
-          return [...filtered, ...prev];
+          const merged = [...filtered, ...prev];
+          return sortMessagesChronologically(merged);
         });
 
         setHasMore(response.data?.hasMore ?? false);
@@ -2193,6 +2313,39 @@ const [messageActionContext, setMessageActionContext] = useState<{
       }, 1500);
     },
     [chatId, wsService]
+  );
+
+  const ensureWebSocketReady = useCallback(
+    async (timeoutMs = 2000) => {
+      const waitUntilReady = () =>
+        new Promise<boolean>((resolve) => {
+          const start = Date.now();
+          const poll = () => {
+            const open = wsService.connected && wsService.socket?.readyState === WebSocket.OPEN;
+            if (open) {
+              resolve(true);
+              return;
+            }
+            if (Date.now() - start >= timeoutMs) {
+              resolve(false);
+              return;
+            }
+            setTimeout(poll, 100);
+          };
+          poll();
+        });
+
+      try {
+        if (!wsService.connected || wsService.socket?.readyState !== WebSocket.OPEN) {
+          await wsService.connect();
+        }
+        return await waitUntilReady();
+      } catch (error) {
+        console.error('Failed to ensure WebSocket ready for chat:', error);
+        return false;
+      }
+    },
+    [wsService]
   );
 
   const uploadSingleAttachment = useCallback(
@@ -2628,8 +2781,17 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
   const handleShareAttachment = useCallback(
     async (attachment?: MessageAttachment | null) => {
-      const target = attachment?.publicDownloadUrl || attachment?.downloadUrl;
-      if (!attachment || !target) {
+      if (!attachment) {
+        NotificationService.show('error', 'Share link is not available for this file');
+        return;
+      }
+      const target =
+        attachment.publicDownloadUrl ||
+        attachment.downloadUrl ||
+        attachment.publicViewUrl ||
+        attachment.previewUrl ||
+        attachment.localUri;
+      if (!target) {
         NotificationService.show('error', 'Share link is not available for this file');
         return;
       }
@@ -2647,6 +2809,45 @@ const [messageActionContext, setMessageActionContext] = useState<{
     []
   );
 
+  const handleCopyMessage = useCallback(async (message: Message) => {
+    const text = message.content || '';
+    if (!text) {
+      NotificationService.show('info', 'Nothing to copy');
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(text);
+      NotificationService.show('success', 'Copied');
+    } catch (error) {
+      console.error('Failed to copy text', error);
+      NotificationService.show('error', 'Unable to copy');
+    }
+  }, []);
+
+  const handleCopyAttachmentLink = useCallback(async (attachment?: MessageAttachment | null) => {
+    if (!attachment) {
+      NotificationService.show('info', 'No attachment to copy');
+      return;
+    }
+    const target =
+      attachment.publicDownloadUrl ||
+      attachment.downloadUrl ||
+      attachment.publicViewUrl ||
+      attachment.previewUrl ||
+      attachment.localUri;
+    if (!target) {
+      NotificationService.show('error', 'Link not available for this file');
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(target);
+      NotificationService.show('success', 'Link copied');
+    } catch (error) {
+      console.error('Failed to copy attachment link', error);
+      NotificationService.show('error', 'Unable to copy link');
+    }
+  }, []);
+
   const handleBubbleLongPress = useCallback(
     (message: Message, event?: GestureResponderEvent) => {
       if (message.isPlaceholder) {
@@ -2658,6 +2859,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
       const canEdit = message.senderId === currentUserId && !message.isDeleted;
       const canDelete = message.senderId === currentUserId && !message.isDeleted;
+      const primaryAttachment = (message.attachments || [])[0];
 
       const replyAction = () => setReplyContext(buildReplyPayloadFromMessage(message));
       const actions: Array<{ label: string; onPress: () => void; destructive?: boolean }> = [
@@ -2666,6 +2868,24 @@ const [messageActionContext, setMessageActionContext] = useState<{
           onPress: replyAction,
         },
       ];
+
+      if (message.content) {
+        actions.push({
+          label: 'Copy',
+          onPress: () => handleCopyMessage(message),
+        });
+      }
+
+      if (primaryAttachment) {
+        actions.push({
+          label: 'Copy link',
+          onPress: () => handleCopyAttachmentLink(primaryAttachment),
+        });
+        actions.push({
+          label: 'Share',
+          onPress: () => handleShareAttachment(primaryAttachment),
+        });
+      }
 
       if (canEdit) {
         actions.push({
@@ -2683,19 +2903,37 @@ const [messageActionContext, setMessageActionContext] = useState<{
       }
 
       if (!canEdit && !canDelete) {
-        replyAction();
-        return;
+        actions.push({ label: 'Cancel', onPress: () => {} });
+      } else {
+        actions.push({ label: 'Cancel', onPress: () => {} });
       }
-
-      actions.push({ label: 'Cancel', onPress: () => {} });
       const anchorY = event?.nativeEvent?.pageY ?? windowHeight / 2;
-      setMessageActionContext({ message, actions, anchorY });
+      const anchorX = event?.nativeEvent?.pageX ?? SCREEN_WIDTH / 2;
+      const above = anchorY > windowHeight * 0.55;
+      setContextTargetId(message.id);
+      setMessageActionContext({ message, actions, anchorY, anchorX, above });
     },
-    [buildReplyPayloadFromMessage, confirmDeleteMessage, currentUserId, startEditMessage, windowHeight]
+    [
+      buildReplyPayloadFromMessage,
+      confirmDeleteMessage,
+      currentUserId,
+      handleCopyAttachmentLink,
+      handleCopyMessage,
+      handleShareAttachment,
+      startEditMessage,
+      windowHeight,
+      SCREEN_WIDTH,
+    ]
   );
 
   const handleSendMessage = useCallback(async () => {
     if (!currentUserId || !chatId) {
+      return;
+    }
+
+    const isSocketReady = await ensureWebSocketReady();
+    if (!isSocketReady) {
+      NotificationService.show('error', 'Nem sikerült csatlakozni a chat szerverhez. Próbáld újra.');
       return;
     }
 
@@ -2741,7 +2979,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       return [...withoutPlaceholders, optimisticMessage];
     });
     InteractionManager.runAfterInteractions(() => {
-      scrollToBottom(true);
+      scrollToBottom(true, false);
     });
     setNewMessage('');
     setReplyContext(null);
@@ -2776,6 +3014,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
         throw new Error('No chat recipients available');
       }
 
+      const previewText = trimmedMessage.slice(0, 300);
       const encryptedPayload = await CryptoService.buildEncryptedPayload({
         chatId,
         message: encodedPayload,
@@ -2792,7 +3031,9 @@ const [messageActionContext, setMessageActionContext] = useState<{
         messageType: 'e2ee',
         replyMetadata: normalizedReply,
         attachments: attachmentIds,
+        preview: previewText,
       });
+
     } catch (error) {
       console.error(`Error sending encrypted message to chat ${chatId}:`, error);
       NotificationService.show('error', 'Failed to send message. Please try again.');
@@ -2816,6 +3057,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
     newMessage,
     pendingAttachments,
     replyContext,
+    ensureWebSocketReady,
     resolveReplyMetadata,
     scrollToBottom,
     setMessagesAnimated,
@@ -2953,6 +3195,105 @@ const [messageActionContext, setMessageActionContext] = useState<{
             messageId: payload.messageId ?? payload.id,
             createdAt: ackTimestamps.local,
           });
+
+          const envelopes = Array.isArray(payload.envelopes) ? payload.envelopes : [];
+          if (!envelopes.length) {
+            return;
+          }
+
+        try {
+          const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+          authTokenRef.current = token || null;
+          const decrypted = await CryptoService.decryptMessage({
+            chatId: targetChatId,
+            envelopes,
+            senderId: payload.senderId ?? payload.userId ?? null,
+            currentUserId,
+            token: token || undefined,
+          });
+          if (!decrypted) {
+            console.warn('Decryption failed for sent message envelope.');
+            const { local, utc, timezone } = resolveMessageTimestamps(
+              payload,
+              payload.timezone || TimezoneService.getTimezone()
+            );
+            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const fallbackContent =
+              typeof payload.preview === 'string' && payload.preview.trim().length
+                ? payload.preview
+                : '[Encrypted message could not be decrypted]';
+            const newEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
+              content: fallbackContent,
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
+              replyTo: undefined,
+              attachments: [],
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
+              status: 'sent',
+              isPlaceholder: false,
+            };
+            setMessagesAnimated((prev) => {
+              const cleaned = prev.filter((msg) => !msg.isDeleted);
+              if (cleaned.some((msg) => msg.id === newEntry.id)) {
+                return cleaned;
+              }
+              const updated = cleaned.filter(
+                (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
+              );
+              return sortMessagesChronologically([...updated, newEntry]);
+            });
+            requestReencrypt('live_decrypt_failed');
+            return;
+          }
+
+            const { local, utc, timezone } = resolveMessageTimestamps(
+              payload,
+              payload.timezone || TimezoneService.getTimezone()
+            );
+            const decodedPayload = decodeMessagePayload(decrypted);
+            const serverReply = resolveReplyMetadata(payload.reply);
+            const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
+            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const attachments = mapServerAttachments(payload.attachments);
+            const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
+            const newEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
+              content: contentText,
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
+              replyTo,
+              attachments,
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
+              status: 'sent',
+            };
+
+            setMessagesAnimated((prev) => {
+              const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
+              if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+                return withoutPlaceholders;
+              }
+              const cleaned = withoutPlaceholders.filter(
+                (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
+              );
+              return sortMessagesChronologically([...cleaned, newEntry]);
+            });
+          } catch (error) {
+            console.error('Failed to decrypt sent message envelope:', error);
+            requestReencrypt('live_decrypt_failed');
+          }
           return;
         }
         case 'message_envelope': {
@@ -2964,17 +3305,50 @@ const [messageActionContext, setMessageActionContext] = useState<{
           try {
             const token = authTokenRef.current ?? (await StorageService.getAuthToken());
             authTokenRef.current = token || null;
-            const decrypted = await CryptoService.decryptMessage({
-              chatId: targetChatId,
-              envelopes,
-              senderId: payload.senderId ?? payload.userId ?? null,
-              currentUserId,
-              token: token || undefined,
+          const decrypted = await CryptoService.decryptMessage({
+            chatId: targetChatId,
+            envelopes,
+            senderId: payload.senderId ?? payload.userId ?? null,
+            currentUserId,
+            token: token || undefined,
+          });
+          if (!decrypted) {
+            console.warn('Decryption failed for incoming message envelope.');
+            const { local, utc, timezone } = resolveMessageTimestamps(
+              payload,
+              payload.timezone || TimezoneService.getTimezone()
+            );
+            const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const fallbackContent =
+              typeof payload.preview === 'string' && payload.preview.trim().length
+                ? payload.preview
+                : '[Encrypted message could not be decrypted]';
+            const fallbackEntry: Message = {
+              id: String(payload.messageId ?? payload.id ?? Date.now()),
+              senderId: String(payload.senderId ?? ''),
+              receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
+              senderName: senderProfile.name,
+              senderAvatar: senderProfile.avatar,
+              content: fallbackContent,
+              timestamp: local,
+              utcTimestamp: utc,
+              timezone,
+              replyTo: undefined,
+              attachments: [],
+              isEdited: Boolean(payload.editedAt),
+              editedAt: payload.editedAt ?? undefined,
+              isPlaceholder: false,
+            };
+            setMessagesAnimated((prev) => {
+              const cleaned = prev.filter((msg) => !msg.isDeleted);
+              if (cleaned.some((msg) => msg.id === fallbackEntry.id)) {
+                return cleaned;
+              }
+              return sortMessagesChronologically([...cleaned, fallbackEntry]);
             });
-            if (!decrypted) {
-              console.warn('Decryption failed for incoming message envelope.');
-              return;
-            }
+            requestReencrypt('live_decrypt_failed');
+            return;
+          }
 
             const { local, utc, timezone } = resolveMessageTimestamps(
               payload,
@@ -2985,13 +3359,14 @@ const [messageActionContext, setMessageActionContext] = useState<{
             const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
             const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
             const attachments = mapServerAttachments(payload.attachments);
+            const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
         const newEntry: Message = {
           id: String(payload.messageId ?? payload.id ?? Date.now()),
           senderId: String(payload.senderId ?? ''),
           receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
           senderName: senderProfile.name,
           senderAvatar: senderProfile.avatar,
-          content: decodedPayload.text,
+          content: contentText,
           timestamp: local,
           utcTimestamp: utc,
           timezone,
@@ -3008,11 +3383,12 @@ const [messageActionContext, setMessageActionContext] = useState<{
               if (exists) {
                 return withoutPlaceholders;
               }
-              return [...withoutPlaceholders, newEntry];
+              return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
             });
             scrollToBottom();
           } catch (error) {
             console.error('Failed to decrypt incoming message envelope:', error);
+            refreshMessages();
           }
           return;
         }
@@ -3026,13 +3402,14 @@ const [messageActionContext, setMessageActionContext] = useState<{
           const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
           const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
           const attachments = mapServerAttachments(payload.attachments);
+          const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
             senderId: String(payload.senderId ?? ''),
             receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
             senderName: senderProfile.name,
             senderAvatar: senderProfile.avatar,
-            content: decodedPayload.text,
+            content: contentText,
             timestamp: local,
             utcTimestamp: utc,
             timezone,
@@ -3047,7 +3424,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
             if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
               return withoutPlaceholders;
             }
-            return [...withoutPlaceholders, newEntry];
+            return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
           });
           scrollToBottom();
           return;
@@ -3177,6 +3554,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       updateOutgoingStatus,
       resolveSenderProfile,
       applyChatUpdate,
+      requestReencrypt,
     ]
   );
 
@@ -3192,6 +3570,27 @@ const [messageActionContext, setMessageActionContext] = useState<{
       isNearTopRef.current = false;
     });
   }, [hasMore, isLoadingMore, isRefreshing, loadEarlier]);
+
+  const handleListLayout = useCallback((event: any) => {
+    listLayoutHeightRef.current = event.nativeEvent.layout.height;
+  }, []);
+
+  const handleContentSizeChange = useCallback(
+    (_: number, height: number) => {
+      contentHeightRef.current = height;
+      if (initialLoadCompleteRef.current && !initialScrollDoneRef.current) {
+        initialScrollDoneRef.current = true;
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        });
+        return;
+      }
+      if (!initialLoadCompleteRef.current || isNearBottomRef.current) {
+        requestAnimationFrame(() => scrollToBottom(true));
+      }
+    },
+    [scrollToBottom]
+  );
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -3273,6 +3672,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
       return;
     }
     initialLoadCompleteRef.current = false;
+    initialScrollDoneRef.current = false;
     loadChatDetails();
   }, [user?.id, chatId, loadChatDetails]);
 
@@ -3452,7 +3852,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
             if (messageItem.isPlaceholder) return;
             setReplyContext(buildReplyPayloadFromMessage(messageItem));
           }}
-          isHighlighted={highlightedMessageId === messageItem.id}
+          isHighlighted={highlightedMessageId === messageItem.id || contextTargetId === messageItem.id}
           replyCount={replyCount}
           onOpenThread={(messageId) => setThreadRootId(messageId)}
           showSenderMetadata={Boolean(chatDetails?.isGroup)}
@@ -3625,78 +4025,37 @@ const [messageActionContext, setMessageActionContext] = useState<{
 
 
                     <FlatList
-
-
                       ref={flatListRef}
-
-
                       data={decoratedData}
-
-
                       extraData={isRemoteTyping}
-
-
                       keyExtractor={(item) => item.id}
-
-
                       renderItem={renderChatItem}
-
-
                       contentContainerStyle={styles.messageList}
-
-
                       ListHeaderComponent={listHeader}
-
-
-                      keyboardShouldPersistTaps="handled"
+                      keyboardShouldPersistTaps="always"
+                      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                      onLayout={handleListLayout}
+                      onContentSizeChange={handleContentSizeChange}
                       onScroll={handleScroll}
-
                       scrollEventThrottle={16}
-
-
                       onViewableItemsChanged={onViewableItemsChanged}
-
-
                       viewabilityConfig={viewabilityConfigRef.current}
-
-
-
-
-
                       refreshControl={
-
-
                         <RefreshControl
-
-
                           tintColor="#2C82FF"
-
-
                           titleColor="#2C82FF"
-
-
                           progressViewOffset={80}
-
-
                           refreshing={isRefreshing}
-
-
                           onRefresh={handleRefresh}
-
-
                         />
-
-
                       }
-
-
                     />
 
 
                     {showScrollToBottomButton && (
                       <Pressable
                         style={styles.scrollToBottomButton}
-                        onPress={() => scrollToBottom(true)}
+                        onPress={() => scrollToBottom(true, true)}
 
 
                         accessibilityRole="button"
@@ -3888,43 +4247,46 @@ const [messageActionContext, setMessageActionContext] = useState<{
       >
         <View style={styles.threadModalOverlay}>
           <View style={styles.threadModalCard}>
-            <View style={styles.threadModalHeader}>
-              <Text style={styles.threadModalTitle}>
-                {threadMessages.length > 1
-                  ? `${threadMessages.length - 1} ${threadMessages.length - 1 === 1 ? 'Reply' : 'Replies'}`
-                  : 'Thread'}
-              </Text>
-              <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
-                <Ionicons name="close" size={20} color="#ffffff" />
+            <BlurView intensity={65} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <View style={styles.threadModalBody}>
+              <View style={styles.threadModalHeader}>
+                <Text style={styles.threadModalTitle}>
+                  {threadMessages.length > 1
+                    ? `${threadMessages.length - 1} ${threadMessages.length - 1 === 1 ? 'Reply' : 'Replies'}`
+                    : 'Thread'}
+                </Text>
+                <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
+                  <Ionicons name="close" size={20} color="#ffffff" />
+                </Pressable>
+              </View>
+              <ScrollView contentContainerStyle={styles.threadModalScroll}>
+                {threadMessages.length ? (
+                  threadMessages.map((threadMessage, index) => (
+                    <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
+                      <View style={styles.threadMessageHeader}>
+                        <Text style={styles.threadMessageAuthor}>
+                          {getReplyLabel(threadMessage.senderId)}
+                        </Text>
+                        <Text style={styles.threadMessageTimestamp}>
+                          {formatTimestamp(parseDate(threadMessage.timestamp))}
+                        </Text>
+                      </View>
+                      <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
+                      {index === 0 && (
+                        <Text style={styles.threadMessageBadge}>Original message</Text>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.threadEmptyText}>
+                    Original message is not available in this history.
+                  </Text>
+                )}
+              </ScrollView>
+              <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
+                <Text style={styles.threadJumpButtonText}>View in chat</Text>
               </Pressable>
             </View>
-            <ScrollView contentContainerStyle={styles.threadModalScroll}>
-              {threadMessages.length ? (
-                threadMessages.map((threadMessage, index) => (
-                  <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
-                    <View style={styles.threadMessageHeader}>
-                      <Text style={styles.threadMessageAuthor}>
-                        {getReplyLabel(threadMessage.senderId)}
-                      </Text>
-                      <Text style={styles.threadMessageTimestamp}>
-                        {formatTimestamp(parseDate(threadMessage.timestamp))}
-                      </Text>
-                    </View>
-                    <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
-                    {index === 0 && (
-                      <Text style={styles.threadMessageBadge}>Original message</Text>
-                    )}
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.threadEmptyText}>
-                  Original message is not available in this history.
-                </Text>
-              )}
-            </ScrollView>
-            <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
-              <Text style={styles.threadJumpButtonText}>View in chat</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -3934,64 +4296,95 @@ const [messageActionContext, setMessageActionContext] = useState<{
         animationType="fade"
         onRequestClose={handleClosePreview}
       >
-        <View style={styles.attachmentModalOverlay}>
-          <View style={styles.attachmentModalCard}>
-            <View style={styles.attachmentModalHeader}>
+        <View style={styles.attachmentModalOverlay} {...previewPanResponder.panHandlers}>
+          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFillObject} />
+          <View
+            style={[
+              styles.attachmentModalTopBar,
+              {
+                paddingTop:
+                  Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0) + 6,
+              },
+            ]}
+          >
+            <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
+              <Ionicons name="chevron-down" size={22} color="#ffffff" />
+            </Pressable>
+            <View style={styles.attachmentModalTitleWrap}>
               <Text style={styles.attachmentModalTitle} numberOfLines={1}>
                 {currentPreviewAttachment?.name || 'Attachment'}
               </Text>
-              <Pressable onPress={handleClosePreview}>
-                <Ionicons name="close" size={18} color="#ffffff" />
-              </Pressable>
+              {currentPreviewAttachment?.fileSize ? (
+                <Text style={styles.attachmentModalFileMeta}>
+                  {formatBytes(currentPreviewAttachment.fileSize)}
+                </Text>
+              ) : null}
             </View>
-            <FlatList
-              style={styles.attachmentModalCarousel}
-              contentContainerStyle={styles.attachmentModalCarouselContent}
-              ref={previewListRef}
-              data={previewContext?.attachments || []}
-              keyExtractor={(item) => item.id}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <View style={styles.attachmentPreviewSlide}>
-                  {item.isImage && (item.previewUrl || item.publicViewUrl || item.localUri) ? (
+            <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
+              <Ionicons name="close" size={18} color="#ffffff" />
+            </Pressable>
+          </View>
+          <FlatList
+            style={styles.attachmentModalCarousel}
+            contentContainerStyle={styles.attachmentModalCarouselContent}
+            ref={previewListRef}
+            data={previewContext?.attachments || []}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <View style={styles.attachmentPreviewSlide}>
+                {item.isImage && (item.previewUrl || item.publicViewUrl || item.localUri) ? (
+                  <ScrollView
+                    style={StyleSheet.absoluteFillObject}
+                    contentContainerStyle={styles.attachmentZoomContainer}
+                    minimumZoomScale={1}
+                    maximumZoomScale={3}
+                    centerContent
+                  >
                     <Image
                       source={{ uri: item.previewUrl || item.publicViewUrl || item.localUri }}
-                      style={StyleSheet.absoluteFillObject}
+                      style={styles.attachmentZoomImage}
                       contentFit="contain"
                     />
-                  ) : item.isVideo && resolveAttachmentUri(item) ? (
-                    <Video
-                      source={{ uri: resolveAttachmentUri(item)! }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode={ResizeMode.CONTAIN}
-                      useNativeControls
-                      shouldPlay={false}
-                    />
-                  ) : (
-                    <View style={styles.attachmentModalFile}>
-                      <Ionicons name="document-text-outline" size={28} color="#ffffff" />
-                      <Text style={styles.attachmentModalFileName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text style={styles.attachmentModalFileMeta}>
-                        {formatBytes(item.fileSize || 0)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-              onMomentumScrollEnd={({ nativeEvent }) => {
-                if (!previewContext) return;
-                const width = nativeEvent.layoutMeasurement.width;
-                if (!width) return;
-                const index = Math.round(nativeEvent.contentOffset.x / width);
-                setPreviewIndex(
-                  Math.min(Math.max(index, 0), (previewContext.attachments.length || 1) - 1)
-                );
-              }}
-            />
+                  </ScrollView>
+                ) : item.isVideo && resolveAttachmentUri(item) ? (
+                  <Video
+                    source={{ uri: resolveAttachmentUri(item)! }}
+                    style={StyleSheet.absoluteFillObject}
+                    resizeMode={ResizeMode.CONTAIN}
+                    useNativeControls
+                    shouldPlay={false}
+                  />
+                ) : (
+                  <View style={styles.attachmentModalFile}>
+                    <Ionicons name="document-text-outline" size={28} color="#ffffff" />
+                    <Text style={styles.attachmentModalFileName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.attachmentModalFileMeta}>
+                      {formatBytes(item.fileSize || 0)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+            onMomentumScrollEnd={({ nativeEvent }) => {
+              if (!previewContext) return;
+              const width = nativeEvent.layoutMeasurement.width;
+              if (!width) return;
+              const index = Math.round(nativeEvent.contentOffset.x / width);
+              setPreviewIndex(
+                Math.min(Math.max(index, 0), (previewContext.attachments.length || 1) - 1)
+              );
+            }}
+          />
+          <BlurView
+            intensity={50}
+            tint="dark"
+            style={[styles.attachmentModalFooter, { paddingBottom: Math.max(insets.bottom, 10) + 8 }]}
+          >
             <View style={styles.attachmentModalFileMetaRow}>
               <Text style={styles.attachmentModalFileName} numberOfLines={1}>
                 {currentPreviewAttachment?.name || 'Attachment'}
@@ -4018,7 +4411,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
                 <Text style={styles.attachmentModalButtonText}>Share</Text>
               </Pressable>
             </View>
-          </View>
+          </BlurView>
         </View>
       </Modal>
       {messageActionContext ? (
@@ -4034,19 +4427,20 @@ const [messageActionContext, setMessageActionContext] = useState<{
             style={[
               styles.messageActionSheetContainer,
               {
-                top: messageActionAnchorTop,
+                top: messageActionAnchor.top,
+                left: messageActionAnchor.left,
                 opacity: messageActionAnim,
                 transform: [
                   {
                     translateY: messageActionAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [-12, 0],
+                      outputRange: [-8, 0],
                     }),
                   },
                   {
                     scale: messageActionAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [0.92, 1],
+                      outputRange: [0.94, 1],
                     }),
                   },
                 ],
@@ -4054,27 +4448,31 @@ const [messageActionContext, setMessageActionContext] = useState<{
             ]}
             pointerEvents="box-none"
           >
-            <BlurView intensity={55} tint="dark" style={styles.messageActionSheet}>
-              <View style={styles.messageActionSheetContent}>
-                <View style={styles.messageActionHeader}>
-                  <Text style={styles.messageActionTitle}>Message</Text>
-                  <Text style={styles.messageActionPreview} numberOfLines={2}>
-                    {messageActionContext.message.content || 'Attachment'}
-                  </Text>
-                </View>
+            <View style={[styles.messageActionArrow, { left: messageActionArrowLeft, top: messageActionArrowTop }]} />
+            <View style={styles.messageActionBubble}>
+              <Text style={styles.messageActionPreview} numberOfLines={2}>
+                {messageActionContext.message.content || 'Attachment'}
+              </Text>
+              <View style={styles.messageActionChipColumn}>
                 {messageActionContext.actions.map((action) => (
                   <Pressable
                     key={`${messageActionContext.message.id}-${action.label}`}
-                    style={[
-                      styles.messageActionButton,
-                      action.destructive && styles.messageActionButtonDestructive,
+                    style={({ pressed }) => [
+                      styles.messageActionRow,
+                      action.destructive && styles.messageActionRowDestructive,
+                      pressed && styles.messageActionRowPressed,
                     ]}
                     onPress={() => handleMessageActionSelect(action)}
                   >
+                    <Ionicons
+                      name={resolveActionIcon(action.label) as any}
+                      size={16}
+                      color={action.destructive ? '#ffb4b4' : '#e7ecff'}
+                    />
                     <Text
                       style={[
-                        styles.messageActionButtonText,
-                        action.destructive && styles.messageActionButtonTextDestructive,
+                        styles.messageActionRowText,
+                        action.destructive && styles.messageActionRowTextDestructive,
                       ]}
                     >
                       {action.label}
@@ -4082,7 +4480,7 @@ const [messageActionContext, setMessageActionContext] = useState<{
                   </Pressable>
                 ))}
               </View>
-            </BlurView>
+            </View>
           </Animated.View>
         </Animated.View>
       ) : null}
@@ -4320,7 +4718,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
-    backgroundColor: 'rgba(44, 130, 255, 0.2)',
+    backgroundColor: 'rgba(44, 130, 255, 0.16)',
   },
   replyChip: {
     flexDirection: 'row',
@@ -4539,21 +4937,30 @@ const styles = StyleSheet.create({
   },
   threadModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
   threadModalCard: {
-    backgroundColor: '#101526',
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 22,
+    overflow: 'hidden',
     maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
   },
   threadModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  threadModalBody: {
+    padding: 16,
+    backgroundColor: 'rgba(10, 14, 28, 0.72)',
   },
   threadModalTitle: {
     color: '#ffffff',
@@ -4567,7 +4974,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   threadMessageCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: 14,
     padding: 12,
     marginBottom: 12,
@@ -4926,42 +5333,41 @@ const styles = StyleSheet.create({
   },
   attachmentModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    backgroundColor: 'rgba(3, 4, 10, 0.65)',
+    justifyContent: 'space-between',
   },
-  attachmentModalCard: {
-    width: '100%',
-    borderRadius: 24,
-    backgroundColor: '#101425',
-    padding: 16,
-  },
-  attachmentModalHeader: {
+  attachmentModalTopBar: {
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: 12,
+  },
+  attachmentModalIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentModalTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
   },
   attachmentModalTitle: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    flex: 1,
-    marginRight: 12,
-  },
-  attachmentModalImage: {
-    width: '100%',
-    height: 240,
-    borderRadius: 16,
-    marginBottom: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    textAlign: 'center',
   },
   attachmentModalCarousel: {
-    marginBottom: 12,
+    flex: 1,
   },
   attachmentModalCarouselContent: {
-    paddingVertical: 8,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     alignItems: 'center',
   },
   attachmentModalFile: {
@@ -4986,12 +5392,30 @@ const styles = StyleSheet.create({
     columnGap: 12,
   },
   attachmentPreviewSlide: {
-    width: Dimensions.get('window').width - 48,
-    height: 260,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    width: Dimensions.get('window').width - 24,
+    height: Dimensions.get('window').height * 0.65,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginBottom: 12,
     alignSelf: 'center',
+    overflow: 'hidden',
+  },
+  attachmentZoomContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 12,
+  },
+  attachmentZoomImage: {
+    width: '100%',
+    height: '100%',
+  },
+  attachmentModalFooter: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    backgroundColor: 'rgba(16, 20, 37, 0.35)',
     overflow: 'hidden',
   },
   attachmentModalFileMetaRow: {
@@ -5016,7 +5440,7 @@ const styles = StyleSheet.create({
   },
   messageActionOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
   },
   messageActionBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -5024,59 +5448,71 @@ const styles = StyleSheet.create({
   },
   messageActionSheetContainer: {
     position: 'absolute',
-    left: 0,
-    right: 0,
     alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  messageActionSheet: {
-    width: 240,
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
-  },
-  messageActionSheetContent: {
-    padding: 16,
-    gap: 8,
-    backgroundColor: 'rgba(4, 8, 18, 0.65)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  messageActionHeader: {
-    marginBottom: 8,
-  },
-  messageActionTitle: {
-    color: '#7C8AA4',
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 4,
+    paddingHorizontal: 0,
   },
   messageActionPreview: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
+    marginBottom: 12,
   },
-  messageActionButton: {
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+  messageActionBubble: {
+    width: 280,
+    borderRadius: 22,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(14, 16, 25, 0.88)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000',
+    shadowOpacity: 0.32,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
+  },
+  messageActionArrow: {
+    position: 'absolute',
+    top: -6,
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: 'rgba(12, 14, 22, 0.82)',
+    transform: [{ rotate: '45deg' }],
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderColor: 'transparent',
+  },
+  messageActionChipColumn: {
+    flexDirection: 'column',
+    gap: 8,
+  },
+  messageActionRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  messageActionButtonDestructive: {
-    backgroundColor: 'rgba(255, 92, 92, 0.12)',
+  messageActionRowPressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  messageActionButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  messageActionRowDestructive: {
+    backgroundColor: 'rgba(255, 82, 82, 0.12)',
+  },
+  messageActionRowText: {
+    color: '#eef1ff',
     fontWeight: '600',
+    fontSize: 13,
   },
-  messageActionButtonTextDestructive: {
-    color: '#FF5C5C',
+  messageActionRowTextDestructive: {
+    color: '#ffd6d6',
+  },
+  quickReactionRow: {
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   attachmentSheet: {
     position: 'absolute',

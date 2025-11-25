@@ -218,6 +218,8 @@ PODS:
     - ExpoModulesCore
   - ExpoBlur (15.0.7):
     - ExpoModulesCore
+  - ExpoClipboard (8.0.7):
+    - ExpoModulesCore
   - ExpoCrypto (15.0.7):
     - ExpoModulesCore
   - ExpoDevice (8.0.9):
@@ -271,6 +273,10 @@ PODS:
   - ExpoLinearGradient (15.0.7):
     - ExpoModulesCore
   - ExpoLinking (8.0.8):
+    - ExpoModulesCore
+  - ExpoLocalization (17.0.7):
+    - ExpoModulesCore
+  - ExpoLocation (19.0.7):
     - ExpoModulesCore
   - ExpoModulesCore (3.0.25):
     - hermes-engine
@@ -2070,6 +2076,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNReactNativeSharedGroupPreferences (1.1.24):
+    - React
   - RNReanimated (4.1.3):
     - hermes-engine
     - RCTRequired
@@ -2191,6 +2199,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNShareMenu (6.0.0):
+    - React
   - RNSVG (15.12.1):
     - hermes-engine
     - RCTRequired
@@ -2359,6 +2369,7 @@ DEPENDENCIES:
   - "expo-dev-menu-interface (from `../node_modules/.pnpm/expo-dev-menu-interface@2.0.0_expo@54.0.23/node_modules/expo-dev-menu-interface/ios`)"
   - "ExpoAsset (from `../node_modules/.pnpm/expo-asset@12.0.9_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-asset/ios`)"
   - "ExpoBlur (from `../node_modules/.pnpm/expo-blur@15.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-blur/ios`)"
+  - "ExpoClipboard (from `../node_modules/.pnpm/expo-clipboard@8.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-clipboard/ios`)"
   - "ExpoCrypto (from `../node_modules/.pnpm/expo-crypto@15.0.7_expo@54.0.23/node_modules/expo-crypto/ios`)"
   - "ExpoDevice (from `../node_modules/.pnpm/expo-device@8.0.9_expo@54.0.23/node_modules/expo-device/ios`)"
   - "ExpoDocumentPicker (from `../node_modules/.pnpm/expo-document-picker@14.0.7_expo@54.0.23/node_modules/expo-document-picker/ios`)"
@@ -2372,6 +2383,8 @@ DEPENDENCIES:
   - "ExpoKeepAwake (from `../node_modules/.pnpm/expo-keep-awake@15.0.7_expo@54.0.23_react@19.1.0/node_modules/expo-keep-awake/ios`)"
   - "ExpoLinearGradient (from `../node_modules/.pnpm/expo-linear-gradient@15.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+_ed56cc1ad0935a7f645e29a5759d88e9/node_modules/expo-linear-gradient/ios`)"
   - "ExpoLinking (from `../node_modules/.pnpm/expo-linking@8.0.8_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-linking/ios`)"
+  - "ExpoLocalization (from `../node_modules/.pnpm/expo-localization@17.0.7_expo@54.0.23_react@19.1.0/node_modules/expo-localization/ios`)"
+  - "ExpoLocation (from `../node_modules/.pnpm/expo-location@19.0.7_expo@54.0.23/node_modules/expo-location/ios`)"
   - "ExpoModulesCore (from `../node_modules/.pnpm/expo-modules-core@3.0.25_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-modules-core`)"
   - "ExpoSecureStore (from `../node_modules/.pnpm/expo-secure-store@15.0.7_expo@54.0.23/node_modules/expo-secure-store/ios`)"
   - "ExpoSplashScreen (from `../node_modules/.pnpm/expo-splash-screen@31.0.10_expo@54.0.23/node_modules/expo-splash-screen/ios`)"
@@ -2449,8 +2462,10 @@ DEPENDENCIES:
   - "ReactNativeDependencies (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0/node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)"
   - "RNCAsyncStorage (from `../node_modules/.pnpm/@react-native-async-storage+async-storage@2.2.0_react-native@0.81.5_@babel+core@7.28.4__7fd457485382322b56f55b64b44b3a00/node_modules/@react-native-async-storage/async-storage`)"
   - "RNGestureHandler (from `../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.28.4_@types+react_56410d40bc832e188f8e0cea96af19fe/node_modules/react-native-gesture-handler`)"
+  - "RNReactNativeSharedGroupPreferences (from `../node_modules/.pnpm/react-native-shared-group-preferences@1.1.24_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0_/node_modules/react-native-shared-group-preferences`)"
   - "RNReanimated (from `../node_modules/.pnpm/react-native-reanimated@4.1.3_@babel+core@7.28.4_react-native-worklets@0.6.1_@babel+cor_fb65521fab63f352918a0b3fc3a4b078/node_modules/react-native-reanimated`)"
   - "RNScreens (from `../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-screens`)"
+  - "RNShareMenu (from `../node_modules/.pnpm/react-native-share-menu@6.0.0/node_modules/react-native-share-menu`)"
   - "RNSVG (from `../node_modules/.pnpm/react-native-svg@15.12.1_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-svg`)"
   - "RNVectorIcons (from `../node_modules/.pnpm/react-native-vector-icons@10.3.0/node_modules/react-native-vector-icons`)"
   - "RNWorklets (from `../node_modules/.pnpm/react-native-worklets@0.6.1_@babel+core@7.28.4_react-native@0.81.5_@babel+core@7.28.4_@_2f8dbde6f608c886670e1d8195b7e71a/node_modules/react-native-worklets`)"
@@ -2499,6 +2514,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/expo-asset@12.0.9_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-asset/ios"
   ExpoBlur:
     :path: "../node_modules/.pnpm/expo-blur@15.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-blur/ios"
+  ExpoClipboard:
+    :path: "../node_modules/.pnpm/expo-clipboard@8.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-clipboard/ios"
   ExpoCrypto:
     :path: "../node_modules/.pnpm/expo-crypto@15.0.7_expo@54.0.23/node_modules/expo-crypto/ios"
   ExpoDevice:
@@ -2525,6 +2542,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/expo-linear-gradient@15.0.7_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+_ed56cc1ad0935a7f645e29a5759d88e9/node_modules/expo-linear-gradient/ios"
   ExpoLinking:
     :path: "../node_modules/.pnpm/expo-linking@8.0.8_expo@54.0.23_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-linking/ios"
+  ExpoLocalization:
+    :path: "../node_modules/.pnpm/expo-localization@17.0.7_expo@54.0.23_react@19.1.0/node_modules/expo-localization/ios"
+  ExpoLocation:
+    :path: "../node_modules/.pnpm/expo-location@19.0.7_expo@54.0.23/node_modules/expo-location/ios"
   ExpoModulesCore:
     :path: "../node_modules/.pnpm/expo-modules-core@3.0.25_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-modules-core"
   ExpoSecureStore:
@@ -2678,10 +2699,14 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/@react-native-async-storage+async-storage@2.2.0_react-native@0.81.5_@babel+core@7.28.4__7fd457485382322b56f55b64b44b3a00/node_modules/@react-native-async-storage/async-storage"
   RNGestureHandler:
     :path: "../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.28.4_@types+react_56410d40bc832e188f8e0cea96af19fe/node_modules/react-native-gesture-handler"
+  RNReactNativeSharedGroupPreferences:
+    :path: "../node_modules/.pnpm/react-native-shared-group-preferences@1.1.24_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0_/node_modules/react-native-shared-group-preferences"
   RNReanimated:
     :path: "../node_modules/.pnpm/react-native-reanimated@4.1.3_@babel+core@7.28.4_react-native-worklets@0.6.1_@babel+cor_fb65521fab63f352918a0b3fc3a4b078/node_modules/react-native-reanimated"
   RNScreens:
     :path: "../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-screens"
+  RNShareMenu:
+    :path: "../node_modules/.pnpm/react-native-share-menu@6.0.0/node_modules/react-native-share-menu"
   RNSVG:
     :path: "../node_modules/.pnpm/react-native-svg@15.12.1_react-native@0.81.5_@babel+core@7.28.4_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-svg"
   RNVectorIcons:
@@ -2708,6 +2733,7 @@ SPEC CHECKSUMS:
   expo-dev-menu-interface: 600df12ea01efecdd822daaf13cc0ac091775533
   ExpoAsset: 9ba6fbd677fb8e241a3899ac00fa735bc911eadf
   ExpoBlur: 2dd8f64aa31f5d405652c21d3deb2d2588b1852f
+  ExpoClipboard: af650d14765f19c60ce2a1eaf9dfe6445eff7365
   ExpoCrypto: c1fbce112d1b6b79652bbe380b4fd4cc91676595
   ExpoDevice: 148accb4071873d19fba80a2506c58ffa433d620
   ExpoDocumentPicker: 2200eefc2817f19315fa18f0147e0b80ece86926
@@ -2721,6 +2747,8 @@ SPEC CHECKSUMS:
   ExpoKeepAwake: 1a2e820692e933c94a565ec3fbbe38ac31658ffe
   ExpoLinearGradient: a464898cb95153125e3b81894fd479bcb1c7dd27
   ExpoLinking: f051f28e50ea9269ff539317c166adec81d9342d
+  ExpoLocalization: b852a5d8ec14c5349c1593eca87896b5b3ebfcca
+  ExpoLocation: 93d7faa0c2adbd5a04686af0c1a61bc6ed3ee2f7
   ExpoModulesCore: aa1a8e103d41de84baa5d7c6b98314e2230f1eef
   ExpoSecureStore: 9c6571fe3fcb045a671c4011c451546eaaab98fd
   ExpoSplashScreen: cbb839de72110dea1851dd3e85080b7923af2540
@@ -2800,8 +2828,10 @@ SPEC CHECKSUMS:
   ReactNativeDependencies: 71ce9c28beb282aa720ea7b46980fff9669f428a
   RNCAsyncStorage: 3a4f5e2777dae1688b781a487923a08569e27fe4
   RNGestureHandler: 2914750df066d89bf9d8f48a10ad5f0051108ac3
+  RNReactNativeSharedGroupPreferences: d4869af3c7757405b6b5ac633d0ef5f9886a9be7
   RNReanimated: f599f8d1bac2a069286d00a54a5d1391da2f8a7d
   RNScreens: d8d6f1792f6e7ac12b0190d33d8d390efc0c1845
+  RNShareMenu: e1cdfa3b9af89416afc75a80377cfd0de4f30ded
   RNSVG: 31d6639663c249b7d5abc9728dde2041eb2a3c34
   RNVectorIcons: 4351544f100d4f12cac156a7c13399e60bab3e26
   RNWorklets: 64cd5ca9abbbeb0499480b0aca773aa481c3636c
@@ -2811,6 +2841,6 @@ SPEC CHECKSUMS:
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
 
-PODFILE CHECKSUM: fd30db6909e7b478f7364257b2e0f0c20ca674a0
+PODFILE CHECKSUM: 4347c247ff438afc51a9f156707240e85a49c19f
 
 COCOAPODS: 1.16.2

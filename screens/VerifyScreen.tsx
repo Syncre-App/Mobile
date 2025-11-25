@@ -1,44 +1,96 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 
 import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
-import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { palette, radii, spacing } from '../theme/designSystem';
 
+const CODE_LENGTH = 6;
+
 export const VerifyScreen: React.FC = () => {
   const { email } = useLocalSearchParams();
-  const [code, setCode] = useState('');
+  const [codeDigits, setCodeDigits] = useState<string[]>(Array.from({ length: CODE_LENGTH }, () => ''));
   const [loading, setLoading] = useState(false);
+  const inputsRef = React.useRef<Array<TextInput | null>>([]);
+
+  useEffect(() => {
+    focusAt(0);
+  }, []);
+
+  const focusAt = (index: number) => {
+    const target = inputsRef.current[index];
+    if (target) {
+      target.focus();
+    }
+  };
+
+  const handleChangeAt = (value: string, index: number) => {
+    const sanitized = value.replace(/\D/g, '');
+    if (!sanitized.length) {
+      const next = [...codeDigits];
+      next[index] = '';
+      setCodeDigits(next);
+      return;
+    }
+
+    const next = [...codeDigits];
+    let cursor = index;
+    sanitized.split('').forEach((char) => {
+      if (cursor >= CODE_LENGTH) return;
+      next[cursor] = char;
+      cursor += 1;
+    });
+    setCodeDigits(next);
+    if (cursor < CODE_LENGTH) {
+      focusAt(cursor);
+    }
+  };
+
+  const handleKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace' && !codeDigits[index] && index > 0) {
+      const next = [...codeDigits];
+      next[index - 1] = '';
+      setCodeDigits(next);
+      focusAt(index - 1);
+    }
+  };
+
+  const handlePaste = (text: string) => {
+    const normalized = text.replace(/\D/g, '').slice(0, CODE_LENGTH);
+    const next = Array.from({ length: CODE_LENGTH }, (_, idx) => normalized[idx] ?? '');
+    setCodeDigits(next);
+  };
 
   const handleVerify = async () => {
-    const c = code.trim();
-    if (!c) {
-      notificationService.show('error', 'Please enter the verification code', 'Error');
+    const code = codeDigits.join('').trim();
+    if (code.length !== CODE_LENGTH) {
+      notificationService.show('error', 'Kérlek add meg a 6 számjegyű kódot', 'Error');
       return;
     }
 
     setLoading(true);
-    console.log('✅ Starting verification for:', email, 'with code:', c);
+    console.log('✅ Starting verification for:', email, 'with code:', code);
 
     try {
       const response = await ApiService.post('/auth/verify', {
         email: email,
-        code: c,
+        code,
       });
 
       console.log('✅ Verify response:', response);
@@ -98,15 +150,48 @@ export const VerifyScreen: React.FC = () => {
 
         <GlassCard style={styles.card} variant="subtle" padding={spacing.lg}>
           <View style={styles.content}>
-            
-            <TransparentField
-              placeholder="Code"
-              value={code}
-              onChangeText={setCode}
-              keyboardType="default"
-              autoCapitalize="characters"
-              style={styles.inputField}
-            />
+            <View style={styles.codeRow}>
+              {Array.from({ length: CODE_LENGTH }).map((_, idx) => (
+                <TextInput
+                  key={idx}
+                  ref={(ref) => {
+                    inputsRef.current[idx] = ref;
+                  }}
+                  style={[
+                    styles.codeInput,
+                    codeDigits[idx] ? styles.codeInputFilled : undefined,
+                  ]}
+                  value={codeDigits[idx]}
+                  onChangeText={(text) => handleChangeAt(text, idx)}
+                  onKeyPress={(e) => handleKeyPress(e, idx)}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  textContentType="oneTimeCode"
+                  returnKeyType="done"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onSubmitEditing={handleVerify}
+                  onFocus={() => {
+                    // noop, but keeps consistent typing experience
+                  }}
+                />
+              ))}
+            </View>
+            <TouchableOpacity
+              style={styles.pasteChip}
+              onPress={async () => {
+                try {
+                  const text = await Clipboard.getStringAsync();
+                  if (text) {
+                    handlePaste(text);
+                  }
+                } catch {
+                  // Clipboard may not be available; ignore
+                }
+              }}
+            >
+              <Text style={styles.pasteText}>Paste code</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleVerify}
@@ -175,8 +260,39 @@ const styles = StyleSheet.create({
   content: {
     gap: spacing.md,
   },
-  inputField: {
-    marginBottom: spacing.md,
+  codeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  codeInput: {
+    flex: 1,
+    height: 58,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    textAlign: 'center',
+    color: palette.text,
+    fontSize: 20,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+  },
+  codeInputFilled: {
+    borderColor: palette.accent,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+  },
+  pasteChip: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.3)',
+  },
+  pasteText: {
+    color: palette.textMuted,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans-Medium',
   },
   verifyButton: {
     width: '100%',

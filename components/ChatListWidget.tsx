@@ -49,6 +49,8 @@ interface ChatListWidgetProps {
   unreadCounts?: Record<string, number>;
   onEditGroup?: (chat: Chat) => void;
   onDeleteGroup?: (chat: Chat) => void;
+  onMarkRead?: (chatId: string) => void;
+  onMarkUnread?: (chatId: string) => void;
 }
 
 export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
@@ -61,6 +63,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   unreadCounts = {},
   onEditGroup = () => {},
   onDeleteGroup = () => {},
+  onMarkRead = () => {},
+  onMarkUnread = () => {},
 }) => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -202,16 +206,27 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   };
 
   const handleChatLongPress = (chat: Chat) => {
+    const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
+    const unread = unreadCounts[chatIdKey] || 0;
+    const hasUnread = unread > 0;
+    const commonActions = [
+      hasUnread
+        ? { text: 'Mark as read', onPress: () => onMarkRead(chatIdKey) }
+        : { text: 'Mark as unread', onPress: () => onMarkUnread(chatIdKey) },
+      { text: 'Cancel', style: 'cancel' as const },
+    ];
+
     if (chat.isGroup) {
       const ownerId = chat.ownerId?.toString?.();
       if (!ownerId || ownerId !== currentUserId) {
+        Alert.alert(getGroupDisplayName(chat), undefined, commonActions);
         return;
       }
       Alert.alert(
         'Group Options',
         getGroupDisplayName(chat),
         [
-          { text: 'Cancel', style: 'cancel' },
+          ...commonActions,
           { text: 'Edit group', onPress: () => onEditGroup(chat) },
           {
             text: 'Delete group',
@@ -230,12 +245,9 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
     Alert.alert(
       'Chat Options',
-      `Do you want to remove ${displayName} from your friends?`,
+      displayName,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        ...commonActions,
         {
           text: 'Remove Friend',
           style: 'destructive',
@@ -331,8 +343,15 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   if (isLoading && chats.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={palette.accent} />
-        <Text style={styles.loadingText}>Loading chats...</Text>
+        {[0, 1, 2, 3].map((key) => (
+          <View key={key} style={styles.skeletonCard}>
+            <View style={styles.skeletonAvatar} />
+            <View style={styles.skeletonBody}>
+              <View style={styles.skeletonLineWide} />
+              <View style={styles.skeletonLineNarrow} />
+            </View>
+          </View>
+        ))}
       </View>
     );
   }
@@ -447,10 +466,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xxl,
+    gap: spacing.md,
   },
   loadingText: {
     color: palette.textMuted,
     fontSize: 16,
     marginTop: spacing.sm,
+  },
+  skeletonCard: {
+    width: '96%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  skeletonAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginRight: spacing.md,
+  },
+  skeletonBody: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  skeletonLineWide: {
+    height: 14,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    width: '72%',
+  },
+  skeletonLineNarrow: {
+    height: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    width: '50%',
   },
 });

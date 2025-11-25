@@ -1,2 +1,3 @@
 onlyBuiltDependencies:
+  - postinstall-postinstall
   - unrs-resolver
