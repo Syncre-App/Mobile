@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-
 import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
@@ -172,26 +171,10 @@ export const VerifyScreen: React.FC = () => {
                   autoCorrect={false}
                   onSubmitEditing={handleVerify}
                   onFocus={() => {
-                    // noop, but keeps consistent typing experience
                   }}
                 />
               ))}
             </View>
-            <TouchableOpacity
-              style={styles.pasteChip}
-              onPress={async () => {
-                try {
-                  const text = await Clipboard.getStringAsync();
-                  if (text) {
-                    handlePaste(text);
-                  }
-                } catch {
-                  // Clipboard may not be available; ignore
-                }
-              }}
-            >
-              <Text style={styles.pasteText}>Paste code</Text>
-            </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleVerify}
