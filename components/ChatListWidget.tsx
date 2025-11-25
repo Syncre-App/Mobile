@@ -462,11 +462,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-    gap: spacing.md,
+    width: '100%',
+    alignSelf: 'stretch',
+    alignItems: 'stretch',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
   },
   loadingText: {
     color: palette.textMuted,
@@ -474,7 +475,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   skeletonCard: {
-    width: '96%',
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
