@@ -571,17 +571,6 @@ export const HomeScreen: React.FC = () => {
     [updateLocalUnread]
   );
 
-  const handleMarkChatUnread = useCallback(
-    (chatId: string) => {
-      if (!chatId) return;
-      updateLocalUnread((prev) => ({
-        ...prev,
-        [chatId]: (prev[chatId] || 0) + 1,
-      }));
-    },
-    [updateLocalUnread]
-  );
-
   const handleFriendStateChanged = useCallback(async () => {
     await Promise.all([loadFriendData(), loadChats(), loadNotifications(), loadUnreadSummary()]);
     WebSocketService.getInstance().refreshFriendsStatus();
@@ -624,6 +613,40 @@ export const HomeScreen: React.FC = () => {
       );
     },
     [loadChats]
+  );
+
+  const handleLeaveGroup = useCallback(
+    (chat: any) => {
+      if (!chat?.id) return;
+      Alert.alert(
+        'Leave group',
+        `Leave ${chat.name || 'this group'}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Leave',
+            style: 'destructive',
+            onPress: async () => {
+              const chatId = chat.id?.toString?.() ?? String(chat.id);
+              const memberId = user?.id?.toString?.() ?? String(user?.id || '');
+              if (!memberId) {
+                NotificationService.show('error', 'Missing user context to leave group');
+                return;
+              }
+              const response = await ChatService.removeMember(chatId, memberId);
+              if (response.success) {
+                NotificationService.show('success', 'Left group');
+                DeviceEventEmitter.emit('chats:refresh');
+                loadChats();
+              } else {
+                NotificationService.show('error', response.error || 'Failed to leave group');
+              }
+            },
+          },
+        ]
+      );
+    },
+    [loadChats, user?.id]
   );
 
   const handleRespondToRequest = useCallback(async (friendId: string, action: 'accept' | 'reject', options?: { notificationId?: string }) => {
@@ -994,8 +1017,8 @@ export const HomeScreen: React.FC = () => {
                 unreadCounts={chatUnreadCounts}
                 onEditGroup={handleEditGroup}
                 onDeleteGroup={handleDeleteGroup}
+                onLeaveGroup={handleLeaveGroup}
                 onMarkRead={handleMarkChatRead}
-                onMarkUnread={handleMarkChatUnread}
               />
             </View>
           </View>

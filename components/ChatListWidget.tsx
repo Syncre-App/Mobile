@@ -47,8 +47,8 @@ interface ChatListWidgetProps {
   unreadCounts?: Record<string, number>;
   onEditGroup?: (chat: Chat) => void;
   onDeleteGroup?: (chat: Chat) => void;
+  onLeaveGroup?: (chat: Chat) => void;
   onMarkRead?: (chatId: string) => void;
-  onMarkUnread?: (chatId: string) => void;
 }
 
 export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
@@ -61,8 +61,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   unreadCounts = {},
   onEditGroup = () => {},
   onDeleteGroup = () => {},
+  onLeaveGroup = () => {},
   onMarkRead = () => {},
-  onMarkUnread = () => {},
 }) => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -206,13 +206,10 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const handleChatLongPress = (chat: Chat) => {
     const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
     const unread = unreadCounts[chatIdKey] || 0;
-    const hasUnread = unread > 0;
     const commonActions = [
-      hasUnread
-        ? { text: 'Mark as read', onPress: () => onMarkRead(chatIdKey) }
-        : { text: 'Mark as unread', onPress: () => onMarkUnread(chatIdKey) },
+      unread > 0 ? { text: 'Mark as read', onPress: () => onMarkRead(chatIdKey) } : null,
       { text: 'Cancel', style: 'cancel' as const },
-    ];
+    ].filter(Boolean) as { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[];
 
     if (chat.isGroup) {
       const ownerId = chat.ownerId?.toString?.();
@@ -224,13 +221,14 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         'Group Options',
         getGroupDisplayName(chat),
         [
-          ...commonActions,
           { text: 'Edit group', onPress: () => onEditGroup(chat) },
+          { text: 'Leave group', style: 'destructive', onPress: () => onLeaveGroup(chat) },
           {
             text: 'Delete group',
             style: 'destructive',
             onPress: () => onDeleteGroup(chat),
           },
+          ...commonActions,
         ],
       );
       return;
