@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
@@ -12,7 +11,7 @@ import { UserAvatar } from './UserAvatar';
 
 interface Chat {
   id: number;
-  users: string; // JSON string of user IDs
+  users: string;
   created_at: string;
   updated_at: string;
   isGroup?: boolean;
@@ -21,7 +20,6 @@ interface Chat {
   avatarUrl?: string | null;
   ownerId?: string | null;
   participants?: User[];
-  // Additional properties that might be populated
   lastMessage?: {
     id: string;
     content: string;
@@ -69,17 +67,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [userDetails, setUserDetails] = useState<{ [key: string]: User }>({});
-
-  useEffect(() => {
-    getCurrentUserId();
-  }, []);
-
-  useEffect(() => {
-    if (chats.length > 0 && currentUserId) {
-      fetchUserDetails();
-    }
-  }, [chats, currentUserId, fetchUserDetails]);
-
+  
   const getCurrentUserId = async () => {
     try {
       const token = await StorageService.getAuthToken();
@@ -143,6 +131,16 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       console.log('❌ Error fetching user details:', error);
     }
   }, [chats, currentUserId, userDetails]);
+
+  useEffect(() => {
+    getCurrentUserId();
+  }, []);
+
+  useEffect(() => {
+    if (chats.length > 0 && currentUserId) {
+      fetchUserDetails();
+    }
+  }, [chats, currentUserId, fetchUserDetails]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
