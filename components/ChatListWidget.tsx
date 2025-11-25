@@ -213,24 +213,20 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
     if (chat.isGroup) {
       const ownerId = chat.ownerId?.toString?.();
-      if (!ownerId || ownerId !== currentUserId) {
-        Alert.alert(getGroupDisplayName(chat), undefined, commonActions);
-        return;
+      const isOwner = ownerId && currentUserId && ownerId === currentUserId;
+      const actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [];
+      actions.push({ text: 'Leave group', style: 'destructive', onPress: () => onLeaveGroup(chat) });
+      if (isOwner) {
+        actions.unshift({ text: 'Edit group', onPress: () => onEditGroup(chat) });
+        actions.push({
+          text: 'Delete group',
+          style: 'destructive',
+          onPress: () => onDeleteGroup(chat),
+        });
       }
-      Alert.alert(
-        'Group Options',
-        getGroupDisplayName(chat),
-        [
-          { text: 'Edit group', onPress: () => onEditGroup(chat) },
-          { text: 'Leave group', style: 'destructive', onPress: () => onLeaveGroup(chat) },
-          {
-            text: 'Delete group',
-            style: 'destructive',
-            onPress: () => onDeleteGroup(chat),
-          },
-          ...commonActions,
-        ],
-      );
+      actions.push(...commonActions);
+
+      Alert.alert('Group Options', getGroupDisplayName(chat), actions);
       return;
     }
 
