@@ -11,71 +11,69 @@ import { StorageService } from '../services/StorageService';
 import { CryptoService } from '../services/CryptoService';
 import { ShareIntentService } from '../services/ShareIntentService';
 
-const toBoolean = (value: unknown): boolean => {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') return value.toLowerCase() === 'true';
-  return Boolean(value);
+const isMaintenanceEnabled = (): boolean => {
+  const raw = Constants.expoConfig?.extra?.maintenance;
+  return raw === true || raw === 'true';
 };
 
-const isMaintenanceEnabled = (): boolean => toBoolean(Constants.expoConfig?.extra?.maintenance);
-
 export default function RootLayout() {
-  const [maintenance, setMaintenance] = useState<boolean>(() => isMaintenanceEnabled());
+  const [maintenance, setMaintenance] = useState<boolean>(false);
   const router = useRouter();
 
-  useEffect(() => {
-    const checkMaintenance = async () => {
-      const maintenanceFlag = isMaintenanceEnabled();
-      if (maintenanceFlag) {
+  const checkMaintenance = async () => {
+    const maintenanceFlag = isMaintenanceEnabled();
+    if (maintenanceFlag) {
+      setMaintenance(true);
+      router.replace('/maintenance');
+      return;
+    }
+
+    try {
+      const apiStatus = await ApiService.get('/health');
+      if (!apiStatus.success) {
         setMaintenance(true);
         router.replace('/maintenance');
         return;
       }
 
-      try {
-        const apiStatus = await ApiService.get('/health');
-        if (!apiStatus.success) {
-          setMaintenance(true);
-          router.replace('/maintenance');
-          return;
-        }
-        const updateStatus = await UpdateService.checkForMandatoryUpdate();
-        if (updateStatus.requiresUpdate) {
-          router.replace('/update');
-          return;
-        }
+      const updateStatus = await UpdateService.checkForMandatoryUpdate();
+      if (updateStatus.requiresUpdate) {
+        setMaintenance(false);
+        router.replace('/update');
+        return;
+      }
 
-        const token = await StorageService.getAuthToken();
-        if (token) {
-          const needsIdentitySetup = await IdentityService.requiresBootstrap(token);
-          const hasLocalIdentity = Boolean(await CryptoService.getStoredIdentity());
+      const token = await StorageService.getAuthToken();
+      if (token) {
+        const needsIdentitySetup = await IdentityService.requiresBootstrap(token);
+        const hasLocalIdentity = Boolean(await CryptoService.getStoredIdentity());
 
-          if (needsIdentitySetup) {
-            setMaintenance(false);
-            router.replace('/identity?mode=setup');
-            return;
-          }
-
-          if (!hasLocalIdentity) {
-            setMaintenance(false);
-            router.replace('/identity?mode=unlock');
-            return;
-          }
-
+        if (needsIdentitySetup) {
           setMaintenance(false);
-          router.replace('/home');
+          router.replace('/identity?mode=setup');
+          return;
+        }
+
+        if (!hasLocalIdentity) {
+          setMaintenance(false);
+          router.replace('/identity?mode=unlock');
           return;
         }
 
         setMaintenance(false);
-        router.replace('/');
-      } catch (error) {
-        setMaintenance(true);
-        router.replace('/maintenance');
+        router.replace('/home');
         return;
       }
-    };
 
+      setMaintenance(false);
+      router.replace('/');
+    } catch {
+      setMaintenance(true);
+      router.replace('/maintenance');
+    }
+  };
+
+  useEffect(() => {
     checkMaintenance();
   }, []);
 
@@ -83,38 +81,33 @@ export default function RootLayout() {
     ShareIntentService.init();
 
     const unsubscribeShare = ShareIntentService.subscribe((payload) => {
-      if (payload) {
-        router.replace('/share');
-      }
+      if (payload) router.replace('/share');
     });
 
-    const linkingSubscription = Linking.addEventListener('url', (event) => {
-      if (ShareIntentService.handleIncomingUrl(event.url)) {
-        router.replace('/share');
-      }
+    const linkingSub = Linking.addEventListener('url', (event) => {
+      if (ShareIntentService.handleIncomingUrl(event.url)) router.replace('/share');
     });
 
-    Linking.getInitialURL()
-      .then((url) => {
-        if (ShareIntentService.handleIncomingUrl(url)) {
-          router.replace('/share');
-        }
-      })
-      .catch(() => {});
+    Linking.getInitialURL().then((url) => {
+      if (ShareIntentService.handleIncomingUrl(url)) router.replace('/share');
+    }).catch(() => { });
 
     return () => {
       unsubscribeShare();
-      linkingSubscription.remove();
+      linkingSub.remove();
     };
   }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#03040A' }}>
       <StatusBar style="light" backgroundColor="#03040A" />
+
       <Stack
+        initialRouteName="index"
         screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: '#03040A' },
+          headerShown: false as boolean,
+          gestureEnabled: true as boolean,
+          contentStyle: undefined,
         }}
       />
     </GestureHandlerRootView>
