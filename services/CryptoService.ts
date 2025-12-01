@@ -467,6 +467,28 @@ export const CryptoService = {
     recipientPublicKeyCache.clear();
   },
 
+  async rotateDeviceIdentity(): Promise<void> {
+    const token = await StorageService.getAuthToken();
+    if (!token) {
+      throw new Error('Missing auth token for device rotation');
+    }
+    const deviceId = await DeviceService.getDeviceId();
+    if (!deviceId) {
+      throw new Error('Missing device identifier for rotation');
+    }
+
+    await ApiService.post(
+      '/keys/rotate',
+      {
+        deviceId,
+      },
+      token
+    );
+
+    // Drop local identity so the app can bootstrap a fresh keypair
+    await this.resetIdentity();
+  },
+
   async buildEncryptedPayload(params: {
     chatId: string;
     message: string;

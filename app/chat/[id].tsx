@@ -1144,6 +1144,7 @@ const ChatScreen: React.FC = () => {
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
   const markSeenInFlightRef = useRef(false);
   const missingEnvelopeRef = useRef(false);
+  const missingHistoryPromptedRef = useRef(false);
   const reencryptRequestedRef = useRef(false);
   const pendingRefreshRef = useRef(false);
   const requestReencrypt = useCallback(
@@ -1163,6 +1164,24 @@ const ChatScreen: React.FC = () => {
     },
     [chatId, wsService]
   );
+
+  const promptIncompleteHistory = useCallback(() => {
+    if (!chatId || !missingEnvelopeRef.current || missingHistoryPromptedRef.current) {
+      return;
+    }
+    missingHistoryPromptedRef.current = true;
+    NotificationService.showAlert(
+      'Chat history incomplete',
+      'Some messages could not be decrypted. Request a re-encrypt to recover history?',
+      [
+        { text: 'Later', style: 'cancel', onPress: () => {} },
+        {
+          text: 'Request re-encrypt',
+          onPress: () => requestReencrypt('missing_history_prompt'),
+        },
+      ]
+    );
+  }, [chatId, requestReencrypt]);
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingUsersRef = useRef<Map<string, string>>(new Map());
@@ -2151,6 +2170,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         });
         if (missingEnvelopeRef.current) {
           requestReencrypt('missing_history');
+          promptIncompleteHistory();
         }
         lastSeenMessageIdRef.current = null;
         setHasMore(response.data?.hasMore ?? false);
@@ -4109,6 +4129,7 @@ const refreshMessages = useCallback(async () => {
   useEffect(() => {
     reencryptRequestedRef.current = false;
     missingEnvelopeRef.current = false;
+    missingHistoryPromptedRef.current = false;
   }, [chatId]);
 
   useEffect(() => {
