@@ -1424,17 +1424,6 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     [chatId]
   );
 
-  const appendSystemNotice = useCallback(
-    (content: string | null | undefined) => {
-      if (!content) {
-        return;
-      }
-      const notice = buildSystemNotice(content);
-      setMessagesAnimated((prev) => [...prev, notice]);
-    },
-    [buildSystemNotice, setMessagesAnimated]
-  );
-
   const applyChatUpdate = useCallback(
     (nextChat: any) => {
       if (!nextChat) {
@@ -1558,6 +1547,17 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
       setMessages((prev) => updater(prev));
     },
     []
+  );
+
+  const appendSystemNotice = useCallback(
+    (content: string | null | undefined) => {
+      if (!content) {
+        return;
+      }
+      const notice = buildSystemNotice(content);
+      setMessagesAnimated((prev) => [...prev, notice]);
+    },
+    [buildSystemNotice, setMessagesAnimated]
   );
 
   // Keep autoscroll snappy; only animate when explicitly requested (e.g., user taps the CTA)
