@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -34,7 +34,6 @@ export const SettingsScreen: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('English');
   const [isRotatingKeys, setIsRotatingKeys] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
-  const bootstrapPollRef = useRef<NodeJS.Timeout | null>(null);
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
@@ -92,19 +91,9 @@ export const SettingsScreen: React.FC = () => {
               const needsBootstrap = await IdentityService.requiresBootstrap();
               if (needsBootstrap) {
                 router.push('/identity');
-                // poll in case the user completes bootstrap without relaunch
-                if (bootstrapPollRef.current) {
-                  clearInterval(bootstrapPollRef.current);
-                }
-                bootstrapPollRef.current = setInterval(async () => {
-                  const stillNeeds = await IdentityService.requiresBootstrap();
-                  if (!stillNeeds) {
-                    NotificationService.show('success', 'Identity restored. You can continue.');
-                    clearInterval(bootstrapPollRef.current as NodeJS.Timeout);
-                    bootstrapPollRef.current = null;
-                    setIsBootstrapping(false);
-                  }
-                }, 3000);
+                IdentityService.startBootstrapWatcher({
+                  onComplete: () => setIsBootstrapping(false),
+                });
               } else {
                 NotificationService.show('info', 'Identity already initialized. You may need to relaunch.');
                 setIsBootstrapping(false);
@@ -113,24 +102,13 @@ export const SettingsScreen: React.FC = () => {
               NotificationService.show('error', 'Failed to rotate keys. Please try again.');
             } finally {
               setIsRotatingKeys(false);
-              // keep bootstrapping state if we’re polling
-              if (!bootstrapPollRef.current) {
-                setIsBootstrapping(false);
-              }
+              setIsBootstrapping(false);
             }
           },
         },
       ]
     );
   };
-
-  useEffect(() => {
-    return () => {
-      if (bootstrapPollRef.current) {
-        clearInterval(bootstrapPollRef.current);
-      }
-    };
-  }, []);
 
   const renderSettingItem = (
     icon: string | null,

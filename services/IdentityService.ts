@@ -1,10 +1,12 @@
 import { ApiService } from './ApiService';
 import { StorageService } from './StorageService';
+import { NotificationService } from './NotificationService';
 
 class IdentityServiceClass {
   private verificationCache: { token: string; timestamp: number; requiresBootstrap: boolean } | null =
     null;
   private static CACHE_TTL_MS = 60_000;
+  private bootstrapWatcher: NodeJS.Timer | null = null;
 
   private isCacheValid(token: string): boolean {
     if (!this.verificationCache) {
@@ -48,6 +50,32 @@ class IdentityServiceClass {
 
   clearCache() {
     this.verificationCache = null;
+  }
+
+  startBootstrapWatcher(options?: { intervalMs?: number; onComplete?: () => void }) {
+    if (this.bootstrapWatcher) {
+      return;
+    }
+    const intervalMs = options?.intervalMs ?? 3000;
+    this.bootstrapWatcher = setInterval(async () => {
+      try {
+        const needs = await this.requiresBootstrap();
+        if (!needs) {
+          NotificationService.show('success', 'Identity restored. You can continue.');
+          this.stopBootstrapWatcher();
+          options?.onComplete?.();
+        }
+      } catch (err) {
+        // swallow; will retry on next tick
+      }
+    }, intervalMs);
+  }
+
+  stopBootstrapWatcher() {
+    if (this.bootstrapWatcher) {
+      clearInterval(this.bootstrapWatcher);
+      this.bootstrapWatcher = null;
+    }
   }
 }
 
