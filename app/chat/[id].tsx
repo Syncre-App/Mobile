@@ -1295,6 +1295,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
   const [replyContext, setReplyContext] = useState<ReplyMetadata | null>(null);
   const [threadRootId, setThreadRootId] = useState<string | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
   const [timestampVisibleFor, setTimestampVisibleFor] = useState<string | null>(null);
@@ -1367,6 +1368,72 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     });
     participantLookupRef.current = lookup;
   }, []);
+
+  const resolveUserLabel = useCallback(
+    (entry: any): string | null => {
+      const id = entry?.id ?? entry?.userId ?? entry?.user_id ?? entry;
+      if (!id) {
+        return null;
+      }
+      const normalizedId = id.toString();
+      if (currentUserId && normalizedId === currentUserId) {
+        return 'You';
+      }
+      const payloadName = entry?.username || entry?.name || entry?.displayName || entry?.email;
+      if (payloadName) {
+        return payloadName;
+      }
+      const participant = participantLookupRef.current[normalizedId];
+      if (participant?.username) {
+        return participant.username;
+      }
+      return `Member ${normalizedId.slice(-4)}`;
+    },
+    [currentUserId]
+  );
+
+  const formatNameList = useCallback((names: string[]) => {
+    if (!names.length) return '';
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} and ${names[1]}`;
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  }, []);
+
+  const resolveNamesFromPayload = useCallback(
+    (value: any): string[] => {
+      if (!value) return [];
+      if (Array.isArray(value)) {
+        return value.map((entry) => resolveUserLabel(entry)).filter(Boolean) as string[];
+      }
+      return [];
+    },
+    [resolveUserLabel]
+  );
+
+  const buildSystemNotice = useCallback(
+    (content: string): Message => ({
+      id: `system-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      senderId: 'system',
+      receiverId: String(chatId ?? 'chat'),
+      senderName: 'System',
+      senderAvatar: null,
+      content,
+      timestamp: new Date().toISOString(),
+      isPlaceholder: true,
+    }),
+    [chatId]
+  );
+
+  const appendSystemNotice = useCallback(
+    (content: string | null | undefined) => {
+      if (!content) {
+        return;
+      }
+      const notice = buildSystemNotice(content);
+      setMessagesAnimated((prev) => [...prev, notice]);
+    },
+    [buildSystemNotice, setMessagesAnimated]
+  );
 
   const applyChatUpdate = useCallback(
     (nextChat: any) => {
@@ -3602,11 +3669,33 @@ const refreshMessages = useCallback(async () => {
           }
           return;
         }
-        case 'chat_updated':
-        case 'chat_members_added':
+        case 'chat_updated': {
+          if (payload.chat) {
+            applyChatUpdate(payload.chat);
+          }
+          return;
+        }
+        case 'chat_members_added': {
+          if (payload.chat) {
+            applyChatUpdate(payload.chat);
+          }
+          const addedNames = resolveNamesFromPayload(
+            payload.members || payload.users || payload.userIds || payload.user_ids || payload.memberIds || payload.member_ids
+          );
+          if (addedNames.length) {
+            appendSystemNotice(`${formatNameList(addedNames)} added to chat`);
+          }
+          return;
+        }
         case 'chat_members_removed': {
           if (payload.chat) {
             applyChatUpdate(payload.chat);
+          }
+          const removedNames = resolveNamesFromPayload(
+            payload.members || payload.users || payload.userIds || payload.user_ids || payload.memberIds || payload.member_ids
+          );
+          if (removedNames.length) {
+            appendSystemNotice(`${formatNameList(removedNames)} removed from chat`);
           }
           return;
         }
@@ -3632,6 +3721,9 @@ const refreshMessages = useCallback(async () => {
       applyChatUpdate,
       requestReencrypt,
       scheduleRefreshMessages,
+      appendSystemNotice,
+      formatNameList,
+      resolveNamesFromPayload,
     ]
   );
 
@@ -3807,8 +3899,14 @@ const refreshMessages = useCallback(async () => {
   }, [chatId, refreshMessages]);
 
   useEffect(() => {
-    const showListener = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
-    const hideListener = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+    const showListener = Keyboard.addListener('keyboardDidShow', (event) => {
+      setIsKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates?.height || 0);
+    });
+    const hideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setIsKeyboardVisible(false);
+      setKeyboardHeight(0);
+    });
     return () => {
       showListener.remove();
       hideListener.remove();
@@ -3932,7 +4030,7 @@ const refreshMessages = useCallback(async () => {
           isHighlighted={highlightedMessageId === messageItem.id || contextTargetId === messageItem.id}
           replyCount={replyCount}
           onOpenThread={(messageId) => setThreadRootId(messageId)}
-          showSenderMetadata={Boolean(chatDetails?.isGroup)}
+          showSenderMetadata={Boolean(chatDetails?.isGroup && isFirstInGroup && !messageItem.isPlaceholder)}
           onBubblePress={() =>
             setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
           }
@@ -3994,6 +4092,12 @@ const refreshMessages = useCallback(async () => {
     }
     return Math.max(insets.bottom, 12);
   }, [insets.bottom, isKeyboardVisible]);
+
+  const attachmentSheetBottom = useMemo(() => {
+    const keyboardOffset =
+      Platform.OS === 'android' ? keyboardHeight : Math.max(keyboardHeight - insets.bottom, 0);
+    return Math.max(insets.bottom + 16, 16) + keyboardOffset;
+  }, [insets.bottom, keyboardHeight]);
   const sendButtonDisabled =
     ((isComposerEmpty && !hasPendingAttachments) ||
       isSendingMessage ||
@@ -4570,6 +4674,7 @@ const refreshMessages = useCallback(async () => {
           <Animated.View
             style={[
               styles.attachmentSheet,
+              { bottom: attachmentSheetBottom },
               {
                 transform: [
                   {
