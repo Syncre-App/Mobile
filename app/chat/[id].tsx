@@ -2351,7 +2351,6 @@ const refreshMessages = useCallback(async () => {
       otherUserIdRef.current = otherParticipantId || null;
       receiverNameRef.current = displayName;
       setReceiverUsername(displayName);
-      setTypingUserLabel(displayName);
 
       const chatPayload = {
         ...chatData,
@@ -3948,9 +3947,9 @@ const refreshMessages = useCallback(async () => {
         unsubscribe();
       }
       ensureTypingStopped();
-      if (remoteTypingTimeoutRef.current) {
-        clearTimeout(remoteTypingTimeoutRef.current);
-      }
+      typingTimersRef.current.forEach((timer) => clearTimeout(timer));
+      typingTimersRef.current.clear();
+      typingUsersRef.current.clear();
     };
   }, [ensureTypingStopped, handleIncomingMessage, wsService]);
 
@@ -4130,7 +4129,6 @@ const refreshMessages = useCallback(async () => {
       highlightedMessageId,
       lastOutgoingMessageId,
       timestampVisibleFor,
-      typingUserLabel,
       Boolean(chatDetails?.isGroup),
       directRecipient,
       handleAttachmentTap,
