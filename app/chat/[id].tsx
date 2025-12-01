@@ -509,7 +509,7 @@ const layoutNext = () => {
   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 };
 
-const TypingIndicator: React.FC = () => {
+const TypingIndicator: React.FC<{ label?: string }> = ({ label }) => {
   const dots = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
@@ -557,6 +557,7 @@ const TypingIndicator: React.FC = () => {
           />
         ))}
       </View>
+      {label ? <Text style={styles.typingText}>{label}</Text> : null}
     </View>
   );
 };
@@ -1115,7 +1116,8 @@ const ChatScreen: React.FC = () => {
   );
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const remoteTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingUsersRef = useRef<Map<string, string>>(new Map());
+  const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const initialLoadCompleteRef = useRef(false);
   const isNearTopRef = useRef(false);
   const isNearBottomRef = useRef(true);
@@ -1286,18 +1288,26 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     avatarUrl: string | null;
     participants: ChatParticipant[];
   } | null>(null);
+  const chatDetailsRef = useRef<{
+    id: string;
+    isGroup: boolean;
+    ownerId: string | null;
+    name: string | null;
+    avatarUrl: string | null;
+    participants: ChatParticipant[];
+  } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<Array<{ id: string; name: string }>>([]);
   const [replyContext, setReplyContext] = useState<ReplyMetadata | null>(null);
   const [threadRootId, setThreadRootId] = useState<string | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-  const [typingUserLabel, setTypingUserLabel] = useState<string>('Someone');
   const [timestampVisibleFor, setTimestampVisibleFor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -1399,6 +1409,14 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
     return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
   }, []);
 
+  const formatTypingLabel = useCallback((entries: Array<{ id: string; name: string }>) => {
+    if (!entries.length) return '';
+    const names = entries.map((entry) => entry.name || 'Someone');
+    if (names.length === 1) return `${names[0]} is typing…`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
+    return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing…`;
+  }, []);
+
   const resolveNamesFromPayload = useCallback(
     (value: any): string[] => {
       if (!value) return [];
@@ -1460,18 +1478,22 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
 
       participantIdsRef.current = updatedUserIds;
 
-      setChatDetails((prev) => ({
-        id: nextChat.id?.toString?.() ?? prev?.id ?? chatId ?? '',
-        isGroup: Boolean(nextChat.isGroup ?? nextChat.is_group ?? prev?.isGroup),
-        ownerId:
-          nextChat.ownerId?.toString?.() ??
-          nextChat.owner_id?.toString?.() ??
-          prev?.ownerId ??
-          null,
-        name: nextChat.name ?? nextChat.displayName ?? prev?.name ?? null,
-        avatarUrl: nextChat.avatarUrl ?? nextChat.avatar_url ?? prev?.avatarUrl ?? null,
-        participants: participantsPayload.length ? participantsPayload : prev?.participants ?? [],
-      }));
+      setChatDetails((prev) => {
+        const nextState = {
+          id: nextChat.id?.toString?.() ?? prev?.id ?? chatId ?? '',
+          isGroup: Boolean(nextChat.isGroup ?? nextChat.is_group ?? prev?.isGroup),
+          ownerId:
+            nextChat.ownerId?.toString?.() ??
+            nextChat.owner_id?.toString?.() ??
+            prev?.ownerId ??
+            null,
+          name: nextChat.name ?? nextChat.displayName ?? prev?.name ?? null,
+          avatarUrl: nextChat.avatarUrl ?? nextChat.avatar_url ?? prev?.avatarUrl ?? null,
+          participants: participantsPayload.length ? participantsPayload : prev?.participants ?? [],
+        };
+        chatDetailsRef.current = nextState;
+        return nextState;
+      });
     },
     [chatId, syncParticipants]
   );
@@ -3232,17 +3254,31 @@ const refreshMessages = useCallback(async () => {
     }
 
     const typingHandler = (data: { userId: string; username: string }) => {
-      console.log('ChatScreen typing handler triggered for user:', data.userId);
       if (data.userId !== currentUserId) {
-        setTypingUserLabel(data.username || receiverNameRef.current || 'Someone');
-        setIsRemoteTyping(true);
-        if (remoteTypingTimeoutRef.current) {
-          clearTimeout(remoteTypingTimeoutRef.current);
+        const name = data.username || receiverNameRef.current || 'Someone';
+        const normalizedId = data.userId?.toString?.() ?? String(data.userId);
+        typingUsersRef.current.set(normalizedId, name);
+        const existingTimer = typingTimersRef.current.get(normalizedId);
+        if (existingTimer) {
+          clearTimeout(existingTimer);
         }
-        remoteTypingTimeoutRef.current = setTimeout(() => {
-          setIsRemoteTyping(false);
-        }, 2500); // Keep indicator for 2.5s
-        // If the user is already near the bottom, scroll so the typing indicator becomes visible
+        const timeout = setTimeout(() => {
+          typingUsersRef.current.delete(normalizedId);
+          typingTimersRef.current.delete(normalizedId);
+          const next = Array.from(typingUsersRef.current.entries()).map(([id, label]) => ({
+            id,
+            name: label,
+          }));
+          setTypingUsers(next);
+          setIsRemoteTyping(next.length > 0);
+        }, 2500);
+        typingTimersRef.current.set(normalizedId, timeout);
+        const next = Array.from(typingUsersRef.current.entries()).map(([id, label]) => ({
+          id,
+          name: label,
+        }));
+        setTypingUsers(next);
+        setIsRemoteTyping(true);
         if (isNearBottomRef.current) {
           InteractionManager.runAfterInteractions(() => {
             scrollToBottom();
@@ -3252,12 +3288,20 @@ const refreshMessages = useCallback(async () => {
     };
 
     const stopTypingHandler = (data: { userId: string }) => {
-      console.log('ChatScreen stop-typing handler triggered for user:', data.userId);
       if (data.userId !== currentUserId) {
-        if (remoteTypingTimeoutRef.current) {
-          clearTimeout(remoteTypingTimeoutRef.current);
+        const normalizedId = data.userId?.toString?.() ?? String(data.userId);
+        const timer = typingTimersRef.current.get(normalizedId);
+        if (timer) {
+          clearTimeout(timer);
+          typingTimersRef.current.delete(normalizedId);
         }
-        setIsRemoteTyping(false);
+        typingUsersRef.current.delete(normalizedId);
+        const next = Array.from(typingUsersRef.current.entries()).map(([id, label]) => ({
+          id,
+          name: label,
+        }));
+        setTypingUsers(next);
+        setIsRemoteTyping(next.length > 0);
       }
     };
 
@@ -3267,11 +3311,11 @@ const refreshMessages = useCallback(async () => {
     return () => {
       unsubscribeTyping();
       unsubscribeStopTyping();
-      if (remoteTypingTimeoutRef.current) {
-        clearTimeout(remoteTypingTimeoutRef.current);
-      }
+      typingTimersRef.current.forEach((timer) => clearTimeout(timer));
+      typingTimersRef.current.clear();
+      typingUsersRef.current.clear();
     };
-  }, [chatId, wsService, currentUserId]);
+  }, [chatId, wsService, currentUserId, receiverNameRef, scrollToBottom]);
 
   useEffect(() => {
     // Debug: log when decorated list or typing state changes so we can confirm the typing item is present
@@ -3670,6 +3714,17 @@ const refreshMessages = useCallback(async () => {
           return;
         }
         case 'chat_updated': {
+          const previous = chatDetailsRef.current;
+          const incomingName = payload.chat?.name ?? payload.chat?.displayName ?? null;
+          const incomingAvatar = payload.chat?.avatarUrl ?? payload.chat?.avatar_url ?? null;
+          if (previous?.isGroup) {
+            if (incomingName && previous.name && incomingName !== previous.name) {
+              appendSystemNotice(`${previous.name} renamed to ${incomingName}`);
+            }
+            if (incomingAvatar && previous.avatarUrl && incomingAvatar !== previous.avatarUrl) {
+              appendSystemNotice('Group avatar updated');
+            }
+          }
           if (payload.chat) {
             applyChatUpdate(payload.chat);
           }
@@ -3969,7 +4024,7 @@ const refreshMessages = useCallback(async () => {
   const renderChatItem = useCallback(
     ({ item, index }: { item: ChatListItem; index: number }) => {
       if (item.kind === 'typing') {
-        return <TypingIndicator />;
+        return <TypingIndicator label={formatTypingLabel(typingUsers)} />;
       }
 
       if (item.kind === 'date') {
@@ -3983,6 +4038,13 @@ const refreshMessages = useCallback(async () => {
       }
 
       const messageItem = item.message;
+      if (messageItem.senderId === 'system') {
+        return (
+          <View style={styles.systemMessageRow}>
+            <Text style={styles.systemMessageText}>{messageItem.content}</Text>
+          </View>
+        );
+      }
       const previousMessage = (() => {
         for (let i = index - 1; i >= 0; i -= 1) {
           const prevItem = decoratedData[i];
@@ -4057,6 +4119,8 @@ const refreshMessages = useCallback(async () => {
       handleAttachmentTap,
       handleOpenLink,
       seenPlacementMap,
+      typingUsers,
+      formatTypingLabel,
     ]
   );
 
@@ -5030,6 +5094,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 13,
     fontWeight: '500',
+  },
+  systemMessageRow: {
+    alignSelf: 'center',
+    marginVertical: 12,
+    paddingHorizontal: 16,
+  },
+  systemMessageText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   typingRow: {
     flexDirection: 'row',
