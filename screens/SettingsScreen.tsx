@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -33,6 +34,7 @@ export const SettingsScreen: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('English');
   const [isRotatingKeys, setIsRotatingKeys] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const bootstrapPollRef = useRef<NodeJS.Timeout | null>(null);
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
@@ -69,6 +71,10 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleRotateKeys = async () => {
+    if (isRotatingKeys || isBootstrapping) {
+      return;
+    }
+
     Alert.alert(
       'Rotate encryption keys',
       'This will revoke the current device keys, request history re-encrypt from others, and restart your secure identity.',
@@ -86,20 +92,45 @@ export const SettingsScreen: React.FC = () => {
               const needsBootstrap = await IdentityService.requiresBootstrap();
               if (needsBootstrap) {
                 router.push('/identity');
+                // poll in case the user completes bootstrap without relaunch
+                if (bootstrapPollRef.current) {
+                  clearInterval(bootstrapPollRef.current);
+                }
+                bootstrapPollRef.current = setInterval(async () => {
+                  const stillNeeds = await IdentityService.requiresBootstrap();
+                  if (!stillNeeds) {
+                    NotificationService.show('success', 'Identity restored. You can continue.');
+                    clearInterval(bootstrapPollRef.current as NodeJS.Timeout);
+                    bootstrapPollRef.current = null;
+                    setIsBootstrapping(false);
+                  }
+                }, 3000);
               } else {
                 NotificationService.show('info', 'Identity already initialized. You may need to relaunch.');
+                setIsBootstrapping(false);
               }
             } catch (error) {
               NotificationService.show('error', 'Failed to rotate keys. Please try again.');
             } finally {
               setIsRotatingKeys(false);
-              setIsBootstrapping(false);
+              // keep bootstrapping state if we’re polling
+              if (!bootstrapPollRef.current) {
+                setIsBootstrapping(false);
+              }
             }
           },
         },
       ]
     );
   };
+
+  useEffect(() => {
+    return () => {
+      if (bootstrapPollRef.current) {
+        clearInterval(bootstrapPollRef.current);
+      }
+    };
+  }, []);
 
   const renderSettingItem = (
     icon: string | null,
@@ -244,7 +275,9 @@ export const SettingsScreen: React.FC = () => {
                 ? 'Bootstrapping…'
                 : 'Refresh your device keys and request re-encrypt',
             handleRotateKeys,
-            undefined,
+            (isRotatingKeys || isBootstrapping) ? (
+              <ActivityIndicator size="small" color={palette.accent} />
+            ) : undefined,
             true
           )}
         </GlassCard>
