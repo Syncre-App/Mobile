@@ -487,6 +487,9 @@ export const CryptoService = {
 
     // Drop local identity so the app can bootstrap a fresh keypair
     await this.resetIdentity();
+    // Ensure a new random device ID for the fresh identity
+    await DeviceService.clearDeviceId();
+    await DeviceService.getOrCreateDeviceId();
   },
 
   async buildEncryptedPayload(params: {

@@ -17,6 +17,8 @@ import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
+import { CryptoService } from '../services/CryptoService';
+import { IdentityService } from '../services/IdentityService';
 import { palette, radii, spacing } from '../theme/designSystem';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
@@ -29,6 +31,8 @@ export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
   const [selectedLanguage, setSelectedLanguage] = useState('English');
+  const [isRotatingKeys, setIsRotatingKeys] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
@@ -57,6 +61,39 @@ export const SettingsScreen: React.FC = () => {
               NotificationService.show('success', 'Cache cleared successfully');
             } catch (error) {
               NotificationService.show('error', 'Failed to clear cache');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRotateKeys = async () => {
+    Alert.alert(
+      'Rotate encryption keys',
+      'This will revoke the current device keys, request history re-encrypt from others, and restart your secure identity.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Rotate',
+          style: 'destructive',
+          onPress: async () => {
+            setIsRotatingKeys(true);
+            try {
+              await CryptoService.rotateDeviceIdentity();
+              NotificationService.show('success', 'Keys rotated. Rebooting identity…');
+              setIsBootstrapping(true);
+              const needsBootstrap = await IdentityService.requiresBootstrap();
+              if (needsBootstrap) {
+                router.push('/identity');
+              } else {
+                NotificationService.show('info', 'Identity already initialized. You may need to relaunch.');
+              }
+            } catch (error) {
+              NotificationService.show('error', 'Failed to rotate keys. Please try again.');
+            } finally {
+              setIsRotatingKeys(false);
+              setIsBootstrapping(false);
             }
           },
         },
@@ -196,6 +233,19 @@ export const SettingsScreen: React.FC = () => {
             handleClearCache,
             undefined,
             false
+          )}
+
+          {renderSettingItem(
+            'key',
+            'Rotate encryption keys',
+            isRotatingKeys
+              ? 'Rotating…'
+              : isBootstrapping
+                ? 'Bootstrapping…'
+                : 'Refresh your device keys and request re-encrypt',
+            handleRotateKeys,
+            undefined,
+            true
           )}
         </GlassCard>
 
