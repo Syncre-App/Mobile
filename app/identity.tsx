@@ -133,7 +133,31 @@ export default function IdentityScreen() {
       router.replace('/home');
     } catch (err: any) {
       console.error('[IdentityScreen] Failed to process identity:', err);
-      setError(err?.message || 'Failed to process secure keys. Please double-check your PIN.');
+      const message = err?.message || 'Failed to process secure keys. Please double-check your PIN.';
+
+      if (/decrypt identity key/i.test(message)) {
+        Alert.alert(
+          'Cannot unlock secure key',
+          'The backup could not be decrypted. If you forgot the PIN, you can reset and create a new key (past messages remain inaccessible).',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Reset secure identity',
+              style: 'destructive',
+              onPress: async () => {
+                await CryptoService.resetIdentity();
+                await PinService.clearPin();
+                IdentityService.clearCache();
+                NotificationService.show('info', 'Secure identity reset. Set a new PIN.');
+                router.replace('/identity?mode=setup');
+              },
+            },
+          ]
+        );
+        setError(null);
+      } else {
+        setError(message);
+      }
     } finally {
       setIsSubmitting(false);
       setPin('');
