@@ -1147,6 +1147,7 @@ const ChatScreen: React.FC = () => {
   const missingHistoryPromptedRef = useRef(false);
   const reencryptRequestedRef = useRef(false);
   const pendingRefreshRef = useRef(false);
+  const identityRepairRef = useRef(false);
   const requestReencrypt = useCallback(
     (reason: string) => {
       if (!chatId) {
@@ -1182,6 +1183,18 @@ const ChatScreen: React.FC = () => {
       ]
     );
   }, [chatId, requestReencrypt]);
+
+  const handleIdentityMissing = useCallback(() => {
+    if (identityRepairRef.current) {
+      return;
+    }
+    identityRepairRef.current = true;
+    NotificationService.show(
+      'error',
+      'Secure identity missing. Please set up your PIN to unlock messages.'
+    );
+    router.push('/identity?mode=setup');
+  }, []);
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingUsersRef = useRef<Map<string, string>>(new Map());
@@ -2181,6 +2194,10 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         });
       } catch (error) {
         console.error(`Error loading messages for chat ${chatIdentifier}:`, error);
+        if (/identity key not initialized/i.test(String(error))) {
+          handleIdentityMissing();
+          return;
+        }
         setMessagesAnimated((prev) => {
           if (prev.length) {
             return prev;
@@ -2511,6 +2528,9 @@ const refreshMessages = useCallback(async () => {
         nextCursorRef.current = response.data?.nextCursor || null;
       } catch (error) {
         console.error('Failed to load earlier messages:', error);
+        if (/identity key not initialized/i.test(String(error))) {
+          handleIdentityMissing();
+        }
       } finally {
         setIsLoadingMore(false);
         if (viaRefresh) {
