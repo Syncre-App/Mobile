@@ -11,6 +11,8 @@ interface FriendSummary {
   username: string;
   email?: string;
   profile_picture?: string | null;
+  status?: string | null;
+  last_seen?: string | null;
 }
 
 interface FriendRequestsWidgetProps {
@@ -34,6 +36,24 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
   const renderIncomingRequest = (request: FriendSummary) => {
     const isProcessing = processingId === request.id;
 
+    const status = request.status ? request.status.toLowerCase() : '';
+    const lastSeen = request.last_seen;
+    const presenceLabel = (() => {
+      if (status === 'online') return 'Online';
+      if (status === 'idle') return 'Idle';
+      if (!lastSeen) return '';
+      const parsed = Date.parse(lastSeen);
+      if (Number.isNaN(parsed)) return '';
+      const diffMs = Date.now() - parsed;
+      const minutes = Math.floor(diffMs / 60000);
+      if (minutes < 3) return 'Idle';
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      return `${days}d ago`;
+    })();
+
     return (
       <View key={request.id} style={styles.requestRow}>
         <UserAvatar
@@ -46,6 +66,9 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
           <Text style={styles.requestName}>{request.username}</Text>
           {request.email ? (
             <Text style={styles.requestEmail}>{request.email}</Text>
+          ) : null}
+          {presenceLabel ? (
+            <Text style={styles.requestPresence}>{presenceLabel}</Text>
           ) : null}
         </View>
         <View style={styles.requestActions}>
@@ -169,6 +192,11 @@ const styles = StyleSheet.create({
   requestEmail: {
     color: palette.textMuted,
     fontSize: 13,
+    marginTop: 2,
+  },
+  requestPresence: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
     marginTop: 2,
   },
   pendingText: {

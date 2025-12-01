@@ -34,6 +34,8 @@ interface User {
   username: string;
   email: string;
   profile_picture?: string | null;
+  status?: string | null;
+  last_seen?: string | null;
   [key: string]: any;
 }
 
@@ -174,6 +176,27 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     return 'Loading...';
   };
 
+  const formatLastSeenLabel = (user?: User): string => {
+    if (!user) return '';
+    const status = user.status ? String(user.status).toLowerCase() : '';
+    if (status === 'online') return 'Online';
+    if (status === 'idle') return 'Idle';
+    const lastSeen = user.last_seen;
+    if (!lastSeen) return '';
+    const parsed = Date.parse(lastSeen);
+    if (Number.isNaN(parsed)) return '';
+    const diffMs = Date.now() - parsed;
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return 'Online';
+    if (minutes < 3) return 'Idle';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return 'Yesterday';
+    return `${days}d ago`;
+  };
+
   const getGroupDisplayName = (chat: Chat): string => {
     return chat.name || chat.displayName || 'Group chat';
   };
@@ -262,6 +285,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       ? String(statusValueRaw).toLowerCase()
       : 'offline';
     const isUserOnline = !isGroupChat && normalizedStatus === 'online';
+    const lastSeenLabel = !isGroupChat ? formatLastSeenLabel(cachedUser) : '';
     const isRemoving = !isGroupChat && removingFriendId === otherUserId;
     const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
     const unread = unreadCounts[chatIdKey] || 0;
@@ -272,7 +296,13 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         ? userDetails[otherUserId]?.profile_picture
         : undefined;
     const groupSubtitle = isGroupChat ? getGroupSubtitle(chat) : null;
-    const presenceValue = isGroupChat ? undefined : (isUserOnline ? 'online' : 'offline');
+    const presenceValue = isGroupChat
+      ? undefined
+      : isUserOnline
+        ? 'online'
+        : normalizedStatus === 'idle'
+          ? 'idle'
+          : 'offline';
 
     return (
       <TouchableOpacity
@@ -307,7 +337,13 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
               <Text style={styles.chatSubtitle} numberOfLines={1}>
                 {groupSubtitle}
               </Text>
-            ) : null}
+            ) : (
+              !isGroupChat && lastSeenLabel ? (
+                <Text style={styles.chatSubtitle} numberOfLines={1}>
+                  {lastSeenLabel}
+                </Text>
+              ) : null
+            )}
           </View>
 
           <View style={styles.rightColumn}>
