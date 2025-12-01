@@ -1840,20 +1840,29 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         }
 
         const decodedPayload = decodeMessagePayload(content ?? '');
-        const contentText = resolveContentText(decodedPayload, preview, attachments.length > 0);
+        const isSystem = (raw as any)?.messageType === 'system' || (raw as any)?.message_type === 'system' || senderId === 'system';
+
+        if (decryptFailed && !isSystem) {
+          // Skip messages we cannot decrypt instead of rendering empty bubbles
+          continue;
+        }
+
+        const contentText = isSystem
+          ? (decodedPayload.text?.trim?.() || preview || 'System update')
+          : resolveContentText(decodedPayload, preview, attachments.length > 0);
         const serverReply = resolveReplyMetadata((raw as any)?.reply);
         const replyTo = isDeleted
           ? undefined
           : serverReply || resolveReplyMetadata(decodedPayload.replyTo);
 
         const senderProfile = resolveSenderProfile(String(senderId));
-        const seenBy = mapServerReceipts((raw as any)?.seenBy);
+        const seenBy = isSystem ? [] : mapServerReceipts((raw as any)?.seenBy);
         results.push({
           id: String(idValue),
-          senderId: String(senderId),
+          senderId: isSystem ? 'system' : String(senderId),
           receiverId: String(receiverId),
-          senderName: senderProfile.name,
-          senderAvatar: senderProfile.avatar,
+          senderName: isSystem ? 'System' : senderProfile.name,
+          senderAvatar: isSystem ? null : senderProfile.avatar,
           content: contentText,
           timestamp: String(local),
           utcTimestamp: utc,
@@ -3631,41 +3640,8 @@ const refreshMessages = useCallback(async () => {
             });
             if (!decrypted) {
               console.warn('Decryption failed for sent message envelope.');
-              const { local, utc, timezone } = resolveMessageTimestamps(
-                payload,
-                payload.timezone || TimezoneService.getTimezone()
-              );
-              const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
-              const attachments = mapServerAttachments(payload.attachments);
-              const fallbackContent = resolveDecryptFallbackText(payload.preview, attachments);
-              const newEntry: Message = {
-                id: String(payload.messageId ?? payload.id ?? Date.now()),
-                senderId: String(payload.senderId ?? ''),
-                receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-                senderName: senderProfile.name,
-                senderAvatar: senderProfile.avatar,
-                content: fallbackContent,
-                timestamp: local,
-                utcTimestamp: utc,
-                timezone,
-                replyTo: undefined,
-                attachments,
-                isEdited: Boolean(payload.editedAt),
-                editedAt: payload.editedAt ?? undefined,
-                status: 'sent',
-                isPlaceholder: false,
-              };
-              setMessagesAnimated((prev) => {
-                const cleaned = prev.filter((msg) => !msg.isDeleted);
-                if (cleaned.some((msg) => msg.id === newEntry.id)) {
-                  return cleaned;
-                }
-                const updated = cleaned.filter(
-                  (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
-                );
-                return sortMessagesChronologically([...updated, newEntry]);
-              });
               requestReencrypt('live_decrypt_failed');
+              scheduleRefreshMessages();
               return;
             }
 
@@ -3730,37 +3706,8 @@ const refreshMessages = useCallback(async () => {
             });
             if (!decrypted) {
               console.warn('Decryption failed for incoming message envelope.');
-              const { local, utc, timezone } = resolveMessageTimestamps(
-                payload,
-                payload.timezone || TimezoneService.getTimezone()
-              );
-              const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
-              const attachments = mapServerAttachments(payload.attachments);
-              const fallbackContent = resolveDecryptFallbackText(payload.preview, attachments);
-              const fallbackEntry: Message = {
-                id: String(payload.messageId ?? payload.id ?? Date.now()),
-                senderId: String(payload.senderId ?? ''),
-                receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-                senderName: senderProfile.name,
-                senderAvatar: senderProfile.avatar,
-                content: fallbackContent,
-                timestamp: local,
-                utcTimestamp: utc,
-                timezone,
-                replyTo: undefined,
-                attachments,
-                isEdited: Boolean(payload.editedAt),
-                editedAt: payload.editedAt ?? undefined,
-                isPlaceholder: false,
-              };
-              setMessagesAnimated((prev) => {
-                const cleaned = prev.filter((msg) => !msg.isDeleted);
-                if (cleaned.some((msg) => msg.id === fallbackEntry.id)) {
-                  return cleaned;
-                }
-                return sortMessagesChronologically([...cleaned, fallbackEntry]);
-              });
               requestReencrypt('live_decrypt_failed');
+              scheduleRefreshMessages();
               return;
             }
 
@@ -3813,25 +3760,33 @@ const refreshMessages = useCallback(async () => {
             payload.timezone || TimezoneService.getTimezone()
           );
           const decodedPayload = decodeMessagePayload(payload.content ?? '');
+          const isSystem =
+            payload.message_type === 'system' ||
+            payload.messageType === 'system' ||
+            payload.senderId === 'system' ||
+            payload.sender_id === 'system' ||
+            decodedPayload.text?.toLowerCase?.().startsWith('system:');
           const serverReply = resolveReplyMetadata(payload.reply);
           const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
           const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
           const attachments = mapServerAttachments(payload.attachments);
           const reactions = mapServerReactions(payload.reactions);
-          const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
+          const contentText = isSystem
+            ? (decodedPayload.text?.trim?.() || payload.preview || 'System update')
+            : resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
-            senderId: String(payload.senderId ?? ''),
+            senderId: isSystem ? 'system' : String(payload.senderId ?? ''),
             receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
-            senderName: senderProfile.name,
-            senderAvatar: senderProfile.avatar,
+            senderName: isSystem ? 'System' : senderProfile.name,
+            senderAvatar: isSystem ? null : senderProfile.avatar,
             content: contentText,
             timestamp: local,
             utcTimestamp: utc,
             timezone,
             replyTo,
             attachments,
-            reactions,
+            reactions: isSystem ? [] : reactions,
             isEdited: Boolean(payload.editedAt),
             editedAt: payload.editedAt ?? undefined,
           };
