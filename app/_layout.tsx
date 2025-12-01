@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiService } from '../services/ApiService';
 import Constants from 'expo-constants';
 import { UpdateService } from '../services/UpdateService';
@@ -100,16 +101,18 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#03040A' }}>
-      <StatusBar style="light" backgroundColor="#03040A" />
+      <SafeAreaProvider>
+        <StatusBar style="light" backgroundColor="#03040A" />
 
-      <Stack
-        initialRouteName="index"
-        screenOptions={{
-          headerShown: false as boolean,
-          gestureEnabled: true as boolean,
-          contentStyle: undefined,
-        }}
-      />
+        <Stack
+          initialRouteName="index"
+          screenOptions={{
+            headerShown: false as boolean,
+            gestureEnabled: true as boolean,
+            contentStyle: undefined,
+          }}
+        />
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
