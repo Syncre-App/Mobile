@@ -1229,6 +1229,11 @@ const [messageActionContext, setMessageActionContext] = useState<{
     above?: boolean;
   } | null>(null);
 const [contextTargetId, setContextTargetId] = useState<string | null>(null);
+const [reactionPicker, setReactionPicker] = useState<{
+    message: Message;
+    anchorX: number;
+    anchorY: number;
+  } | null>(null);
   const messageActionAnim = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
@@ -1236,6 +1241,16 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
   const ACTION_CARD_WIDTH = 280;
   const ACTION_CARD_HEIGHT = 240;
   const SCREEN_WIDTH = Dimensions.get('window').width;
+  const reactionPickerPosition = useMemo(() => {
+    if (!reactionPicker) {
+      return null;
+    }
+    const buttonCount = DEFAULT_REACTIONS.length + 1; // emojis + more
+    const width = buttonCount * 44 + 16;
+    const left = Math.max(8, Math.min(reactionPicker.anchorX - width / 2, SCREEN_WIDTH - width - 8));
+    const top = Math.max(reactionPicker.anchorY - 90, 12);
+    return { top, left };
+  }, [SCREEN_WIDTH, reactionPicker]);
   const messageActionAnchor = useMemo(() => {
     if (!messageActionContext) {
       return { top: 0, left: SCREEN_WIDTH / 2 - ACTION_CARD_WIDTH / 2 };
@@ -3289,15 +3304,8 @@ const refreshMessages = useCallback(async () => {
     }
   }, []);
 
-  const handleBubbleLongPress = useCallback(
-    (message: Message, event?: GestureResponderEvent) => {
-      if (message.isPlaceholder) {
-        if (message.replyTo) {
-          setReplyContext(buildReplyPayloadFromMessage(message));
-        }
-        return;
-      }
-
+  const openMessageActions = useCallback(
+    (message: Message, anchorX?: number, anchorY?: number) => {
       const canEdit = message.senderId === currentUserId && !message.isDeleted;
       const canDelete = message.senderId === currentUserId && !message.isDeleted;
       const primaryAttachment = (message.attachments || [])[0];
@@ -3343,25 +3351,21 @@ const refreshMessages = useCallback(async () => {
         });
       }
 
-      DEFAULT_REACTIONS.forEach((reaction) => {
-        actions.push({
-          label: `React ${reaction}`,
-          onPress: () => handleToggleReaction(message, reaction),
-        });
-      });
-
       if (!canEdit && !canDelete) {
         actions.push({ label: 'Cancel', onPress: () => {} });
       } else {
         actions.push({ label: 'Cancel', onPress: () => {} });
       }
-      const anchorY = event?.nativeEvent?.pageY ?? windowHeight / 2;
-      const anchorX = event?.nativeEvent?.pageX ?? SCREEN_WIDTH / 2;
-      const above = anchorY > windowHeight * 0.55;
+
+      const resolvedY = anchorY ?? windowHeight / 2;
+      const resolvedX = anchorX ?? SCREEN_WIDTH / 2;
+      const above = resolvedY > windowHeight * 0.55;
+      setReactionPicker(null);
       setContextTargetId(message.id);
-      setMessageActionContext({ message, actions, anchorY, anchorX, above });
+      setMessageActionContext({ message, actions, anchorY: resolvedY, anchorX: resolvedX, above });
     },
     [
+      SCREEN_WIDTH,
       buildReplyPayloadFromMessage,
       confirmDeleteMessage,
       currentUserId,
@@ -3370,8 +3374,24 @@ const refreshMessages = useCallback(async () => {
       handleShareAttachment,
       startEditMessage,
       windowHeight,
-      SCREEN_WIDTH,
     ]
+  );
+
+  const handleBubbleLongPress = useCallback(
+    (message: Message, event?: GestureResponderEvent) => {
+      if (message.isPlaceholder) {
+        if (message.replyTo) {
+          setReplyContext(buildReplyPayloadFromMessage(message));
+        }
+        return;
+      }
+
+      const anchorY = event?.nativeEvent?.pageY ?? windowHeight / 2;
+      const anchorX = event?.nativeEvent?.pageX ?? SCREEN_WIDTH / 2;
+      setContextTargetId(message.id);
+      setReactionPicker({ message, anchorX, anchorY });
+    },
+    [SCREEN_WIDTH, buildReplyPayloadFromMessage, windowHeight]
   );
 
   const handleSendMessage = useCallback(async () => {
@@ -4474,6 +4494,45 @@ const refreshMessages = useCallback(async () => {
           <View style={styles.headerButtonPlaceholder} />
         )}
       </View>
+
+      {reactionPicker && reactionPickerPosition ? (
+        <Pressable
+          style={styles.reactionPickerBackdrop}
+          onPress={() => {
+            setReactionPicker(null);
+            setContextTargetId(null);
+          }}
+        >
+          <View
+            style={[
+              styles.reactionPickerBar,
+              { top: reactionPickerPosition.top, left: reactionPickerPosition.left },
+            ]}
+          >
+            {DEFAULT_REACTIONS.map((reaction) => (
+              <Pressable
+                key={`reaction-${reaction}`}
+                style={styles.reactionEmojiButton}
+                onPress={() => handleToggleReaction(reactionPicker.message, reaction)}
+              >
+                <Text style={styles.reactionEmojiText}>{reaction}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={styles.reactionEmojiButton}
+              onPress={() =>
+                openMessageActions(
+                  reactionPicker.message,
+                  reactionPicker.anchorX,
+                  reactionPicker.anchorY
+                )
+              }
+            >
+              <Ionicons name="ellipsis-horizontal" size={20} color="#ffffff" />
+            </Pressable>
+          </View>
+        </Pressable>
+      ) : null}
 
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <KeyboardAvoidingView
@@ -5859,6 +5918,38 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginTop: 8,
+  },
+  reactionPickerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-start',
+  },
+  reactionPickerBar: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: 'rgba(20, 24, 38, 0.95)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  reactionEmojiButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reactionEmojiText: {
+    fontSize: 22,
   },
   reactionPill: {
     flexDirection: 'row',
