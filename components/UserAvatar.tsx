@@ -88,7 +88,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 
       <View style={[styles.avatarFrame, { width: size, height: size }]}>
         <LinearGradient
-          colors={gradients.avatarRing}
+          colors={gradients.avatarRing as [string, string, string]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[

@@ -1245,6 +1245,8 @@ const ChatScreen: React.FC = () => {
   const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
 const previewListRef = useRef<FlatList<MessageAttachment>>(null);
 const [previewIndex, setPreviewIndex] = useState(0);
+const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
+const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
 const handleClosePreview = useCallback(() => setPreviewContext(null), []);
 const previewPanResponder = useMemo(
   () =>
@@ -1258,133 +1260,6 @@ const previewPanResponder = useMemo(
     }),
   [handleClosePreview]
 );
-const [editingMessage, setEditingMessage] = useState<Message | null>(null);
-const [messageActionContext, setMessageActionContext] = useState<{
-    message: Message;
-    actions: Array<{ label: string; onPress: () => void; destructive?: boolean }>;
-    anchorY: number;
-    anchorX: number;
-    above?: boolean;
-  } | null>(null);
-const [contextTargetId, setContextTargetId] = useState<string | null>(null);
-const [reactionPicker, setReactionPicker] = useState<{
-    message: Message;
-    anchorX: number;
-    anchorY: number;
-  } | null>(null);
-const reactionAnim = useRef(new Animated.Value(0)).current;
-  const closeReactionPicker = useCallback(() => {
-    setReactionPicker(null);
-    setContextTargetId(null);
-    reactionAnim.stopAnimation();
-    reactionAnim.setValue(0);
-  }, [reactionAnim]);
-  const messageActionAnim = useRef(new Animated.Value(0)).current;
-  const windowHeight = Dimensions.get('window').height;
-  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
-  const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
-  const ACTION_CARD_WIDTH = 280;
-  const ACTION_CARD_HEIGHT = 240;
-  const SCREEN_WIDTH = Dimensions.get('window').width;
-  const reactionPickerPosition = useMemo(() => {
-    if (!reactionPicker) {
-      return null;
-    }
-    const buttonCount = DEFAULT_REACTIONS.length + 1; // emojis + more
-    const width = buttonCount * 44 + 20;
-    const pickerHeight = 62;
-    const left = Math.max(10, Math.min(reactionPicker.anchorX - width / 2, SCREEN_WIDTH - width - 10));
-    const top = Math.max(
-      Math.min(reactionPicker.anchorY - 72, windowHeight - pickerHeight - insets.bottom - 12),
-      insets.top + 12
-    );
-    return { top, left, width, height: pickerHeight };
-  }, [SCREEN_WIDTH, insets.bottom, insets.top, reactionPicker, windowHeight]);
-
-  useEffect(() => {
-    if (reactionPicker) {
-      reactionAnim.setValue(0);
-      Animated.spring(reactionAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        damping: 14,
-        stiffness: 200,
-      }).start();
-    }
-  }, [reactionAnim, reactionPicker]);
-  const messageActionAnchor = useMemo(() => {
-    if (!messageActionContext) {
-      return { top: 0, left: SCREEN_WIDTH / 2 - ACTION_CARD_WIDTH / 2 };
-    }
-    const placeAbove = messageActionContext.above ?? messageActionContext.anchorY > windowHeight * 0.55;
-    let rawTop = placeAbove
-      ? messageActionContext.anchorY - ACTION_CARD_HEIGHT - 12
-      : messageActionContext.anchorY + 12;
-    rawTop = Math.max(rawTop, 52);
-    const maxTop = windowHeight - ACTION_CARD_HEIGHT - 32;
-    const top = Math.min(rawTop, maxTop);
-    const rawLeft = messageActionContext.anchorX - ACTION_CARD_WIDTH / 2;
-    const left = Math.max(12, Math.min(rawLeft, SCREEN_WIDTH - ACTION_CARD_WIDTH - 12));
-    return { top, left };
-  }, [ACTION_CARD_WIDTH, SCREEN_WIDTH, messageActionContext, windowHeight]);
-  const messageActionArrowLeft = useMemo(() => {
-    if (!messageActionContext) {
-      return ACTION_CARD_WIDTH / 2 - 6;
-    }
-    const offset = messageActionContext.anchorX - messageActionAnchor.left - 6;
-    return Math.max(14, Math.min(offset, ACTION_CARD_WIDTH - 26));
-  }, [ACTION_CARD_WIDTH, messageActionAnchor.left, messageActionContext]);
-  const messageActionArrowTop = useMemo(() => {
-    if (!messageActionContext) {
-      return -6;
-    }
-    const placeAbove = messageActionContext.above ?? messageActionContext.anchorY > windowHeight * 0.55;
-    return placeAbove ? ACTION_CARD_HEIGHT - 6 : -6;
-  }, [ACTION_CARD_HEIGHT, messageActionContext, windowHeight]);
-
-  const dismissMessageActions = useCallback(
-    (onFinished?: () => void) => {
-      if (!messageActionContext) {
-        onFinished?.();
-        return;
-      }
-      Animated.timing(messageActionAnim, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }).start(() => {
-        setMessageActionContext(null);
-        setContextTargetId(null);
-        onFinished?.();
-      });
-    },
-    [messageActionAnim, messageActionContext]
-  );
-
-  useEffect(() => {
-    if (messageActionContext) {
-      messageActionAnim.setValue(0);
-      Animated.spring(messageActionAnim, {
-        toValue: 1,
-        friction: 7,
-        tension: 90,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [messageActionAnim, messageActionContext]);
-
-  useEffect(() => {
-    if (attachmentSheetVisible) {
-      attachmentSheetAnim.setValue(0);
-      Animated.spring(attachmentSheetAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 90,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [attachmentSheetAnim, attachmentSheetVisible]);
-
   useEffect(() => {
     if (previewContext && previewContext.attachments.length) {
       const nextIndex = Math.min(
@@ -1413,17 +1288,6 @@ const reactionAnim = useRef(new Animated.Value(0)).current;
       setAttachmentSheetVisible(false);
     });
   }, [attachmentSheetAnim]);
-
-  const handleMessageActionSelect = useCallback(
-    (action: { label: string; onPress: () => void }) => {
-      dismissMessageActions(() => {
-        requestAnimationFrame(() => {
-          action.onPress?.();
-        });
-      });
-    },
-    [dismissMessageActions]
-  );
   const resolveActionIcon = useCallback((label: string): any => {
     const normalized = label.toLowerCase();
     if (normalized.includes('reply')) return 'return-down-back';
@@ -1479,6 +1343,32 @@ const reactionAnim = useRef(new Animated.Value(0)).current;
   const [memberPickerError, setMemberPickerError] = useState<string | null>(null);
   const [memberPickerBusy, setMemberPickerBusy] = useState(false);
   const participantLookupRef = useRef<Record<string, ChatParticipant>>({});
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const windowHeight = Dimensions.get('window').height;
+  const ACTION_CARD_WIDTH = 280;
+  const ACTION_CARD_HEIGHT = 240;
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+  const reactionAnim = useRef(new Animated.Value(0)).current;
+  const messageActionAnim = useRef(new Animated.Value(0)).current;
+  const [messageActionContext, setMessageActionContext] = useState<{
+    message: Message;
+    actions: Array<{ label: string; onPress: () => void; destructive?: boolean }>;
+    anchorY: number;
+    anchorX: number;
+    above?: boolean;
+  } | null>(null);
+  const [contextTargetId, setContextTargetId] = useState<string | null>(null);
+  const [reactionPicker, setReactionPicker] = useState<{
+    message: Message;
+    anchorX: number;
+    anchorY: number;
+  } | null>(null);
+  const closeReactionPicker = useCallback(() => {
+    setReactionPicker(null);
+    setContextTargetId(null);
+    reactionAnim.stopAnimation();
+    reactionAnim.setValue(0);
+  }, [reactionAnim]);
 
   const handleNavigateBack = useCallback(() => {
     if (threadRootId) {
@@ -1508,6 +1398,145 @@ const reactionAnim = useRef(new Animated.Value(0)).current;
   );
 
   const currentUserId = user?.id ? String(user.id) : null;
+
+  const reactionPickerPosition = useMemo(() => {
+    if (!reactionPicker) {
+      return null;
+    }
+    const buttonCount = DEFAULT_REACTIONS.length + 1; // emojis + menu
+    const width = buttonCount * 40 + 24;
+    const pickerHeight = 68;
+    const showAbove = reactionPicker.anchorY > windowHeight * 0.6;
+    const rawLeft = reactionPicker.anchorX - width / 2;
+    const left = Math.max(12, Math.min(rawLeft, SCREEN_WIDTH - width - 12));
+    const rawTop = showAbove
+      ? reactionPicker.anchorY - pickerHeight - 12
+      : reactionPicker.anchorY + 12;
+    const top = Math.max(
+      insets.top + 12,
+      Math.min(rawTop, windowHeight - pickerHeight - insets.bottom - 12)
+    );
+    return { top, left, width, height: pickerHeight };
+  }, [SCREEN_WIDTH, insets.bottom, insets.top, reactionPicker, windowHeight]);
+
+  const currentUserReaction = useMemo(() => {
+    if (!reactionPicker || !currentUserId) {
+      return null;
+    }
+    const messageId = reactionPicker.message.id;
+    const messageList = Array.isArray(messages) ? messages : [];
+    const liveMessage = messageList.find((m) => m.id === messageId) || reactionPicker.message;
+    const reactions = Array.isArray(liveMessage?.reactions) ? liveMessage.reactions : [];
+    const hit = reactions.find((entry) => entry.userIds?.includes(currentUserId));
+    return hit ? hit.reaction : null;
+  }, [currentUserId, messages, reactionPicker]);
+
+  const visibleReactions = useMemo(() => {
+    if (!reactionPicker) return [];
+    const messageId = reactionPicker.message.id;
+    const messageList = Array.isArray(messages) ? messages : [];
+    const liveMessage = messageList.find((m) => m.id === messageId) || reactionPicker.message;
+    const reactions = Array.isArray(liveMessage?.reactions) ? liveMessage.reactions : [];
+    return reactions.filter((entry) => entry.count > 0);
+  }, [messages, reactionPicker]);
+
+  useEffect(() => {
+    if (reactionPicker) {
+      reactionAnim.setValue(0);
+      Animated.spring(reactionAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 14,
+        stiffness: 200,
+      }).start();
+    }
+  }, [reactionAnim, reactionPicker]);
+
+  const messageActionAnchor = useMemo(() => {
+    if (!messageActionContext) {
+      return { top: 0, left: SCREEN_WIDTH / 2 - ACTION_CARD_WIDTH / 2 };
+    }
+    const placeAbove = messageActionContext.above ?? messageActionContext.anchorY > windowHeight * 0.55;
+    let rawTop = placeAbove
+      ? messageActionContext.anchorY - ACTION_CARD_HEIGHT - 12
+      : messageActionContext.anchorY + 12;
+    rawTop = Math.max(rawTop, 52);
+    const maxTop = windowHeight - ACTION_CARD_HEIGHT - 32;
+    const top = Math.min(rawTop, maxTop);
+    const rawLeft = messageActionContext.anchorX - ACTION_CARD_WIDTH / 2;
+    const left = Math.max(12, Math.min(rawLeft, SCREEN_WIDTH - ACTION_CARD_WIDTH - 12));
+    return { top, left };
+  }, [ACTION_CARD_HEIGHT, ACTION_CARD_WIDTH, SCREEN_WIDTH, messageActionContext, windowHeight]);
+
+  const messageActionArrowLeft = useMemo(() => {
+    if (!messageActionContext) {
+      return ACTION_CARD_WIDTH / 2 - 6;
+    }
+    const offset = messageActionContext.anchorX - messageActionAnchor.left - 6;
+    return Math.max(14, Math.min(offset, ACTION_CARD_WIDTH - 26));
+  }, [ACTION_CARD_WIDTH, messageActionAnchor.left, messageActionContext]);
+
+  const messageActionArrowTop = useMemo(() => {
+    if (!messageActionContext) {
+      return -6;
+    }
+    const placeAbove = messageActionContext.above ?? messageActionContext.anchorY > windowHeight * 0.55;
+    return placeAbove ? ACTION_CARD_HEIGHT - 6 : -6;
+  }, [ACTION_CARD_HEIGHT, messageActionContext, windowHeight]);
+
+  const dismissMessageActions = useCallback(
+    (onFinished?: () => void) => {
+      if (!messageActionContext) {
+        onFinished?.();
+        return;
+      }
+      Animated.timing(messageActionAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start(() => {
+        setMessageActionContext(null);
+        setContextTargetId(null);
+        onFinished?.();
+      });
+    },
+    [messageActionAnim, messageActionContext]
+  );
+
+  const handleMessageActionSelect = useCallback(
+    (action: { label: string; onPress: () => void }) => {
+      dismissMessageActions(() => {
+        requestAnimationFrame(() => {
+          action.onPress?.();
+        });
+      });
+    },
+    [dismissMessageActions]
+  );
+
+  useEffect(() => {
+    if (messageActionContext) {
+      messageActionAnim.setValue(0);
+      Animated.spring(messageActionAnim, {
+        toValue: 1,
+        friction: 7,
+        tension: 90,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [messageActionAnim, messageActionContext]);
+
+  useEffect(() => {
+    if (attachmentSheetVisible) {
+      attachmentSheetAnim.setValue(0);
+      Animated.spring(attachmentSheetAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 90,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [attachmentSheetAnim, attachmentSheetVisible]);
 
   const getReplyLabel = useCallback(
     (senderId: string) => {
@@ -3313,19 +3342,108 @@ const refreshMessages = useCallback(async () => {
           throw new Error('Missing auth token');
         }
         authTokenRef.current = token;
-        const hasReacted = message.reactions?.some(
-          (entry) => entry.reaction === reaction && entry.userIds?.includes(currentUserId)
-        );
+        const userId = currentUserId;
+        const existing = (message.reactions || []).find((entry) => entry.userIds?.includes(userId));
         const endpoint = `/chat/${chatId}/messages/${message.id}/reactions`;
-        const response = hasReacted
-          ? await ApiService.delete(endpoint, token)
-          : await ApiService.post(endpoint, { reaction }, token);
-        if (!response.success) {
-          NotificationService.show('error', response.error || 'Failed to update reaction');
+        const deleteReaction = async (emoji: string) =>
+          ApiService.delete(`${endpoint}?reaction=${encodeURIComponent(emoji)}`, token);
+        const normalizeReactions = (list: Message['reactions']) =>
+          Array.isArray(list) ? list : [];
+
+        const applyOptimistic = (updater: (reactions: Message['reactions']) => any) => {
+          setMessagesAnimated((prev) =>
+            prev.map((msg) => {
+              if (msg.id !== message.id) return msg;
+              const next = updater(normalizeReactions(msg.reactions));
+              return { ...msg, reactions: next };
+            })
+          );
+        };
+
+        // Remove same reaction (toggle off)
+        if (existing && existing.reaction === reaction) {
+          const before = normalizeReactions(message.reactions);
+          applyOptimistic((reactions) =>
+            normalizeReactions(reactions)
+              .map((entry) =>
+                entry.reaction === reaction
+                  ? {
+                      ...entry,
+                      userIds: (entry.userIds || []).filter((id) => id !== userId),
+                      count: Math.max((entry.count || 1) - 1, 0),
+                    }
+                  : entry
+              )
+              .filter((entry) => (entry.userIds || []).length > 0)
+          );
+          const response = await ApiService.delete(
+            `${endpoint}?reaction=${encodeURIComponent(reaction)}`,
+            token
+          );
+          if (!response.success) {
+            applyOptimistic(() => before);
+            NotificationService.show('error', response.error || 'Failed to update reaction');
+            return;
+          }
+          const reactions = mapServerReactions(response.data?.reactions) || [];
+          applyOptimistic(() => reactions);
           return;
         }
-        const reactions = mapServerReactions(response.data?.reactions);
-        setMessagesAnimated((prev) => prev.map((msg) => (msg.id === message.id ? { ...msg, reactions } : msg)));
+
+        // Switch reaction: clear old then add new
+        if (existing && existing.reaction !== reaction) {
+          const before = normalizeReactions(message.reactions);
+          applyOptimistic((reactions) =>
+            normalizeReactions(reactions)
+              .map((entry) =>
+                entry.reaction === existing.reaction
+                  ? {
+                      ...entry,
+                      userIds: (entry.userIds || []).filter((id) => id !== userId),
+                      count: Math.max((entry.count || 1) - 1, 0),
+                    }
+                  : entry
+              )
+              .filter((entry) => (entry.userIds || []).length > 0)
+          );
+          const clearResp = await ApiService.delete(
+            `${endpoint}?reaction=${encodeURIComponent(existing.reaction)}`,
+            token
+          );
+          if (!clearResp.success) {
+            applyOptimistic(() => before);
+            NotificationService.show('error', clearResp.error || 'Failed to update reaction');
+            return;
+          }
+        }
+
+        // Add new reaction
+        const beforeAdd = Array.isArray(message.reactions) ? message.reactions : [];
+        applyOptimistic((reactions) => {
+          const safe = normalizeReactions(reactions);
+          const existingEntry = safe.find((entry) => entry.reaction === reaction);
+          if (existingEntry) {
+            return safe.map((entry) =>
+              entry.reaction === reaction
+                ? {
+                    ...entry,
+                    count: (entry.count || 0) + 1,
+                    userIds: Array.from(new Set([...(entry.userIds || []), userId])),
+                  }
+                : entry
+            );
+          }
+          return [...safe, { reaction, count: 1, userIds: [userId] }];
+        });
+
+        const addResp = await ApiService.post(endpoint, { reaction }, token);
+        if (!addResp.success) {
+          applyOptimistic(() => beforeAdd);
+          NotificationService.show('error', addResp.error || 'Failed to update reaction');
+          return;
+        }
+        const reactions = mapServerReactions(addResp.data?.reactions) || [];
+        applyOptimistic(() => reactions);
       } catch (error) {
         console.error('Failed to toggle reaction', error);
         NotificationService.show('error', 'Unable to react right now');
@@ -4615,7 +4733,10 @@ const refreshMessages = useCallback(async () => {
             {DEFAULT_REACTIONS.map((reaction) => (
               <Pressable
                 key={`reaction-${reaction}`}
-                style={styles.reactionEmojiButton}
+                style={[
+                  styles.reactionEmojiButton,
+                  currentUserReaction === reaction && styles.reactionEmojiButtonActive,
+                ]}
                 onPress={() => {
                   handleToggleReaction(reactionPicker.message, reaction);
                   setContextTargetId(reactionPicker.message.id);
@@ -4625,18 +4746,26 @@ const refreshMessages = useCallback(async () => {
                 <Text style={styles.reactionEmojiText}>{reaction}</Text>
               </Pressable>
             ))}
-            <Pressable
-              style={styles.reactionEmojiButton}
-              onPress={() =>
-                openMessageActions(
-                  reactionPicker.message,
-                  reactionPicker.anchorX,
-                  reactionPicker.anchorY
-                )
-              }
-            >
-              <Ionicons name="ellipsis-horizontal" size={20} color="#ffffff" />
-            </Pressable>
+            {visibleReactions.length ? (
+              <View style={styles.reactionPickerLabel}>
+                <Text style={styles.reactionPickerLabelText} numberOfLines={1}>
+                  {visibleReactions
+                    .map((entry) => `${entry.reaction} ${entry.count}`)
+                    .join('   ')}
+                </Text>
+              </View>
+            ) : null}
+            {currentUserReaction ? (
+              <View style={styles.reactionPickerLabel}>
+                <Text style={styles.reactionPickerLabelText}>
+                  Your reaction: {currentUserReaction} (tap again to remove)
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.reactionPickerLabel}>
+                <Text style={styles.reactionPickerLabelText}>Tap to react. Tap again to remove.</Text>
+              </View>
+            )}
           </Animated.View>
         </View>
       ) : null}
@@ -6049,15 +6178,29 @@ const styles = StyleSheet.create({
     zIndex: 51,
   },
   reactionEmojiButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  reactionEmojiButtonActive: {
+    backgroundColor: 'rgba(44, 130, 255, 0.35)',
+    borderWidth: 1.5,
+    borderColor: '#2C82FF',
+  },
   reactionEmojiText: {
     fontSize: 24,
+  },
+  reactionPickerLabel: {
+    marginLeft: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  reactionPickerLabelText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
   },
   reactionPill: {
     flexDirection: 'row',
