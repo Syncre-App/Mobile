@@ -597,6 +597,7 @@ interface MessageBubbleProps {
   replyCount?: number;
   showSenderMetadata?: boolean;
   onBubblePress?: () => void;
+  onBubbleDoubleTap?: (event: GestureResponderEvent) => void;
   onBubbleLongPress?: (event: GestureResponderEvent) => void;
   onAttachmentPress?: (attachment: MessageAttachment, attachments?: MessageAttachment[]) => void;
   onLinkPress?: (url: string) => void;
@@ -621,6 +622,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   replyCount = 0,
   showSenderMetadata = false,
   onBubblePress,
+  onBubbleDoubleTap,
   onBubbleLongPress,
   onAttachmentPress,
   onLinkPress,
@@ -634,6 +636,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const swipeAnim = useRef(new Animated.Value(0)).current;
   const swipePeakRef = useRef(0);
   const replyTriggeredRef = useRef(false);
+  const lastTapRef = useRef(0);
+  const singleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textSegments = useMemo(() => splitTextByLinks(message.content || ''), [message.content]);
   const embeddableLink = useMemo(() => {
     if (message.isPlaceholder || message.attachments?.length) {
@@ -709,6 +713,40 @@ useEffect(() => {
         },
       }),
     [isMine, onReplySwipe, swipeAnim]
+  );
+
+  useEffect(
+    () => () => {
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+        singleTapTimeoutRef.current = null;
+      }
+    },
+    []
+  );
+
+  const handleBubblePress = useCallback(
+    (event: GestureResponderEvent) => {
+      const now = Date.now();
+      if (now - lastTapRef.current < 250) {
+        if (singleTapTimeoutRef.current) {
+          clearTimeout(singleTapTimeoutRef.current);
+          singleTapTimeoutRef.current = null;
+        }
+        lastTapRef.current = 0;
+        onBubbleDoubleTap?.(event);
+        return;
+      }
+      lastTapRef.current = now;
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+      }
+      singleTapTimeoutRef.current = setTimeout(() => {
+        singleTapTimeoutRef.current = null;
+        onBubblePress?.();
+      }, 220);
+    },
+    [onBubbleDoubleTap, onBubblePress]
   );
 
   useEffect(() => {
@@ -808,7 +846,7 @@ useEffect(() => {
           <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
         </Animated.View>
         <Pressable
-          onPress={onBubblePress}
+          onPress={handleBubblePress}
           onLongPress={(event) => onBubbleLongPress?.(event)}
           style={[
             styles.messageContent,
@@ -1234,6 +1272,13 @@ const [reactionPicker, setReactionPicker] = useState<{
     anchorX: number;
     anchorY: number;
   } | null>(null);
+const reactionAnim = useRef(new Animated.Value(0)).current;
+  const closeReactionPicker = useCallback(() => {
+    setReactionPicker(null);
+    setContextTargetId(null);
+    reactionAnim.stopAnimation();
+    reactionAnim.setValue(0);
+  }, [reactionAnim]);
   const messageActionAnim = useRef(new Animated.Value(0)).current;
   const windowHeight = Dimensions.get('window').height;
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
@@ -1246,11 +1291,27 @@ const [reactionPicker, setReactionPicker] = useState<{
       return null;
     }
     const buttonCount = DEFAULT_REACTIONS.length + 1; // emojis + more
-    const width = buttonCount * 44 + 16;
-    const left = Math.max(8, Math.min(reactionPicker.anchorX - width / 2, SCREEN_WIDTH - width - 8));
-    const top = Math.max(reactionPicker.anchorY - 90, 12);
-    return { top, left };
-  }, [SCREEN_WIDTH, reactionPicker]);
+    const width = buttonCount * 44 + 20;
+    const pickerHeight = 62;
+    const left = Math.max(10, Math.min(reactionPicker.anchorX - width / 2, SCREEN_WIDTH - width - 10));
+    const top = Math.max(
+      Math.min(reactionPicker.anchorY - 72, windowHeight - pickerHeight - insets.bottom - 12),
+      insets.top + 12
+    );
+    return { top, left, width, height: pickerHeight };
+  }, [SCREEN_WIDTH, insets.bottom, insets.top, reactionPicker, windowHeight]);
+
+  useEffect(() => {
+    if (reactionPicker) {
+      reactionAnim.setValue(0);
+      Animated.spring(reactionAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 14,
+        stiffness: 200,
+      }).start();
+    }
+  }, [reactionAnim, reactionPicker]);
   const messageActionAnchor = useMemo(() => {
     if (!messageActionContext) {
       return { top: 0, left: SCREEN_WIDTH / 2 - ACTION_CARD_WIDTH / 2 };
@@ -2652,8 +2713,16 @@ const refreshMessages = useCallback(async () => {
             options.onProgress(1);
           }
           try {
-            const json = JSON.parse(xhr.responseText || '{}');
-            resolve(json);
+            const parsed = JSON.parse(xhr.responseText || '{}');
+            const normalized =
+              typeof parsed === 'object' && parsed !== null && 'success' in parsed
+                ? parsed
+                : {
+                    success: xhr.status >= 200 && xhr.status < 300,
+                    data: parsed,
+                    statusCode: xhr.status,
+                  };
+            resolve(normalized);
           } catch (err) {
             reject(err);
           }
@@ -3388,10 +3457,22 @@ const refreshMessages = useCallback(async () => {
 
       const anchorY = event?.nativeEvent?.pageY ?? windowHeight / 2;
       const anchorX = event?.nativeEvent?.pageX ?? SCREEN_WIDTH / 2;
+      openMessageActions(message, anchorX, anchorY);
+    },
+    [SCREEN_WIDTH, buildReplyPayloadFromMessage, openMessageActions, windowHeight]
+  );
+
+  const handleBubbleDoubleTap = useCallback(
+    (message: Message, event?: GestureResponderEvent) => {
+      if (message.isPlaceholder) {
+        return;
+      }
+      const anchorY = event?.nativeEvent?.pageY ?? windowHeight / 2;
+      const anchorX = event?.nativeEvent?.pageX ?? SCREEN_WIDTH / 2;
       setContextTargetId(message.id);
       setReactionPicker({ message, anchorX, anchorY });
     },
-    [SCREEN_WIDTH, buildReplyPayloadFromMessage, windowHeight]
+    [SCREEN_WIDTH, windowHeight]
   );
 
   const handleSendMessage = useCallback(async () => {
@@ -4075,6 +4156,9 @@ const refreshMessages = useCallback(async () => {
       if (!initialLoadCompleteRef.current) {
         return;
       }
+      if (reactionPicker) {
+        closeReactionPicker();
+      }
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
       const hasScrollableContent = contentSize.height > layoutMeasurement.height + 40;
       if (!hasScrollableContent) {
@@ -4351,9 +4435,14 @@ const refreshMessages = useCallback(async () => {
           replyCount={replyCount}
           onOpenThread={(messageId) => setThreadRootId(messageId)}
           showSenderMetadata={Boolean(chatDetails?.isGroup && isFirstInGroup && !messageItem.isPlaceholder)}
-          onBubblePress={() =>
-            setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id))
-          }
+          onBubblePress={() => {
+            if (reactionPicker) {
+              closeReactionPicker();
+              return;
+            }
+            setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id));
+          }}
+          onBubbleDoubleTap={(event) => handleBubbleDoubleTap(messageItem, event)}
           onBubbleLongPress={(event) => handleBubbleLongPress(messageItem, event)}
           onAttachmentPress={handleAttachmentTap}
           onLinkPress={handleOpenLink}
@@ -4379,7 +4468,8 @@ const refreshMessages = useCallback(async () => {
       handleOpenLink,
       seenPlacementMap,
       handleToggleReaction,
-      currentUserId,
+      handleBubbleDoubleTap,
+      handleBubbleLongPress,
       typingUsers,
       formatTypingLabel,
     ]
@@ -4496,24 +4586,41 @@ const refreshMessages = useCallback(async () => {
       </View>
 
       {reactionPicker && reactionPickerPosition ? (
-        <Pressable
-          style={styles.reactionPickerBackdrop}
-          onPress={() => {
-            setReactionPicker(null);
-            setContextTargetId(null);
-          }}
-        >
-          <View
+        <View style={styles.reactionPickerOverlay} pointerEvents="box-none">
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              closeReactionPicker();
+            }}
+          />
+          <Animated.View
             style={[
               styles.reactionPickerBar,
-              { top: reactionPickerPosition.top, left: reactionPickerPosition.left },
+              {
+                top: reactionPickerPosition.top,
+                left: reactionPickerPosition.left,
+                width: reactionPickerPosition.width,
+                transform: [
+                  {
+                    scale: reactionAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.85, 1],
+                    }),
+                  },
+                ],
+                opacity: reactionAnim,
+              },
             ]}
           >
             {DEFAULT_REACTIONS.map((reaction) => (
               <Pressable
                 key={`reaction-${reaction}`}
                 style={styles.reactionEmojiButton}
-                onPress={() => handleToggleReaction(reactionPicker.message, reaction)}
+                onPress={() => {
+                  handleToggleReaction(reactionPicker.message, reaction);
+                  setContextTargetId(reactionPicker.message.id);
+                  closeReactionPicker();
+                }}
               >
                 <Text style={styles.reactionEmojiText}>{reaction}</Text>
               </Pressable>
@@ -4530,8 +4637,8 @@ const refreshMessages = useCallback(async () => {
             >
               <Ionicons name="ellipsis-horizontal" size={20} color="#ffffff" />
             </Pressable>
-          </View>
-        </Pressable>
+          </Animated.View>
+        </View>
       ) : null}
 
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -5919,37 +6026,38 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 8,
   },
-  reactionPickerBackdrop: {
+  reactionPickerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-start',
+    zIndex: 50,
   },
   reactionPickerBar: {
     position: 'absolute',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: 'rgba(20, 24, 38, 0.95)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#0F1324',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.12)',
     shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 14,
+    zIndex: 51,
   },
   reactionEmojiButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   reactionEmojiText: {
-    fontSize: 22,
+    fontSize: 24,
   },
   reactionPill: {
     flexDirection: 'row',

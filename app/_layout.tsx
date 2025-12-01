@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiService } from '../services/ApiService';
 import Constants from 'expo-constants';
@@ -77,6 +78,27 @@ export default function RootLayout() {
   useEffect(() => {
     checkMaintenance();
   }, []);
+
+  useEffect(() => {
+    // Handle notification taps -> navigate to the target chat
+    const handleNotificationResponse = (response: Notifications.NotificationResponse | null) => {
+      const data = response?.notification?.request?.content?.data as any;
+      const chatId = data?.chatId || data?.chat_id || data?.chatID;
+      if (chatId) {
+        router.push(`/chat/${chatId}`);
+      }
+    };
+
+    Notifications.getLastNotificationResponseAsync()
+      .then(handleNotificationResponse)
+      .catch(() => {});
+
+    const responseSub = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+
+    return () => {
+      responseSub.remove();
+    };
+  }, [router]);
 
   useEffect(() => {
     ShareIntentService.init();
