@@ -8,7 +8,7 @@
     "scheme": "syncre",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
-    "jsEngine": "jsc",
+    "jsEngine": "hermes",
     "notification": {
       "icon": "./assets/logo.png",
       "color": "#2C82FF"
