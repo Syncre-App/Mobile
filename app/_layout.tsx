@@ -11,21 +11,22 @@ import { StorageService } from '../services/StorageService';
 import { CryptoService } from '../services/CryptoService';
 import { ShareIntentService } from '../services/ShareIntentService';
 
-const isMaintenanceEnabled = (): boolean => {
-  const value = Constants.expoConfig?.extra?.maintenance;
-  if (typeof value === 'string') {
-    return value.toLowerCase() === 'true';
-  }
+const toBoolean = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.toLowerCase() === 'true';
   return Boolean(value);
 };
 
+const isMaintenanceEnabled = (): boolean => toBoolean(Constants.expoConfig?.extra?.maintenance);
+
 export default function RootLayout() {
-  const [maintenance, setMaintenance] = useState(true);
+  const [maintenance, setMaintenance] = useState<boolean>(() => isMaintenanceEnabled());
   const router = useRouter();
 
   useEffect(() => {
     const checkMaintenance = async () => {
-      if (isMaintenanceEnabled()) {
+      const maintenanceFlag = isMaintenanceEnabled();
+      if (maintenanceFlag) {
         setMaintenance(true);
         router.replace('/maintenance');
         return;
