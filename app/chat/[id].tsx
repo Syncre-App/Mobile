@@ -2632,6 +2632,10 @@ const refreshMessages = useCallback(async () => {
         xhr.open('POST', uploadUrl);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.onload = () => {
+          // Ensure UI gets a final 100% update before resolving
+          if (typeof options.onProgress === 'function') {
+            options.onProgress(1);
+          }
           try {
             const json = JSON.parse(xhr.responseText || '{}');
             resolve(json);
@@ -2643,7 +2647,8 @@ const refreshMessages = useCallback(async () => {
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable && typeof options.onProgress === 'function') {
             const progress = event.total > 0 ? event.loaded / event.total : 0;
-            options.onProgress(progress);
+            const clamped = Math.min(Math.max(progress, 0), 1);
+            options.onProgress(clamped);
           }
         };
 
@@ -4848,7 +4853,7 @@ const refreshMessages = useCallback(async () => {
                 ) : item.isVideo && resolveAttachmentUri(item) ? (
                   <Video
                     source={{ uri: resolveAttachmentUri(item)! }}
-                    style={StyleSheet.absoluteFillObject}
+                    style={styles.attachmentModalVideo}
                     resizeMode={ResizeMode.CONTAIN}
                     useNativeControls
                     shouldPlay={false}
@@ -5909,7 +5914,7 @@ const styles = StyleSheet.create({
   },
   attachmentModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(3, 4, 10, 0.65)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'space-between',
   },
   attachmentModalTopBar: {
@@ -5971,10 +5976,15 @@ const styles = StyleSheet.create({
     width: Dimensions.get('window').width - 24,
     height: Dimensions.get('window').height * 0.65,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#000000',
     marginBottom: 12,
     alignSelf: 'center',
     overflow: 'hidden',
+  },
+  attachmentModalVideo: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000',
   },
   attachmentZoomContainer: {
     flex: 1,
