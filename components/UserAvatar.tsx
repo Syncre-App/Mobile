@@ -3,7 +3,7 @@ import { Image, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { gradients, palette } from '../theme/designSystem';
 
-type Presence = 'online' | 'offline' | 'busy' | 'away' | null | undefined;
+type Presence = 'online' | 'offline' | 'busy' | 'away' | 'idle' | null | undefined;
 type PresencePlacement = 'overlay' | 'left';
 
 interface UserAvatarProps {
@@ -23,6 +23,8 @@ const getPresenceColor = (presence: Presence, override?: string) => {
       return '#4CAF50';
     case 'busy':
       return '#FF6B6B';
+    case 'idle':
+      return '#FFC107';
     case 'away':
       return '#FFC107';
     default:
