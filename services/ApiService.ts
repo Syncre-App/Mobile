@@ -1,7 +1,18 @@
 import { UserCacheService } from './UserCacheService';
 import { TimezoneService } from './TimezoneService';
 
-const BASE_URL = 'https://api.syncre.xyz/v1';
+// Allow overriding the API URL via Expo public env for local/dev servers.
+// Example: EXPO_PUBLIC_API_URL=http://192.168.0.5:3000/v1
+const resolveBaseUrl = () => {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (envUrl) {
+    const normalized = envUrl.endsWith('/v1') ? envUrl : `${envUrl.replace(/\/+$/, '')}/v1`;
+    return normalized;
+  }
+  return 'https://api.syncre.xyz/v1';
+};
+
+const BASE_URL = resolveBaseUrl();
 
 export interface ApiResponse<T = any> {
   success: boolean;

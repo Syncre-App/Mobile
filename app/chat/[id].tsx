@@ -4442,9 +4442,6 @@ const refreshMessages = useCallback(async () => {
     <SafeAreaView
       style={[
         styles.container,
-        {
-          paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
-        },
       ]}
       edges={['top', 'left', 'right']}
     >
@@ -5039,7 +5036,7 @@ const refreshMessages = useCallback(async () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 0,
+    paddingTop: 0,
   },
   fallbackContainer: {
     flex: 1,

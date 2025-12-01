@@ -14,6 +14,7 @@ export interface WebSocketMessage {
 import { DeviceEventEmitter } from 'react-native';
 import { ReencryptionService } from './ReencryptionService';
 import { TimezoneService } from './TimezoneService';
+import { ApiService } from './ApiService';
 
 export class WebSocketService {
   private static instance: WebSocketService;
@@ -79,7 +80,15 @@ export class WebSocketService {
       
       // According to the WebSocket API documentation, connect first then authenticate with auth message
       // Don't include token in URL - server expects auth message within 5 seconds
-      const wsUrl = `wss://api.syncre.xyz/ws`;
+      let wsUrl: string;
+      try {
+        const api = new URL(ApiService.baseUrl);
+        const wsScheme = api.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${wsScheme}//${api.host}/ws`;
+      } catch (err) {
+        // Fallback to production if parsing fails
+        wsUrl = 'wss://api.syncre.xyz/ws';
+      }
       console.log('🌐 WebSocket URL:', wsUrl);
 
       try {
