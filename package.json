@@ -19,7 +19,7 @@
     "@react-native/codegen": "^0.82.1",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.5",
-    "@react-navigation/native": "^7.1.8",
+    "@react-navigation/native": "^7.1.22",
     "@stablelib/hkdf": "^2.0.1",
     "@stablelib/pbkdf2": "^2.0.1",
     "@stablelib/sha256": "^2.0.1",
