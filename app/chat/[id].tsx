@@ -52,6 +52,8 @@ interface MessageAttachment {
   publicDownloadUrl?: string;
   localUri?: string;
   uploadPending?: boolean;
+  uploadProgress?: number;
+  uploadError?: boolean;
 }
 
 interface SeenReceipt {
@@ -84,6 +86,7 @@ interface Message {
   isEdited?: boolean;
   deletedLabel?: string | null;
   seenBy?: SeenReceipt[];
+  reactions?: Array<{ reaction: string; count: number; userIds: string[] }>;
 }
 
 interface ChatParticipant {
@@ -520,6 +523,7 @@ const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
 const SWIPE_REPLY_THRESHOLD = 18;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
+const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
 
 const layoutNext = () => {
@@ -599,6 +603,8 @@ interface MessageBubbleProps {
   isGroupChat: boolean;
   directRecipient?: ChatParticipant | null;
   seenOverride?: SeenReceipt[] | null;
+  onReact?: (message: Message, reaction: string) => void;
+  currentUserId?: string | null;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -621,6 +627,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isGroupChat,
   directRecipient,
   seenOverride = null,
+  onReact,
+  currentUserId,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -758,6 +766,7 @@ useEffect(() => {
   const activeSeenReceipts = overrideSeenReceipts;
   const shouldShowSeenAvatars = activeSeenReceipts.length > 0;
   const MAX_SEEN_AVATARS = 4;
+  const reactions = Array.isArray(message.reactions) ? message.reactions : [];
   const displayedSeenReceipts = (() => {
     if (!shouldShowSeenAvatars) {
       return [];
@@ -1038,6 +1047,23 @@ useEffect(() => {
                 ) : null}
               </Pressable>
             ) : null}
+            {reactions.length ? (
+              <View style={styles.reactionRow}>
+                {reactions.map((entry) => {
+                  const mine = currentUserId ? entry.userIds?.includes(currentUserId) : false;
+                  return (
+                    <Pressable
+                      key={`${message.id}-reaction-${entry.reaction}`}
+                      style={[styles.reactionPill, mine && styles.reactionPillMine]}
+                      onPress={() => onReact?.(message, entry.reaction)}
+                    >
+                      <Text style={styles.reactionText}>{entry.reaction}</Text>
+                      <Text style={styles.reactionCount}>{entry.count}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
             {message.isEdited && !message.isPlaceholder ? (
               <Text style={styles.editedLabel}>Edited</Text>
             ) : null}
@@ -1046,7 +1072,13 @@ useEffect(() => {
             <Text style={styles.statusText}>{statusText}</Text>
           ) : null}
           {shouldShowSeenAvatars && displayedSeenReceipts.length ? (
-            <View style={styles.seenReceiptRow}>
+            <Pressable
+              style={styles.seenReceiptRow}
+              onLongPress={() => {
+                const names = activeSeenReceipts.map((r) => r.username || 'Member').join(', ');
+                Alert.alert('Seen by', names || 'No viewers', [{ text: 'OK' }]);
+              }}
+            >
               {isGroupChat && unseenReceiptCount > 0 ? (
                 <View style={styles.seenReceiptOverflow}>
                   <Text style={styles.seenReceiptOverflowText}>+{unseenReceiptCount}</Text>
@@ -1061,7 +1093,7 @@ useEffect(() => {
                   style={styles.seenReceiptAvatar}
                 />
               ))}
-            </View>
+            </Pressable>
           ) : null}
           {replyCount > 0 && onOpenThread && (
             <Pressable
@@ -1760,6 +1792,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
         const attachments = Array.isArray(raw.attachments)
           ? raw.attachments.map((item: any) => mapServerAttachment(item))
           : [];
+        const reactions = mapServerReactions((raw as any)?.reactions);
 
         let content: string | null = null;
         if (raw.isEncrypted && Array.isArray(raw.envelopes)) {
@@ -1838,6 +1871,7 @@ const [contextTargetId, setContextTargetId] = useState<string | null>(null);
           editedAt: editedAt ?? undefined,
           isPlaceholder: Boolean(isDeleted),
           seenBy,
+          reactions,
         });
       }
 
@@ -2529,6 +2563,54 @@ const refreshMessages = useCallback(async () => {
     [wsService]
   );
 
+  const uploadAttachmentWithProgress = useCallback(
+    async (
+      file: UploadableAsset,
+      options: { onProgress?: (progress: number) => void } = {}
+    ): Promise<any> => {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+      authTokenRef.current = token;
+      if (!chatId) {
+        throw new Error('Chat not available');
+      }
+
+      const uploadUrl = `${ApiService.baseUrl}/chat/${chatId}/attachments`;
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.onload = () => {
+          try {
+            const json = JSON.parse(xhr.responseText || '{}');
+            resolve(json);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        xhr.onerror = () => reject(new Error('Upload failed'));
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && typeof options.onProgress === 'function') {
+            const progress = event.total > 0 ? event.loaded / event.total : 0;
+            options.onProgress(progress);
+          }
+        };
+
+        const formData = new FormData();
+        formData.append('file', {
+          uri: file.uri,
+          name: file.name || `attachment-${Date.now()}`,
+          type: file.type || 'application/octet-stream',
+        } as any);
+
+        xhr.send(formData);
+      });
+    },
+    [chatId]
+  );
+
   const uploadSingleAttachment = useCallback(
     async (file: UploadableAsset) => {
       if (!chatId) {
@@ -2553,15 +2635,34 @@ const refreshMessages = useCallback(async () => {
         publicDownloadUrl: undefined,
         localUri: file.uri,
         uploadPending: true,
+        uploadProgress: 0,
+        uploadError: false,
       };
 
       setPendingAttachments((prev) => [...prev, placeholder]);
 
       try {
-        const response = await ChatService.uploadAttachment(chatId, file);
+        const response = await uploadAttachmentWithProgress(file, {
+          onProgress: (progress) => {
+            setPendingAttachments((prev) =>
+              prev.map((attachment) =>
+                attachment.id === tempId
+                  ? { ...attachment, uploadProgress: progress, uploadError: false }
+                  : attachment
+              )
+            );
+          },
+        });
+
         if (!response.success || !response.data?.attachment) {
           NotificationService.show('error', response.error || 'Failed to upload attachment');
-          setPendingAttachments((prev) => prev.filter((attachment) => attachment.id !== tempId));
+          setPendingAttachments((prev) =>
+            prev.map((attachment) =>
+              attachment.id === tempId
+                ? { ...attachment, uploadPending: false, uploadError: true }
+                : attachment
+            )
+          );
           return;
         }
         const mapped = mapServerAttachment(response.data.attachment);
@@ -2571,6 +2672,8 @@ const refreshMessages = useCallback(async () => {
               ? {
                   ...mapped,
                   uploadPending: false,
+                  uploadError: false,
+                  uploadProgress: 1,
                 }
               : attachment
           )
@@ -2578,10 +2681,16 @@ const refreshMessages = useCallback(async () => {
       } catch (error) {
         console.error('Attachment upload failed:', error);
         NotificationService.show('error', 'Unable to upload attachment');
-        setPendingAttachments((prev) => prev.filter((attachment) => attachment.id !== tempId));
+        setPendingAttachments((prev) =>
+          prev.map((attachment) =>
+            attachment.id === tempId
+              ? { ...attachment, uploadPending: false, uploadError: true }
+              : attachment
+          )
+        );
       }
     },
-    [chatId]
+    [chatId, uploadAttachmentWithProgress]
   );
 
   const ensureAttachmentCapacity = useCallback(
@@ -2747,6 +2856,73 @@ const refreshMessages = useCallback(async () => {
       }
     },
     []
+  );
+
+  const handleRetryAttachment = useCallback(
+    async (attachment: MessageAttachment) => {
+      if (!attachment?.localUri) {
+        return;
+      }
+      const file: UploadableAsset = {
+        uri: attachment.localUri,
+        name: attachment.name,
+        type: attachment.mimeType,
+        size: attachment.fileSize,
+      };
+
+      const tempId = attachment.id;
+      setPendingAttachments((prev) =>
+        prev.map((item) =>
+          item.id === tempId
+            ? { ...item, uploadPending: true, uploadError: false, uploadProgress: 0 }
+            : item
+        )
+      );
+
+      try {
+        const response = await uploadAttachmentWithProgress(file, {
+          onProgress: (progress) => {
+            setPendingAttachments((prev) =>
+              prev.map((item) =>
+                item.id === tempId ? { ...item, uploadProgress: progress, uploadError: false } : item
+              )
+            );
+          },
+        });
+
+        if (!response.success || !response.data?.attachment) {
+          NotificationService.show('error', response.error || 'Failed to upload attachment');
+          setPendingAttachments((prev) =>
+            prev.map((item) =>
+              item.id === tempId ? { ...item, uploadPending: false, uploadError: true } : item
+            )
+          );
+          return;
+        }
+        const mapped = mapServerAttachment(response.data.attachment);
+        setPendingAttachments((prev) =>
+          prev.map((item) =>
+            item.id === tempId
+              ? {
+                  ...mapped,
+                  uploadPending: false,
+                  uploadError: false,
+                  uploadProgress: 1,
+                }
+              : item
+          )
+        );
+      } catch (error) {
+        console.error('Attachment retry failed:', error);
+        NotificationService.show('error', 'Unable to upload attachment');
+        setPendingAttachments((prev) =>
+          prev.map((item) =>
+            item.id === tempId ? { ...item, uploadPending: false, uploadError: true } : item
+          )
+        );
+      }
+    },
+    [uploadAttachmentWithProgress]
   );
 
   const startEditMessage = useCallback(
@@ -2990,6 +3166,36 @@ const refreshMessages = useCallback(async () => {
     []
   );
 
+  const handleToggleReaction = useCallback(
+    async (message: Message, reaction: string) => {
+      if (!chatId || !currentUserId) return;
+      try {
+        const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+        if (!token) {
+          throw new Error('Missing auth token');
+        }
+        authTokenRef.current = token;
+        const hasReacted = message.reactions?.some(
+          (entry) => entry.reaction === reaction && entry.userIds?.includes(currentUserId)
+        );
+        const endpoint = `/chat/${chatId}/messages/${message.id}/reactions`;
+        const response = hasReacted
+          ? await ApiService.delete(`${endpoint}?reaction=${encodeURIComponent(reaction)}`, token)
+          : await ApiService.post(endpoint, { reaction }, token);
+        if (!response.success) {
+          NotificationService.show('error', response.error || 'Failed to update reaction');
+          return;
+        }
+        const reactions = mapServerReactions(response.reactions || response.data?.reactions);
+        setMessagesAnimated((prev) => prev.map((msg) => (msg.id === message.id ? { ...msg, reactions } : msg)));
+      } catch (error) {
+        console.error('Failed to toggle reaction', error);
+        NotificationService.show('error', 'Unable to react right now');
+      }
+    },
+    [chatId, currentUserId, setMessagesAnimated]
+  );
+
   const handleCopyMessage = useCallback(async (message: Message) => {
     const text = message.content || '';
     if (!text) {
@@ -3082,6 +3288,13 @@ const refreshMessages = useCallback(async () => {
           onPress: () => confirmDeleteMessage(message),
         });
       }
+
+      DEFAULT_REACTIONS.forEach((reaction) => {
+        actions.push({
+          label: `React ${reaction}`,
+          onPress: () => handleToggleReaction(message, reaction),
+        });
+      });
 
       if (!canEdit && !canDelete) {
         actions.push({ label: 'Cancel', onPress: () => {} });
@@ -3604,6 +3817,7 @@ const refreshMessages = useCallback(async () => {
           const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
           const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
           const attachments = mapServerAttachments(payload.attachments);
+          const reactions = mapServerReactions(payload.reactions);
           const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
           const newEntry: Message = {
             id: String(payload.messageId ?? payload.id ?? Date.now()),
@@ -3617,6 +3831,7 @@ const refreshMessages = useCallback(async () => {
             timezone,
             replyTo,
             attachments,
+            reactions,
             isEdited: Boolean(payload.editedAt),
             editedAt: payload.editedAt ?? undefined,
           };
@@ -3659,6 +3874,17 @@ const refreshMessages = useCallback(async () => {
                 })),
               };
             })
+          );
+          return;
+        }
+        case 'message_reaction': {
+          const messageId = String(payload.messageId ?? payload.id ?? '');
+          const reactions = mapServerReactions(payload.reactions);
+          if (!messageId || !reactions) {
+            return;
+          }
+          setMessagesAnimated((prev) =>
+            prev.map((msg) => (msg.id === messageId ? { ...msg, reactions } : msg))
           );
           return;
         }
@@ -4118,6 +4344,8 @@ const refreshMessages = useCallback(async () => {
           isGroupChat={Boolean(chatDetails?.isGroup)}
           directRecipient={directRecipient}
           seenOverride={seenPlacementMap.get(messageItem.id) ?? null}
+          onReact={handleToggleReaction}
+          currentUserId={currentUserId}
         />
       );
     },
@@ -4134,6 +4362,8 @@ const refreshMessages = useCallback(async () => {
       handleAttachmentTap,
       handleOpenLink,
       seenPlacementMap,
+      handleToggleReaction,
+      currentUserId,
       typingUsers,
       formatTypingLabel,
     ]
@@ -4404,8 +4634,27 @@ const refreshMessages = useCallback(async () => {
                   </Text>
                   {attachment.uploadPending ? (
                     <View style={styles.attachmentChipProgress}>
-                      <ActivityIndicator size="small" color="#ffffff" />
-                      <Text style={styles.attachmentChipMeta}>Uploading…</Text>
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressBar,
+                            { width: `${Math.round((attachment.uploadProgress || 0) * 100)}%` },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.attachmentChipMeta}>
+                        {Math.round((attachment.uploadProgress || 0) * 100)}%
+                      </Text>
+                    </View>
+                  ) : attachment.uploadError ? (
+                    <View style={styles.attachmentChipProgress}>
+                      <Text style={styles.attachmentChipMeta}>Upload failed</Text>
+                      <Pressable
+                        onPress={() => handleRetryAttachment(attachment)}
+                        style={styles.retryButton}
+                      >
+                        <Text style={styles.retryButtonText}>Retry</Text>
+                      </Pressable>
                     </View>
                   ) : (
                     <Text style={styles.attachmentChipMeta}>{formatBytes(attachment.fileSize)}</Text>
@@ -5565,6 +5814,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     columnGap: 6,
   },
+  progressTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#2C82FF',
+  },
+  retryButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   attachmentChipRemove: {
     width: 20,
     height: 20,
@@ -5572,6 +5843,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  reactionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  reactionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    gap: 6,
+  },
+  reactionPillMine: {
+    backgroundColor: 'rgba(44, 130, 255, 0.2)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(44, 130, 255, 0.6)',
+  },
+  reactionText: {
+    fontSize: 14,
+    color: '#ffffff',
+  },
+  reactionCount: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
   },
   editingBanner: {
     flexDirection: 'row',
@@ -5834,3 +6135,17 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
+const mapServerReactions = (raw?: any): Array<{ reaction: string; count: number; userIds: string[] }> => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => {
+      if (!entry?.reaction) return null;
+      const reaction = String(entry.reaction);
+      const count = Number(entry.count) || 0;
+      const userIds = Array.isArray(entry.userIds)
+        ? entry.userIds.map((id) => id?.toString?.() ?? String(id)).filter(Boolean)
+        : [];
+      return { reaction, count: Math.max(count, userIds.length || 1), userIds };
+    })
+    .filter(Boolean) as Array<{ reaction: string; count: number; userIds: string[] }>;
+};
