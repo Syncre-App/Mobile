@@ -765,7 +765,7 @@ useEffect(() => {
   const overrideSeenReceipts = Array.isArray(seenOverride) ? seenOverride : [];
   const activeSeenReceipts = overrideSeenReceipts;
   const shouldShowSeenAvatars = activeSeenReceipts.length > 0;
-  const MAX_SEEN_AVATARS = 4;
+  const MAX_SEEN_AVATARS = 2;
   const reactions = Array.isArray(message.reactions) ? message.reactions : [];
   const displayedSeenReceipts = (() => {
     if (!shouldShowSeenAvatars) {
@@ -1079,11 +1079,6 @@ useEffect(() => {
                 Alert.alert('Seen by', names || 'No viewers', [{ text: 'OK' }]);
               }}
             >
-              {isGroupChat && unseenReceiptCount > 0 ? (
-                <View style={styles.seenReceiptOverflow}>
-                  <Text style={styles.seenReceiptOverflowText}>+{unseenReceiptCount}</Text>
-                </View>
-              ) : null}
               {displayedSeenReceipts.map((receipt) => (
                 <UserAvatar
                   key={`${message.id}-seen-${receipt.userId}`}
@@ -1093,6 +1088,11 @@ useEffect(() => {
                   style={styles.seenReceiptAvatar}
                 />
               ))}
+              {isGroupChat && unseenReceiptCount > 0 ? (
+                <View style={styles.seenReceiptOverflow}>
+                  <Text style={styles.seenReceiptOverflowText}>+{unseenReceiptCount}</Text>
+                </View>
+              ) : null}
             </Pressable>
           ) : null}
           {replyCount > 0 && onOpenThread && (
@@ -3959,14 +3959,6 @@ const refreshMessages = useCallback(async () => {
           const previous = chatDetailsRef.current;
           const incomingName = payload.chat?.name ?? payload.chat?.displayName ?? null;
           const incomingAvatar = payload.chat?.avatarUrl ?? payload.chat?.avatar_url ?? null;
-          if (previous?.isGroup) {
-            if (incomingName && previous.name && incomingName !== previous.name) {
-              appendSystemNotice(`${previous.name} renamed to ${incomingName}`);
-            }
-            if (incomingAvatar && previous.avatarUrl && incomingAvatar !== previous.avatarUrl) {
-              appendSystemNotice('Group avatar updated');
-            }
-          }
           if (payload.chat) {
             applyChatUpdate(payload.chat);
           }
@@ -4283,6 +4275,9 @@ const refreshMessages = useCallback(async () => {
       if (messageItem.senderId === 'system') {
         return (
           <View style={styles.systemMessageRow}>
+            <View style={styles.systemMessageBadge}>
+              <Ionicons name="information-circle-outline" size={14} color="rgba(255, 255, 255, 0.85)" />
+            </View>
             <Text style={styles.systemMessageText}>{messageItem.content}</Text>
           </View>
         );
@@ -5358,7 +5353,23 @@ const styles = StyleSheet.create({
   systemMessageRow: {
     alignSelf: 'center',
     marginVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  systemMessageBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   systemMessageText: {
     color: 'rgba(255, 255, 255, 0.6)',
