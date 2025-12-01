@@ -4194,17 +4194,13 @@ const refreshMessages = useCallback(async () => {
     const counterpart = chatDetails.participants?.find(
       (participant) => participant.id !== currentUserId
     );
-    if (!counterpart?.status) {
+    if (!counterpart) {
       return null;
     }
-    const normalized = String(counterpart.status).toLowerCase();
-    if (normalized === 'online') {
-      return 'Online';
-    }
-    if (normalized === 'away') {
-      return 'Away';
-    }
-    return 'Offline';
+    const normalized = counterpart.status ? String(counterpart.status).toLowerCase() : '';
+    if (normalized === 'online') return 'Online';
+    if (normalized === 'idle') return 'Idle';
+    return formatLastSeenLabel(counterpart.last_seen);
   }, [chatDetails, currentUserId]);
 
 
