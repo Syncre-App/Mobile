@@ -5,6 +5,8 @@ interface User {
   username: string;
   email: string;
   profile_picture?: string | null;
+  status?: string | null;
+  last_seen?: string | null;
   [key: string]: any;
 }
 

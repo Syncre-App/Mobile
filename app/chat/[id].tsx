@@ -91,6 +91,7 @@ interface ChatParticipant {
   username: string;
   profile_picture?: string | null;
   status?: string | null;
+  last_seen?: string | null;
 }
 
 type ChatListItem =
@@ -491,6 +492,22 @@ const formatTimestamp = (date: Date): string => {
   });
 
   return timeFormatter.format(date);
+};
+
+const formatLastSeenLabel = (lastSeen?: string | null) => {
+  if (!lastSeen) return 'Offline';
+  const parsed = Date.parse(lastSeen);
+  if (Number.isNaN(parsed)) return 'Offline';
+  const diffMs = Date.now() - parsed;
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return 'Online';
+  if (diffMinutes < 3) return 'Idle';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'Yesterday';
+  return `${diffDays}d ago`;
 };
 
 const sortMessagesChronologically = (list: Message[]): Message[] =>

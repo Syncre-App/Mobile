@@ -1,5 +1,5 @@
 export interface UserStatus {
-  [userId: string]: 'online' | 'offline' | 'away';
+  [userId: string]: 'online' | 'offline' | 'away' | 'idle';
 }
 
 export interface WebSocketMessage {
@@ -20,6 +20,7 @@ export class WebSocketService {
   private ws: WebSocket | null = null;
   private messageListeners: ((message: WebSocketMessage) => void)[] = [];
   private statusListeners: ((statuses: UserStatus) => void)[] = [];
+  private lastSeenMap: Record<string, string | null> = {};
   private userStatuses: UserStatus = {};
   private isConnected = false;
   private isConnecting = false;
@@ -268,6 +269,9 @@ export class WebSocketService {
             ...this.userStatuses,
             [message.userId]: message.status,
           };
+          if (message.lastSeen !== undefined) {
+            this.lastSeenMap[message.userId] = message.lastSeen;
+          }
           this.notifyStatusListeners();
         }
         break;
@@ -451,6 +455,10 @@ export class WebSocketService {
   // Get current user statuses
   getUserStatuses(): UserStatus {
     return { ...this.userStatuses };
+  }
+
+  getLastSeenMap(): Record<string, string | null> {
+    return { ...this.lastSeenMap };
   }
 
   // Request fresh status for all friends
