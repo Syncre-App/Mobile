@@ -18,6 +18,7 @@ interface Friend {
   username: string;
   profile_picture?: string | null;
   status?: string | null;
+  last_seen?: string | null;
 }
 
 interface GroupMemberPickerProps {
@@ -137,13 +138,30 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   const renderFriend = ({ item }: { item: Friend }) => {
     const id = item.id?.toString?.() ?? String(item.id);
     const isSelected = selectedIds.has(id);
+    const presenceLabel = (() => {
+      const lastSeen = item.last_seen;
+      if (item.status === 'online') return 'Online';
+      if (item.status === 'idle') return 'Idle';
+      if (lastSeen) {
+        const diff = Date.now() - Date.parse(lastSeen);
+        const minutes = Math.floor(diff / 60000);
+        if (minutes < 3) return 'Idle';
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        return `${days}d ago`;
+      }
+      return item.status || '';
+    })();
+
     return (
       <TouchableOpacity style={styles.friendItem} onPress={() => toggleSelection(id)}>
         <View style={styles.friendInfo}>
           <UserAvatar uri={item.profile_picture} name={item.username} size={44} />
           <View>
             <Text style={styles.friendName}>{item.username}</Text>
-            {item.status ? <Text style={styles.friendStatus}>{item.status}</Text> : null}
+            {presenceLabel ? <Text style={styles.friendStatus}>{presenceLabel}</Text> : null}
           </View>
         </View>
         <View
