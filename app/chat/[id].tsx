@@ -2693,7 +2693,7 @@ const refreshMessages = useCallback(async () => {
     [chatId, uploadAttachmentWithProgress]
   );
 
-  const ensureAttachmentCapacity = useCallback(
+    const ensureAttachmentCapacity = useCallback(
     (files: UploadableAsset[]) => {
       const sanitized = files.filter((file) => file && file.uri);
       if (!sanitized.length) {
@@ -3180,13 +3180,13 @@ const refreshMessages = useCallback(async () => {
         );
         const endpoint = `/chat/${chatId}/messages/${message.id}/reactions`;
         const response = hasReacted
-          ? await ApiService.delete(`${endpoint}?reaction=${encodeURIComponent(reaction)}`, token)
+          ? await ApiService.delete(endpoint, token)
           : await ApiService.post(endpoint, { reaction }, token);
         if (!response.success) {
           NotificationService.show('error', response.error || 'Failed to update reaction');
           return;
         }
-        const reactions = mapServerReactions(response.reactions || response.data?.reactions);
+        const reactions = mapServerReactions(response.data?.reactions);
         setMessagesAnimated((prev) => prev.map((msg) => (msg.id === message.id ? { ...msg, reactions } : msg)));
       } catch (error) {
         console.error('Failed to toggle reaction', error);
@@ -6135,10 +6135,13 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
-const mapServerReactions = (raw?: any): Array<{ reaction: string; count: number; userIds: string[] }> => {
+
+const mapServerReactions = (
+  raw?: any
+): Array<{ reaction: string; count: number; userIds: string[] }> => {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((entry) => {
+    .map((entry: { reaction?: string; count?: number; userIds?: any[] }) => {
       if (!entry?.reaction) return null;
       const reaction = String(entry.reaction);
       const count = Number(entry.count) || 0;
