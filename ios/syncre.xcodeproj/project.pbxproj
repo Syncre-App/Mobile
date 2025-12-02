@@ -402,6 +402,7 @@
 				);
 				INFOPLIST_FILE = syncre/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Syncre;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -438,6 +439,7 @@
 				DEVELOPMENT_TEAM = R9PZGUCNJ3;
 				INFOPLIST_FILE = syncre/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Syncre;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
