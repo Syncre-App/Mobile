@@ -8,6 +8,7 @@ import { UserCacheService } from '../services/UserCacheService';
 import { UserStatus } from '../services/WebSocketService';
 import { palette, radii, spacing } from '../theme/designSystem';
 import { UserAvatar } from './UserAvatar';
+import BadgeIcon from './BadgeIcon';
 
 interface Chat {
   id: number;
@@ -316,6 +317,9 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         : normalizedStatus === 'idle'
           ? 'idle'
           : 'offline';
+    const userBadges = !isGroupChat && cachedUser?.badges
+      ? (Array.isArray(cachedUser.badges) ? cachedUser.badges : [])
+      : [];
 
     return (
       <TouchableOpacity
@@ -340,6 +344,17 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
               <Text style={styles.chatName} numberOfLines={1}>
                 {displayName}
               </Text>
+              {userBadges.length > 0 && (
+                <View style={styles.badgeContainer}>
+                  {userBadges.slice(0, 3).map((badge: string, idx: number) => (
+                    <BadgeIcon
+                      key={`${chat.id}-badge-${badge}-${idx}`}
+                      type={badge as any}
+                      size={16}
+                    />
+                  ))}
+                </View>
+              )}
               {hasUnread && (
                 <View style={styles.chatUnreadPill}>
                   <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
@@ -459,9 +474,16 @@ const styles = StyleSheet.create({
   },
   chatName: {
     color: palette.text,
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: 'PlusJakartaSans-SemiBold',
     marginBottom: 2,
+    flexShrink: 1,
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 5,
   },
   chatSubtitle: {
     color: palette.textMuted,
