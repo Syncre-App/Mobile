@@ -147,6 +147,7 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: spacing.sm,
+    alignItems: 'center',
   },
   iconBadge: {
     width: 46,
@@ -160,11 +161,13 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 24,
     fontFamily: 'SpaceGrotesk-SemiBold',
+    textAlign: 'center',
   },
   subtitle: {
     color: palette.textMuted,
     fontSize: 14,
     lineHeight: 20,
+    textAlign: 'center',
   },
   linkButton: {
     marginTop: spacing.md,
@@ -176,7 +179,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(147, 197, 253, 0.08)',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: spacing.sm,
   },
   linkButtonText: {
     color: '#93c5fd',
@@ -209,6 +213,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: radii.pill,
   },
   acceptButtonText: {
     color: '#ffffff',
