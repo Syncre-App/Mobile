@@ -521,10 +521,11 @@ const sortMessagesChronologically = (list: Message[]): Message[] =>
 const MESSAGE_CHAR_LIMIT = 5000;
 const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
 const SWIPE_REPLY_THRESHOLD = 12;
-const SWIPE_CAPTURE_MIN_DISTANCE = 4;
-const SWIPE_REPLY_FEEDBACK_OFFSET = 42;
-const SWIPE_REPLY_FEEDBACK_DURATION = 260;
-const SWIPE_REPLY_RETURN_DURATION = 380;
+const SWIPE_CAPTURE_MIN_DISTANCE = 2;
+const SWIPE_MAX_DISTANCE = 70;
+const SWIPE_REPLY_FEEDBACK_OFFSET = 48;
+const SWIPE_REPLY_FEEDBACK_DURATION = 300;
+const SWIPE_REPLY_RETURN_DURATION = 420;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
 const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -657,15 +658,24 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     setEmbedFailed(false);
   }, [embeddableLink?.url]);
 
-  const resetSwipe = useCallback(() => {
+  const forceResetSwipe = useCallback(() => {
     swipeAnim.stopAnimation(() => {
       Animated.spring(swipeAnim, {
         toValue: 0,
-        tension: 120,
-        friction: 14,
+        tension: 130,
+        friction: 15,
         useNativeDriver: true,
       }).start();
     });
+  }, [swipeAnim]);
+
+  const resetSwipe = useCallback(() => {
+    Animated.spring(swipeAnim, {
+      toValue: 0,
+      tension: 130,
+      friction: 15,
+      useNativeDriver: true,
+    }).start();
   }, [swipeAnim]);
 
   const triggerReplyFeedback = useCallback(() => {
@@ -710,7 +720,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       if (!isCorrectDirection) {
         return false;
       }
-      return absHorizontal > absVertical * 0.35;
+      return absHorizontal > absVertical * 0.28;
     },
     [isMine]
   );
@@ -728,9 +738,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onPanResponderMove: (_, gesture) => {
           let nextValue = 0;
           if (!isMine && gesture.dx > 0) {
-            nextValue = Math.min(gesture.dx, 80);
+            nextValue = Math.min(gesture.dx, SWIPE_MAX_DISTANCE);
           } else if (isMine && gesture.dx < 0) {
-            nextValue = Math.max(gesture.dx, -80);
+            nextValue = Math.max(gesture.dx, -SWIPE_MAX_DISTANCE);
           }
           swipeAnim.setValue(nextValue);
           const magnitude = isMine ? -nextValue : nextValue;
@@ -749,21 +759,25 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           const magnitude =
             swipePeakRef.current ||
             (isMine ? Math.abs(Math.min(gesture.dx, 0)) : Math.abs(Math.max(gesture.dx, 0)));
-          if (!replyTriggeredRef.current && magnitude > SWIPE_REPLY_THRESHOLD && onReplySwipe) {
+          const shouldTrigger = !replyTriggeredRef.current && magnitude > SWIPE_REPLY_THRESHOLD && !!onReplySwipe;
+          if (shouldTrigger) {
             triggerReply();
-          } else if (!replyTriggeredRef.current) {
+          } else {
             resetSwipe();
           }
           swipePeakRef.current = 0;
           replyTriggeredRef.current = false;
+          if (shouldTrigger) {
+            setTimeout(forceResetSwipe, SWIPE_REPLY_FEEDBACK_DURATION + SWIPE_REPLY_RETURN_DURATION + 60);
+          }
         },
         onPanResponderTerminate: () => {
           swipePeakRef.current = 0;
           replyTriggeredRef.current = false;
-          resetSwipe();
+          forceResetSwipe();
         },
       }),
-    [isMine, onReplySwipe, resetSwipe, shouldCaptureSwipe, triggerReply, swipeAnim]
+    [forceResetSwipe, isMine, onReplySwipe, resetSwipe, shouldCaptureSwipe, triggerReply, swipeAnim]
   );
 
   useEffect(
