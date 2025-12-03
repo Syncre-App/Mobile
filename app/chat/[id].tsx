@@ -1095,8 +1095,6 @@ useEffect(() => {
                       style={[styles.reactionPill, mine && styles.reactionPillMine]}
                       onPress={() => onReact?.(message, entry.reaction)}
                     >
-                      <Text style={styles.reactionText}>{entry.reaction}</Text>
-                      <Text style={styles.reactionCount}>{entry.count}</Text>
                     </Pressable>
                   );
                 })}
@@ -4777,49 +4775,21 @@ const refreshMessages = useCallback(async () => {
                 </Text>
               </View>
             ) : null}
-            {currentUserReaction ? (
-              <View style={styles.reactionPickerLabel}>
-                <Text style={styles.reactionPickerLabelText}>
-                  Your reaction: {currentUserReaction} (tap again to remove)
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.reactionPickerLabel}>
-                <Text style={styles.reactionPickerLabelText}>Tap to react. Tap again to remove.</Text>
-              </View>
-            )}
           </Animated.View>
         </View>
       ) : null}
-
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <KeyboardAvoidingView
             style={styles.keyboardAvoidingView}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={keyboardOffset}
-          >
-
+            keyboardVerticalOffset={keyboardOffset}>
                 {isThreadLoading ? (
-
-
                   <View style={styles.loadingState}>
-
-
                     <ActivityIndicator size="large" color="#2C82FF" />
-
-
                     <Text style={styles.loadingStateText}>Loading conversation…</Text>
-
-
                   </View>
-
-
                 ) : (
-
-
                   <Animated.View style={styles.messagesWrapper}>
-
-
                     <FlatList
                       ref={flatListRef}
                       data={decoratedData}
