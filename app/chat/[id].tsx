@@ -1342,6 +1342,8 @@ const previewPanResponder = useMemo(
   const [excludedMemberIds, setExcludedMemberIds] = useState<string[]>([]);
   const [memberPickerError, setMemberPickerError] = useState<string | null>(null);
   const [memberPickerBusy, setMemberPickerBusy] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [safetyBusy, setSafetyBusy] = useState(false);
   const participantLookupRef = useRef<Record<string, ChatParticipant>>({});
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const windowHeight = Dimensions.get('window').height;
@@ -1387,6 +1389,109 @@ const previewPanResponder = useMemo(
     return true;
   }, [navigation, replyContext, router, threadRootId]);
 
+  const submitReport = useCallback(
+    async (reason: string) => {
+      const targetId = otherUserIdRef.current;
+      if (!targetId || safetyBusy) {
+        return;
+      }
+      setSafetyBusy(true);
+      try {
+        const token = await StorageService.getAuthToken();
+        if (!token) {
+          NotificationService.show('error', 'Please log in again to report this user.');
+          return;
+        }
+        const response = await ApiService.post(
+          '/user/report',
+          { targetUserId: targetId, reason },
+          token
+        );
+        if (response.success) {
+          NotificationService.show('success', 'Report submitted. Thanks for keeping Syncre safe.');
+        } else {
+          NotificationService.show('error', response.error || 'Failed to submit report');
+        }
+      } catch (error: any) {
+        NotificationService.show('error', error?.message || 'Failed to submit report');
+      } finally {
+        setSafetyBusy(false);
+      }
+    },
+    [safetyBusy]
+  );
+
+  const handleReportUser = useCallback(() => {
+    if (!otherUserIdRef.current) return;
+    Alert.alert(
+      'Report user',
+      `Send a report about ${receiverNameRef.current}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Harassment', style: 'destructive', onPress: () => submitReport('Harassment') },
+        { text: 'Spam', onPress: () => submitReport('Spam') },
+        { text: 'Safety issue', onPress: () => submitReport('Safety issue') },
+      ],
+      { cancelable: true }
+    );
+  }, [submitReport]);
+
+  const toggleBlockUser = useCallback(async () => {
+    const targetId = otherUserIdRef.current;
+    if (!targetId || safetyBusy) return;
+    setSafetyBusy(true);
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Please log in again to change block settings.');
+        return;
+      }
+      const endpoint = isBlocked ? '/user/unblock' : '/user/block';
+      const response = await ApiService.post(
+        endpoint,
+        { targetUserId: targetId },
+        token
+      );
+      if (response.success) {
+        const updatedList = (response.data as any)?.blocked_users || [];
+        const normalized = Array.isArray(updatedList)
+          ? updatedList.map((id: any) => id?.toString?.() ?? String(id)).filter(Boolean)
+          : [];
+        setIsBlocked(normalized.includes(targetId.toString()));
+        if (user) {
+          const updatedUser = { ...(user as any), blocked_users: normalized };
+          await StorageService.setObject('user_data', updatedUser);
+        }
+        NotificationService.show('success', isBlocked ? 'User unblocked' : 'User blocked');
+      } else {
+        NotificationService.show('error', response.error || 'Failed to update block status');
+      }
+    } catch (error: any) {
+      NotificationService.show('error', error?.message || 'Failed to update block status');
+    } finally {
+      setSafetyBusy(false);
+    }
+  }, [isBlocked, safetyBusy, user]);
+
+  const handleOpenSafetyMenu = useCallback(() => {
+    if (!otherUserIdRef.current) {
+      return;
+    }
+    Alert.alert(
+      'Safety',
+      `Actions for ${receiverNameRef.current}`,
+      [
+        {
+          text: isBlocked ? 'Unblock user' : 'Block user',
+          onPress: toggleBlockUser,
+        },
+        { text: 'Report user', style: 'destructive', onPress: handleReportUser },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
+  }, [handleReportUser, isBlocked, toggleBlockUser]);
+
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS !== 'android') {
@@ -1396,6 +1501,17 @@ const previewPanResponder = useMemo(
       return () => subscription.remove();
     }, [handleNavigateBack])
   );
+
+  useEffect(() => {
+    const targetId = otherUserIdRef.current;
+    if (!targetId || !(user as any)?.blocked_users) {
+      return;
+    }
+    const blockedList = (user as any).blocked_users
+      .map((id: any) => id?.toString?.() ?? String(id))
+      .filter(Boolean);
+    setIsBlocked(blockedList.includes(targetId.toString()));
+  }, [user]);
 
   const currentUserId = user?.id ? String(user.id) : null;
 
@@ -2536,6 +2652,14 @@ const refreshMessages = useCallback(async () => {
       otherUserIdRef.current = otherParticipantId || null;
       receiverNameRef.current = displayName;
       setReceiverUsername(displayName);
+      if (!isGroupChat && otherParticipantId && Array.isArray((user as any)?.blocked_users)) {
+        const blockedList = (user as any).blocked_users
+          .map((id: any) => id?.toString?.() ?? String(id))
+          .filter(Boolean);
+        setIsBlocked(blockedList.includes(otherParticipantId.toString()));
+      } else if (isGroupChat) {
+        setIsBlocked(false);
+      }
 
       const chatPayload = {
         ...chatData,
@@ -3598,6 +3722,11 @@ const refreshMessages = useCallback(async () => {
       return;
     }
 
+    if (isBlocked) {
+      NotificationService.show('info', 'Unblock this user to send messages.');
+      return;
+    }
+
     const isSocketReady = await ensureWebSocketReady();
     if (!isSocketReady) {
       NotificationService.show('error', 'Nem sikerült csatlakozni a chat szerverhez. Próbáld újra.');
@@ -3719,6 +3848,7 @@ const refreshMessages = useCallback(async () => {
     chatId,
     currentUserId,
     editingMessage,
+    isBlocked,
     ensureTypingStopped,
     handleSubmitEdit,
     newMessage,
@@ -4635,7 +4765,9 @@ const refreshMessages = useCallback(async () => {
     ((isComposerEmpty && !hasPendingAttachments) ||
       isSendingMessage ||
       attachmentPickerBusy ||
-      hasUploadingAttachments);
+      hasUploadingAttachments ||
+      isBlocked ||
+      safetyBusy);
 
   const isGroupChat = Boolean(chatDetails?.isGroup);
   const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
@@ -4689,18 +4821,31 @@ const refreshMessages = useCallback(async () => {
             <Text style={styles.presenceLabel}>{receiverPresenceLabel}</Text>
           ) : null}
         </View>
-        {shouldShowAddButton ? (
-          <Pressable
-            onPress={() => handleOpenMemberPicker(addButtonMode)}
-            style={styles.headerActionButton}
-            accessibilityRole="button"
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFFFFF" />
-            <Ionicons name="add" size={12} color="#FFFFFF" style={styles.headerActionAdd} />
-          </Pressable>
-        ) : (
-          <View style={styles.headerButtonPlaceholder} />
-        )}
+        <View style={styles.headerActions}>
+          {shouldShowAddButton ? (
+            <Pressable
+              onPress={() => handleOpenMemberPicker(addButtonMode)}
+              style={styles.headerActionButton}
+              accessibilityRole="button"
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFFFFF" />
+              <Ionicons name="add" size={12} color="#FFFFFF" style={styles.headerActionAdd} />
+            </Pressable>
+          ) : (
+            <View style={styles.headerButtonPlaceholder} />
+          )}
+          {otherUserIdRef.current ? (
+            <Pressable
+              onPress={handleOpenSafetyMenu}
+              style={styles.headerActionButton}
+              accessibilityRole="button"
+            >
+              <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
+            </Pressable>
+          ) : (
+            <View style={styles.headerButtonPlaceholder} />
+          )}
+        </View>
       </View>
 
       {reactionPicker && reactionPickerPosition ? (
@@ -4966,6 +5111,13 @@ const refreshMessages = useCallback(async () => {
             <Pressable onPress={handleCancelEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={14} color="#ffffff" />
             </Pressable>
+          </View>
+        ) : null}
+
+        {isBlocked ? (
+          <View style={styles.blockNotice}>
+            <Ionicons name="shield-outline" size={16} color="#f9a8d4" />
+            <Text style={styles.blockNoticeText}>You blocked this user. Unblock to send messages.</Text>
           </View>
         ) : null}
 
@@ -5362,6 +5514,11 @@ const styles = StyleSheet.create({
   headerButtonPlaceholder: {
     width: 44,
     height: 44,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerTitleWrapper: {
     flex: 1,
@@ -5868,6 +6025,18 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 12,
     fontWeight: '600',
+  },
+  blockNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  blockNoticeText: {
+    color: '#f3e8ff',
+    fontSize: 12,
+    flex: 1,
   },
   inputContainer: {
     flexDirection: 'row',

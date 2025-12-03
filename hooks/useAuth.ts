@@ -52,6 +52,13 @@ export const useAuth = (): UseAuthResult => {
           console.error('useAuth: failed to ensure identity keys', cryptoError);
         }
         await LocationSyncService.sync();
+      } else {
+        if ([401, 403, 423].includes(response.statusCode)) {
+          await StorageService.removeAuthToken();
+          await StorageService.removeItem('user_data');
+          setUser(null);
+        }
+        return;
       }
     } catch (error) {
       console.error('useAuth: failed to refresh user', error);

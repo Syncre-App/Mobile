@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  Linking,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -20,6 +21,7 @@ import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
 import { CryptoService } from '../services/CryptoService';
 import { IdentityService } from '../services/IdentityService';
+import { ApiService } from '../services/ApiService';
 import { palette, radii, spacing } from '../theme/designSystem';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
@@ -103,6 +105,46 @@ export const SettingsScreen: React.FC = () => {
             } finally {
               setIsRotatingKeys(false);
               setIsBootstrapping(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleOpenTerms = () => {
+    Linking.openURL('https://syncre.xyz/terms').catch(() => {
+      NotificationService.show('error', 'Could not open the terms page');
+    });
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account',
+      'We will log you out and schedule deletion in 24 hours. Signing back in during that window will cancel it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Schedule deletion',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await StorageService.getAuthToken();
+              if (!token) {
+                NotificationService.show('error', 'Please log in again to manage your account');
+                router.replace('/' as any);
+                return;
+              }
+              const response = await ApiService.post('/user/delete-account', {}, token);
+              if (response.success) {
+                NotificationService.show('success', 'Deletion scheduled. We logged you out.');
+                await StorageService.clear();
+                router.replace('/' as any);
+              } else {
+                NotificationService.show('error', response.error || 'Failed to schedule deletion');
+              }
+            } catch (error: any) {
+              NotificationService.show('error', error?.message || 'Failed to schedule deletion');
             }
           },
         },
@@ -257,6 +299,28 @@ export const SettingsScreen: React.FC = () => {
               <ActivityIndicator size="small" color={palette.accent} />
             ) : undefined,
             true
+          )}
+        </GlassCard>
+
+        <GlassCard width="100%" style={styles.section} variant="subtle">
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Account</Text>
+          </View>
+          
+          {renderSettingItem(
+            'document-text-outline',
+            'Terms of Service',
+            'Read the Syncre EULA and acceptable use rules',
+            handleOpenTerms,
+            undefined,
+            false
+          )}
+
+          {renderSettingItem(
+            'trash-bin-outline',
+            'Delete account',
+            'Logs you out and deletes data after 24h unless you sign back in',
+            handleDeleteAccount
           )}
         </GlassCard>
 

@@ -34,6 +34,13 @@ export default function Index() {
       const response = await ApiService.get('/user/me', token);
       
       if (response.success) {
+        await StorageService.setObject('user_data', response.data);
+        if (response.data?.requires_terms_acceptance || !response.data?.terms_accepted_at) {
+          console.log('⚖️ Terms require re-acceptance - navigating to terms');
+          setIsAuthenticated(true);
+          router.replace('/terms' as any);
+          return;
+        }
         console.log('✅ Token is valid - navigating to home');
         // Token is valid, navigate to home screen
         setIsAuthenticated(true);

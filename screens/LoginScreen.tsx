@@ -77,7 +77,9 @@ export const LoginScreen: React.FC = () => {
 
           notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');
 
-          if (needsSetup) {
+          if (data?.requires_terms_acceptance || !user?.terms_accepted_at) {
+            router.replace('/terms' as any);
+          } else if (needsSetup) {
             router.replace('/identity?mode=setup' as any);
           } else if (!localIdentity) {
             router.replace('/identity?mode=unlock' as any);
@@ -89,7 +91,24 @@ export const LoginScreen: React.FC = () => {
         }
       } else {
         console.warn('Login failed response:', response);
-        notificationService.show('error', response.error || 'Login failed', 'Error');
+        const bannedUntil = (response.data as any)?.banned_until || (response.data as any)?.bannedUntil;
+        const deleteAfter = (response.data as any)?.delete_after;
+        if (bannedUntil) {
+          const until = new Date(bannedUntil);
+          notificationService.show(
+            'error',
+            `Your account is banned until ${until.toLocaleString()}.`,
+            'Login blocked'
+          );
+        } else if (deleteAfter) {
+          notificationService.show(
+            'error',
+            'Account deletion is pending. Try again after the 24h grace window or contact support.',
+            'Login blocked'
+          );
+        } else {
+          notificationService.show('error', response.error || 'Login failed', 'Error');
+        }
       }
     } catch (error: any) {
       console.error('Login error:', error);

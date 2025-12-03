@@ -55,7 +55,7 @@ export class ApiService {
 
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData?.message || responseData?.error || responseData?.text || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
@@ -115,7 +115,7 @@ export class ApiService {
 
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData?.message || responseData?.error || responseData?.text || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
@@ -172,7 +172,7 @@ export class ApiService {
       
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData.message || responseData.error || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
@@ -198,7 +198,7 @@ export class ApiService {
       
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData.message || responseData.error || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
@@ -236,7 +236,7 @@ export class ApiService {
 
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData?.message || responseData?.error || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };

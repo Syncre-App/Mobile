@@ -63,6 +63,12 @@ export const HomeScreen: React.FC = () => {
     });
   }, [notifications]);
 
+  useEffect(() => {
+    if (user && (user.requires_terms_acceptance || !user.terms_accepted_at)) {
+      router.replace('/terms' as any);
+    }
+  }, [router, user]);
+
   const persistNotifications = useCallback((list: any[]) => {
     const minimized = list.map((notification: any) => ({
       id: notification.id,

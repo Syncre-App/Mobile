@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -25,6 +26,7 @@ export const RegisterScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handleRegister = async () => {
     const u = username.trim();
@@ -40,6 +42,10 @@ export const RegisterScreen: React.FC = () => {
         notificationService.show('error', 'Passwords do not match', 'Error');
       return;
     }
+    if (!acceptedTerms) {
+        notificationService.show('error', 'You must accept the Terms of Service to continue', 'Error');
+      return;
+    }
 
     setLoading(true);
     console.log('📝 Starting registration for:', e, '(username:', u, ')');
@@ -49,6 +55,7 @@ export const RegisterScreen: React.FC = () => {
         email: e,
         username: u,
         password: p,
+        acceptedTerms: true,
       });
 
       console.log('📝 Register response:', response);
@@ -85,9 +92,15 @@ export const RegisterScreen: React.FC = () => {
       } else {
           notificationService.show('error', `Error: ${error.message || error}`, 'Error');
       }
-    } finally {
+  } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenTerms = () => {
+    Linking.openURL('https://syncre.xyz/terms').catch(() => {
+      notificationService.show('error', 'Could not open terms page', 'Error');
+    });
   };
 
   const goToLogin = () => {
@@ -147,6 +160,22 @@ export const RegisterScreen: React.FC = () => {
               prefixIcon={<Ionicons name="lock-closed" size={18} color={palette.textSubtle} />}
               style={styles.inputField}
             />
+
+            <View style={styles.termsRow}>
+              <TouchableOpacity
+                onPress={() => setAcceptedTerms((prev) => !prev)}
+                style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}
+                accessibilityRole="checkbox"
+              >
+                {acceptedTerms ? <Ionicons name="checkmark" size={14} color="#0b1220" /> : null}
+              </TouchableOpacity>
+              <Text style={styles.termsText}>
+                I accept the{' '}
+                <Text style={styles.termsLink} onPress={handleOpenTerms}>
+                  Terms of Service
+                </Text>
+              </Text>
+            </View>
 
             <TouchableOpacity onPress={handleRegister} disabled={loading} style={styles.registerButton}>
               <LinearGradient
@@ -232,6 +261,36 @@ const styles = StyleSheet.create({
   },
   inputField: {
     marginBottom: spacing.md,
+  },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  checkboxChecked: {
+    backgroundColor: '#6ee7b7',
+    borderColor: '#6ee7b7',
+  },
+  termsText: {
+    color: palette.textMuted,
+    fontSize: 13,
+    flex: 1,
+  },
+  termsLink: {
+    color: '#60a5fa',
+    textDecorationLine: 'underline',
   },
   registerButton: {
     width: '100%',
