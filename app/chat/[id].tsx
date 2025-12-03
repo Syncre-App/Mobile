@@ -638,6 +638,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const replyTriggeredRef = useRef(false);
   const lastTapRef = useRef(0);
   const singleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mediaTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mediaLastTapRef = useRef(0);
   const textSegments = useMemo(() => splitTextByLinks(message.content || ''), [message.content]);
   const embeddableLink = useMemo(() => {
     if (message.isPlaceholder || message.attachments?.length) {
@@ -721,6 +723,10 @@ useEffect(() => {
         clearTimeout(singleTapTimeoutRef.current);
         singleTapTimeoutRef.current = null;
       }
+      if (mediaTapTimeoutRef.current) {
+        clearTimeout(mediaTapTimeoutRef.current);
+        mediaTapTimeoutRef.current = null;
+      }
     },
     []
   );
@@ -763,21 +769,100 @@ useEffect(() => {
     !isFirstInGroup && styles.messageRowStacked,
     isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
     message.replyTo && styles.messageRowWithReply,
+    isMediaOnlyMessage && styles.messageRowMedia,
   ];
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const hasAttachments = attachments.length > 0;
+  const hasPreviewableMedia = attachments.some(
+    (attachment) =>
+      (attachment.isImage || attachment.isVideo) &&
+      attachment.status !== 'expired' &&
+      (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
+  );
+  const hasContent = Boolean((message.content || '').trim().length);
+  const isMediaOnlyMessage =
+    hasPreviewableMedia && !hasContent && !message.replyTo && !message.isPlaceholder;
+  const previewableImageAttachments = useMemo(
+    () =>
+      attachments.filter(
+        (attachment) =>
+          attachment.isImage &&
+          attachment.status !== 'expired' &&
+          (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
+      ),
+    [attachments]
+  );
+  const previewableVideoAttachments = useMemo(
+    () =>
+      attachments.filter(
+        (attachment) =>
+          attachment.isVideo &&
+          attachment.status !== 'expired' &&
+          (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
+      ),
+    [attachments]
+  );
+  const combinedPreviewable = useMemo(
+    () => [...previewableImageAttachments, ...previewableVideoAttachments],
+    [previewableImageAttachments, previewableVideoAttachments]
+  );
+  const previewableIds = useMemo(
+    () => new Set(combinedPreviewable.map((attachment) => attachment.id)),
+    [combinedPreviewable]
+  );
+  const fileAttachments = useMemo(
+    () => attachments.filter((attachment) => !previewableIds.has(attachment.id)),
+    [attachments, previewableIds]
+  );
 
   const bubbleStyle = [
     styles.messageBubble,
-    isMine ? styles.myBubble : styles.theirBubble,
-    isMine
-      ? isLastInGroup
-        ? styles.myBubbleLast
-        : styles.myBubbleStacked
-      : isLastInGroup
-        ? styles.theirBubbleLast
-        : styles.theirBubbleStacked,
+    isMediaOnlyMessage
+      ? styles.messageBubbleMediaOnly
+      : isMine
+        ? styles.myBubble
+        : styles.theirBubble,
+    !isMediaOnlyMessage &&
+      (isMine
+        ? isLastInGroup
+          ? styles.myBubbleLast
+          : styles.myBubbleStacked
+        : isLastInGroup
+          ? styles.theirBubbleLast
+          : styles.theirBubbleStacked),
     message.isPlaceholder && styles.placeholderBubble,
     message.replyTo && styles.messageBubbleWithReply,
   ];
+  const handleAttachmentPress = useCallback(
+    (event: GestureResponderEvent, attachment: MessageAttachment, siblings?: MessageAttachment[]) => {
+      if (!attachment) {
+        return;
+      }
+      if (!attachment.isImage && !attachment.isVideo) {
+        onAttachmentPress?.(attachment, siblings);
+        return;
+      }
+      const now = Date.now();
+      if (now - mediaLastTapRef.current < 250) {
+        if (mediaTapTimeoutRef.current) {
+          clearTimeout(mediaTapTimeoutRef.current);
+          mediaTapTimeoutRef.current = null;
+        }
+        mediaLastTapRef.current = 0;
+        onBubbleDoubleTap?.(event);
+        return;
+      }
+      mediaLastTapRef.current = now;
+      if (mediaTapTimeoutRef.current) {
+        clearTimeout(mediaTapTimeoutRef.current);
+      }
+      mediaTapTimeoutRef.current = setTimeout(() => {
+        mediaTapTimeoutRef.current = null;
+        onAttachmentPress?.(attachment, siblings);
+      }, 220);
+    },
+    [onAttachmentPress, onBubbleDoubleTap]
+  );
 
   const replyHintOpacity = useMemo(() => {
     if (isMine) {
@@ -798,8 +883,6 @@ useEffect(() => {
     showStatus && message.status
       ? formatStatusLabel(message.status)
       : null;
-  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
-  const hasAttachments = attachments.length > 0;
   const overrideSeenReceipts = Array.isArray(seenOverride) ? seenOverride : [];
   const activeSeenReceipts = overrideSeenReceipts;
   const shouldShowSeenAvatars = activeSeenReceipts.length > 0;
@@ -852,6 +935,7 @@ useEffect(() => {
             styles.messageContent,
             isMine ? styles.messageContentMine : styles.messageContentTheirs,
             message.replyTo && styles.messageContentWithReply,
+            isMediaOnlyMessage && styles.messageContentMediaOnly,
           ]}
           delayLongPress={120}
         >
@@ -897,21 +981,6 @@ useEffect(() => {
             )}
             {(() => {
               if (!hasAttachments) return null;
-              const previewableImageAttachments = attachments.filter(
-                (attachment) =>
-                  attachment.isImage &&
-                  attachment.status !== 'expired' &&
-                  (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
-              );
-              const previewableVideoAttachments = attachments.filter(
-                (attachment) =>
-                  attachment.isVideo &&
-                  attachment.status !== 'expired' &&
-                  (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
-              );
-              const combinedPreviewable = [...previewableImageAttachments, ...previewableVideoAttachments];
-              const previewableIds = new Set(combinedPreviewable.map((attachment) => attachment.id));
-              const fileAttachments = attachments.filter((attachment) => !previewableIds.has(attachment.id));
               const showPreview = combinedPreviewable.length > 0;
               const primaryItem = showPreview ? combinedPreviewable[0] : null;
               const remainingPreviewItems = showPreview ? combinedPreviewable.slice(1) : [];
@@ -922,7 +991,7 @@ useEffect(() => {
                     <Pressable
                       key={`${message.id}-hero-image`}
                       style={styles.heroImageCard}
-                      onPress={() => onAttachmentPress?.(primaryItem, combinedPreviewable)}
+                      onPress={(event) => handleAttachmentPress(event, primaryItem, combinedPreviewable)}
                     >
                       {primaryItem.isVideo ? (
                         resolveAttachmentUri(primaryItem) ? (
@@ -975,7 +1044,12 @@ useEffect(() => {
                               styles.attachmentCard,
                               isPreviewable ? styles.attachmentImageCardCompact : styles.attachmentFileCard,
                             ]}
-                            onPress={() => !isExpired && onAttachmentPress?.(attachment, [attachment])}
+                            onPress={(event) => {
+                              if (isExpired) return;
+                              const siblings =
+                                attachment.isImage || attachment.isVideo ? combinedPreviewable : [attachment];
+                              handleAttachmentPress(event, attachment, siblings);
+                            }}
                             disabled={isExpired}
                           >
                             {isPreviewable ? (
@@ -1245,22 +1319,29 @@ const ChatScreen: React.FC = () => {
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [attachmentPickerBusy, setAttachmentPickerBusy] = useState(false);
   const [previewContext, setPreviewContext] = useState<{ attachments: MessageAttachment[]; index: number } | null>(null);
-const previewListRef = useRef<FlatList<MessageAttachment>>(null);
-const [previewIndex, setPreviewIndex] = useState(0);
-const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
-const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
-const handleClosePreview = useCallback(() => setPreviewContext(null), []);
-const previewPanResponder = useMemo(
-  () =>
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > 80) {
-          handleClosePreview();
-        }
-      },
-    }),
-  [handleClosePreview]
+  const previewListRef = useRef<FlatList<MessageAttachment>>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [previewChromeVisible, setPreviewChromeVisible] = useState(true);
+  const previewChromeAnim = useRef(new Animated.Value(1)).current;
+  const slideTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
+  const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
+  const handleClosePreview = useCallback(() => {
+    setPreviewContext(null);
+    setPreviewChromeVisible(true);
+    previewChromeAnim.setValue(1);
+  }, [previewChromeAnim]);
+  const previewPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 80) {
+            handleClosePreview();
+          }
+        },
+      }),
+    [handleClosePreview]
   );
   useEffect(() => {
     if (previewContext && previewContext.attachments.length) {
@@ -1269,6 +1350,8 @@ const previewPanResponder = useMemo(
         previewContext.attachments.length - 1
       );
       setPreviewIndex(nextIndex);
+      setPreviewChromeVisible(true);
+      previewChromeAnim.setValue(1);
       requestAnimationFrame(() => {
         try {
           previewListRef.current?.scrollToIndex({ index: nextIndex, animated: false });
@@ -1277,10 +1360,44 @@ const previewPanResponder = useMemo(
         }
       });
     }
-  }, [previewContext]);
+  }, [previewChromeAnim, previewContext]);
   const currentPreviewAttachment = previewContext
     ? previewContext.attachments[Math.min(previewIndex, previewContext.attachments.length - 1)]
     : null;
+  const togglePreviewChrome = useCallback(() => {
+    const next = !previewChromeVisible;
+    setPreviewChromeVisible(next);
+    Animated.timing(previewChromeAnim, {
+      toValue: next ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [previewChromeAnim, previewChromeVisible]);
+  const handleSlideTouchStart = useCallback((event: GestureResponderEvent) => {
+    slideTouchStartRef.current = {
+      x: event.nativeEvent.pageX,
+      y: event.nativeEvent.pageY,
+    };
+  }, []);
+  const handleSlideTouchEnd = useCallback(
+    (event: GestureResponderEvent) => {
+      const start = slideTouchStartRef.current;
+      slideTouchStartRef.current = null;
+      if (!start) return;
+      if (
+        (event.nativeEvent.touches && event.nativeEvent.touches.length > 0) ||
+        (event.nativeEvent.changedTouches && event.nativeEvent.changedTouches.length > 1)
+      ) {
+        return;
+      }
+      const dx = Math.abs((event.nativeEvent.pageX || 0) - start.x);
+      const dy = Math.abs((event.nativeEvent.pageY || 0) - start.y);
+      if (dx < 6 && dy < 6) {
+        togglePreviewChrome();
+      }
+    },
+    [togglePreviewChrome]
+  );
   const closeAttachmentSheet = useCallback(() => {
     Animated.timing(attachmentSheetAnim, {
       toValue: 0,
@@ -3040,8 +3157,10 @@ const refreshMessages = useCallback(async () => {
       }
       try {
         await ChatService.deleteAttachment(attachmentId);
+        NotificationService.show('success', 'Fájl törölve a tárhelyről');
       } catch (error) {
         console.error('Failed to remove attachment', error);
+        NotificationService.show('error', 'Nem sikerült törölni a fájlt a tárhelyről');
       }
     },
     []
@@ -3289,6 +3408,8 @@ const refreshMessages = useCallback(async () => {
         (attachment.isImage || attachment.isVideo) &&
         (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
       ) {
+        setPreviewChromeVisible(true);
+        previewChromeAnim.setValue(1);
         const source = gallery.length ? gallery : [attachment];
         const index = source.findIndex((item) => item.id === attachment.id);
         setPreviewContext({
@@ -3296,13 +3417,36 @@ const refreshMessages = useCallback(async () => {
           index: index >= 0 ? index : 0,
         });
       } else {
+        setPreviewChromeVisible(true);
+        previewChromeAnim.setValue(1);
         setPreviewContext({
           attachments: [attachment],
           index: 0,
         });
       }
     },
-    []
+    [previewChromeAnim, setPreviewChromeVisible]
+  );
+
+  const handlePendingAttachmentPress = useCallback(
+    (attachment: MessageAttachment) => {
+      if (!attachment) return;
+      const gallery = pendingAttachments.filter(
+        (item) =>
+          (item.isImage || item.isVideo) &&
+          item.status !== 'expired' &&
+          ((item.previewUrl || item.publicViewUrl) ?? item.localUri)
+      );
+      const source = gallery.length ? gallery : pendingAttachments;
+      const index = source.findIndex((item) => item.id === attachment.id);
+      setPreviewChromeVisible(true);
+      previewChromeAnim.setValue(1);
+      setPreviewContext({
+        attachments: source,
+        index: index >= 0 ? index : 0,
+      });
+    },
+    [pendingAttachments, previewChromeAnim, setPreviewChromeVisible]
   );
 
   const handleDownloadAttachment = useCallback(
@@ -4893,19 +5037,25 @@ const refreshMessages = useCallback(async () => {
           </View>
         )}
         {pendingAttachments.length > 0 ? (
-          <ScrollView
+          <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.attachmentPreviewContent}
             style={styles.attachmentPreviewRow}
-          >
-            {pendingAttachments.map((attachment) => (
-              <View key={`pending-${attachment.id}`} style={styles.attachmentChip}>
+            data={pendingAttachments}
+            keyExtractor={(item) => `pending-${item.id}`}
+            snapToInterval={260}
+            decelerationRate="fast"
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => handlePendingAttachmentPress(item)}
+                style={styles.attachmentChip}
+              >
                 <Ionicons
                   name={
-                    attachment.isVideo
+                    item.isVideo
                       ? 'videocam-outline'
-                      : attachment.isImage
+                      : item.isImage
                         ? 'image-outline'
                         : 'document-text-outline'
                   }
@@ -4914,46 +5064,46 @@ const refreshMessages = useCallback(async () => {
                 />
                 <View style={styles.attachmentChipBody}>
                   <Text style={styles.attachmentChipName} numberOfLines={1}>
-                    {attachment.name}
+                    {item.name}
                   </Text>
-                  {attachment.uploadPending ? (
+                  {item.uploadPending ? (
                     <View style={styles.attachmentChipProgress}>
                       <View style={styles.progressTrack}>
                         <View
                           style={[
                             styles.progressBar,
-                            { width: `${Math.round((attachment.uploadProgress || 0) * 100)}%` },
+                            { width: `${Math.round((item.uploadProgress || 0) * 100)}%` },
                           ]}
                         />
                       </View>
                       <Text style={styles.attachmentChipMeta}>
-                        {Math.round((attachment.uploadProgress || 0) * 100)}%
+                        {Math.round((item.uploadProgress || 0) * 100)}%
                       </Text>
                     </View>
-                  ) : attachment.uploadError ? (
+                  ) : item.uploadError ? (
                     <View style={styles.attachmentChipProgress}>
                       <Text style={styles.attachmentChipMeta}>Upload failed</Text>
                       <Pressable
-                        onPress={() => handleRetryAttachment(attachment)}
+                        onPress={() => handleRetryAttachment(item)}
                         style={styles.retryButton}
                       >
                         <Text style={styles.retryButtonText}>Retry</Text>
                       </Pressable>
                     </View>
                   ) : (
-                    <Text style={styles.attachmentChipMeta}>{formatBytes(attachment.fileSize)}</Text>
+                    <Text style={styles.attachmentChipMeta}>{formatBytes(item.fileSize)}</Text>
                   )}
                 </View>
                 <Pressable
-                  onPress={() => handleRemoveAttachment(attachment.id)}
+                  onPress={() => handleRemoveAttachment(item.id)}
                   style={styles.attachmentChipRemove}
                   hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
                 >
                   <Ionicons name="close" size={12} color="#ffffff" />
                 </Pressable>
-              </View>
-            ))}
-          </ScrollView>
+              </Pressable>
+            )}
+          />
         ) : null}
         {editingMessage ? (
           <View style={styles.editingBanner}>
@@ -5087,14 +5237,24 @@ const refreshMessages = useCallback(async () => {
       >
         <View style={styles.attachmentModalOverlay} {...previewPanResponder.panHandlers}>
           <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFillObject} />
-          <View
+          <Animated.View
             style={[
               styles.attachmentModalTopBar,
               {
                 paddingTop:
                   Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0) + 6,
+                opacity: previewChromeAnim,
+                transform: [
+                  {
+                    translateY: previewChromeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-30, 0],
+                    }),
+                  },
+                ],
               },
             ]}
+            pointerEvents={previewChromeVisible ? 'auto' : 'none'}
           >
             <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
               <Ionicons name="chevron-down" size={22} color="#ffffff" />
@@ -5112,7 +5272,7 @@ const refreshMessages = useCallback(async () => {
             <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
               <Ionicons name="close" size={18} color="#ffffff" />
             </Pressable>
-          </View>
+          </Animated.View>
           <FlatList
             style={styles.attachmentModalCarousel}
             contentContainerStyle={styles.attachmentModalCarouselContent}
@@ -5122,8 +5282,17 @@ const refreshMessages = useCallback(async () => {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
+            getItemLayout={(_, index) => ({
+              length: SCREEN_WIDTH,
+              offset: SCREEN_WIDTH * index,
+              index,
+            })}
             renderItem={({ item }) => (
-              <View style={styles.attachmentPreviewSlide}>
+              <View
+                style={styles.attachmentPreviewSlide}
+                onTouchStart={handleSlideTouchStart}
+                onTouchEnd={handleSlideTouchEnd}
+              >
                 {item.isImage && (item.previewUrl || item.publicViewUrl || item.localUri) ? (
                   <ScrollView
                     style={StyleSheet.absoluteFillObject}
@@ -5169,11 +5338,25 @@ const refreshMessages = useCallback(async () => {
               );
             }}
           />
-          <BlurView
-            intensity={50}
-            tint="dark"
-            style={[styles.attachmentModalFooter, { paddingBottom: Math.max(insets.bottom, 10) + 8 }]}
+          <Animated.View
+            style={[
+              styles.attachmentModalFooter,
+              {
+                paddingBottom: Math.max(insets.bottom, 10) + 8,
+                opacity: previewChromeAnim,
+                transform: [
+                  {
+                    translateY: previewChromeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents={previewChromeVisible ? 'auto' : 'none'}
           >
+            <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFillObject} />
             <View style={styles.attachmentModalFileMetaRow}>
               <Text style={styles.attachmentModalFileName} numberOfLines={1}>
                 {currentPreviewAttachment?.name || 'Attachment'}
@@ -5200,7 +5383,7 @@ const refreshMessages = useCallback(async () => {
                 <Text style={styles.attachmentModalButtonText}>Share</Text>
               </Pressable>
             </View>
-          </BlurView>
+          </Animated.View>
         </View>
       </Modal>
       {messageActionContext ? (
@@ -5434,6 +5617,9 @@ const styles = StyleSheet.create({
   messageRowWithReply: {
     marginTop: 10,
   },
+  messageRowMedia: {
+    maxWidth: '100%',
+  },
   messageRowMine: {
     alignSelf: 'flex-end',
   },
@@ -5451,6 +5637,15 @@ const styles = StyleSheet.create({
       width: 0,
       height: 4,
     },
+  },
+  messageBubbleMediaOnly: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
   messageBubbleWithReply: {
     alignSelf: 'stretch',
@@ -5480,6 +5675,9 @@ const styles = StyleSheet.create({
   },
   messageContentWithReply: {
     minWidth: '75%',
+  },
+  messageContentMediaOnly: {
+    maxWidth: '100%',
   },
   messageContentMine: {
     alignItems: 'flex-end',
@@ -6084,22 +6282,23 @@ const styles = StyleSheet.create({
     maxHeight: 72,
   },
   attachmentPreviewContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingBottom: 8,
     alignItems: 'center',
-    columnGap: 8,
+    columnGap: 12,
   },
   attachmentChip: {
+    width: 240,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 18,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    columnGap: 8,
+    paddingVertical: 10,
+    columnGap: 10,
   },
   attachmentChipBody: {
-    maxWidth: 180,
+    flex: 1,
   },
   attachmentChipName: {
     color: '#ffffff',
@@ -6282,8 +6481,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   attachmentModalCarouselContent: {
-    paddingVertical: 20,
-    paddingHorizontal: 16,
     alignItems: 'center',
   },
   attachmentModalFile: {
@@ -6308,13 +6505,12 @@ const styles = StyleSheet.create({
     columnGap: 12,
   },
   attachmentPreviewSlide: {
-    width: Dimensions.get('window').width - 24,
-    height: Dimensions.get('window').height * 0.65,
-    borderRadius: 24,
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height,
     backgroundColor: '#000000',
-    marginBottom: 12,
     alignSelf: 'center',
     overflow: 'hidden',
+    justifyContent: 'center',
   },
   attachmentModalVideo: {
     width: '100%',
