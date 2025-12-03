@@ -11,6 +11,16 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { Video, ResizeMode } from 'expo-av';
+import {
+  EncodingType,
+  FileSystemUploadType,
+  cacheDirectory,
+  createUploadTask,
+  deleteAsync,
+  getInfoAsync,
+  readAsStringAsync,
+  writeAsStringAsync,
+} from 'expo-file-system';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
 import { NotificationService } from '../../services/NotificationService';
@@ -112,7 +122,9 @@ const ATTACHMENT_STATUS_MAP: Record<string, 'pending' | 'active' | 'expired'> = 
   expired: 'expired',
 };
 const MAX_PENDING_ATTACHMENTS = 10;
-const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 1024 * 1024 * 1024; // 1GB
+const CHUNK_UPLOAD_THRESHOLD_BYTES = 99 * 1024 * 1024; // Cloudflare cap
+const CHUNK_TARGET_BYTES = 80 * 1024 * 1024;
 
 const buildAbsoluteUrl = (pathValue?: string | null): string | undefined => {
   if (!pathValue) {
@@ -3068,6 +3080,108 @@ const ChatScreen: React.FC = () => {
     [chatId]
   );
 
+  const updatePendingProgress = useCallback((tempId: string, progress: number) => {
+    setPendingAttachments((prev) =>
+      prev.map((attachment) =>
+        attachment.id === tempId
+          ? { ...attachment, uploadProgress: Math.min(Math.max(progress, 0), 1), uploadError: false }
+          : attachment
+      )
+    );
+  }, []);
+
+  const uploadAttachmentInChunks = useCallback(
+    async (file: UploadableAsset, sizeBytes: number, tempId: string) => {
+      if (!chatId) {
+        throw new Error('Chat not available');
+      }
+
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+      authTokenRef.current = token;
+
+      const start = await ApiService.post(
+        `/chat/${chatId}/attachments/chunk/start`,
+        {
+          fileName: file.name || `attachment-${Date.now()}`,
+          mimeType: file.type || 'application/octet-stream',
+          fileSize: sizeBytes,
+        },
+        token
+      );
+      if (!start.success || !start.data?.uploadId) {
+        throw new Error(start.error || 'Unable to start chunked upload');
+      }
+
+      const uploadId = start.data.uploadId as string;
+      const chunkSize = Number(start.data.chunkSize) || CHUNK_TARGET_BYTES;
+      const totalChunks = Number(start.data.totalChunks) || Math.max(1, Math.ceil(sizeBytes / chunkSize));
+
+      let completedChunks = 0;
+
+      for (let index = 0; index < totalChunks; index += 1) {
+        const offset = index * chunkSize;
+        const length = Math.min(chunkSize, sizeBytes - offset);
+
+        const base64 = await readAsStringAsync(file.uri, {
+          encoding: EncodingType.Base64,
+          position: offset,
+          length,
+        });
+        const chunkPath = `${cacheDirectory}chunk-${uploadId}-${index + 1}.part`;
+        await writeAsStringAsync(chunkPath, base64, { encoding: EncodingType.Base64 });
+
+        const uploadUrl = `${ApiService.baseUrl}/chat/${chatId}/attachments/chunk/${uploadId}`;
+        const task = createUploadTask(
+          uploadUrl,
+          chunkPath,
+          {
+            httpMethod: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            uploadType: FileSystemUploadType.MULTIPART,
+            fieldName: 'chunk',
+            parameters: {
+              chunkIndex: String(index + 1),
+              totalChunks: String(totalChunks),
+            },
+          },
+          (progressEvent) => {
+            const chunkProgress =
+              progressEvent.totalBytesExpectedToSend && progressEvent.totalBytesExpectedToSend > 0
+                ? progressEvent.totalBytesSent / progressEvent.totalBytesExpectedToSend
+                : 0;
+            const overall = (completedChunks + chunkProgress) / totalChunks;
+            updatePendingProgress(tempId, overall);
+          }
+        );
+
+        const result = await task.uploadAsync();
+        await deleteAsync(chunkPath, { idempotent: true }).catch(() => null);
+        if (!result || result.status < 200 || result.status >= 300) {
+          throw new Error('Chunk upload failed');
+        }
+        completedChunks += 1;
+        updatePendingProgress(tempId, completedChunks / totalChunks);
+      }
+
+      const complete = await ApiService.post(
+        `/chat/${chatId}/attachments/chunk/${uploadId}/complete`,
+        {},
+        token
+      );
+
+      if (!complete.success || !complete.data?.attachment) {
+        throw new Error(complete.error || 'Failed to finalize upload');
+      }
+
+      updatePendingProgress(tempId, 1);
+      return complete.data.attachment;
+    },
+    [chatId, updatePendingProgress]
+  );
+
   const uploadSingleAttachment = useCallback(
     async (file: UploadableAsset) => {
       if (!chatId) {
@@ -3078,11 +3192,15 @@ const ChatScreen: React.FC = () => {
       const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isImage = Boolean(file.type && file.type.toLowerCase().startsWith('image/'));
       const isVideo = Boolean(file.type && file.type.toLowerCase().startsWith('video/'));
+      const fileInfo = await getInfoAsync(file.uri);
+      const resolvedSize = fileInfo.exists && !fileInfo.isDirectory
+        ? Number(file.size || fileInfo.size || 0)
+        : Number(file.size || 0);
       const placeholder: MessageAttachment = {
         id: tempId,
         name: file.name || 'Attachment',
         mimeType: file.type || 'application/octet-stream',
-        fileSize: Number(file.size) || 0,
+        fileSize: resolvedSize,
         status: 'pending',
         isImage,
         isVideo,
@@ -3099,30 +3217,20 @@ const ChatScreen: React.FC = () => {
       setPendingAttachments((prev) => [...prev, placeholder]);
 
       try {
-        const response = await uploadAttachmentWithProgress(file, {
-          onProgress: (progress) => {
-            setPendingAttachments((prev) =>
-              prev.map((attachment) =>
-                attachment.id === tempId
-                  ? { ...attachment, uploadProgress: progress, uploadError: false }
-                  : attachment
-              )
-            );
-          },
-        });
-
-        if (!response.success || !response.data?.attachment) {
-          NotificationService.show('error', response.error || 'Failed to upload attachment');
-          setPendingAttachments((prev) =>
-            prev.map((attachment) =>
-              attachment.id === tempId
-                ? { ...attachment, uploadPending: false, uploadError: true }
-                : attachment
-            )
-          );
-          return;
+        let attachmentResponse: any;
+        if (resolvedSize > CHUNK_UPLOAD_THRESHOLD_BYTES) {
+          attachmentResponse = await uploadAttachmentInChunks(file, resolvedSize, tempId);
+        } else {
+          const response = await uploadAttachmentWithProgress(file, {
+            onProgress: (progress) => updatePendingProgress(tempId, progress),
+          });
+          if (!response.success || !response.data?.attachment) {
+            throw new Error(response.error || 'Failed to upload attachment');
+          }
+          attachmentResponse = response.data.attachment;
         }
-        const mapped = mapServerAttachment(response.data.attachment);
+
+        const mapped = mapServerAttachment(attachmentResponse);
         setPendingAttachments((prev) =>
           prev.map((attachment) =>
             attachment.id === tempId
@@ -3147,7 +3255,7 @@ const ChatScreen: React.FC = () => {
         );
       }
     },
-    [chatId, uploadAttachmentWithProgress]
+    [chatId, updatePendingProgress, uploadAttachmentInChunks, uploadAttachmentWithProgress]
   );
 
     const ensureAttachmentCapacity = useCallback(
@@ -3172,7 +3280,7 @@ const ChatScreen: React.FC = () => {
       );
       const newBytes = sanitized.reduce((total, file) => total + (file.size || 0), 0);
       if (currentBytes + newBytes > MAX_ATTACHMENT_BYTES) {
-        NotificationService.show('warning', 'Attachments are limited to 100MB per message');
+        NotificationService.show('warning', 'Attachments are limited to 1GB per message');
         return false;
       }
 

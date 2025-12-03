@@ -116,34 +116,11 @@ export const PasswordResetScreen: React.FC = () => {
       });
 
       if (response.success && response.data) {
-        const data: any = response.data;
-        const token = data.token;
-        const user = data.user;
-
-        if (token) {
-          await StorageService.setAuthToken(token);
-        }
-        if (user) {
-          await StorageService.setObject('user_data', user);
-        }
-
-        if (token) {
-          const [needsSetup, localIdentity] = await Promise.all([
-            IdentityService.requiresBootstrap(token),
-            CryptoService.getStoredIdentity(),
-          ]);
-
-          notificationService.show('success', 'Password updated. You are signed in.', 'Success');
-          if (needsSetup) {
-            router.replace('/identity?mode=setup' as any);
-          } else if (!localIdentity) {
-            router.replace('/identity?mode=unlock' as any);
-          } else {
-            router.replace('/home' as any);
-          }
-        } else {
-          router.replace('/' as any);
-        }
+        await StorageService.removeAuthToken();
+        await StorageService.removeItem('user_data');
+        await CryptoService.resetIdentity().catch(() => null);
+        notificationService.show('success', 'Password updated. Please sign in with your new password.', 'Success');
+        router.replace('/' as any);
       } else {
         notificationService.show('error', response.error || 'Reset failed', 'Error');
       }
