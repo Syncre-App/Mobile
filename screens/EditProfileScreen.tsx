@@ -319,13 +319,6 @@ export const EditProfileScreen: React.FC = () => {
           </View>
         </GlassCard>
 
-        <GlassCard width="100%" style={[styles.card, styles.bioCard]} variant="subtle">
-          <BlurView intensity={40} tint="dark" style={styles.bioBlur}>
-            <Text style={styles.bioTitle}>Bio editing is coming soon</Text>
-            <Text style={styles.bioSubtitle}>We’re working on this feature, stay tuned!</Text>
-          </BlurView>
-        </GlassCard>
-
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             onPress={handleUpload}
@@ -495,25 +488,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  bioCard: {
-    marginBottom: 32,
-    overflow: 'hidden',
-  },
-  bioBlur: {
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    gap: 6,
-  },
-  bioTitle: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bioSubtitle: {
-    color: 'rgba(255, 255, 255, 0.65)',
-    fontSize: 13,
   },
   buttonContainer: {
     gap: 12,
