@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { AppBackground } from '../components/AppBackground';
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
@@ -69,9 +68,9 @@ export const HomeScreen: React.FC = () => {
     }
   }, [router, user]);
 
-  const blockedSet = useMemo(
+  const blockedSet = useMemo<Set<string>>(
     () =>
-      new Set(
+      new Set<string>(
         Array.isArray(user?.blocked_users)
           ? user.blocked_users.map((id: any) => id?.toString?.() ?? String(id)).filter(Boolean)
           : []
