@@ -521,10 +521,13 @@ const sortMessagesChronologically = (list: Message[]): Message[] =>
 const MESSAGE_CHAR_LIMIT = 5000;
 const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
 const SWIPE_REPLY_THRESHOLD = 12;
+const SWIPE_CAPTURE_MIN_DISTANCE = 4;
+const SWIPE_REPLY_FEEDBACK_OFFSET = 42;
+const SWIPE_REPLY_FEEDBACK_DURATION = 260;
+const SWIPE_REPLY_RETURN_DURATION = 380;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
 const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
-
 
 const layoutNext = () => {
   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -655,28 +658,34 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   }, [embeddableLink?.url]);
 
   const resetSwipe = useCallback(() => {
-    Animated.spring(swipeAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-    }).start();
+    swipeAnim.stopAnimation(() => {
+      Animated.spring(swipeAnim, {
+        toValue: 0,
+        tension: 120,
+        friction: 14,
+        useNativeDriver: true,
+      }).start();
+    });
   }, [swipeAnim]);
 
   const triggerReplyFeedback = useCallback(() => {
-    Animated.sequence([
-      Animated.timing(swipeAnim, {
-        toValue: isMine ? -34 : 34,
-        duration: 180,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.delay(120),
-      Animated.timing(swipeAnim, {
-        toValue: 0,
-        duration: 320,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
+    const targetOffset = isMine ? -SWIPE_REPLY_FEEDBACK_OFFSET : SWIPE_REPLY_FEEDBACK_OFFSET;
+    swipeAnim.stopAnimation(() => {
+      Animated.sequence([
+        Animated.timing(swipeAnim, {
+          toValue: targetOffset,
+          duration: SWIPE_REPLY_FEEDBACK_DURATION,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(swipeAnim, {
+          toValue: 0,
+          duration: SWIPE_REPLY_RETURN_DURATION,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
   }, [isMine, swipeAnim]);
 
   const triggerReply = useCallback(() => {
@@ -689,14 +698,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     Haptics.selectionAsync().catch(() => null);
   }, [onReplySwipe, triggerReplyFeedback]);
 
-  const shouldCaptureSwipe = useCallback((gesture: any) => {
-    const horizontal = Math.abs(gesture.dx);
-    const vertical = Math.abs(gesture.dy);
-    if (horizontal < 1) {
-      return false;
-    }
-    return horizontal > vertical * 0.45;
-  }, []);
+  const shouldCaptureSwipe = useCallback(
+    (gesture: any) => {
+      const { dx, dy } = gesture;
+      const absHorizontal = Math.abs(dx);
+      const absVertical = Math.abs(dy);
+      if (absHorizontal < SWIPE_CAPTURE_MIN_DISTANCE) {
+        return false;
+      }
+      const isCorrectDirection = isMine ? dx < 0 : dx > 0;
+      if (!isCorrectDirection) {
+        return false;
+      }
+      return absHorizontal > absVertical * 0.35;
+    },
+    [isMine]
+  );
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -704,6 +721,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onMoveShouldSetPanResponder: (_, gesture) => shouldCaptureSwipe(gesture),
         onMoveShouldSetPanResponderCapture: (_, gesture) => shouldCaptureSwipe(gesture),
         onPanResponderGrant: () => {
+          swipeAnim.stopAnimation();
           swipePeakRef.current = 0;
           replyTriggeredRef.current = false;
         },
