@@ -69,6 +69,16 @@ export const HomeScreen: React.FC = () => {
     }
   }, [router, user]);
 
+  const blockedSet = useMemo(
+    () =>
+      new Set(
+        Array.isArray(user?.blocked_users)
+          ? user.blocked_users.map((id: any) => id?.toString?.() ?? String(id)).filter(Boolean)
+          : []
+      ),
+    [user?.blocked_users]
+  );
+
   const persistNotifications = useCallback((list: any[]) => {
     const minimized = list.map((notification: any) => ({
       id: notification.id,
@@ -716,6 +726,49 @@ export const HomeScreen: React.FC = () => {
     }
   }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
 
+  const handleReportUser = useCallback(async (userId: string) => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Missing authentication token');
+        return;
+      }
+      const response = await ApiService.post('/user/report', { targetUserId: userId, reason: 'Reported from chat list' }, token);
+      if (response.success) {
+        NotificationService.show('success', 'Report submitted');
+      } else {
+        NotificationService.show('error', response.error || 'Failed to submit report');
+      }
+    } catch (error) {
+      console.error('Failed to report user:', error);
+      NotificationService.show('error', 'Failed to submit report');
+    }
+  }, []);
+
+  const handleToggleBlockUser = useCallback(async (userId: string, isBlocked: boolean) => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Missing authentication token');
+        return;
+      }
+      const endpoint = isBlocked ? '/user/unblock' : '/user/block';
+      const response = await ApiService.post(endpoint, { targetUserId: userId }, token);
+      if (response.success) {
+        const nextList = (response.data as any)?.blocked_users || [];
+        const updatedUser = user ? { ...user, blocked_users: nextList } : { blocked_users: nextList };
+        setUser(updatedUser);
+        await StorageService.setObject('user_data', updatedUser);
+        NotificationService.show('success', isBlocked ? 'User unblocked' : 'User blocked');
+      } else {
+        NotificationService.show('error', response.error || 'Failed to update block list');
+      }
+    } catch (error) {
+      console.error('Failed to toggle block user:', error);
+      NotificationService.show('error', 'Failed to update block list');
+    }
+  }, [user]);
+
   const handleChatRefresh = useCallback(async () => {
     await Promise.all([loadChats(), loadFriendData(), loadNotifications(), loadUnreadSummary()]);
   }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
@@ -1019,6 +1072,9 @@ export const HomeScreen: React.FC = () => {
                 onRefresh={handleChatRefresh}
                 userStatuses={userStatuses}
                 onRemoveFriend={handleRemoveFriend}
+                onReportUser={handleReportUser}
+                onToggleBlock={handleToggleBlockUser}
+                blockedUserIds={blockedSet}
                 removingFriendId={removingFriendId}
                 unreadCounts={chatUnreadCounts}
                 onEditGroup={handleEditGroup}

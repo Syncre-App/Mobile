@@ -45,6 +45,9 @@ interface ChatListWidgetProps {
   onRefresh: () => void;
   userStatuses: UserStatus;
   onRemoveFriend: (friendId: string) => void;
+  onReportUser: (userId: string) => void;
+  onToggleBlock: (userId: string, isBlocked: boolean) => void;
+  blockedUserIds?: Set<string>;
   removingFriendId?: string | null;
   unreadCounts?: Record<string, number>;
   onEditGroup?: (chat: Chat) => void;
@@ -59,6 +62,9 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   onRefresh,
   userStatuses,
   onRemoveFriend,
+  onReportUser,
+  onToggleBlock,
+  blockedUserIds,
   removingFriendId = null,
   unreadCounts = {},
   onEditGroup = () => {},
@@ -257,17 +263,27 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     if (!otherUserId) return;
 
     const displayName = getChatDisplayName(chat);
+    const isBlocked = blockedUserIds?.has(otherUserId.toString()) ?? false;
 
     Alert.alert(
       'Chat Options',
       displayName,
       [
-        ...commonActions,
         {
           text: 'Remove Friend',
           style: 'destructive',
           onPress: () => onRemoveFriend(otherUserId),
         },
+        {
+          text: 'Report User',
+          style: 'destructive',
+          onPress: () => onReportUser(otherUserId),
+        },
+        {
+          text: isBlocked ? 'Unblock User' : 'Block User',
+          onPress: () => onToggleBlock(otherUserId, isBlocked),
+        },
+        ...commonActions,
       ],
     );
   };
