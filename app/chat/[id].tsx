@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, BackHandler, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable, Linking, Share, GestureResponderEvent, Dimensions } from 'react-native';
+import { ActivityIndicator, Alert, Animated, BackHandler, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable, Linking, Share, GestureResponderEvent, Dimensions, Easing } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -520,7 +520,7 @@ const sortMessagesChronologically = (list: Message[]): Message[] =>
 
 const MESSAGE_CHAR_LIMIT = 5000;
 const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
-const SWIPE_REPLY_THRESHOLD = 18;
+const SWIPE_REPLY_THRESHOLD = 12;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
 const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -649,22 +649,60 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   }, [message.attachments, message.content, message.isPlaceholder]);
   const [embedLoaded, setEmbedLoaded] = useState(false);
   const [embedFailed, setEmbedFailed] = useState(false);
-useEffect(() => {
-  setEmbedLoaded(false);
-  setEmbedFailed(false);
-}, [embeddableLink?.url]);
+  useEffect(() => {
+    setEmbedLoaded(false);
+    setEmbedFailed(false);
+  }, [embeddableLink?.url]);
+
+  const resetSwipe = useCallback(() => {
+    Animated.spring(swipeAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+  }, [swipeAnim]);
+
+  const triggerReplyFeedback = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(swipeAnim, {
+        toValue: isMine ? -34 : 34,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.delay(120),
+      Animated.timing(swipeAnim, {
+        toValue: 0,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [isMine, swipeAnim]);
+
+  const triggerReply = useCallback(() => {
+    if (replyTriggeredRef.current) {
+      return;
+    }
+    replyTriggeredRef.current = true;
+    onReplySwipe?.();
+    triggerReplyFeedback();
+    Haptics.selectionAsync().catch(() => null);
+  }, [onReplySwipe, triggerReplyFeedback]);
+
+  const shouldCaptureSwipe = useCallback((gesture: any) => {
+    const horizontal = Math.abs(gesture.dx);
+    const vertical = Math.abs(gesture.dy);
+    if (horizontal < 1) {
+      return false;
+    }
+    return horizontal > vertical * 0.45;
+  }, []);
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, gesture) => {
-          const horizontal = Math.abs(gesture.dx);
-          const vertical = Math.abs(gesture.dy);
-          if (horizontal < 4) {
-            return false;
-          }
-          return horizontal * 0.8 > vertical;
-        },
+        onMoveShouldSetPanResponder: (_, gesture) => shouldCaptureSwipe(gesture),
+        onMoveShouldSetPanResponderCapture: (_, gesture) => shouldCaptureSwipe(gesture),
         onPanResponderGrant: () => {
           swipePeakRef.current = 0;
           replyTriggeredRef.current = false;
@@ -686,9 +724,7 @@ useEffect(() => {
             !replyTriggeredRef.current &&
             onReplySwipe
           ) {
-            replyTriggeredRef.current = true;
-            onReplySwipe();
-            Haptics.selectionAsync().catch(() => null);
+            triggerReply();
           }
         },
         onPanResponderRelease: (_, gesture) => {
@@ -696,25 +732,20 @@ useEffect(() => {
             swipePeakRef.current ||
             (isMine ? Math.abs(Math.min(gesture.dx, 0)) : Math.abs(Math.max(gesture.dx, 0)));
           if (!replyTriggeredRef.current && magnitude > SWIPE_REPLY_THRESHOLD && onReplySwipe) {
-            onReplySwipe();
+            triggerReply();
+          } else if (!replyTriggeredRef.current) {
+            resetSwipe();
           }
           swipePeakRef.current = 0;
           replyTriggeredRef.current = false;
-          Animated.spring(swipeAnim, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
         },
         onPanResponderTerminate: () => {
           swipePeakRef.current = 0;
           replyTriggeredRef.current = false;
-          Animated.spring(swipeAnim, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
+          resetSwipe();
         },
       }),
-    [isMine, onReplySwipe, swipeAnim]
+    [isMine, onReplySwipe, resetSwipe, shouldCaptureSwipe, triggerReply, swipeAnim]
   );
 
   useEffect(
@@ -1988,6 +2019,10 @@ const ChatScreen: React.FC = () => {
 
   const scrollToMessageById = useCallback(
     (targetId: string) => {
+      isNearBottomRef.current = false;
+      if (!showScrollToBottomButton) {
+        setShowScrollToBottomButton(true);
+      }
       const index = decoratedData.findIndex((item) => item.kind === 'message' && item.message.id === targetId);
       if (index >= 0) {
         requestAnimationFrame(() => {
@@ -2006,7 +2041,7 @@ const ChatScreen: React.FC = () => {
         pendingScrollIdRef.current = targetId;
       }
     },
-    [decoratedData]
+    [decoratedData, setShowScrollToBottomButton, showScrollToBottomButton]
   );
 
   const lastOutgoingMessageId = useMemo(() => {
@@ -2397,7 +2432,21 @@ const ChatScreen: React.FC = () => {
         const rawMessages = response.success && Array.isArray(response.data?.messages) ? response.data.messages : [];
 
         if (!rawMessages.length) {
-          setMessagesAnimated(() => generatePlaceholderMessages(displayName));
+          setMessagesAnimated((prev) => {
+            const optimistic = prev.filter(
+              (msg) =>
+                msg.senderId === currentUserId &&
+                !msg.isPlaceholder &&
+                (msg.status === 'sending' ||
+                  msg.status === 'sent' ||
+                  msg.status === 'delivered' ||
+                  msg.status === 'seen')
+            );
+            if (optimistic.length) {
+              return optimistic;
+            }
+            return generatePlaceholderMessages(displayName);
+          });
           setHasMore(false);
           nextCursorRef.current = null;
           initialLoadCompleteRef.current = true;
@@ -2413,7 +2462,14 @@ const ChatScreen: React.FC = () => {
         setMessagesAnimated((prev) => {
           const existingIds = new Set(sorted.map((msg) => msg.id));
           const localSending = prev.filter(
-            (msg) => msg.status === 'sending' && !existingIds.has(msg.id)
+            (msg) =>
+              msg.senderId === currentUserId &&
+              !msg.isPlaceholder &&
+              !existingIds.has(msg.id) &&
+              (msg.status === 'sending' ||
+                msg.status === 'sent' ||
+                msg.status === 'delivered' ||
+                msg.status === 'seen')
           );
           return sortMessagesChronologically([...sorted, ...localSending]);
         });
@@ -2446,21 +2502,27 @@ const ChatScreen: React.FC = () => {
         initialLoadCompleteRef.current = true;
       }
     },
-    [generatePlaceholderMessages, scrollToBottom, setMessagesAnimated, transformMessages, requestReencrypt]
+    [
+      currentUserId,
+      generatePlaceholderMessages,
+      scrollToBottom,
+      setMessagesAnimated,
+      transformMessages,
+      requestReencrypt,
+    ]
   );
-  
-const refreshMessages = useCallback(async () => {
-  if (!chatId) {
-    return;
-  }
+  const refreshMessages = useCallback(async () => {
+    if (!chatId) {
+      return;
+    }
 
     const token = authTokenRef.current ?? (await StorageService.getAuthToken());
     if (!token) {
       return;
     }
-  authTokenRef.current = token;
-  await loadMessagesForChat(token, chatId, receiverNameRef.current, otherUserIdRef.current);
-}, [chatId, loadMessagesForChat]);
+    authTokenRef.current = token;
+    await loadMessagesForChat(token, chatId, receiverNameRef.current, otherUserIdRef.current);
+  }, [chatId, loadMessagesForChat]);
 
   const scheduleRefreshMessages = useCallback(() => {
     if (pendingRefreshRef.current) {
