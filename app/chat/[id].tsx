@@ -1095,6 +1095,10 @@ useEffect(() => {
                       style={[styles.reactionPill, mine && styles.reactionPillMine]}
                       onPress={() => onReact?.(message, entry.reaction)}
                     >
+                      <Text style={styles.reactionText}>{entry.reaction}</Text>
+                      {entry.count > 1 ? (
+                        <Text style={styles.reactionCount}>{entry.count}</Text>
+                      ) : null}
                     </Pressable>
                   );
                 })}
