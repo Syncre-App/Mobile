@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
 import { NotificationService, notificationService } from '../services/NotificationService';
@@ -108,12 +109,20 @@ export default function TermsAcceptScreen() {
             style={[styles.acceptButton, isSubmitting && styles.acceptButtonDisabled]}
             onPress={handleAccept}
             disabled={isSubmitting}
+            activeOpacity={0.9}
           >
-            {isSubmitting ? (
-              <ActivityIndicator color="#0b1220" />
-            ) : (
-              <Text style={styles.acceptButtonText}>Accept & Continue</Text>
-            )}
+            <LinearGradient
+              colors={['#2563EB', '#0EA5E9']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.acceptGradient}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.acceptButtonText}>Accept & Continue</Text>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </GlassCard>
       </ScrollView>
@@ -190,17 +199,19 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     marginTop: spacing.xl,
-    backgroundColor: '#34d399',
-    paddingVertical: spacing.md,
     borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
   },
   acceptButtonDisabled: {
     opacity: 0.7,
   },
+  acceptGradient: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   acceptButtonText: {
-    color: '#0b1220',
+    color: '#ffffff',
     fontSize: 16,
     fontFamily: 'PlusJakartaSans-Bold',
   },
