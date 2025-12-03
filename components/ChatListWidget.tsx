@@ -182,19 +182,16 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     return 'Loading...';
   };
 
-  const formatLastSeenLabel = (user?: User): string => {
+  const formatLastSeenLabel = (user?: User | null): string => {
     if (!user) return '';
-    const status = user.status ? String(user.status).toLowerCase() : '';
-    if (status === 'online') return 'Online';
-    if (status === 'idle') return 'Idle';
     const lastSeen = user.last_seen;
     if (!lastSeen) return '';
     const parsed = Date.parse(lastSeen);
     if (Number.isNaN(parsed)) return '';
     const diffMs = Date.now() - parsed;
     const minutes = Math.floor(diffMs / 60000);
-    if (minutes < 1) return 'Online';
-    if (minutes < 3) return 'Idle';
+    if (minutes < 1) return '';
+    if (minutes < 3) return '';
     if (minutes < 60) return `${minutes}m ago`;
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h ago`;
