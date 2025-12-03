@@ -40,7 +40,7 @@ export const TransparentField: React.FC<TransparentFieldProps> = ({
   return (
     <View style={style}>
       <LinearGradient
-        colors={gradients.cardStroke}
+        colors={gradients.cardStroke as [string, string]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradientBorder}
