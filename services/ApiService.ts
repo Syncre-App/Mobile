@@ -1,8 +1,6 @@
 import { UserCacheService } from './UserCacheService';
 import { TimezoneService } from './TimezoneService';
 
-// Allow overriding the API URL via Expo public env for local/dev servers.
-// Example: EXPO_PUBLIC_API_URL=http://192.168.0.5:3000/v1
 const resolveBaseUrl = () => {
   const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
   if (envUrl) {
@@ -83,7 +81,6 @@ export class ApiService {
       try {
         responseData = await response.json();
       } catch (e) {
-        // Non-JSON response — capture text for debugging
         const text = await response.text();
         console.warn('ApiService.get: Non-JSON response:', text);
         responseData = { text };

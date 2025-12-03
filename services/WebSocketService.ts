@@ -6,7 +6,7 @@ export interface WebSocketMessage {
   type: string;
   data?: any;
   timestamp?: number;
-  token?: string; // For auth messages
+  token?: string;
   chatId?: string | number;
   [key: string]: any;
 }

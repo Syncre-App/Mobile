@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { StorageService } from './StorageService';
 
-const DEVICE_ID_STORAGE_KEY = 'push_device_id'; // keep aligned with push registration
+const DEVICE_ID_STORAGE_KEY = 'push_device_id';
 
 export const DeviceService = {
   async getOrCreateDeviceId(): Promise<string> {
