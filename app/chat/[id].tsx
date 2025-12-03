@@ -763,14 +763,6 @@ useEffect(() => {
     }).start();
   }, [fadeAnim]);
 
-  const containerStyle = [
-    styles.messageRow,
-    isMine ? styles.messageRowMine : styles.messageRowTheirs,
-    !isFirstInGroup && styles.messageRowStacked,
-    isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
-    message.replyTo && styles.messageRowWithReply,
-    isMediaOnlyMessage && styles.messageRowMedia,
-  ];
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const hasAttachments = attachments.length > 0;
   const hasPreviewableMedia = attachments.some(
@@ -782,6 +774,14 @@ useEffect(() => {
   const hasContent = Boolean((message.content || '').trim().length);
   const isMediaOnlyMessage =
     hasPreviewableMedia && !hasContent && !message.replyTo && !message.isPlaceholder;
+  const containerStyle = [
+    styles.messageRow,
+    isMine ? styles.messageRowMine : styles.messageRowTheirs,
+    !isFirstInGroup && styles.messageRowStacked,
+    isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
+    message.replyTo && styles.messageRowWithReply,
+    isMediaOnlyMessage && styles.messageRowMedia,
+  ];
   const previewableImageAttachments = useMemo(
     () =>
       attachments.filter(
