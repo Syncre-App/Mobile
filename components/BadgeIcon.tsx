@@ -143,8 +143,8 @@ const BadgeIcon: React.FC<BadgeIconProps> = ({ type, size = 16, style }) => {
         return (
           <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
             <Circle cx="8" cy="8" r="7" fill="#C9A227" />
-            <Path d="M8 2.5L12 8.5H4L8 2.5Z" stroke="white" strokeWidth="1.3" fill="none" />
-            <Path d="M8 13.5L4 7.5H12L8 13.5Z" stroke="white" strokeWidth="1.3" fill="none" />
+            <Path d="M8 2L13 11H3L8 2Z" stroke="white" strokeWidth="1.2" fill="none" />
+            <Path d="M8 14L3 5H13L8 14Z" stroke="white" strokeWidth="1.2" fill="none" />
           </Svg>
         );
 
