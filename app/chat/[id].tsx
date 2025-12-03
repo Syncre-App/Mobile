@@ -11,16 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { Video, ResizeMode } from 'expo-av';
-import {
-  EncodingType,
-  FileSystemUploadType,
-  cacheDirectory,
-  createUploadTask,
-  deleteAsync,
-  getInfoAsync,
-  readAsStringAsync,
-  writeAsStringAsync,
-} from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
 import { NotificationService } from '../../services/NotificationService';
@@ -3125,22 +3116,24 @@ const ChatScreen: React.FC = () => {
         const offset = index * chunkSize;
         const length = Math.min(chunkSize, sizeBytes - offset);
 
-        const base64 = await readAsStringAsync(file.uri, {
-          encoding: EncodingType.Base64,
+        const base64 = await FileSystem.readAsStringAsync(file.uri, {
+          encoding: 'base64',
           position: offset,
           length,
         });
-        const chunkPath = `${cacheDirectory}chunk-${uploadId}-${index + 1}.part`;
-        await writeAsStringAsync(chunkPath, base64, { encoding: EncodingType.Base64 });
+        const chunkPath = `${FileSystem.cacheDirectory}chunk-${uploadId}-${index + 1}.part`;
+        await FileSystem.writeAsStringAsync(chunkPath, base64, {
+          encoding: 'base64',
+        });
 
         const uploadUrl = `${ApiService.baseUrl}/chat/${chatId}/attachments/chunk/${uploadId}`;
-        const task = createUploadTask(
+        const task = FileSystem.createUploadTask(
           uploadUrl,
           chunkPath,
           {
             httpMethod: 'POST',
             headers: { Authorization: `Bearer ${token}` },
-            uploadType: FileSystemUploadType.MULTIPART,
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
             fieldName: 'chunk',
             parameters: {
               chunkIndex: String(index + 1),
@@ -3158,7 +3151,7 @@ const ChatScreen: React.FC = () => {
         );
 
         const result = await task.uploadAsync();
-        await deleteAsync(chunkPath, { idempotent: true }).catch(() => null);
+        await FileSystem.deleteAsync(chunkPath, { idempotent: true }).catch(() => null);
         if (!result || result.status < 200 || result.status >= 300) {
           throw new Error('Chunk upload failed');
         }
@@ -3192,7 +3185,7 @@ const ChatScreen: React.FC = () => {
       const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isImage = Boolean(file.type && file.type.toLowerCase().startsWith('image/'));
       const isVideo = Boolean(file.type && file.type.toLowerCase().startsWith('video/'));
-      const fileInfo = await getInfoAsync(file.uri);
+      const fileInfo = await FileSystem.getInfoAsync(file.uri);
       const resolvedSize = fileInfo.exists && !fileInfo.isDirectory
         ? Number(file.size || fileInfo.size || 0)
         : Number(file.size || 0);
