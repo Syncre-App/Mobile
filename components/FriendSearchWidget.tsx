@@ -13,6 +13,7 @@ interface User {
   id: string;
   username: string;
   profile_picture?: string | null;
+  friendship_status?: string;
   [key: string]: any;
 }
 
@@ -53,8 +54,7 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
       
       if (response.success && response.data) {
         let users: User[];
-        
-        // Handle both array and object response
+
         if (Array.isArray(response.data)) {
           users = response.data;
         } else if (response.data.users && Array.isArray(response.data.users)) {
@@ -62,22 +62,16 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
         } else {
           users = [];
         }
-        
-        const filtered = users.filter((candidate: any) => {
-          const availability = candidate?.friendship_status || candidate?.status;
-          const normalized = availability ? String(availability).toLowerCase() : 'available';
-          return normalized === 'available';
-        });
-        
-        console.log('🔍 Found', users.length, 'users');
-        console.log('🔍 Filtered to', filtered.length, 'available users');
-        UserCacheService.addUsers(
-          filtered.map((candidate: any) => ({
-            ...candidate,
-            id: candidate.id?.toString?.() ?? String(candidate.id),
-          }))
-        );
-        setSearchResults(filtered);
+
+        const normalized = users.map((candidate: any) => ({
+          ...candidate,
+          id: candidate.id?.toString?.() ?? String(candidate.id),
+          friendship_status: candidate.friendship_status || candidate.status || 'available',
+        }));
+
+        console.log('🔍 Found', normalized.length, 'users');
+        UserCacheService.addUsers(normalized as any[]);
+        setSearchResults(normalized);
       } else {
         console.log('❌ Search failed:', response.error);
         setSearchResults([]);
@@ -130,15 +124,25 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
         }
 
         onFriendUpdated();
-        
-        // Clear search
-        setSearchQuery('');
-        setSearchResults([]);
+        setSearchResults((prev) =>
+          prev.map((entry) =>
+            entry.id === user.id
+              ? {
+                  ...entry,
+                  friendship_status: status === 'accepted' ? 'friend' : 'pending_outgoing',
+                }
+              : entry
+          )
+        );
       } else {
         console.log('❌ Failed to add friend:', response.error);
         if (response.statusCode === 409) {
           NotificationService.show('info', response.error || 'Friend request already pending or you are already connected');
-          setSearchResults((prev) => prev.filter((item) => item.id !== user.id));
+          setSearchResults((prev) =>
+            prev.map((entry) =>
+              entry.id === user.id ? { ...entry, friendship_status: 'pending_outgoing' } : entry
+            )
+          );
         } else {
           NotificationService.show('error', response.error || 'Failed to send friend request');
         }
@@ -146,6 +150,49 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
     } catch (error: any) {      
       console.log('❌ Error adding friend:', error);
       NotificationService.show('error', 'Failed to send friend request');
+    }
+  };
+
+  const handleCancelRequest = async (user: User) => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        console.log('❌ No auth token for canceling friend request');
+        return;
+      }
+      const response = await ApiService.post('/user/remove', { friendId: user.id }, token);
+      if (response.success) {
+        NotificationService.show('info', 'Friend request withdrawn');
+        setSearchResults((prev) =>
+          prev.map((entry) =>
+            entry.id === user.id ? { ...entry, friendship_status: 'available' } : entry
+          )
+        );
+        onFriendUpdated();
+      } else {
+        NotificationService.show('error', response.error || 'Unable to cancel request');
+      }
+    } catch (error: any) {
+      console.log('❌ Error canceling request:', error);
+      NotificationService.show('error', 'Unable to cancel request');
+    }
+  };
+
+  const resolveStatus = (user: User) => {
+    const status = user.friendship_status || user.status || 'available';
+    return String(status).toLowerCase();
+  };
+
+  const renderStatusText = (status: string) => {
+    switch (status) {
+      case 'friend':
+        return 'You are already friends';
+      case 'pending_outgoing':
+        return 'Request sent — tap to cancel';
+      case 'pending_incoming':
+        return 'They sent you a request';
+      default:
+        return 'Tap to send a friend request';
     }
   };
 
@@ -166,21 +213,48 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
     );
   };
 
-  const renderSearchResult = ({ item }: { item: User }) => (
-    <TouchableOpacity style={styles.searchResultItem} onPress={() => confirmAddFriend(item)}>
-      <UserAvatar
-        uri={item.profile_picture}
-        name={item.username || item.email}
-        size={44}
-        style={styles.avatarContainer}
-      />
-      <View style={styles.searchResultInfo}>
-        <Text style={styles.searchResultUsername}>{item.username}</Text>
-        <Text style={styles.searchResultMeta}>Tap to send a friend request</Text>
-      </View>
-      <Ionicons name="person-add" size={20} color="#2C82FF" />
-    </TouchableOpacity>
-  );
+  const renderSearchResult = ({ item }: { item: User }) => {
+    const status = resolveStatus(item);
+    const actionable = status === 'available' || status === 'pending_outgoing';
+    const onPress =
+      status === 'available'
+        ? () => confirmAddFriend(item)
+        : status === 'pending_outgoing'
+          ? () => handleCancelRequest(item)
+          : undefined;
+    const icon = (() => {
+      if (status === 'friend') return <Ionicons name="checkmark-circle" size={20} color="#22c55e" />;
+      if (status === 'pending_outgoing') return <Ionicons name="time-outline" size={20} color="#f59e0b" />;
+      if (status === 'pending_incoming') return <Ionicons name="mail-unread-outline" size={20} color="#22d3ee" />;
+      return <Ionicons name="person-add" size={20} color="#2C82FF" />;
+    })();
+
+    const content = (
+      <>
+        <UserAvatar
+          uri={item.profile_picture}
+          name={item.username || item.email}
+          size={44}
+          style={styles.avatarContainer}
+        />
+        <View style={styles.searchResultInfo}>
+          <Text style={styles.searchResultUsername}>{item.username}</Text>
+          <Text style={styles.searchResultMeta}>{renderStatusText(status)}</Text>
+        </View>
+        {icon}
+      </>
+    );
+
+    if (actionable) {
+      return (
+        <TouchableOpacity style={styles.searchResultItem} onPress={onPress} disabled={!onPress}>
+          {content}
+        </TouchableOpacity>
+      );
+    }
+
+    return <View style={[styles.searchResultItem, styles.searchResultItemDisabled]}>{content}</View>;
+  };
 
   return (
     <View style={[styles.container, !showHeader && styles.containerCompact]}>
@@ -253,6 +327,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  searchResultItemDisabled: {
+    opacity: 0.7,
   },
   avatarContainer: {
     marginRight: spacing.xs,

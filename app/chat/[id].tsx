@@ -69,6 +69,7 @@ interface Message {
   receiverId: string;
   senderName?: string | null;
   senderAvatar?: string | null;
+  senderBadges?: string[];
   content: string;
   timestamp: string;
   utcTimestamp?: string;
@@ -94,6 +95,7 @@ interface ChatParticipant {
   username: string;
   profile_picture?: string | null;
   status?: string | null;
+  badges?: string[];
   last_seen?: string | null;
 }
 
@@ -529,6 +531,16 @@ const SWIPE_REPLY_RETURN_DURATION = 420;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
 const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+const BADGE_STYLES: Record<string, { label: string; bg: string; fg: string; border: string }> = {
+  staff: { label: 'Staff', bg: 'rgba(250, 204, 21, 0.16)', fg: '#facc15', border: 'rgba(250, 204, 21, 0.65)' },
+  early_access: { label: 'Early Access', bg: 'rgba(16, 185, 129, 0.14)', fg: '#34d399', border: 'rgba(52, 211, 153, 0.55)' },
+  developer: { label: 'Developer', bg: 'rgba(59, 130, 246, 0.14)', fg: '#60a5fa', border: 'rgba(96, 165, 250, 0.55)' },
+  verified: { label: 'Verified', bg: 'rgba(14, 165, 233, 0.14)', fg: '#38bdf8', border: 'rgba(56, 189, 248, 0.55)' },
+  bot: { label: 'Bot', bg: 'rgba(167, 139, 250, 0.14)', fg: '#c4b5fd', border: 'rgba(196, 181, 253, 0.55)' },
+  donor: { label: 'Donor', bg: 'rgba(244, 114, 182, 0.14)', fg: '#f472b6', border: 'rgba(244, 114, 182, 0.55)' },
+  support: { label: 'Support', bg: 'rgba(94, 234, 212, 0.14)', fg: '#67e8f9', border: 'rgba(103, 232, 249, 0.55)' },
+  default: { label: 'Badge', bg: 'rgba(148, 163, 184, 0.14)', fg: '#e5e7eb', border: 'rgba(148, 163, 184, 0.45)' },
+};
 
 const layoutNext = () => {
   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -657,6 +669,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     setEmbedLoaded(false);
     setEmbedFailed(false);
   }, [embeddableLink?.url]);
+
+  const badgeKeys = useMemo(() => {
+    const list = Array.isArray(message.senderBadges) ? message.senderBadges : [];
+    const normalized = list
+      .map((entry) => (typeof entry === 'string' ? entry.toLowerCase() : null))
+      .filter(Boolean) as string[];
+    return Array.from(new Set(normalized));
+  }, [message.senderBadges]);
 
   const forceResetSwipe = useCallback(() => {
     swipeAnim.stopAnimation(() => {
@@ -1010,9 +1030,29 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 size={32}
                 style={styles.senderMetaAvatar}
               />
-              <Text style={styles.senderMetaName} numberOfLines={1}>
-                {message.senderName || 'Member'}
-              </Text>
+              <View style={styles.senderMetaDetails}>
+                <Text style={styles.senderMetaName} numberOfLines={1}>
+                  {message.senderName || 'Member'}
+                </Text>
+                {badgeKeys.length ? (
+                  <View style={styles.badgeRow}>
+                    {badgeKeys.map((badge, idx) => {
+                      const meta = BADGE_STYLES[badge] || BADGE_STYLES.default;
+                      return (
+                        <View
+                          key={`${message.id}-${badge}-${idx}`}
+                          style={[
+                            styles.badgePill,
+                            { backgroundColor: meta.bg, borderColor: meta.border },
+                          ]}
+                        >
+                          <Text style={[styles.badgeLabel, { color: meta.fg }]}>{meta.label}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
             </View>
           ) : null}
           <View style={bubbleStyle}>
@@ -1754,6 +1794,7 @@ const ChatScreen: React.FC = () => {
         username: participant.username || `User ${key}`,
         profile_picture: participant.profile_picture || null,
         status: participant.status || null,
+        badges: Array.isArray(participant.badges) ? participant.badges : [],
       };
     });
     participantLookupRef.current = lookup;
@@ -1897,16 +1938,21 @@ const ChatScreen: React.FC = () => {
   const resolveSenderProfile = useCallback(
     (senderId: string | null | undefined) => {
       if (!senderId) {
-        return { name: 'Member', avatar: null };
+        return { name: 'Member', avatar: null, badges: [] as string[] };
       }
       const normalized = senderId.toString();
       if (currentUserId && normalized === currentUserId) {
-        return { name: 'You', avatar: user?.profile_picture || null };
+        return {
+          name: 'You',
+          avatar: user?.profile_picture || null,
+          badges: Array.isArray((user as any)?.badges) ? ((user as any).badges as string[]) : [],
+        };
       }
       const participant = participantLookupRef.current[normalized];
       return {
         name: participant?.username || 'Member',
         avatar: participant?.profile_picture || null,
+        badges: Array.isArray(participant?.badges) ? participant?.badges : [],
       };
     },
     [currentUserId, user?.profile_picture]
@@ -2128,6 +2174,11 @@ const ChatScreen: React.FC = () => {
           ? raw.attachments.map((item: any) => mapServerAttachment(item))
           : [];
         const reactions = mapServerReactions((raw as any)?.reactions);
+        const rawBadges = Array.isArray((raw as any)?.senderBadges)
+          ? (raw as any).senderBadges
+          : Array.isArray((raw as any)?.sender_badges)
+            ? (raw as any).sender_badges
+            : [];
 
         let content: string | null = null;
         if (raw.isEncrypted && Array.isArray(raw.envelopes)) {
@@ -2191,6 +2242,9 @@ const ChatScreen: React.FC = () => {
           : serverReply || resolveReplyMetadata(decodedPayload.replyTo);
 
         const senderProfile = resolveSenderProfile(String(senderId));
+        const senderBadges = rawBadges.length
+          ? rawBadges.map((entry: any) => String(entry))
+          : senderProfile.badges || [];
         const seenBy = isSystem ? [] : mapServerReceipts((raw as any)?.seenBy);
         results.push({
           id: String(idValue),
@@ -2198,6 +2252,7 @@ const ChatScreen: React.FC = () => {
           receiverId: String(receiverId),
           senderName: isSystem ? 'System' : senderProfile.name,
           senderAvatar: isSystem ? null : senderProfile.avatar,
+          senderBadges: senderBadges,
           content: contentText,
           timestamp: String(local),
           utcTimestamp: utc,
@@ -2699,6 +2754,7 @@ const ChatScreen: React.FC = () => {
             username: participant.username || participant.email || 'Friend',
             profile_picture: participant.profile_picture || null,
             status: participant.status || null,
+            badges: Array.isArray(participant.badges) ? participant.badges : [],
           }))
         : [];
 
@@ -2745,6 +2801,7 @@ const ChatScreen: React.FC = () => {
                 username: userResponse.data.username || userResponse.data.email || 'Friend',
                 profile_picture: userResponse.data.profile_picture || null,
                 status: userResponse.data.status || null,
+                badges: Array.isArray(userResponse.data.badges) ? userResponse.data.badges : [],
               });
               syncParticipants(normalizedParticipants);
             }
@@ -3569,12 +3626,11 @@ const ChatScreen: React.FC = () => {
         NotificationService.show('error', 'Share link is not available for this file');
         return;
       }
-      const target =
-        attachment.publicDownloadUrl ||
-        attachment.downloadUrl ||
-        attachment.publicViewUrl ||
-        attachment.previewUrl ||
-        attachment.localUri;
+      const viewUrl = attachment.publicViewUrl || attachment.previewUrl;
+      const downloadUrl = attachment.publicDownloadUrl || attachment.downloadUrl;
+      const target = (attachment.isImage || attachment.isVideo)
+        ? viewUrl || downloadUrl || attachment.localUri
+        : downloadUrl || viewUrl || attachment.localUri;
       if (!target) {
         NotificationService.show('error', 'Share link is not available for this file');
         return;
@@ -3893,6 +3949,7 @@ const ChatScreen: React.FC = () => {
       receiverId: String(otherUserIdRef.current ?? ''),
       senderName: user?.username || 'You',
       senderAvatar: user?.profile_picture || null,
+      senderBadges: [],
       content: trimmedMessage,
       timestamp: new Date().toISOString(),
       status: 'sending',
@@ -4178,6 +4235,9 @@ const ChatScreen: React.FC = () => {
             const serverReply = resolveReplyMetadata(payload.reply);
             const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
             const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const senderBadges = Array.isArray((payload as any)?.senderBadges ?? (payload as any)?.sender_badges)
+              ? ((payload as any)?.senderBadges ?? (payload as any)?.sender_badges)
+              : senderProfile.badges || [];
             const attachments = mapServerAttachments(payload.attachments);
             const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
             const newEntry: Message = {
@@ -4186,6 +4246,7 @@ const ChatScreen: React.FC = () => {
               receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
               senderName: senderProfile.name,
               senderAvatar: senderProfile.avatar,
+              senderBadges,
               content: contentText,
               timestamp: local,
               utcTimestamp: utc,
@@ -4244,6 +4305,9 @@ const ChatScreen: React.FC = () => {
             const serverReply = resolveReplyMetadata(payload.reply);
             const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
             const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+            const senderBadges = Array.isArray((payload as any)?.senderBadges ?? (payload as any)?.sender_badges)
+              ? ((payload as any)?.senderBadges ?? (payload as any)?.sender_badges)
+              : senderProfile.badges || [];
             const attachments = mapServerAttachments(payload.attachments);
             const contentText = resolveContentText(decodedPayload, payload.preview, attachments.length > 0);
             const newEntry: Message = {
@@ -4252,6 +4316,7 @@ const ChatScreen: React.FC = () => {
               receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
               senderName: senderProfile.name,
               senderAvatar: senderProfile.avatar,
+              senderBadges,
               content: contentText,
               timestamp: local,
               utcTimestamp: utc,
@@ -4294,6 +4359,9 @@ const ChatScreen: React.FC = () => {
           const serverReply = resolveReplyMetadata(payload.reply);
           const replyTo = serverReply || resolveReplyMetadata(decodedPayload.replyTo);
           const senderProfile = resolveSenderProfile(payload.senderId ? String(payload.senderId) : '');
+          const senderBadges = Array.isArray((payload as any)?.senderBadges ?? (payload as any)?.sender_badges)
+            ? ((payload as any)?.senderBadges ?? (payload as any)?.sender_badges)
+            : senderProfile.badges || [];
           const attachments = mapServerAttachments(payload.attachments);
           const reactions = mapServerReactions(payload.reactions);
           const contentText = isSystem
@@ -4305,6 +4373,7 @@ const ChatScreen: React.FC = () => {
             receiverId: String(payload.receiverId ?? otherUserIdRef.current ?? ''),
             senderName: isSystem ? 'System' : senderProfile.name,
             senderAvatar: isSystem ? null : senderProfile.avatar,
+            senderBadges: isSystem ? [] : senderBadges,
             content: contentText,
             timestamp: local,
             utcTimestamp: utc,
@@ -5787,10 +5856,32 @@ const styles = StyleSheet.create({
   senderMetaAvatar: {
     marginRight: 8,
   },
+  senderMetaDetails: {
+    flex: 1,
+    marginTop: 2,
+  },
   senderMetaName: {
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 12,
     fontWeight: '600',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 2,
+  },
+  badgePill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  badgeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   placeholderBubble: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',

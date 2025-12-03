@@ -165,7 +165,7 @@ export const LoginScreen: React.FC = () => {
                 />
                 <Text style={styles.rememberText}>Remember me</Text>
               </View>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push({ pathname: '/reset', params: { email } } as any)}>
                 <Text style={styles.forgotText}>Forgot?</Text>
               </TouchableOpacity>
             </View>

@@ -103,16 +103,43 @@ export default function RootLayout() {
   useEffect(() => {
     ShareIntentService.init();
 
+    const handleIncomingUrl = (url?: string | null) => {
+      if (!url) return false;
+      if (ShareIntentService.handleIncomingUrl(url)) {
+        router.replace('/share');
+        return true;
+      }
+      try {
+        const parsed = Linking.parse(url);
+        const path = (parsed?.path || '').replace(/^\//, '').toLowerCase();
+        if (path.startsWith('reset')) {
+          const params = parsed?.queryParams || {};
+          router.replace({
+            pathname: '/reset',
+            params: {
+              email: (params.email as string) || '',
+              token: (params.token as string) || (params.t as string) || '',
+              code: (params.code as string) || (params.c as string) || '',
+            },
+          } as any);
+          return true;
+        }
+      } catch (err) {
+        console.warn('[linking] Failed to parse incoming url', err);
+      }
+      return false;
+    };
+
     const unsubscribeShare = ShareIntentService.subscribe((payload) => {
       if (payload) router.replace('/share');
     });
 
     const linkingSub = Linking.addEventListener('url', (event) => {
-      if (ShareIntentService.handleIncomingUrl(event.url)) router.replace('/share');
+      if (handleIncomingUrl(event.url)) return;
     });
 
     Linking.getInitialURL().then((url) => {
-      if (ShareIntentService.handleIncomingUrl(url)) router.replace('/share');
+      handleIncomingUrl(url);
     }).catch(() => { });
 
     return () => {
