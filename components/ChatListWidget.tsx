@@ -347,11 +347,12 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
               {userBadges.length > 0 && (
                 <View style={styles.badgeContainer}>
                   {userBadges.slice(0, 3).map((badge: string, idx: number) => (
-                    <BadgeIcon
-                      key={`${chat.id}-badge-${badge}-${idx}`}
-                      type={badge as any}
-                      size={16}
-                    />
+                    <View key={`${chat.id}-badge-${badge}-${idx}`} style={styles.badgeWrapper}>
+                      <BadgeIcon
+                        type={badge as any}
+                        size={22}
+                      />
+                    </View>
                   ))}
                 </View>
               )}
@@ -483,7 +484,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginLeft: 5,
+    marginLeft: 1,
+  },
+  badgeWrapper: {
+    shadowColor: '#ffffff',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 1,
   },
   chatSubtitle: {
     color: palette.textMuted,
