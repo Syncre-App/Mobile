@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { View, StyleSheet, ViewStyle, DimensionValue, StyleProp } from 'react-native';
+import { View, StyleSheet, ViewStyle, DimensionValue, StyleProp, ColorValue } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { gradients, palette, radii, shadows, tokens } from '../theme/designSystem';
@@ -30,7 +30,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     ? 'rgba(255, 255, 255, 0.12)'
     : palette.border;
 
-  const gradientColors = isHero
+  const gradientColors: [ColorValue, ColorValue] = isHero
     ? ['rgba(37, 99, 235, 0.22)', 'rgba(99, 102, 241, 0.12)']
     : ['rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.02)'];
 
@@ -52,7 +52,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
           style={[styles.gradient, { padding }]}
         >
           <LinearGradient
-            colors={gradients.cardStroke}
+            colors={gradients.cardStroke as [ColorValue, ColorValue, ...ColorValue[]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.strokeOverlay}

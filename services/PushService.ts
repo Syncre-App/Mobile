@@ -3,7 +3,6 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import appConfig from '../app.json';
-
 import { ApiService } from './ApiService';
 import { StorageService } from './StorageService';
 import { DeviceService } from './DeviceService';

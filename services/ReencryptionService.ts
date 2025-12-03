@@ -133,7 +133,7 @@ class ReencryptionServiceClass {
             chatId,
             message: plaintext,
             recipientUserId: targetUserId,
-            recipientDeviceId,
+            recipientDeviceId: targetDeviceId,
             token,
             currentUserId,
           });

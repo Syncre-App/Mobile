@@ -6,7 +6,7 @@ class IdentityServiceClass {
   private verificationCache: { token: string; timestamp: number; requiresBootstrap: boolean } | null =
     null;
   private static CACHE_TTL_MS = 60_000;
-  private bootstrapWatcher: NodeJS.Timer | null = null;
+  private bootstrapWatcher: ReturnType<typeof setInterval> | null = null;
 
   private isCacheValid(token: string): boolean {
     if (!this.verificationCache) {

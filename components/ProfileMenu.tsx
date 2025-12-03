@@ -9,7 +9,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-
 import { UserAvatar } from './UserAvatar';
 
 interface ProfileMenuProps {

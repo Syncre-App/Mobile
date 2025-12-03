@@ -1,6 +1,5 @@
 import * as Location from 'expo-location';
 import * as Localization from 'expo-localization';
-
 import { ApiService } from './ApiService';
 import { StorageService } from './StorageService';
 import { TimezoneService } from './TimezoneService';
@@ -35,10 +34,7 @@ export const LocationSyncService = {
       let coords: { latitude: number; longitude: number } | null = null;
       try {
         const permission = await Location.requestForegroundPermissionsAsync();
-        if (
-          permission.status === Location.PermissionStatus.GRANTED ||
-          permission.status === 'granted'
-        ) {
+        if (permission.status === Location.PermissionStatus.GRANTED) {
           const position = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Lowest,
           });

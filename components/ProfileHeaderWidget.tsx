@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
 import { UserStatus } from '../services/WebSocketService';
 
 interface User {
