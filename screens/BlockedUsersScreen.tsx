@@ -45,7 +45,7 @@ export const BlockedUsersScreen: React.FC = () => {
       const token = await StorageService.getAuthToken();
       if (!token) return;
       
-      const response = await ApiService.get('/friends/blocked', token);
+      const response = await ApiService.get('/user/blocked', token);
       if (response.success && response.blockedUsers) {
         setBlockedUsers(response.blockedUsers);
       }
@@ -71,23 +71,32 @@ export const BlockedUsersScreen: React.FC = () => {
         {
           text: 'Unblock',
           onPress: async () => {
+            // Store the user for potential rollback
+            const userToUnblock = user;
+            
             try {
               const token = await StorageService.getAuthToken();
               if (!token) return;
 
+              // Optimistically update the UI first
+              setBlockedUsers((prev) => prev.filter((u) => u.id !== user.id));
+
               const response = await ApiService.post(
-                `/friends/unblock/${user.id}`,
-                {},
+                '/user/unblock',
+                { targetUserId: user.id },
                 token
               );
               
               if (response.success) {
-                setBlockedUsers((prev) => prev.filter((u) => u.id !== user.id));
                 NotificationService.show('success', `${user.display_name || user.username} has been unblocked`);
               } else {
+                // Rollback on failure
+                setBlockedUsers((prev) => [...prev, userToUnblock]);
                 NotificationService.show('error', response.error || 'Failed to unblock user');
               }
             } catch (error) {
+              // Rollback on error
+              setBlockedUsers((prev) => [...prev, userToUnblock]);
               console.error('Error unblocking user:', error);
               NotificationService.show('error', 'Failed to unblock user');
             }
