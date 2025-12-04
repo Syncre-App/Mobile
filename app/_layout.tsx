@@ -152,15 +152,30 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#03040A' }}>
       <SafeAreaProvider>
         <StatusBar style="light" backgroundColor="#03040A" />
-
         <Stack
-          initialRouteName="index"
           screenOptions={{
-            headerShown: false as boolean,
-            gestureEnabled: true as boolean,
-            contentStyle: undefined,
+            headerShown: false,
+            gestureEnabled: true,
+            animation: 'slide_from_right',
+            contentStyle: { backgroundColor: '#03040A' },
           }}
-        />
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen name="home" />
+          <Stack.Screen name="register" />
+          <Stack.Screen name="verify" />
+          <Stack.Screen name="reset" />
+          <Stack.Screen name="terms" />
+          <Stack.Screen name="identity" />
+          <Stack.Screen name="maintenance" />
+          <Stack.Screen name="update" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="edit-profile" />
+          <Stack.Screen name="profile" />
+          <Stack.Screen name="chat/[id]" />
+          <Stack.Screen name="group/[id]" />
+          <Stack.Screen name="share" />
+        </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

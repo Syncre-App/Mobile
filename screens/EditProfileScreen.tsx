@@ -279,16 +279,19 @@ export const EditProfileScreen: React.FC = () => {
         <GlassCard width="100%" style={[styles.card, styles.photoCard]} variant="subtle" padding={spacing.lg}>
           <View style={styles.photoPickerWrapper}>
             <TouchableOpacity
-              style={styles.photoPicker}
+              style={[
+                styles.photoPicker,
+                (selectedImage || profilePicture) && styles.photoPickerWithImage
+              ]}
               onPress={handlePickImage}
               activeOpacity={0.9}
               accessibilityRole="button"
               accessibilityLabel="Change profile picture"
             >
               {selectedImage ? (
-                <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} />
+                <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} resizeMode="cover" />
               ) : profilePicture ? (
-                <Image source={{ uri: profilePicture }} style={styles.profileImage} />
+                <Image source={{ uri: profilePicture }} style={styles.profileImage} resizeMode="cover" />
               ) : (
                 <View style={styles.profilePlaceholder}>
                   <Ionicons name="person" size={42} color="rgba(255, 255, 255, 0.7)" />
@@ -428,6 +431,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 12 },
+  },
+  photoPickerWithImage: {
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   profileImage: {
     width: 150,
