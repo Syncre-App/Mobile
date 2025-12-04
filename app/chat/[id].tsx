@@ -549,21 +549,6 @@ const shouldFilterMessage = (content: string | null | undefined): boolean => {
   return leo.check(content);
 };
 
-const BADGE_STYLES: Record<string, { label: string; bg: string; fg: string; border: string }> = {
-  staff: { label: 'Staff', bg: 'rgba(88, 101, 242, 0.16)', fg: '#5865F2', border: 'rgba(88, 101, 242, 0.65)' },
-  early_access: { label: 'Early Access', bg: 'rgba(88, 101, 242, 0.14)', fg: '#5865F2', border: 'rgba(88, 101, 242, 0.55)' },
-  developer: { label: 'Developer', bg: 'rgba(59, 165, 92, 0.14)', fg: '#3BA55C', border: 'rgba(59, 165, 92, 0.55)' },
-  verified: { label: 'Verified', bg: 'rgba(14, 165, 233, 0.14)', fg: '#38bdf8', border: 'rgba(56, 189, 248, 0.55)' },
-  bot: { label: 'Bot', bg: 'rgba(167, 139, 250, 0.14)', fg: '#c4b5fd', border: 'rgba(196, 181, 253, 0.55)' },
-  donator: { label: 'Donator', bg: 'rgba(244, 127, 255, 0.14)', fg: '#F47FFF', border: 'rgba(244, 127, 255, 0.55)' },
-  support: { label: 'Support', bg: 'rgba(250, 166, 26, 0.14)', fg: '#FAA61A', border: 'rgba(250, 166, 26, 0.55)' },
-  tester: { label: 'Tester', bg: 'rgba(116, 127, 141, 0.14)', fg: '#747F8D', border: 'rgba(116, 127, 141, 0.55)' },
-  bug_hunter: { label: 'Bug Hunter', bg: 'rgba(237, 66, 69, 0.14)', fg: '#ED4245', border: 'rgba(237, 66, 69, 0.55)' },
-  premium: { label: 'Premium', bg: 'rgba(255, 215, 0, 0.14)', fg: '#FFD700', border: 'rgba(255, 215, 0, 0.55)' },
-  og: { label: 'OG', bg: 'rgba(0, 209, 255, 0.14)', fg: '#00D1FF', border: 'rgba(0, 209, 255, 0.55)' },
-  default: { label: 'Badge', bg: 'rgba(148, 163, 184, 0.14)', fg: '#e5e7eb', border: 'rgba(148, 163, 184, 0.45)' },
-};
-
 const layoutNext = () => {
   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 };
