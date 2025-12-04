@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { Link, useRouter } from 'expo-router';
 import React from 'react';
 import {
@@ -10,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { NativeBlur, BlurPresets } from './NativeBlur';
 import { UserAvatar } from './UserAvatar';
 
 interface ProfileMenuProps {
@@ -74,7 +74,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       <Pressable style={styles.overlay} onPress={handleOverlayPress}>
         <View style={styles.menuContainer}>
           <View style={styles.menuPanel}>
-            <BlurView intensity={50} tint="dark" style={styles.blurView}>
+            <NativeBlur {...BlurPresets.modal} style={styles.blurView}>
               <View style={styles.menuContent}>
                 {/* User Info Header */}
                 <View style={styles.userHeader}>
@@ -158,7 +158,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                   </Text>
                 </TouchableOpacity>
               </View>
-            </BlurView>
+            </NativeBlur>
           </View>
         </View>
       </Pressable>

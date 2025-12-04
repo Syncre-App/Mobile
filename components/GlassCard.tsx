@@ -1,7 +1,7 @@
 import React, { ReactNode } from 'react';
 import { View, StyleSheet, ViewStyle, DimensionValue, StyleProp, ColorValue } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import { NativeBlur } from './NativeBlur';
 import { gradients, palette, radii, shadows, tokens } from '../theme/designSystem';
 
 interface GlassCardProps {
@@ -44,7 +44,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
         style,
       ]}
     >
-      <BlurView intensity={intensity} tint="dark" style={styles.blur}>
+      <NativeBlur intensity={intensity} tint="dark" style={styles.blur}>
         <LinearGradient
           colors={gradientColors}
           start={{ x: 0, y: 0 }}
@@ -59,7 +59,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
           />
           {children}
         </LinearGradient>
-      </BlurView>
+      </NativeBlur>
     </View>
   );
 };

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeBlur, BlurPresets } from './NativeBlur';
 
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
@@ -62,7 +62,7 @@ const ToastItem: React.FC<{ notification: Notification }> = ({ notification }) =
         },
       ]}
     >
-      <BlurView intensity={60} tint="dark" style={styles.blurView}>
+      <NativeBlur {...BlurPresets.toast} style={styles.blurView}>
         <View style={styles.toastContent}>
           <Ionicons name={icon.name} size={22} color={icon.color} style={styles.icon} />
           <View style={styles.textContainer}>
@@ -72,7 +72,7 @@ const ToastItem: React.FC<{ notification: Notification }> = ({ notification }) =
             <Text style={styles.message} numberOfLines={3}>{notification.message}</Text>
           </View>
         </View>
-      </BlurView>
+      </NativeBlur>
     </Animated.View>
   );
 };

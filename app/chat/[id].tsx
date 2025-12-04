@@ -4,7 +4,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+import { NativeBlur, BlurPresets } from '../../components/NativeBlur';
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -5448,7 +5448,7 @@ const ChatScreen: React.FC = () => {
       >
         <View style={styles.threadModalOverlay}>
           <View style={styles.threadModalCard}>
-            <BlurView intensity={65} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
             <View style={styles.threadModalBody}>
               <View style={styles.threadModalHeader}>
                 <Text style={styles.threadModalTitle}>
@@ -5498,7 +5498,7 @@ const ChatScreen: React.FC = () => {
         onRequestClose={handleClosePreview}
       >
         <View style={styles.attachmentModalOverlay} {...previewPanResponder.panHandlers}>
-          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFillObject} />
+          <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
           <Animated.View
             style={[
               styles.attachmentModalTopBar,
@@ -5618,7 +5618,7 @@ const ChatScreen: React.FC = () => {
             ]}
             pointerEvents={previewChromeVisible ? 'auto' : 'none'}
           >
-            <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <NativeBlur {...BlurPresets.navigation} style={StyleSheet.absoluteFillObject} />
             <View style={styles.attachmentModalFileMetaRow}>
               <Text style={styles.attachmentModalFileName} numberOfLines={1}>
                 {currentPreviewAttachment?.name || 'Attachment'}
