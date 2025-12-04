@@ -276,7 +276,7 @@ export const EditProfileScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentColumn}>
-        <GlassCard width="100%" style={[styles.card, styles.photoCard]} variant="subtle" padding={spacing.lg}>
+        <GlassCard style={[styles.card, styles.photoCard]} variant="subtle" padding={spacing.lg}>
           <View style={styles.photoPickerWrapper}>
             <TouchableOpacity
               style={[
@@ -289,9 +289,13 @@ export const EditProfileScreen: React.FC = () => {
               accessibilityLabel="Change profile picture"
             >
               {selectedImage ? (
-                <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} resizeMode="cover" />
+                <View style={styles.imageContainer}>
+                  <Image source={{ uri: selectedImage.uri }} style={styles.profileImage} resizeMode="cover" />
+                </View>
               ) : profilePicture ? (
-                <Image source={{ uri: profilePicture }} style={styles.profileImage} resizeMode="cover" />
+                <View style={styles.imageContainer}>
+                  <Image source={{ uri: profilePicture }} style={styles.profileImage} resizeMode="cover" />
+                </View>
               ) : (
                 <View style={styles.profilePlaceholder}>
                   <Ionicons name="person" size={42} color="rgba(255, 255, 255, 0.7)" />
@@ -307,7 +311,6 @@ export const EditProfileScreen: React.FC = () => {
               <Ionicons name="pencil" size={16} color="#ffffff" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.photoHint}>PNG or JPG · max 5 MB</Text>
         </GlassCard>
 
         <GlassCard width="100%" style={[styles.card, styles.infoCard]} variant="subtle">
@@ -434,12 +437,17 @@ const styles = StyleSheet.create({
   },
   photoPickerWithImage: {
     backgroundColor: 'transparent',
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 0,
+  },
+  imageContainer: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    overflow: 'hidden',
   },
   profileImage: {
     width: 150,
     height: 150,
-    borderRadius: 75,
   },
   profilePlaceholder: {
     width: '100%',
