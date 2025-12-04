@@ -1,10 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
-  ActivityIndicator,
-  Linking,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -19,9 +17,6 @@ import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
-import { CryptoService } from '../services/CryptoService';
-import { IdentityService } from '../services/IdentityService';
-import { ApiService } from '../services/ApiService';
 import { palette, radii, spacing } from '../theme/designSystem';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
@@ -34,8 +29,6 @@ export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
   const [selectedLanguage, setSelectedLanguage] = useState('English');
-  const [isRotatingKeys, setIsRotatingKeys] = useState(false);
-  const [isBootstrapping, setIsBootstrapping] = useState(false);
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
@@ -64,87 +57,6 @@ export const SettingsScreen: React.FC = () => {
               NotificationService.show('success', 'Cache cleared successfully');
             } catch (error) {
               NotificationService.show('error', 'Failed to clear cache');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleRotateKeys = async () => {
-    if (isRotatingKeys || isBootstrapping) {
-      return;
-    }
-
-    Alert.alert(
-      'Rotate encryption keys',
-      'This will revoke the current device keys, request history re-encrypt from others, and restart your secure identity.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Rotate',
-          style: 'destructive',
-          onPress: async () => {
-            setIsRotatingKeys(true);
-            try {
-              await CryptoService.rotateDeviceIdentity();
-              NotificationService.show('success', 'Keys rotated. Rebooting identity…');
-              setIsBootstrapping(true);
-              const needsBootstrap = await IdentityService.requiresBootstrap();
-              if (needsBootstrap) {
-                router.push('/identity');
-                IdentityService.startBootstrapWatcher({
-                  onComplete: () => setIsBootstrapping(false),
-                });
-              } else {
-                NotificationService.show('info', 'Identity already initialized. You may need to relaunch.');
-                setIsBootstrapping(false);
-              }
-            } catch (error) {
-              NotificationService.show('error', 'Failed to rotate keys. Please try again.');
-            } finally {
-              setIsRotatingKeys(false);
-              setIsBootstrapping(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleOpenTerms = () => {
-    Linking.openURL('https://syncre.xyz/terms').catch(() => {
-      NotificationService.show('error', 'Could not open the terms page');
-    });
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete account',
-      'We will log you out and schedule deletion in 24 hours. Signing back in during that window will cancel it.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Schedule deletion',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const token = await StorageService.getAuthToken();
-              if (!token) {
-                NotificationService.show('error', 'Please log in again to manage your account');
-                router.replace('/' as any);
-                return;
-              }
-              const response = await ApiService.post('/user/delete-account', {}, token);
-              if (response.success) {
-                NotificationService.show('success', 'Deletion scheduled. We logged you out.');
-                await StorageService.clear();
-                router.replace('/' as any);
-              } else {
-                NotificationService.show('error', response.error || 'Failed to schedule deletion');
-              }
-            } catch (error: any) {
-              NotificationService.show('error', error?.message || 'Failed to schedule deletion');
             }
           },
         },
@@ -284,43 +196,6 @@ export const SettingsScreen: React.FC = () => {
             handleClearCache,
             undefined,
             false
-          )}
-
-          {renderSettingItem(
-            'key',
-            'Rotate encryption keys',
-            isRotatingKeys
-              ? 'Rotating…'
-              : isBootstrapping
-                ? 'Bootstrapping…'
-                : 'Refresh your device keys and request re-encrypt',
-            handleRotateKeys,
-            (isRotatingKeys || isBootstrapping) ? (
-              <ActivityIndicator size="small" color={palette.accent} />
-            ) : undefined,
-            true
-          )}
-        </GlassCard>
-
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Account</Text>
-          </View>
-          
-          {renderSettingItem(
-            'document-text-outline',
-            'Terms of Service',
-            'Read the Syncre EULA and acceptable use rules',
-            handleOpenTerms,
-            undefined,
-            false
-          )}
-
-          {renderSettingItem(
-            'trash-bin-outline',
-            'Delete account',
-            'Logs you out and deletes data after 24h unless you sign back in',
-            handleDeleteAccount
           )}
         </GlassCard>
 

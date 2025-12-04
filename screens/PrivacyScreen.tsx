@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Linking,
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -16,6 +16,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GlassCard } from '../components/GlassCard';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
+import { ApiService } from '../services/ApiService';
+import { CryptoService } from '../services/CryptoService';
+import { IdentityService } from '../services/IdentityService';
 import { AppBackground } from '../components/AppBackground';
 import { palette, radii, spacing } from '../theme/designSystem';
 
@@ -28,10 +31,8 @@ export const PrivacyScreen: React.FC = () => {
   const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
   
   const [contentFilter, setContentFilter] = useState<'standard' | 'none'>('standard');
-  // Activity status settings - disabled for now (Coming Soon)
-  const [readReceipts] = useState(true);
-  const [lastSeen] = useState(true);
-  const [typingIndicator] = useState(true);
+  const [isRotatingKeys, setIsRotatingKeys] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -65,6 +66,87 @@ export const PrivacyScreen: React.FC = () => {
 
   const handleBlockedUsers = () => {
     router.push('/blocked-users' as any);
+  };
+
+  const handleRotateKeys = async () => {
+    if (isRotatingKeys || isBootstrapping) {
+      return;
+    }
+
+    Alert.alert(
+      'Rotate encryption keys',
+      'This will revoke the current device keys, request history re-encrypt from others, and restart your secure identity.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Rotate',
+          style: 'destructive',
+          onPress: async () => {
+            setIsRotatingKeys(true);
+            try {
+              await CryptoService.rotateDeviceIdentity();
+              NotificationService.show('success', 'Keys rotated. Rebooting identity…');
+              setIsBootstrapping(true);
+              const needsBootstrap = await IdentityService.requiresBootstrap();
+              if (needsBootstrap) {
+                router.push('/identity');
+                IdentityService.startBootstrapWatcher({
+                  onComplete: () => setIsBootstrapping(false),
+                });
+              } else {
+                NotificationService.show('info', 'Identity already initialized. You may need to relaunch.');
+                setIsBootstrapping(false);
+              }
+            } catch (error) {
+              NotificationService.show('error', 'Failed to rotate keys. Please try again.');
+            } finally {
+              setIsRotatingKeys(false);
+              setIsBootstrapping(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleOpenTerms = () => {
+    Linking.openURL('https://syncre.xyz/terms').catch(() => {
+      NotificationService.show('error', 'Could not open the terms page');
+    });
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account',
+      'We will log you out and schedule deletion in 24 hours. Signing back in during that window will cancel it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Schedule deletion',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await StorageService.getAuthToken();
+              if (!token) {
+                NotificationService.show('error', 'Please log in again to manage your account');
+                router.replace('/' as any);
+                return;
+              }
+              const response = await ApiService.post('/user/delete-account', {}, token);
+              if (response.success) {
+                NotificationService.show('success', 'Deletion scheduled. We logged you out.');
+                await StorageService.clear();
+                router.replace('/' as any);
+              } else {
+                NotificationService.show('error', response.error || 'Failed to schedule deletion');
+              }
+            } catch (error: any) {
+              NotificationService.show('error', error?.message || 'Failed to schedule deletion');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleBack = () => {
@@ -153,68 +235,6 @@ export const PrivacyScreen: React.FC = () => {
           )}
         </GlassCard>
 
-        {/* Activity Status Section - Coming Soon */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Activity Status</Text>
-          </View>
-          
-          <View style={styles.comingSoonWrapper}>
-            {renderSettingItem(
-              'checkmark-done-outline',
-              'Read Receipts',
-              'Let others know when you\'ve read their messages',
-              undefined,
-              <Switch
-                value={readReceipts}
-                onValueChange={() => {}}
-                trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
-                thumbColor="white"
-                disabled
-              />,
-              false
-            )}
-
-            {renderSettingItem(
-              'time-outline',
-              'Last Seen',
-              'Show when you were last active',
-              undefined,
-              <Switch
-                value={lastSeen}
-                onValueChange={() => {}}
-                trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
-                thumbColor="white"
-                disabled
-              />,
-              true
-            )}
-
-            {renderSettingItem(
-              'ellipsis-horizontal',
-              'Typing Indicator',
-              'Show when you\'re typing a message',
-              undefined,
-              <Switch
-                value={typingIndicator}
-                onValueChange={() => {}}
-                trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
-                thumbColor="white"
-                disabled
-              />,
-              true
-            )}
-
-            {/* Blur overlay with "Soon..." */}
-            <BlurView intensity={25} tint="dark" style={styles.comingSoonOverlay}>
-              <View style={styles.comingSoonBadge}>
-                <Ionicons name="time-outline" size={18} color={palette.accent} />
-                <Text style={styles.comingSoonText}>Soon...</Text>
-              </View>
-            </BlurView>
-          </View>
-        </GlassCard>
-
         {/* Blocked Users Section */}
         <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
@@ -228,6 +248,46 @@ export const PrivacyScreen: React.FC = () => {
             handleBlockedUsers,
             undefined,
             false
+          )}
+        </GlassCard>
+
+        {/* Account Section */}
+        <GlassCard width="100%" style={styles.section} variant="subtle">
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Account</Text>
+          </View>
+          
+          {renderSettingItem(
+            'key-outline',
+            'Rotate encryption keys',
+            isRotatingKeys
+              ? 'Rotating…'
+              : isBootstrapping
+                ? 'Bootstrapping…'
+                : 'Refresh your device keys and request re-encrypt',
+            handleRotateKeys,
+            (isRotatingKeys || isBootstrapping) ? (
+              <ActivityIndicator size="small" color={palette.accent} />
+            ) : undefined,
+            false
+          )}
+
+          {renderSettingItem(
+            'document-text-outline',
+            'Terms of Service',
+            'Read the Syncre EULA and acceptable use rules',
+            handleOpenTerms,
+            undefined,
+            true
+          )}
+
+          {renderSettingItem(
+            'trash-bin-outline',
+            'Delete account',
+            'Logs you out and deletes data after 24h unless you sign back in',
+            handleDeleteAccount,
+            undefined,
+            true
           )}
         </GlassCard>
 
@@ -344,34 +404,6 @@ const styles = StyleSheet.create({
   },
   settingRight: {
     marginLeft: spacing.md,
-  },
-  comingSoonWrapper: {
-    position: 'relative',
-  },
-  comingSoonOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: radii.md,
-    overflow: 'hidden',
-  },
-  comingSoonBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.full,
-    gap: spacing.xs,
-  },
-  comingSoonText: {
-    color: palette.accent,
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   infoContainer: {
     flexDirection: 'row',
