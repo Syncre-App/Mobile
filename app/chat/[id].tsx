@@ -535,6 +535,19 @@ const SWIPE_REPLY_RETURN_DURATION = 420;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
 const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+// Content filter - list of words/patterns to filter (basic profanity filter)
+const FILTERED_WORDS = [
+  'fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'cunt', 'dick', 'cock',
+  'pussy', 'whore', 'slut', 'nigger', 'faggot', 'retard', 'porn', 'sex',
+];
+const FILTERED_PATTERN = new RegExp(`\\b(${FILTERED_WORDS.join('|')})\\b`, 'i');
+
+const shouldFilterMessage = (content: string | null | undefined): boolean => {
+  if (!content) return false;
+  return FILTERED_PATTERN.test(content);
+};
+
 const BADGE_STYLES: Record<string, { label: string; bg: string; fg: string; border: string }> = {
   staff: { label: 'Staff', bg: 'rgba(88, 101, 242, 0.16)', fg: '#5865F2', border: 'rgba(88, 101, 242, 0.65)' },
   early_access: { label: 'Early Access', bg: 'rgba(88, 101, 242, 0.14)', fg: '#5865F2', border: 'rgba(88, 101, 242, 0.55)' },
@@ -630,6 +643,7 @@ interface MessageBubbleProps {
   seenOverride?: SeenReceipt[] | null;
   onReact?: (message: Message, reaction: string) => void;
   currentUserId?: string | null;
+  isFiltered?: boolean;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -655,6 +669,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   seenOverride = null,
   onReact,
   currentUserId,
+  isFiltered = false,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -664,6 +679,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const singleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaLastTapRef = useRef(0);
+  const [isRevealed, setIsRevealed] = useState(false);
   const textSegments = useMemo(() => splitTextByLinks(message.content || ''), [message.content]);
   const embeddableLink = useMemo(() => {
     if (message.isPlaceholder || message.attachments?.length) {
@@ -1057,6 +1073,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           ) : null}
           <View style={bubbleStyle}>
+            {isFiltered && !isRevealed ? (
+              <Pressable
+                style={styles.filteredOverlay}
+                onPress={() => setIsRevealed(true)}
+              >
+                <View style={styles.filteredContent}>
+                  <Ionicons name="eye-off-outline" size={20} color="rgba(255, 255, 255, 0.7)" />
+                  <Text style={styles.filteredText}>Content hidden</Text>
+                  <Text style={styles.filteredHint}>Tap to reveal</Text>
+                </View>
+              </Pressable>
+            ) : (
+              <>
             {message.replyTo && (
               <Pressable
                 onPress={() => onReplyPress?.(message.replyTo as ReplyMetadata)}
@@ -1285,6 +1314,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             {message.isEdited && !message.isPlaceholder ? (
               <Text style={styles.editedLabel}>Edited</Text>
             ) : null}
+              </>
+            )}
           </View>
           {statusText && !(message.status === 'seen' && shouldShowSeenAvatars) ? (
             <Text style={styles.statusText}>{statusText}</Text>
@@ -1566,6 +1597,8 @@ const ChatScreen: React.FC = () => {
   const [memberPickerError, setMemberPickerError] = useState<string | null>(null);
   const [memberPickerBusy, setMemberPickerBusy] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [isUnblocking, setIsUnblocking] = useState(false);
+  const [contentFilterMode, setContentFilterMode] = useState<'standard' | 'none'>('standard');
   const participantLookupRef = useRef<Record<string, ChatParticipant>>({});
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const windowHeight = Dimensions.get('window').height;
@@ -1631,6 +1664,10 @@ const ChatScreen: React.FC = () => {
       .filter(Boolean);
     setIsBlocked(blockedList.includes(targetId.toString()));
   }, [user]);
+
+  useEffect(() => {
+    StorageService.getContentFilter().then(setContentFilterMode);
+  }, []);
 
   const currentUserId = user?.id ? String(user.id) : null;
 
@@ -2859,6 +2896,33 @@ const ChatScreen: React.FC = () => {
     applyChatUpdate,
   ]);
 
+  const handleUnblockUser = useCallback(async () => {
+    const targetId = otherUserIdRef.current;
+    if (!targetId) return;
+    setIsUnblocking(true);
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Missing authentication token');
+        return;
+      }
+      const response = await ApiService.post('/user/unblock', { targetUserId: targetId }, token);
+      if (response.success) {
+        setIsBlocked(false);
+        NotificationService.show('success', 'User unblocked');
+        // Reload messages
+        loadChatDetails();
+      } else {
+        NotificationService.show('error', response.error || 'Failed to unblock user');
+      }
+    } catch (error) {
+      console.error('Failed to unblock user:', error);
+      NotificationService.show('error', 'Failed to unblock user');
+    } finally {
+      setIsUnblocking(false);
+    }
+  }, [loadChatDetails]);
+
   const loadEarlier = useCallback(
     async (options: { viaRefresh?: boolean } = {}) => {
       const { viaRefresh = false } = options;
@@ -3882,6 +3946,47 @@ const ChatScreen: React.FC = () => {
     }
   }, []);
 
+  const handleReportMessage = useCallback(async (message: Message) => {
+    Alert.alert(
+      'Report Message',
+      'Are you sure you want to report this message? This will be reviewed by our team.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await StorageService.getAuthToken();
+              if (!token) {
+                NotificationService.show('error', 'Missing authentication token');
+                return;
+              }
+              const response = await ApiService.post(
+                '/user/report',
+                {
+                  targetUserId: message.senderId,
+                  reason: 'Reported message',
+                  messageId: message.id,
+                  messageContent: message.content?.slice(0, 200),
+                },
+                token
+              );
+              if (response.success) {
+                NotificationService.show('success', 'Report submitted');
+              } else {
+                NotificationService.show('error', response.error || 'Failed to submit report');
+              }
+            } catch (error) {
+              console.error('Failed to report message:', error);
+              NotificationService.show('error', 'Failed to submit report');
+            }
+          },
+        },
+      ]
+    );
+  }, []);
+
   const handleCopyAttachmentLink = useCallback(async (attachment?: MessageAttachment | null) => {
     if (!attachment) {
       NotificationService.show('info', 'No attachment to copy');
@@ -3953,11 +4058,16 @@ const ChatScreen: React.FC = () => {
         });
       }
 
-      if (!canEdit && !canDelete) {
-        actions.push({ label: 'Cancel', onPress: () => {} });
-      } else {
-        actions.push({ label: 'Cancel', onPress: () => {} });
+      // Report option for messages from others
+      if (message.senderId !== currentUserId && !message.isDeleted) {
+        actions.push({
+          label: 'Report',
+          destructive: true,
+          onPress: () => handleReportMessage(message),
+        });
       }
+
+      actions.push({ label: 'Cancel', onPress: () => {} });
 
       const resolvedY = anchorY ?? windowHeight / 2;
       const resolvedX = anchorX ?? SCREEN_WIDTH / 2;
@@ -3973,6 +4083,7 @@ const ChatScreen: React.FC = () => {
       currentUserId,
       handleCopyAttachmentLink,
       handleCopyMessage,
+      handleReportMessage,
       handleShareAttachment,
       startEditMessage,
       windowHeight,
@@ -4998,6 +5109,7 @@ const ChatScreen: React.FC = () => {
           seenOverride={seenPlacementMap.get(messageItem.id) ?? null}
           onReact={handleToggleReaction}
           currentUserId={currentUserId}
+          isFiltered={contentFilterMode === 'standard' && !isMine && shouldFilterMessage(messageItem.content)}
         />
       );
     },
@@ -5017,6 +5129,7 @@ const ChatScreen: React.FC = () => {
       handleToggleReaction,
       handleBubbleDoubleTap,
       handleBubbleLongPress,
+      contentFilterMode,
       typingUsers,
       formatTypingLabel,
     ]
@@ -5093,6 +5206,48 @@ const ChatScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.fallbackContainer}>
         <Text style={styles.fallbackText}>Unable to open this chat.</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Blocked user screen - don't load messages, just show blocked state
+  if (isBlocked && !isGroupChat) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <AppBackground />
+        <Stack.Screen options={{ title: receiverUsername }} />
+
+        <View style={styles.header}>
+          <Pressable onPress={handleNavigateBack} style={styles.headerButton} accessibilityRole="button">
+            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          </Pressable>
+          <View style={styles.headerTitleWrapper}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {receiverUsername}
+            </Text>
+          </View>
+          <View style={styles.headerButtonPlaceholder} />
+        </View>
+
+        <View style={styles.blockedUserContainer}>
+          <Ionicons name="ban-outline" size={64} color="rgba(255, 255, 255, 0.4)" />
+          <Text style={styles.blockedUserTitle}>This user is blocked</Text>
+          <Text style={styles.blockedUserSubtitle}>
+            You won't receive messages from this user while they're blocked.
+          </Text>
+          <Pressable
+            style={[styles.unblockButton, isUnblocking && styles.unblockButtonDisabled]}
+            onPress={handleUnblockUser}
+            disabled={isUnblocking}
+          >
+            {isUnblocking ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.unblockButtonText}>Unblock User</Text>
+            )}
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -5792,6 +5947,61 @@ const styles = StyleSheet.create({
   fallbackText: {
     color: '#ffffff',
     fontSize: 16,
+  },
+  filteredOverlay: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minWidth: 140,
+  },
+  filteredContent: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  filteredText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  filteredHint: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 12,
+  },
+  blockedUserContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  blockedUserTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '600',
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  blockedUserSubtitle: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 15,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 22,
+  },
+  unblockButton: {
+    marginTop: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  unblockButtonDisabled: {
+    opacity: 0.6,
+  },
+  unblockButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',

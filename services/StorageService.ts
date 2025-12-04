@@ -75,4 +75,15 @@ export class StorageService {
   static async removeAuthToken(): Promise<void> {
     return this.removeItem('auth_token');
   }
+
+  // Content filter helpers
+  static async setContentFilter(mode: 'standard' | 'none'): Promise<void> {
+    return this.setItem('content_filter', mode);
+  }
+
+  static async getContentFilter(): Promise<'standard' | 'none'> {
+    const value = await this.getItem('content_filter');
+    if (value === 'none') return 'none';
+    return 'standard'; // default
+  }
 }

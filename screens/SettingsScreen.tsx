@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -36,7 +36,34 @@ export const SettingsScreen: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('English');
   const [isRotatingKeys, setIsRotatingKeys] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [contentFilter, setContentFilter] = useState<'standard' | 'none'>('standard');
   const appVersion = UpdateService.getCurrentVersion();
+
+  useEffect(() => {
+    StorageService.getContentFilter().then(setContentFilter);
+  }, []);
+
+  const handleContentFilterChange = async () => {
+    const options = [
+      { text: 'Standard', value: 'standard' as const },
+      { text: 'None (No filtering)', value: 'none' as const },
+    ];
+    Alert.alert(
+      'Content Filter',
+      'Standard mode blurs potentially offensive messages. Tap to reveal them.\n\nNone disables all filtering.',
+      [
+        ...options.map((opt) => ({
+          text: opt.value === contentFilter ? `✓ ${opt.text}` : opt.text,
+          onPress: async () => {
+            setContentFilter(opt.value);
+            await StorageService.setContentFilter(opt.value);
+            NotificationService.show('success', `Content filter set to ${opt.text}`);
+          },
+        })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ]
+    );
+  };
 
   const handleBack = () => {
     router.back();
@@ -268,6 +295,22 @@ export const SettingsScreen: React.FC = () => {
             () => {
               Alert.alert('Language', 'Multiple languages will be supported in future updates');
             }
+          )}
+        </GlassCard>
+
+        {/* Privacy Section */}
+        <GlassCard width="100%" style={styles.section} variant="subtle">
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Privacy</Text>
+          </View>
+          
+          {renderSettingItem(
+            'shield-checkmark-outline',
+            'Content Filter',
+            contentFilter === 'standard' ? 'Standard (blur offensive content)' : 'None (no filtering)',
+            handleContentFilterChange,
+            undefined,
+            false
           )}
         </GlassCard>
 
