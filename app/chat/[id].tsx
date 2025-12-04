@@ -26,6 +26,7 @@ import { GroupMemberPicker } from '../../components/GroupMemberPicker';
 import { UserAvatar } from '../../components/UserAvatar';
 import { AppBackground } from '../../components/AppBackground';
 import BadgeIcon from '../../components/BadgeIcon';
+import leo from 'leo-profanity';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -114,8 +115,8 @@ const ATTACHMENT_STATUS_MAP: Record<string, 'pending' | 'active' | 'expired'> = 
   expired: 'expired',
 };
 const MAX_PENDING_ATTACHMENTS = 10;
-const MAX_ATTACHMENT_BYTES = 1024 * 1024 * 1024; // 1GB
-const CHUNK_UPLOAD_THRESHOLD_BYTES = 99 * 1024 * 1024; // Cloudflare cap
+const MAX_ATTACHMENT_BYTES = 1024 * 1024 * 1024;
+const CHUNK_UPLOAD_THRESHOLD_BYTES = 99 * 1024 * 1024;
 const CHUNK_TARGET_BYTES = 80 * 1024 * 1024;
 
 const buildAbsoluteUrl = (pathValue?: string | null): string | undefined => {
@@ -250,7 +251,7 @@ const clampFutureTimestamp = (value: string | null | undefined): string | null =
     return value;
   }
   const now = Date.now();
-  const maxFutureSkew = 5 * 60 * 1000; // 5 minutes
+  const maxFutureSkew = 5 * 60 * 1000;
   if (parsed > now + maxFutureSkew) {
     return new Date(now).toISOString();
   }
@@ -334,7 +335,6 @@ const decodeMessagePayload = (raw: string): { text: string; replyTo?: ReplyMetad
       };
     }
   } catch {
-    // swallow JSON parse errors and treat as plain text
   }
   return { text: raw };
 };
@@ -535,17 +535,18 @@ const SWIPE_REPLY_RETURN_DURATION = 420;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
 const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
-
-// Content filter - list of words/patterns to filter (basic profanity filter)
-const FILTERED_WORDS = [
-  'fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'cunt', 'dick', 'cock',
-  'pussy', 'whore', 'slut', 'nigger', 'faggot', 'retard', 'porn', 'sex',
+const huWords = [
+  "bazdmeg", "bazmeg", "geci", "fasz", "kurva", "picsa", "szar", "szopd", "kibaszott",
+  "buzi", "köcsög", "baszik", "kúr", "nemnormális", "balfasz", "fing", "ribanc",
+  "szopik", "baszod", "faszfej", "seggfej", "segg", "csicska", "pina"
 ];
-const FILTERED_PATTERN = new RegExp(`\\b(${FILTERED_WORDS.join('|')})\\b`, 'i');
+
+leo.loadDictionary("en");
+leo.add(huWords);
 
 const shouldFilterMessage = (content: string | null | undefined): boolean => {
   if (!content) return false;
-  return FILTERED_PATTERN.test(content);
+  return leo.check(content);
 };
 
 const BADGE_STYLES: Record<string, { label: string; bg: string; fg: string; border: string }> = {
