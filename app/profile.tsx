@@ -150,7 +150,7 @@ export default function ProfileScreen() {
             'Privacy',
             'Manage your privacy settings',
             () => {
-              Alert.alert('Privacy', 'Privacy settings will be available in future updates');
+              router.push('/privacy' as any);
             }
           )}
         </GlassCard>

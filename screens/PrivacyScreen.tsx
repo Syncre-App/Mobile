@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -27,22 +28,15 @@ export const PrivacyScreen: React.FC = () => {
   const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
   
   const [contentFilter, setContentFilter] = useState<'standard' | 'none'>('standard');
-  const [readReceipts, setReadReceipts] = useState(true);
-  const [lastSeen, setLastSeen] = useState(true);
-  const [typingIndicator, setTypingIndicator] = useState(true);
+  // Activity status settings - disabled for now (Coming Soon)
+  const [readReceipts] = useState(true);
+  const [lastSeen] = useState(true);
+  const [typingIndicator] = useState(true);
 
   useEffect(() => {
     const loadSettings = async () => {
       const filter = await StorageService.getContentFilter();
       setContentFilter(filter);
-      
-      // Load other privacy settings
-      const receipts = await StorageService.getReadReceipts();
-      setReadReceipts(receipts);
-      const seen = await StorageService.getLastSeen();
-      setLastSeen(seen);
-      const typing = await StorageService.getTypingIndicator();
-      setTypingIndicator(typing);
     };
     loadSettings();
   }, []);
@@ -67,24 +61,6 @@ export const PrivacyScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' as const },
       ]
     );
-  };
-
-  const handleReadReceiptsChange = async (value: boolean) => {
-    setReadReceipts(value);
-    await StorageService.setReadReceipts(value);
-    NotificationService.show('success', value ? 'Read receipts enabled' : 'Read receipts disabled');
-  };
-
-  const handleLastSeenChange = async (value: boolean) => {
-    setLastSeen(value);
-    await StorageService.setLastSeen(value);
-    NotificationService.show('success', value ? 'Last seen visible' : 'Last seen hidden');
-  };
-
-  const handleTypingIndicatorChange = async (value: boolean) => {
-    setTypingIndicator(value);
-    await StorageService.setTypingIndicator(value);
-    NotificationService.show('success', value ? 'Typing indicator enabled' : 'Typing indicator disabled');
   };
 
   const handleBlockedUsers = () => {
@@ -177,53 +153,66 @@ export const PrivacyScreen: React.FC = () => {
           )}
         </GlassCard>
 
-        {/* Activity Status Section */}
+        {/* Activity Status Section - Coming Soon */}
         <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Activity Status</Text>
           </View>
           
-          {renderSettingItem(
-            'checkmark-done-outline',
-            'Read Receipts',
-            'Let others know when you\'ve read their messages',
-            undefined,
-            <Switch
-              value={readReceipts}
-              onValueChange={handleReadReceiptsChange}
-              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
-              thumbColor="white"
-            />,
-            false
-          )}
+          <View style={styles.comingSoonWrapper}>
+            {renderSettingItem(
+              'checkmark-done-outline',
+              'Read Receipts',
+              'Let others know when you\'ve read their messages',
+              undefined,
+              <Switch
+                value={readReceipts}
+                onValueChange={() => {}}
+                trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
+                thumbColor="white"
+                disabled
+              />,
+              false
+            )}
 
-          {renderSettingItem(
-            'time-outline',
-            'Last Seen',
-            'Show when you were last active',
-            undefined,
-            <Switch
-              value={lastSeen}
-              onValueChange={handleLastSeenChange}
-              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
-              thumbColor="white"
-            />,
-            true
-          )}
+            {renderSettingItem(
+              'time-outline',
+              'Last Seen',
+              'Show when you were last active',
+              undefined,
+              <Switch
+                value={lastSeen}
+                onValueChange={() => {}}
+                trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
+                thumbColor="white"
+                disabled
+              />,
+              true
+            )}
 
-          {renderSettingItem(
-            'ellipsis-horizontal',
-            'Typing Indicator',
-            'Show when you\'re typing a message',
-            undefined,
-            <Switch
-              value={typingIndicator}
-              onValueChange={handleTypingIndicatorChange}
-              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
-              thumbColor="white"
-            />,
-            true
-          )}
+            {renderSettingItem(
+              'ellipsis-horizontal',
+              'Typing Indicator',
+              'Show when you\'re typing a message',
+              undefined,
+              <Switch
+                value={typingIndicator}
+                onValueChange={() => {}}
+                trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
+                thumbColor="white"
+                disabled
+              />,
+              true
+            )}
+
+            {/* Blur overlay with "Soon..." */}
+            <BlurView intensity={25} tint="dark" style={styles.comingSoonOverlay}>
+              <View style={styles.comingSoonBadge}>
+                <Ionicons name="time-outline" size={18} color={palette.accent} />
+                <Text style={styles.comingSoonText}>Soon...</Text>
+              </View>
+            </BlurView>
+          </View>
         </GlassCard>
 
         {/* Blocked Users Section */}
@@ -355,6 +344,34 @@ const styles = StyleSheet.create({
   },
   settingRight: {
     marginLeft: spacing.md,
+  },
+  comingSoonWrapper: {
+    position: 'relative',
+  },
+  comingSoonOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: radii.md,
+    overflow: 'hidden',
+  },
+  comingSoonBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.full,
+    gap: spacing.xs,
+  },
+  comingSoonText: {
+    color: palette.accent,
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   infoContainer: {
     flexDirection: 'row',

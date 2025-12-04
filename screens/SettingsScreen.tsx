@@ -271,22 +271,6 @@ export const SettingsScreen: React.FC = () => {
           )}
         </GlassCard>
 
-        {/* Privacy Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Privacy</Text>
-          </View>
-          
-          {renderSettingItem(
-            'shield-checkmark-outline',
-            'Privacy Settings',
-            'Content filter, activity status, blocked users',
-            () => router.push('/privacy' as any),
-            undefined,
-            false
-          )}
-        </GlassCard>
-
         {/* Storage Section */}
         <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
