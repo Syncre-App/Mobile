@@ -36,34 +36,7 @@ export const SettingsScreen: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('English');
   const [isRotatingKeys, setIsRotatingKeys] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
-  const [contentFilter, setContentFilter] = useState<'standard' | 'none'>('standard');
   const appVersion = UpdateService.getCurrentVersion();
-
-  useEffect(() => {
-    StorageService.getContentFilter().then(setContentFilter);
-  }, []);
-
-  const handleContentFilterChange = async () => {
-    const options = [
-      { text: 'Standard', value: 'standard' as const },
-      { text: 'None (No filtering)', value: 'none' as const },
-    ];
-    Alert.alert(
-      'Content Filter',
-      'Standard mode blurs potentially offensive messages. Tap to reveal them.\n\nNone disables all filtering.',
-      [
-        ...options.map((opt) => ({
-          text: opt.value === contentFilter ? `✓ ${opt.text}` : opt.text,
-          onPress: async () => {
-            setContentFilter(opt.value);
-            await StorageService.setContentFilter(opt.value);
-            NotificationService.show('success', `Content filter set to ${opt.text}`);
-          },
-        })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ]
-    );
-  };
 
   const handleBack = () => {
     router.back();
@@ -306,9 +279,9 @@ export const SettingsScreen: React.FC = () => {
           
           {renderSettingItem(
             'shield-checkmark-outline',
-            'Content Filter',
-            contentFilter === 'standard' ? 'Standard (blur offensive content)' : 'None (no filtering)',
-            handleContentFilterChange,
+            'Privacy Settings',
+            'Content filter, activity status, blocked users',
+            () => router.push('/privacy' as any),
             undefined,
             false
           )}

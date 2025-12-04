@@ -86,4 +86,32 @@ export class StorageService {
     if (value === 'none') return 'none';
     return 'standard'; // default
   }
+
+  // Privacy settings helpers
+  static async setReadReceipts(enabled: boolean): Promise<void> {
+    return this.setItem('read_receipts', enabled ? 'true' : 'false');
+  }
+
+  static async getReadReceipts(): Promise<boolean> {
+    const value = await this.getItem('read_receipts');
+    return value !== 'false'; // default true
+  }
+
+  static async setLastSeen(enabled: boolean): Promise<void> {
+    return this.setItem('last_seen', enabled ? 'true' : 'false');
+  }
+
+  static async getLastSeen(): Promise<boolean> {
+    const value = await this.getItem('last_seen');
+    return value !== 'false'; // default true
+  }
+
+  static async setTypingIndicator(enabled: boolean): Promise<void> {
+    return this.setItem('typing_indicator', enabled ? 'true' : 'false');
+  }
+
+  static async getTypingIndicator(): Promise<boolean> {
+    const value = await this.getItem('typing_indicator');
+    return value !== 'false'; // default true
+  }
 }
