@@ -120,7 +120,7 @@ export const RegisterScreen: React.FC = () => {
         <View style={styles.hero}>
           <Text style={styles.overline}>Create your handle</Text>
           <Text style={styles.title}>Join the Syncre collective</Text>
-          <Text style={styles.subtitle}>Encryption-first chat across mobile & web.</Text>
+          <Text style={styles.subtitle}>Encryption-first chat across mobile.</Text>
         </View>
 
         <GlassCard style={styles.formCard} variant="subtle" padding={spacing.lg}>
@@ -193,7 +193,9 @@ export const RegisterScreen: React.FC = () => {
             </TouchableOpacity>
 
             <TouchableOpacity onPress={goToLogin} style={styles.loginLink}>
-              <Text style={styles.loginLinkText}>Already have an account? Login</Text>
+              <Text style={styles.loginLinkText}>
+                Already have an account? <Text style={styles.loginLinkHighlight}>Login</Text>
+              </Text>
             </TouchableOpacity>
           </View>
         </GlassCard>
@@ -324,5 +326,9 @@ const styles = StyleSheet.create({
   loginLinkText: {
     color: palette.textMuted,
     fontSize: 14,
+  },
+  loginLinkHighlight: {
+    color: palette.accentSecondary,
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
 });
