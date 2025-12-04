@@ -7,7 +7,6 @@ import {
     Image,
     ScrollView,
     StyleSheet,
-    Switch,
     Text,
     TouchableOpacity,
     View,
@@ -25,7 +24,6 @@ import { palette, radii, spacing } from '../theme/designSystem';
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(true);
   const [obscurePassword, setObscurePassword] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -155,18 +153,8 @@ export const LoginScreen: React.FC = () => {
             />
 
             <View style={styles.row}>
-              <View style={styles.rememberRow}>
-                <Switch
-                  value={remember}
-                  onValueChange={setRemember}
-                  trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
-                  thumbColor="#fff"
-                  ios_backgroundColor="rgba(255,255,255,0.15)"
-                />
-                <Text style={styles.rememberText}>Remember me</Text>
-              </View>
               <TouchableOpacity onPress={() => router.push({ pathname: '/reset', params: { email } } as any)}>
-                <Text style={styles.forgotText}>Forgot?</Text>
+                <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
             </View>
 
@@ -256,13 +244,11 @@ const styles = StyleSheet.create({
   field: { marginBottom: spacing.md },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     width: '100%',
     marginBottom: spacing.lg,
   },
-  rememberRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  rememberText: { color: palette.textMuted, fontSize: 14 },
   forgotText: { color: palette.accentSecondary, fontSize: 14, textDecorationLine: 'underline' },
   loginButton: { width: '100%', marginBottom: spacing.md },
   loginButtonDisabled: { opacity: 0.75 },

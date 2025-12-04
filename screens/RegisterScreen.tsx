@@ -167,7 +167,7 @@ export const RegisterScreen: React.FC = () => {
                 style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}
                 accessibilityRole="checkbox"
               >
-                {acceptedTerms ? <Ionicons name="checkmark" size={14} color="#0b1220" /> : null}
+                {acceptedTerms ? <Ionicons name="checkmark" size={14} color="#ffffff" /> : null}
               </TouchableOpacity>
               <Text style={styles.termsText}>
                 I accept the{' '}
@@ -280,8 +280,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   checkboxChecked: {
-    backgroundColor: '#6ee7b7',
-    borderColor: '#6ee7b7',
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
   },
   termsText: {
     color: palette.textMuted,
