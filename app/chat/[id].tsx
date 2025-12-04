@@ -5069,8 +5069,9 @@ const ChatScreen: React.FC = () => {
 
   const isGroupChat = Boolean(chatDetails?.isGroup);
   const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
-  const shouldShowAddButton = isGroupChat ? isGroupOwner : Boolean(otherUserIdRef.current);
-  const addButtonMode: 'create' | 'add' = isGroupChat ? 'add' : 'create';
+  const shouldShowAddButton = !isGroupChat && Boolean(otherUserIdRef.current);
+  const shouldShowSettingsButton = isGroupChat && isGroupOwner;
+  const addButtonMode: 'create' | 'add' = 'create';
   const receiverPresenceLabel = useMemo(() => {
     if (!chatDetails || chatDetails.isGroup) {
       return null;
@@ -5119,7 +5120,15 @@ const ChatScreen: React.FC = () => {
             <Text style={styles.presenceLabel}>{receiverPresenceLabel}</Text>
           ) : null}
         </View>
-        {shouldShowAddButton ? (
+        {shouldShowSettingsButton ? (
+          <Pressable
+            onPress={() => router.push(`/group/${chatId}/edit`)}
+            style={styles.headerActionButton}
+            accessibilityRole="button"
+          >
+            <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
+          </Pressable>
+        ) : shouldShowAddButton ? (
           <Pressable
             onPress={() => handleOpenMemberPicker(addButtonMode)}
             style={styles.headerActionButton}

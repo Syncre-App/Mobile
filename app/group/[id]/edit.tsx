@@ -15,10 +15,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UserAvatar } from '../../../components/UserAvatar';
+import { GroupMemberPicker } from '../../../components/GroupMemberPicker';
 import { ChatService, UploadableAsset } from '../../../services/ChatService';
 import { ApiService } from '../../../services/ApiService';
 import { NotificationService } from '../../../services/NotificationService';
 import { StorageService } from '../../../services/StorageService';
+
+interface Friend {
+  id: string;
+  username: string;
+  profile_picture?: string | null;
+  status?: string | null;
+}
+
+const MAX_GROUP_MEMBERS = 10;
 
 export default function GroupEditScreen() {
   const router = useRouter();
@@ -32,6 +42,12 @@ export default function GroupEditScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [memberPickerVisible, setMemberPickerVisible] = useState(false);
+  const [friendRoster, setFriendRoster] = useState<Friend[]>([]);
+  const [isFriendRosterLoading, setIsFriendRosterLoading] = useState(false);
+  const [memberPickerBusy, setMemberPickerBusy] = useState(false);
+  const [memberPickerError, setMemberPickerError] = useState<string | null>(null);
 
   const loadGroupDetails = useCallback(async () => {
     if (!chatId) return;
@@ -68,9 +84,102 @@ export default function GroupEditScreen() {
     }
   }, [chatId, router]);
 
+  const loadCurrentUser = useCallback(async () => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (token) {
+        const response = await ApiService.get('/user/me', token);
+        if (response.success && response.data) {
+          setCurrentUserId(response.data.id?.toString?.() ?? String(response.data.id));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load current user:', error);
+    }
+  }, []);
+
+  const loadFriendRoster = useCallback(async () => {
+    setIsFriendRosterLoading(true);
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        setFriendRoster([]);
+        return;
+      }
+      const response = await ApiService.get('/user/friends', token);
+      if (response.success && Array.isArray(response.data?.friends)) {
+        const roster = (response.data.friends as any[]).map((friend) => ({
+          id: friend.id?.toString?.() ?? String(friend.id),
+          username: friend.username || friend.email || 'Friend',
+          profile_picture: friend.profile_picture || null,
+          status: friend.status || null,
+        }));
+        setFriendRoster(roster);
+      }
+    } catch (error) {
+      console.error('Failed to load friend roster:', error);
+    } finally {
+      setIsFriendRosterLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadGroupDetails();
-  }, [loadGroupDetails]);
+    loadCurrentUser();
+  }, [loadGroupDetails, loadCurrentUser]);
+
+  const handleOpenMemberPicker = useCallback(async () => {
+    setMemberPickerError(null);
+    if (!friendRoster.length) {
+      await loadFriendRoster();
+    }
+    setMemberPickerVisible(true);
+  }, [friendRoster.length, loadFriendRoster]);
+
+  const handleMemberPickerClose = useCallback(() => {
+    setMemberPickerVisible(false);
+    setMemberPickerError(null);
+    setMemberPickerBusy(false);
+  }, []);
+
+  const handleMemberPickerConfirm = useCallback(
+    async (selectedIds: string[]) => {
+      if (!chatId || !selectedIds.length) {
+        return;
+      }
+      setMemberPickerBusy(true);
+      setMemberPickerError(null);
+      try {
+        const response = await ChatService.addMembers(chatId, selectedIds);
+        if (response.success && response.data?.chat) {
+          NotificationService.show('success', 'Members added');
+          setParticipants(
+            Array.isArray(response.data.chat.participants)
+              ? response.data.chat.participants.map((participant: any) => ({
+                  ...participant,
+                  id: participant.id?.toString?.() ?? String(participant.id),
+                }))
+              : []
+          );
+          DeviceEventEmitter.emit('chats:refresh');
+          handleMemberPickerClose();
+        } else {
+          setMemberPickerError(response.error || 'Failed to add members');
+        }
+      } catch (error) {
+        console.error('Failed to add members:', error);
+        setMemberPickerError('Failed to add members');
+      } finally {
+        setMemberPickerBusy(false);
+      }
+    },
+    [chatId, handleMemberPickerClose]
+  );
+
+  const excludedMemberIds = [
+    currentUserId || '',
+    ...participants.map((p) => p.id),
+  ].filter(Boolean);
 
   const handleSaveName = useCallback(async () => {
     if (!chatId) return;
@@ -242,12 +351,34 @@ export default function GroupEditScreen() {
               );
             })}
 
+            {participants.length < MAX_GROUP_MEMBERS && (
+              <Pressable style={styles.addMemberButton} onPress={handleOpenMemberPicker}>
+                <Ionicons name="person-add-outline" size={20} color="#ffffff" />
+                <Text style={styles.addMemberButtonText}>Add members</Text>
+              </Pressable>
+            )}
+
             <Pressable style={[styles.secondaryButton, styles.dangerButton]} onPress={handleDeleteGroup}>
               <Text style={styles.dangerButtonText}>Delete group</Text>
             </Pressable>
           </>
         )}
       </ScrollView>
+      <GroupMemberPicker
+        visible={memberPickerVisible}
+        title="Add members"
+        friends={friendRoster}
+        lockedIds={[]}
+        excludedIds={excludedMemberIds}
+        minimumTotal={1}
+        maxTotal={MAX_GROUP_MEMBERS - participants.length}
+        mode="add"
+        isLoading={isFriendRosterLoading}
+        isSubmitting={memberPickerBusy}
+        errorMessage={memberPickerError}
+        onClose={handleMemberPickerClose}
+        onConfirm={handleMemberPickerConfirm}
+      />
     </SafeAreaView>
   );
 }
@@ -376,6 +507,23 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ffffff',
     fontSize: 16,
+  },
+  addMemberButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderStyle: 'dashed',
+    marginTop: 8,
+  },
+  addMemberButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
 
