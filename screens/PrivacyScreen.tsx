@@ -33,11 +33,28 @@ export const PrivacyScreen: React.FC = () => {
   const [contentFilter, setContentFilter] = useState<'standard' | 'none'>('standard');
   const [isRotatingKeys, setIsRotatingKeys] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [botStatus, setBotStatus] = useState<'pending' | 'approved' | null>(null);
+  const [isLoadingBotStatus, setIsLoadingBotStatus] = useState(true);
 
   useEffect(() => {
     const loadSettings = async () => {
       const filter = await StorageService.getContentFilter();
       setContentFilter(filter);
+      
+      // Load bot status
+      try {
+        const token = await StorageService.getAuthToken();
+        if (token) {
+          const response = await ApiService.get('/user/bot-status', token) as { success: boolean; bot_status?: 'pending' | 'approved' | null };
+          if (response.success) {
+            setBotStatus(response.bot_status ?? null);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load bot status:', error);
+      } finally {
+        setIsLoadingBotStatus(false);
+      }
     };
     loadSettings();
   }, []);
@@ -62,6 +79,101 @@ export const PrivacyScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' as const },
       ]
     );
+  };
+
+  const handleBotAccountPress = () => {
+    if (botStatus === 'approved') {
+      Alert.alert(
+        'Bot Account',
+        'This account is a verified bot account. Bot accounts can be used for automated services and integrations.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (botStatus === 'pending') {
+      Alert.alert(
+        'Verification Pending',
+        'Your bot account request is being reviewed. This usually takes 1-2 business days.',
+        [
+          { text: 'OK' },
+          {
+            text: 'Cancel Request',
+            style: 'destructive',
+            onPress: handleCancelBotRequest,
+          },
+        ]
+      );
+      return;
+    }
+
+    // No bot status - show request dialog
+    Alert.alert(
+      'Bot Account',
+      'Mark this account as a bot account for SDK/API integrations.\n\nBot accounts:\n• Can use the Syncre SDK\n• Are marked with a Bot badge\n• Cannot be used for regular messaging\n\nThis requires manual verification.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Request Bot Status',
+          onPress: () => {
+            Alert.prompt(
+              'Bot Request Reason',
+              'Please describe why you need a bot account (e.g., what service/integration you\'re building):',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Submit',
+                  onPress: (reason: string | undefined) => handleRequestBotAccount(reason || ''),
+                },
+              ],
+              'plain-text'
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRequestBotAccount = async (reason: string) => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Please log in again');
+        return;
+      }
+
+      const response = await ApiService.post('/user/request-bot', { reason }, token);
+      if (response.success) {
+        setBotStatus('pending');
+        NotificationService.show('success', 'Bot account request submitted');
+      } else {
+        NotificationService.show('error', response.error || 'Failed to submit request');
+      }
+    } catch (error) {
+      console.error('Failed to request bot account:', error);
+      NotificationService.show('error', 'Failed to submit request');
+    }
+  };
+
+  const handleCancelBotRequest = async () => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Please log in again');
+        return;
+      }
+
+      const response = await ApiService.post('/user/cancel-bot-request', {}, token);
+      if (response.success) {
+        setBotStatus(null);
+        NotificationService.show('success', 'Bot request cancelled');
+      } else {
+        NotificationService.show('error', response.error || 'Failed to cancel request');
+      }
+    } catch (error) {
+      console.error('Failed to cancel bot request:', error);
+      NotificationService.show('error', 'Failed to cancel request');
+    }
   };
 
   const handleBlockedUsers = () => {
@@ -288,6 +400,34 @@ export const PrivacyScreen: React.FC = () => {
             handleDeleteAccount,
             undefined,
             true
+          )}
+        </GlassCard>
+
+        {/* Developer Section */}
+        <GlassCard width="100%" style={styles.section} variant="subtle">
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Developer</Text>
+          </View>
+          
+          {renderSettingItem(
+            'hardware-chip-outline',
+            'Bot Account',
+            isLoadingBotStatus
+              ? 'Loading...'
+              : botStatus === 'approved'
+                ? 'Verified bot account'
+                : botStatus === 'pending'
+                  ? 'Verification pending...'
+                  : 'Request bot status for SDK integrations',
+            handleBotAccountPress,
+            isLoadingBotStatus ? (
+              <ActivityIndicator size="small" color={palette.accent} />
+            ) : botStatus === 'approved' ? (
+              <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+            ) : botStatus === 'pending' ? (
+              <Ionicons name="time" size={20} color="#f59e0b" />
+            ) : undefined,
+            false
           )}
         </GlassCard>
 
