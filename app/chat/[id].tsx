@@ -522,7 +522,17 @@ const formatLastSeenLabel = (lastSeen?: string | null) => {
 const sortMessagesChronologically = (list: Message[]): Message[] =>
   list
     .slice()
-    .sort((a, b) => parseDate(a.timestamp).getTime() - parseDate(b.timestamp).getTime());
+    .sort((a, b) => {
+      const timeA = parseDate(a.timestamp).getTime();
+      const timeB = parseDate(b.timestamp).getTime();
+      if (timeA !== timeB) {
+        return timeA - timeB;
+      }
+      // If timestamps are equal, sort by message ID (auto-increment ensures order)
+      const idA = parseInt(a.id, 10) || 0;
+      const idB = parseInt(b.id, 10) || 0;
+      return idA - idB;
+    });
 
 const MESSAGE_CHAR_LIMIT = 5000;
 const SWIPE_REPLY_THRESHOLD = 12;
