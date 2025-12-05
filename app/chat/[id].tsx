@@ -525,7 +525,6 @@ const sortMessagesChronologically = (list: Message[]): Message[] =>
     .sort((a, b) => parseDate(a.timestamp).getTime() - parseDate(b.timestamp).getTime());
 
 const MESSAGE_CHAR_LIMIT = 5000;
-const REPLY_ACCENT = 'rgba(255, 255, 255, 0.25)';
 const SWIPE_REPLY_THRESHOLD = 12;
 const SWIPE_CAPTURE_MIN_DISTANCE = 2;
 const SWIPE_MAX_DISTANCE = 70;
