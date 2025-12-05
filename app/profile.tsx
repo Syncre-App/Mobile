@@ -14,14 +14,16 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GlassCard } from '../components/GlassCard';
 import { AppBackground } from '../components/AppBackground';
 import { UpdateService } from '../services/UpdateService';
-import { palette } from '../theme/designSystem';
+import { palette, spacing, radii } from '../theme/designSystem';
+
+const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
 export default function ProfileScreen() {
   const router = useRouter();
   const appVersion = UpdateService.getCurrentVersion();
   const insets = useSafeAreaInsets();
-  const minimumTopPadding = 12;
-  const safeExtraTop = Math.max(minimumTopPadding - insets.top, 0);
+  const minTopPadding = spacing.lg;
+  const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
 
   const handleBack = () => {
     router.back();
@@ -95,12 +97,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView
-      style={[
-        styles.container,
-        {
-          paddingTop: safeExtraTop,
-        },
-      ]}
+      style={[styles.container, { paddingTop: extraTopPadding }]}
       edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
@@ -111,7 +108,11 @@ export default function ProfileScreen() {
         <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
+
+        <View style={styles.headerCentered} pointerEvents="none">
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+
         <View style={styles.headerPlaceholder} />
       </View>
 
@@ -204,36 +205,46 @@ const styles = StyleSheet.create({
     backgroundColor: palette.background,
   },
   header: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  headerCentered: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerButton: {
-    width: 40,
-    height: 40,
-    padding: 8,
-    borderRadius: 8,
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
+    borderRadius: radii.md,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   headerPlaceholder: {
-    width: 40,
-    height: 40,
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
   },
   headerTitle: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontFamily: 'SpaceGrotesk-SemiBold',
   },
   content: {
     flex: 1,
   },
   scrollContainer: {
-    paddingBottom: 32,
-    paddingHorizontal: 16,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.md,
     alignItems: 'stretch',
   },
   contentColumn: {
@@ -242,27 +253,27 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   section: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
     overflow: 'hidden',
     width: '100%',
     maxWidth: 420,
     alignSelf: 'center',
   },
   sectionHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
   },
   sectionTitle: {
     color: 'white',
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -272,20 +283,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTexts: {
-    marginLeft: 16,
+    marginLeft: spacing.md,
     flex: 1,
   },
   settingTitle: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: 'PlusJakartaSans-Medium',
   },
   settingSubtitle: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 14,
     marginTop: 2,
+    fontFamily: 'PlusJakartaSans-Regular',
   },
   settingRight: {
-    marginLeft: 16,
+    marginLeft: spacing.md,
   },
 });

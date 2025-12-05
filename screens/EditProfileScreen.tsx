@@ -24,7 +24,9 @@ import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
-import { spacing } from '../theme/designSystem';
+import { palette, spacing, radii } from '../theme/designSystem';
+
+const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
 interface User {
   id: string;
@@ -51,8 +53,8 @@ const resolveExtension = (fileName?: string | null, mimeType?: string | null) =>
 export const EditProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const topInset = insets.top;
-  const minimumTopPadding = spacing.md;
-  const containerPaddingTop = Math.max(minimumTopPadding - topInset, 0);
+  const minTopPadding = spacing.lg;
+  const extraTopPadding = Math.max(minTopPadding - topInset, 0);
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -245,7 +247,7 @@ export const EditProfileScreen: React.FC = () => {
 
   if (initialLoading) {
     return (
-      <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
         <AppBackground />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2C82FF" />
@@ -256,7 +258,7 @@ export const EditProfileScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <AppBackground />
 
@@ -265,7 +267,11 @@ export const EditProfileScreen: React.FC = () => {
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+
+        <View style={styles.headerCentered} pointerEvents="none">
+          <Text style={styles.headerTitle}>Edit Profile</Text>
+        </View>
+
         <View style={styles.headerPlaceholder} />
       </View>
 
@@ -357,7 +363,7 @@ export const EditProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#03040A',
+    backgroundColor: palette.background,
   },
   loadingContainer: {
     flex: 1,
@@ -367,39 +373,50 @@ const styles = StyleSheet.create({
   loadingText: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 16,
-    marginTop: 16,
+    marginTop: spacing.md,
+    fontFamily: 'PlusJakartaSans-Regular',
   },
   header: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  headerCentered: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerButton: {
-    width: 40,
-    height: 40,
-    padding: 8,
-    borderRadius: 8,
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
+    borderRadius: radii.md,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   headerPlaceholder: {
-    width: 40,
-    height: 40,
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
   },
   headerTitle: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontFamily: 'SpaceGrotesk-SemiBold',
   },
   content: {
     flex: 1,
   },
   scrollContainer: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: spacing.md,
+    paddingBottom: spacing.xxl,
   },
   contentColumn: {
     width: '100%',
@@ -412,10 +429,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   photoCard: {
-    marginBottom: 24,
+    marginBottom: spacing.lg + spacing.xs,
     alignItems: 'center',
-    gap: 16,
-    paddingVertical: 28,
+    gap: spacing.md,
+    paddingVertical: spacing.xl + spacing.xs,
   },
   photoPickerWrapper: {
     position: 'relative',
@@ -427,13 +444,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    backgroundColor: 'rgba(12, 18, 36, 0.75)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   photoPickerWithImage: {
     backgroundColor: 'transparent',
@@ -454,7 +467,6 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(6, 11, 23, 0.55)',
   },
   editBadge: {
     position: 'absolute',
@@ -479,15 +491,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   infoCard: {
-    marginBottom: 24,
+    marginBottom: spacing.lg + spacing.xs,
     overflow: 'hidden',
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
   },
@@ -497,19 +509,20 @@ const styles = StyleSheet.create({
   infoLabel: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 14,
+    fontFamily: 'PlusJakartaSans-Regular',
   },
   infoValue: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   buttonContainer: {
-    gap: 12,
-    marginTop: 12,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
     alignItems: 'stretch',
   },
   saveButton: {
-    borderRadius: 14,
+    borderRadius: radii.lg,
     overflow: 'hidden',
     alignSelf: 'stretch',
   },
@@ -522,13 +535,13 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: 'white',
-    fontWeight: '600',
     fontSize: 14,
     letterSpacing: 1.1,
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   cancelButton: {
-    paddingVertical: 16,
-    borderRadius: 14,
+    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
@@ -536,6 +549,6 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
 });

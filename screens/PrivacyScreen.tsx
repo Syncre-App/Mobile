@@ -487,7 +487,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.lg,
     alignItems: 'stretch',
