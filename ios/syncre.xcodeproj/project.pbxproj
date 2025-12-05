@@ -10,6 +10,7 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		2DB3F30C3029D91030962114 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED06425F083087AEB248E5D /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		4F94E47D2EE2DE630093BA6D /* Syncre.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4F94E47C2EE2DE630093BA6D /* Syncre.icon */; };
 		9630BC83C10703246158DAFB /* libPods-syncre.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EC545D42D98D5B5BFDB6DD58 /* libPods-syncre.a */; };
 		A28E11670FE9D7C0F6F3C6C1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0E2567E476961FA88168B0B3 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
@@ -22,6 +23,7 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = syncre/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = syncre/Info.plist; sourceTree = "<group>"; };
 		467CC1A00E3398F93135B82A /* Pods-syncre.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-syncre.debug.xcconfig"; path = "Target Support Files/Pods-syncre/Pods-syncre.debug.xcconfig"; sourceTree = "<group>"; };
+		4F94E47C2EE2DE630093BA6D /* Syncre.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Syncre.icon; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = syncre/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		CED06425F083087AEB248E5D /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-syncre/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
@@ -51,6 +53,7 @@
 				F11748442D0722820044C1D9 /* syncre-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
+				4F94E47C2EE2DE630093BA6D /* Syncre.icon */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 				0E2567E476961FA88168B0B3 /* PrivacyInfo.xcprivacy */,
@@ -195,6 +198,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
+				4F94E47D2EE2DE630093BA6D /* Syncre.icon in Resources */,
 				A28E11670FE9D7C0F6F3C6C1 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -392,7 +396,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 467CC1A00E3398F93135B82A /* Pods-syncre.debug.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Syncre;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = syncre/syncre.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
@@ -434,7 +438,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = E1EDFA1E5C7E16EFD75119C0 /* Pods-syncre.release.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Syncre;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = syncre/syncre.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
