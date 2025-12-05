@@ -33,7 +33,7 @@ export const ProfileHeaderWidget: React.FC<ProfileHeaderWidgetProps> = ({
       [
         {
           text: 'Edit Profile',
-          onPress: () => router.push('/edit-profile' as any),
+          onPress: () => router.push('/settings/edit-profile' as any),
         },
         {
           text: 'Settings',

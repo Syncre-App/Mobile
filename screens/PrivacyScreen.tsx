@@ -177,7 +177,7 @@ export const PrivacyScreen: React.FC = () => {
   };
 
   const handleBlockedUsers = () => {
-    router.push('/blocked-users' as any);
+    router.push('/settings/blocked-users' as any);
   };
 
   const handleRotateKeys = async () => {
@@ -340,7 +340,7 @@ export const PrivacyScreen: React.FC = () => {
           {renderSettingItem(
             'shield-checkmark-outline',
             'Content Filter',
-            contentFilter === 'standard' ? 'Standard (blur offensive content)' : 'None (no filtering)',
+            contentFilter === 'standard' ? 'Standard (blur offensive)' : 'None',
             handleContentFilterChange,
             undefined,
             false
@@ -376,7 +376,7 @@ export const PrivacyScreen: React.FC = () => {
               ? 'Rotating…'
               : isBootstrapping
                 ? 'Bootstrapping…'
-                : 'Refresh your device keys and request re-encrypt',
+                : 'Refresh device keys',
             handleRotateKeys,
             (isRotatingKeys || isBootstrapping) ? (
               <ActivityIndicator size="small" color={palette.accent} />
@@ -387,7 +387,7 @@ export const PrivacyScreen: React.FC = () => {
           {renderSettingItem(
             'document-text-outline',
             'Terms of Service',
-            'Read the Syncre EULA and acceptable use rules',
+            'Read the Syncre EULA',
             handleOpenTerms,
             undefined,
             true
@@ -396,7 +396,7 @@ export const PrivacyScreen: React.FC = () => {
           {renderSettingItem(
             'trash-bin-outline',
             'Delete account',
-            'Logs you out and deletes data after 24h unless you sign back in',
+            'Permanently delete your account',
             handleDeleteAccount,
             undefined,
             true

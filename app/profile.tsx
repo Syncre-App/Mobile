@@ -132,7 +132,7 @@ export default function ProfileScreen() {
             'Edit Profile',
             'Update your profile information',
             () => {
-              router.push('/edit-profile' as any);
+              router.push('/settings/edit-profile' as any);
             }
           )}
           
@@ -150,7 +150,7 @@ export default function ProfileScreen() {
             'Privacy',
             'Manage your privacy settings',
             () => {
-              router.push('/privacy' as any);
+              router.push('/settings/privacy' as any);
             }
           )}
         </GlassCard>
