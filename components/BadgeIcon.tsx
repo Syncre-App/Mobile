@@ -14,6 +14,7 @@ export type BadgeType =
   | 'og'
   | 'verified'
   | 'bot'
+  | 'system'
   | 'jewish';
 
 interface BadgeIconProps {
@@ -34,6 +35,7 @@ const BADGE_COLORS: Record<BadgeType, string> = {
   og: '#00D1FF',
   verified: '#38bdf8',
   bot: '#c4b5fd',
+  system: '#06b6d4',
   jewish: '#C9A227',
 };
 
@@ -136,6 +138,15 @@ const BadgeIcon: React.FC<BadgeIconProps> = ({ type, size = 16, style }) => {
             <Circle cx="9.5" cy="9" r="1" fill={color} />
             <Path d="M8 4V6" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
             <Circle cx="8" cy="4" r="1" fill="white" />
+          </Svg>
+        );
+
+      case 'system':
+        return (
+          <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+            <Circle cx="8" cy="8" r="7" fill={color} />
+            <Path d="M8 4L11 8L8 12L5 8L8 4Z" fill="white" />
+            <Circle cx="8" cy="8" r="1.5" fill={color} />
           </Svg>
         );
 
