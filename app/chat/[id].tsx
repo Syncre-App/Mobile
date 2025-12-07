@@ -5,6 +5,7 @@ import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeBlur, BlurPresets } from '../../components/NativeBlur';
+import { GlassCard } from '../../components/GlassCard';
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -5895,9 +5896,7 @@ const ChatScreen: React.FC = () => {
             ]}
             pointerEvents="box-none"
           >
-            <View style={[styles.messageActionArrow, { left: messageActionArrowLeft, top: messageActionArrowTop }]} />
-            <View style={styles.messageActionBubble}>
-              <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
+            <GlassCard width={280} padding={0} variant="subtle" style={styles.messageActionBubble}>
               <View style={styles.messageActionBubbleContent}>
                 <Text style={styles.messageActionPreview} numberOfLines={2}>
                   {messageActionContext.message.content || 'Attachment'}
@@ -5930,7 +5929,7 @@ const ChatScreen: React.FC = () => {
                   ))}
                 </View>
               </View>
-            </View>
+            </GlassCard>
           </Animated.View>
         </Animated.View>
       ) : null}
@@ -5942,7 +5941,7 @@ const ChatScreen: React.FC = () => {
           <Pressable style={styles.messageActionBackdrop} onPress={closeAttachmentSheet} />
           <Animated.View
             style={[
-              styles.attachmentSheet,
+              styles.attachmentSheetWrapper,
               { bottom: attachmentSheetBottom },
               {
                 transform: [
@@ -5957,7 +5956,7 @@ const ChatScreen: React.FC = () => {
               },
             ]}
           >
-            <NativeBlur intensity={60} tint="dark" style={styles.attachmentSheetBlur}>
+            <GlassCard width="100%" padding={0} style={styles.attachmentSheet}>
               <View style={styles.attachmentSheetContent}>
                 <Text style={styles.attachmentSheetTitle}>ADD ATTACHMENT</Text>
                 <Pressable
@@ -5981,7 +5980,7 @@ const ChatScreen: React.FC = () => {
                   </View>
                 </Pressable>
               </View>
-            </NativeBlur>
+            </GlassCard>
           </Animated.View>
         </Animated.View>
       ) : null}
@@ -7123,34 +7122,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   messageActionBubble: {
-    width: 280,
-    borderRadius: 22,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 12,
-    overflow: 'hidden',
+    // GlassCard handles styling
   },
   messageActionBubbleContent: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  messageActionArrow: {
-    position: 'absolute',
-    top: -6,
-    width: 12,
-    height: 12,
-    borderRadius: 3,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    transform: [{ rotate: '45deg' }],
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    borderColor: 'transparent',
-  },
+
   messageActionChipColumn: {
     flexDirection: 'column',
     gap: 8,
@@ -7182,29 +7160,19 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     paddingHorizontal: 0,
   },
-  attachmentSheet: {
+  attachmentSheetWrapper: {
     position: 'absolute',
     left: 16,
     right: 16,
     bottom: 24,
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
   },
-  attachmentSheetBlur: {
-    flex: 1,
+  attachmentSheet: {
+    // GlassCard handles styling
   },
   attachmentSheetContent: {
     paddingVertical: 16,
     paddingHorizontal: 20,
     gap: 4,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
   },
   attachmentSheetTitle: {
     color: 'rgba(255,255,255,0.5)',

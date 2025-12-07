@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { NativeBlur, BlurPresets } from './NativeBlur';
+import { GlassCard } from './GlassCard';
 import { UserAvatar } from './UserAvatar';
 
 interface Friend {
@@ -141,19 +141,19 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
     const isSelected = selectedIds.has(id);
     const presenceLabel = (() => {
       const lastSeen = item.last_seen;
-      if (item.status === 'online') return 'Online';
-      if (item.status === 'idle') return 'Idle';
+      if (item.status === 'online') return 'online';
+      if (item.status === 'idle') return 'idle';
       if (lastSeen) {
         const diff = Date.now() - Date.parse(lastSeen);
         const minutes = Math.floor(diff / 60000);
-        if (minutes < 3) return 'Idle';
+        if (minutes < 3) return 'idle';
         if (minutes < 60) return `${minutes}m ago`;
         const hours = Math.floor(minutes / 60);
         if (hours < 24) return `${hours}h ago`;
         const days = Math.floor(hours / 24);
         return `${days}d ago`;
       }
-      return item.status || '';
+      return 'offline';
     })();
 
     return (
@@ -162,7 +162,7 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
           <UserAvatar uri={item.profile_picture} name={item.username} size={44} />
           <View>
             <Text style={styles.friendName}>{item.username}</Text>
-            {presenceLabel ? <Text style={styles.friendStatus}>{presenceLabel}</Text> : null}
+            <Text style={styles.friendStatus}>{presenceLabel}</Text>
           </View>
         </View>
         <View
@@ -179,12 +179,11 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable style={styles.backdropPress} onPress={onClose} />
-        <View style={styles.sheet}>
-          <NativeBlur {...BlurPresets.modal} style={styles.blurView}>
-            <View style={styles.sheetContent}>
+        <GlassCard width="100%" style={styles.sheet} padding={0}>
+          <View style={styles.sheetContent}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{title}</Text>
               <Pressable style={styles.closeButton} onPress={onClose} accessibilityRole="button">
@@ -192,73 +191,73 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
               </Pressable>
             </View>
 
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search friends"
-                placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                value={search}
-                onChangeText={setSearch}
-              />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search friends"
+              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              value={search}
+              onChangeText={setSearch}
+            />
 
-              {lockedParticipants.length ? (
-                <View style={styles.lockedSection}>
-                  <Text style={styles.lockedLabel}>Already included</Text>
-                  {lockedParticipants.map((participant) => (
-                    <View key={participant.id} style={styles.lockedChip}>
-                      <UserAvatar
-                        uri={participant.profile_picture || undefined}
-                        name={participant.username}
-                        size={28}
-                        style={styles.lockedAvatar}
-                      />
-                      <Text style={styles.lockedName}>{participant.username}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-
-              {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-              {isLoading ? (
-                <View style={styles.loadingState}>
-                  <ActivityIndicator color="#FFFFFF" />
-                </View>
-              ) : (
-                <FlatList
-                  data={filteredFriends}
-                  keyExtractor={(item) => item.id?.toString?.() ?? String(item.id)}
-                  renderItem={renderFriend}
-                  contentContainerStyle={styles.friendList}
-                  ListEmptyComponent={
-                    <Text style={styles.emptyText}>No friends available for this action.</Text>
-                  }
-                />
-              )}
-
-              <View style={styles.sheetFooter}>
-                <Text style={styles.counterText}>
-                  {totalWithOwner}/{maxTotal} people
-                </Text>
-                <Pressable
-                  style={[
-                    styles.confirmButton,
-                    (!minSatisfied || isSubmitting) && styles.confirmButtonDisabled,
-                  ]}
-                  disabled={!minSatisfied || isSubmitting}
-                  onPress={handleConfirm}
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color="#0B1630" />
-                  ) : (
-                    <Text style={styles.confirmButtonText}>
-                      {mode === 'create' ? 'Continue' : 'Add'}
-                    </Text>
-                  )}
-                </Pressable>
+            {lockedParticipants.length ? (
+              <View style={styles.lockedSection}>
+                <Text style={styles.lockedLabel}>Already included</Text>
+                {lockedParticipants.map((participant) => (
+                  <View key={participant.id} style={styles.lockedChip}>
+                    <UserAvatar
+                      uri={participant.profile_picture || undefined}
+                      name={participant.username}
+                      size={28}
+                      style={styles.lockedAvatar}
+                    />
+                    <Text style={styles.lockedName}>{participant.username}</Text>
+                  </View>
+                ))}
               </View>
+            ) : null}
+
+            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+            {isLoading ? (
+              <View style={styles.loadingState}>
+                <ActivityIndicator color="#FFFFFF" />
+              </View>
+            ) : (
+              <FlatList
+                data={filteredFriends}
+                keyExtractor={(item) => item.id?.toString?.() ?? String(item.id)}
+                renderItem={renderFriend}
+                contentContainerStyle={styles.friendList}
+                style={styles.friendListContainer}
+                ListEmptyComponent={
+                  <Text style={styles.emptyText}>No friends available for this action.</Text>
+                }
+              />
+            )}
+
+            <View style={styles.sheetFooter}>
+              <Text style={styles.counterText}>
+                {totalWithOwner}/{maxTotal} people
+              </Text>
+              <Pressable
+                style={[
+                  styles.confirmButton,
+                  (!minSatisfied || isSubmitting) && styles.confirmButtonDisabled,
+                ]}
+                disabled={!minSatisfied || isSubmitting}
+                onPress={handleConfirm}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#0B1630" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>
+                    {mode === 'create' ? 'Continue' : 'Add'}
+                  </Text>
+                )}
+              </Pressable>
             </View>
-          </NativeBlur>
-        </View>
+          </View>
+        </GlassCard>
       </View>
     </Modal>
   );
@@ -276,22 +275,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheet: {
-    borderRadius: 20,
-    overflow: 'hidden',
     maxHeight: '80%',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  blurView: {
-    overflow: 'hidden',
   },
   sheetContent: {
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20,
@@ -346,6 +332,9 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  friendListContainer: {
+    maxHeight: 300,
   },
   friendList: {
     paddingBottom: 12,
