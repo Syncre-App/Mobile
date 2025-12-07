@@ -6144,6 +6144,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 4,
+    minWidth: 120,
   },
   senderMetaAvatar: {
     marginRight: 8,
