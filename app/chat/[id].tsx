@@ -925,13 +925,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         ? styles.myBubble
         : styles.theirBubble,
     !isMediaOnlyMessage &&
-      (isMine
-        ? isLastInGroup
-          ? styles.myBubbleLast
-          : styles.myBubbleStacked
-        : isLastInGroup
-          ? styles.theirBubbleLast
-          : styles.theirBubbleStacked),
+    (isMine
+      ? isLastInGroup
+        ? styles.myBubbleLast
+        : styles.myBubbleStacked
+      : isLastInGroup
+        ? styles.theirBubbleLast
+        : styles.theirBubbleStacked),
     message.isPlaceholder && styles.placeholderBubble,
     message.replyTo && styles.messageBubbleWithReply,
   ];
@@ -1081,234 +1081,234 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               </Pressable>
             ) : (
               <>
-            {message.replyTo && (
-              <Pressable
-                onPress={() => onReplyPress?.(message.replyTo as ReplyMetadata)}
-                style={[
-                  styles.replyChip,
-                  isMine ? styles.replyChipMine : styles.replyChipTheirs,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.replyChipBar,
-                    isMine ? styles.replyChipBarMine : styles.replyChipBarTheirs,
-                  ]}
-                />
-                <View style={styles.replyChipBody}>
-                  <Text style={styles.replyChipLabel} numberOfLines={1}>
-                    {message.replyTo.senderLabel}
-                  </Text>
-                  {message.replyTo.preview ? (
-                    <Text style={styles.replyChipText} numberOfLines={2}>
-                      {message.replyTo.preview}
-                    </Text>
-                  ) : null}
-                </View>
-              </Pressable>
-            )}
-            {(() => {
-              if (!hasAttachments) return null;
-              const showPreview = combinedPreviewable.length > 0;
-              const primaryItem = showPreview ? combinedPreviewable[0] : null;
-              const remainingPreviewItems = showPreview ? combinedPreviewable.slice(1) : [];
-
-              return (
-                <>
-                  {primaryItem ? (
-                    <Pressable
-                      key={`${message.id}-hero-image`}
-                      style={styles.heroImageCard}
-                      onPress={(event) => handleAttachmentPress(event, primaryItem, combinedPreviewable)}
-                    >
-                      {primaryItem.isVideo ? (
-                        resolveAttachmentUri(primaryItem) ? (
-                          <Video
-                            source={{ uri: resolveAttachmentUri(primaryItem)! }}
-                            style={styles.heroVideo}
-                            resizeMode={ResizeMode.COVER}
-                            useNativeControls
-                            shouldPlay={false}
-                            isLooping={false}
-                          />
-                        ) : (
-                          <View style={styles.heroVideoPlaceholder}>
-                            <Ionicons name="play" size={24} color="#ffffff" />
-                          </View>
-                        )
-                      ) : (
-                        <Image
-                          source={{
-                            uri: primaryItem.previewUrl || primaryItem.publicViewUrl || primaryItem.localUri,
-                          }}
-                          style={styles.heroImage}
-                          contentFit="cover"
-                        />
-                      )}
-                      {remainingPreviewItems.length ? (
-                        <View style={styles.attachmentMoreBadge}>
-                          <Text style={styles.attachmentMoreBadgeText}>+{remainingPreviewItems.length} more</Text>
-                        </View>
-                      ) : null}
-                    </Pressable>
-                  ) : null}
-
-                  {fileAttachments.length ? (
+                {message.replyTo && (
+                  <Pressable
+                    onPress={() => onReplyPress?.(message.replyTo as ReplyMetadata)}
+                    style={[
+                      styles.replyChip,
+                      isMine ? styles.replyChipMine : styles.replyChipTheirs,
+                    ]}
+                  >
                     <View
                       style={[
-                        styles.attachmentGroup,
-                        isMine ? styles.attachmentGroupMine : styles.attachmentGroupTheirs,
+                        styles.replyChipBar,
+                        isMine ? styles.replyChipBarMine : styles.replyChipBarTheirs,
                       ]}
-                    >
-                      {fileAttachments.map((attachment) => {
-                        const isExpired = attachment.status === 'expired';
-                        const isPreviewable =
-                          (attachment.isImage || attachment.isVideo) &&
-                          (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri);
-                        return (
-                          <Pressable
-                            key={`${message.id}-file-${attachment.id}`}
-                            style={[
-                              styles.attachmentCard,
-                              isPreviewable ? styles.attachmentImageCardCompact : styles.attachmentFileCard,
-                            ]}
-                            onPress={(event) => {
-                              if (isExpired) return;
-                              const siblings =
-                                attachment.isImage || attachment.isVideo ? combinedPreviewable : [attachment];
-                              handleAttachmentPress(event, attachment, siblings);
-                            }}
-                            disabled={isExpired}
-                          >
-                            {isPreviewable ? (
-                              attachment.isVideo ? (
-                                <View style={styles.attachmentVideoThumb}>
-                                  {resolveAttachmentUri(attachment) ? (
-                                    <Video
-                                      source={{ uri: resolveAttachmentUri(attachment)! }}
-                                      style={StyleSheet.absoluteFillObject}
-                                      resizeMode={ResizeMode.COVER}
-                                      useNativeControls
-                                      shouldPlay={false}
-                                    />
-                                  ) : null}
-                                  <View style={styles.attachmentVideoOverlay}>
-                                    <Ionicons name="play" size={18} color="#ffffff" />
-                                  </View>
-                                </View>
-                              ) : (
-                                <Image
-                                  source={{
-                                    uri: attachment.previewUrl || attachment.publicViewUrl || attachment.localUri,
-                                  }}
-                                  style={styles.attachmentImage}
-                                  contentFit="cover"
-                                />
-                              )
-                            ) : (
-                              <View style={styles.attachmentFileRow}>
-                                <Ionicons
-                                  name="document-text-outline"
-                                  size={18}
-                                  color="rgba(255,255,255,0.9)"
-                                  style={styles.attachmentFileIcon}
-                                />
-                                <View style={styles.attachmentFileBody}>
-                                  <Text style={styles.attachmentFileName} numberOfLines={1}>
-                                    {attachment.name}
-                                  </Text>
-                                  <Text style={styles.attachmentFileMeta}>
-                                    {formatBytes(attachment.fileSize)}
-                                  </Text>
-                                </View>
-                              </View>
-                            )}
-                            {isExpired ? (
-                              <View style={styles.attachmentExpiredOverlay}>
-                                <Text style={styles.attachmentExpiredText}>File or media expired</Text>
-                              </View>
-                            ) : null}
-                          </Pressable>
-                        );
-                      })}
+                    />
+                    <View style={styles.replyChipBody}>
+                      <Text style={styles.replyChipLabel} numberOfLines={1}>
+                        {message.replyTo.senderLabel}
+                      </Text>
+                      {message.replyTo.preview ? (
+                        <Text style={styles.replyChipText} numberOfLines={2}>
+                          {message.replyTo.preview}
+                        </Text>
+                      ) : null}
                     </View>
-                  ) : null}
-                </>
-              );
-            })()}
-            {message.content?.length ? (
-              <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
-                {textSegments.map((segment, idx) =>
-                  segment.type === 'link' ? (
-                    <Text
-                      key={`${message.id}-link-${idx}`}
-                      style={styles.linkText}
-                      onPress={() => onLinkPress?.(segment.value)}
-                    >
-                      {segment.value}
-                    </Text>
-                  ) : (
-                    <Text key={`${message.id}-text-${idx}`}>{segment.value}</Text>
-                  )
+                  </Pressable>
                 )}
-              </Text>
-            ) : null}
-            {embeddableLink && !embedFailed ? (
-              <Pressable
-                style={styles.embedPreview}
-                onPress={() => onLinkPress?.(embeddableLink.url)}
-              >
-                {embeddableLink.type === 'image' ? (
-                  <Image
-                    source={{ uri: embeddableLink.url }}
-                    style={styles.embedImage}
-                    contentFit="cover"
-                    transition={300}
-                    onLoad={() => setEmbedLoaded(true)}
-                    onError={() => setEmbedFailed(true)}
-                  />
-                ) : (
-                  <Video
-                    source={{ uri: embeddableLink.url }}
-                    style={styles.embedVideo}
-                    resizeMode={ResizeMode.COVER}
-                    useNativeControls
-                    shouldPlay={false}
-                    onLoadStart={() => setEmbedLoaded(false)}
-                    onLoad={() => setEmbedLoaded(true)}
-                    onError={() => setEmbedFailed(true)}
-                  />
-                )}
-                {!embedLoaded ? (
-                  <View style={styles.embedPlaceholder}>
-                    <ActivityIndicator size="small" color="#ffffff" />
-                    <Text style={styles.embedPlaceholderText}>Previewing…</Text>
+                {(() => {
+                  if (!hasAttachments) return null;
+                  const showPreview = combinedPreviewable.length > 0;
+                  const primaryItem = showPreview ? combinedPreviewable[0] : null;
+                  const remainingPreviewItems = showPreview ? combinedPreviewable.slice(1) : [];
+
+                  return (
+                    <>
+                      {primaryItem ? (
+                        <Pressable
+                          key={`${message.id}-hero-image`}
+                          style={styles.heroImageCard}
+                          onPress={(event) => handleAttachmentPress(event, primaryItem, combinedPreviewable)}
+                        >
+                          {primaryItem.isVideo ? (
+                            resolveAttachmentUri(primaryItem) ? (
+                              <Video
+                                source={{ uri: resolveAttachmentUri(primaryItem)! }}
+                                style={styles.heroVideo}
+                                resizeMode={ResizeMode.COVER}
+                                useNativeControls
+                                shouldPlay={false}
+                                isLooping={false}
+                              />
+                            ) : (
+                              <View style={styles.heroVideoPlaceholder}>
+                                <Ionicons name="play" size={24} color="#ffffff" />
+                              </View>
+                            )
+                          ) : (
+                            <Image
+                              source={{
+                                uri: primaryItem.previewUrl || primaryItem.publicViewUrl || primaryItem.localUri,
+                              }}
+                              style={styles.heroImage}
+                              contentFit="cover"
+                            />
+                          )}
+                          {remainingPreviewItems.length ? (
+                            <View style={styles.attachmentMoreBadge}>
+                              <Text style={styles.attachmentMoreBadgeText}>+{remainingPreviewItems.length} more</Text>
+                            </View>
+                          ) : null}
+                        </Pressable>
+                      ) : null}
+
+                      {fileAttachments.length ? (
+                        <View
+                          style={[
+                            styles.attachmentGroup,
+                            isMine ? styles.attachmentGroupMine : styles.attachmentGroupTheirs,
+                          ]}
+                        >
+                          {fileAttachments.map((attachment) => {
+                            const isExpired = attachment.status === 'expired';
+                            const isPreviewable =
+                              (attachment.isImage || attachment.isVideo) &&
+                              (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri);
+                            return (
+                              <Pressable
+                                key={`${message.id}-file-${attachment.id}`}
+                                style={[
+                                  styles.attachmentCard,
+                                  isPreviewable ? styles.attachmentImageCardCompact : styles.attachmentFileCard,
+                                ]}
+                                onPress={(event) => {
+                                  if (isExpired) return;
+                                  const siblings =
+                                    attachment.isImage || attachment.isVideo ? combinedPreviewable : [attachment];
+                                  handleAttachmentPress(event, attachment, siblings);
+                                }}
+                                disabled={isExpired}
+                              >
+                                {isPreviewable ? (
+                                  attachment.isVideo ? (
+                                    <View style={styles.attachmentVideoThumb}>
+                                      {resolveAttachmentUri(attachment) ? (
+                                        <Video
+                                          source={{ uri: resolveAttachmentUri(attachment)! }}
+                                          style={StyleSheet.absoluteFillObject}
+                                          resizeMode={ResizeMode.COVER}
+                                          useNativeControls
+                                          shouldPlay={false}
+                                        />
+                                      ) : null}
+                                      <View style={styles.attachmentVideoOverlay}>
+                                        <Ionicons name="play" size={18} color="#ffffff" />
+                                      </View>
+                                    </View>
+                                  ) : (
+                                    <Image
+                                      source={{
+                                        uri: attachment.previewUrl || attachment.publicViewUrl || attachment.localUri,
+                                      }}
+                                      style={styles.attachmentImage}
+                                      contentFit="cover"
+                                    />
+                                  )
+                                ) : (
+                                  <View style={styles.attachmentFileRow}>
+                                    <Ionicons
+                                      name="document-text-outline"
+                                      size={18}
+                                      color="rgba(255,255,255,0.9)"
+                                      style={styles.attachmentFileIcon}
+                                    />
+                                    <View style={styles.attachmentFileBody}>
+                                      <Text style={styles.attachmentFileName} numberOfLines={1}>
+                                        {attachment.name}
+                                      </Text>
+                                      <Text style={styles.attachmentFileMeta}>
+                                        {formatBytes(attachment.fileSize)}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                )}
+                                {isExpired ? (
+                                  <View style={styles.attachmentExpiredOverlay}>
+                                    <Text style={styles.attachmentExpiredText}>File or media expired</Text>
+                                  </View>
+                                ) : null}
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      ) : null}
+                    </>
+                  );
+                })()}
+                {message.content?.length ? (
+                  <Text style={[styles.messageText, message.isPlaceholder && styles.placeholderText]}>
+                    {textSegments.map((segment, idx) =>
+                      segment.type === 'link' ? (
+                        <Text
+                          key={`${message.id}-link-${idx}`}
+                          style={styles.linkText}
+                          onPress={() => onLinkPress?.(segment.value)}
+                        >
+                          {segment.value}
+                        </Text>
+                      ) : (
+                        <Text key={`${message.id}-text-${idx}`}>{segment.value}</Text>
+                      )
+                    )}
+                  </Text>
+                ) : null}
+                {embeddableLink && !embedFailed ? (
+                  <Pressable
+                    style={styles.embedPreview}
+                    onPress={() => onLinkPress?.(embeddableLink.url)}
+                  >
+                    {embeddableLink.type === 'image' ? (
+                      <Image
+                        source={{ uri: embeddableLink.url }}
+                        style={styles.embedImage}
+                        contentFit="cover"
+                        transition={300}
+                        onLoad={() => setEmbedLoaded(true)}
+                        onError={() => setEmbedFailed(true)}
+                      />
+                    ) : (
+                      <Video
+                        source={{ uri: embeddableLink.url }}
+                        style={styles.embedVideo}
+                        resizeMode={ResizeMode.COVER}
+                        useNativeControls
+                        shouldPlay={false}
+                        onLoadStart={() => setEmbedLoaded(false)}
+                        onLoad={() => setEmbedLoaded(true)}
+                        onError={() => setEmbedFailed(true)}
+                      />
+                    )}
+                    {!embedLoaded ? (
+                      <View style={styles.embedPlaceholder}>
+                        <ActivityIndicator size="small" color="#ffffff" />
+                        <Text style={styles.embedPlaceholderText}>Previewing…</Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                ) : null}
+                {reactions.length ? (
+                  <View style={styles.reactionRow}>
+                    {reactions.map((entry) => {
+                      const mine = currentUserId ? entry.userIds?.includes(currentUserId) : false;
+                      return (
+                        <Pressable
+                          key={`${message.id}-reaction-${entry.reaction}`}
+                          style={[styles.reactionPill, mine && styles.reactionPillMine]}
+                          onPress={() => onReact?.(message, entry.reaction)}
+                        >
+                          <Text style={styles.reactionText}>{entry.reaction}</Text>
+                          {entry.count > 1 ? (
+                            <Text style={styles.reactionCount}>{entry.count}</Text>
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
                   </View>
                 ) : null}
-              </Pressable>
-            ) : null}
-            {reactions.length ? (
-              <View style={styles.reactionRow}>
-                {reactions.map((entry) => {
-                  const mine = currentUserId ? entry.userIds?.includes(currentUserId) : false;
-                  return (
-                    <Pressable
-                      key={`${message.id}-reaction-${entry.reaction}`}
-                      style={[styles.reactionPill, mine && styles.reactionPillMine]}
-                      onPress={() => onReact?.(message, entry.reaction)}
-                    >
-                      <Text style={styles.reactionText}>{entry.reaction}</Text>
-                      {entry.count > 1 ? (
-                        <Text style={styles.reactionCount}>{entry.count}</Text>
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-            {message.isEdited && !message.isPlaceholder ? (
-              <Text style={styles.editedLabel}>Edited</Text>
-            ) : null}
+                {message.isEdited && !message.isPlaceholder ? (
+                  <Text style={styles.editedLabel}>Edited</Text>
+                ) : null}
               </>
             )}
           </View>
@@ -1368,14 +1368,12 @@ const ChatScreen: React.FC = () => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
-
   const wsService = useMemo(() => WebSocketService.getInstance(), []);
   const flatListRef = useRef<FlatList<ChatListItem>>(null);
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
   const composerLimitWarningRef = useRef(false);
   const initialScrollDoneRef = useRef(false);
-
   const receiverNameRef = useRef('Loading…');
   const otherUserIdRef = useRef<string | null>(null);
   const participantIdsRef = useRef<string[]>([]);
@@ -1419,7 +1417,7 @@ const ChatScreen: React.FC = () => {
       'Chat history incomplete',
       'Some messages could not be decrypted. Request a re-encrypt to recover history?',
       [
-        { text: 'Later', style: 'cancel', onPress: () => {} },
+        { text: 'Later', style: 'cancel', onPress: () => { } },
         {
           text: 'Request re-encrypt',
           onPress: () => requestReencrypt('missing_history_prompt'),
@@ -1904,11 +1902,11 @@ const ChatScreen: React.FC = () => {
 
       const normalizedParticipants: ChatParticipant[] = Array.isArray(nextChat.participants)
         ? (nextChat.participants as any[]).map((participant) => ({
-            id: participant.id?.toString?.() ?? String(participant.id),
-            username: participant.username || participant.email || 'Friend',
-            profile_picture: participant.profile_picture || null,
-            status: participant.status || null,
-          }))
+          id: participant.id?.toString?.() ?? String(participant.id),
+          username: participant.username || participant.email || 'Friend',
+          profile_picture: participant.profile_picture || null,
+          status: participant.status || null,
+        }))
         : [];
 
       if (normalizedParticipants.length) {
@@ -2169,7 +2167,7 @@ const ChatScreen: React.FC = () => {
   }, [messages, currentUserId]);
 
   const transformMessages = useCallback(
-  async (
+    async (
       rawMessages: any[],
       otherUserId: string | null,
       token: string | null,
@@ -2430,9 +2428,9 @@ const ChatScreen: React.FC = () => {
       const attachmentIds =
         Array.isArray(incoming.attachments) && incoming.attachments.length
           ? incoming.attachments
-              .map((entry) => entry?.id ?? entry?.attachmentId ?? entry)
-              .filter((id) => id != null)
-              .map((id) => String(id))
+            .map((entry) => entry?.id ?? entry?.attachmentId ?? entry)
+            .filter((id) => id != null)
+            .map((id) => String(id))
           : [];
       const normalizePreview = (value: string) => value.trim().slice(0, 300);
       const incomingPreview = normalizePreview(previewText);
@@ -2783,12 +2781,12 @@ const ChatScreen: React.FC = () => {
       const chatData = chatResponse.data.chat;
       const normalizedParticipants: ChatParticipant[] = Array.isArray(chatData.participants)
         ? (chatData.participants as any[]).map((participant) => ({
-            id: participant.id?.toString?.() ?? String(participant.id),
-            username: participant.username || participant.email || 'Friend',
-            profile_picture: participant.profile_picture || null,
-            status: participant.status || null,
-            badges: Array.isArray(participant.badges) ? participant.badges : [],
-          }))
+          id: participant.id?.toString?.() ?? String(participant.id),
+          username: participant.username || participant.email || 'Friend',
+          profile_picture: participant.profile_picture || null,
+          status: participant.status || null,
+          badges: Array.isArray(participant.badges) ? participant.badges : [],
+        }))
         : [];
 
       if (normalizedParticipants.length) {
@@ -2799,16 +2797,16 @@ const ChatScreen: React.FC = () => {
       const parsedUserIds: string[] = Array.isArray(chatData.userIds)
         ? chatData.userIds.map((pid: any) => pid?.toString?.() ?? String(pid))
         : (() => {
-            try {
-              const parsed = JSON.parse(chatData.users ?? '[]');
-              if (Array.isArray(parsed)) {
-                return parsed.map((pid: any) => pid?.toString?.() ?? String(pid));
-              }
-            } catch (err) {
-              console.warn('chat:parseUsers', 'Failed to parse chat user list', err);
+          try {
+            const parsed = JSON.parse(chatData.users ?? '[]');
+            if (Array.isArray(parsed)) {
+              return parsed.map((pid: any) => pid?.toString?.() ?? String(pid));
             }
-            return [];
-          })();
+          } catch (err) {
+            console.warn('chat:parseUsers', 'Failed to parse chat user list', err);
+          }
+          return [];
+        })();
 
       participantIdsRef.current = parsedUserIds;
 
@@ -2905,7 +2903,6 @@ const ChatScreen: React.FC = () => {
       if (response.success) {
         setIsBlocked(false);
         NotificationService.show('success', 'User unblocked');
-        // Reload messages
         loadChatDetails();
       } else {
         NotificationService.show('error', response.error || 'Failed to unblock user');
@@ -3087,7 +3084,6 @@ const ChatScreen: React.FC = () => {
         xhr.open('POST', uploadUrl);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.onload = () => {
-          // Ensure UI gets a final 100% update before resolving
           if (typeof options.onProgress === 'function') {
             options.onProgress(1);
           }
@@ -3097,10 +3093,10 @@ const ChatScreen: React.FC = () => {
               typeof parsed === 'object' && parsed !== null && 'success' in parsed
                 ? parsed
                 : {
-                    success: xhr.status >= 200 && xhr.status < 300,
-                    data: parsed,
-                    statusCode: xhr.status,
-                  };
+                  success: xhr.status >= 200 && xhr.status < 300,
+                  data: parsed,
+                  statusCode: xhr.status,
+                };
             resolve(normalized);
           } catch (err) {
             reject(err);
@@ -3285,11 +3281,11 @@ const ChatScreen: React.FC = () => {
           prev.map((attachment) =>
             attachment.id === tempId
               ? {
-                  ...mapped,
-                  uploadPending: false,
-                  uploadError: false,
-                  uploadProgress: 1,
-                }
+                ...mapped,
+                uploadPending: false,
+                uploadError: false,
+                uploadProgress: 1,
+              }
               : attachment
           )
         );
@@ -3308,7 +3304,7 @@ const ChatScreen: React.FC = () => {
     [chatId, updatePendingProgress, uploadAttachmentInChunks, uploadAttachmentWithProgress]
   );
 
-    const ensureAttachmentCapacity = useCallback(
+  const ensureAttachmentCapacity = useCallback(
     (files: UploadableAsset[]) => {
       const sanitized = files.filter((file) => file && file.uri);
       if (!sanitized.length) {
@@ -3521,11 +3517,11 @@ const ChatScreen: React.FC = () => {
           prev.map((item) =>
             item.id === tempId
               ? {
-                  ...mapped,
-                  uploadPending: false,
-                  uploadError: false,
-                  uploadProgress: 1,
-                }
+                ...mapped,
+                uploadPending: false,
+                uploadError: false,
+                uploadProgress: 1,
+              }
               : item
           )
         );
@@ -3819,8 +3815,6 @@ const ChatScreen: React.FC = () => {
         const userId = currentUserId;
         const existing = (message.reactions || []).find((entry) => entry.userIds?.includes(userId));
         const endpoint = `/chat/${chatId}/messages/${message.id}/reactions`;
-        const deleteReaction = async (emoji: string) =>
-          ApiService.delete(`${endpoint}?reaction=${encodeURIComponent(emoji)}`, token);
         const normalizeReactions = (list: Message['reactions']) =>
           Array.isArray(list) ? list : [];
 
@@ -3834,7 +3828,6 @@ const ChatScreen: React.FC = () => {
           );
         };
 
-        // Remove same reaction (toggle off)
         if (existing && existing.reaction === reaction) {
           const before = normalizeReactions(message.reactions);
           applyOptimistic((reactions) =>
@@ -3842,10 +3835,10 @@ const ChatScreen: React.FC = () => {
               .map((entry) =>
                 entry.reaction === reaction
                   ? {
-                      ...entry,
-                      userIds: (entry.userIds || []).filter((id) => id !== userId),
-                      count: Math.max((entry.count || 1) - 1, 0),
-                    }
+                    ...entry,
+                    userIds: (entry.userIds || []).filter((id) => id !== userId),
+                    count: Math.max((entry.count || 1) - 1, 0),
+                  }
                   : entry
               )
               .filter((entry) => (entry.userIds || []).length > 0)
@@ -3864,7 +3857,6 @@ const ChatScreen: React.FC = () => {
           return;
         }
 
-        // Switch reaction: clear old then add new
         if (existing && existing.reaction !== reaction) {
           const before = normalizeReactions(message.reactions);
           applyOptimistic((reactions) =>
@@ -3872,10 +3864,10 @@ const ChatScreen: React.FC = () => {
               .map((entry) =>
                 entry.reaction === existing.reaction
                   ? {
-                      ...entry,
-                      userIds: (entry.userIds || []).filter((id) => id !== userId),
-                      count: Math.max((entry.count || 1) - 1, 0),
-                    }
+                    ...entry,
+                    userIds: (entry.userIds || []).filter((id) => id !== userId),
+                    count: Math.max((entry.count || 1) - 1, 0),
+                  }
                   : entry
               )
               .filter((entry) => (entry.userIds || []).length > 0)
@@ -3891,7 +3883,6 @@ const ChatScreen: React.FC = () => {
           }
         }
 
-        // Add new reaction
         const beforeAdd = Array.isArray(message.reactions) ? message.reactions : [];
         applyOptimistic((reactions) => {
           const safe = normalizeReactions(reactions);
@@ -3900,10 +3891,10 @@ const ChatScreen: React.FC = () => {
             return safe.map((entry) =>
               entry.reaction === reaction
                 ? {
-                    ...entry,
-                    count: (entry.count || 0) + 1,
-                    userIds: Array.from(new Set([...(entry.userIds || []), userId])),
-                  }
+                  ...entry,
+                  count: (entry.count || 0) + 1,
+                  userIds: Array.from(new Set([...(entry.userIds || []), userId])),
+                }
                 : entry
             );
           }
@@ -4062,7 +4053,7 @@ const ChatScreen: React.FC = () => {
         });
       }
 
-      actions.push({ label: 'Cancel', onPress: () => {} });
+      actions.push({ label: 'Cancel', onPress: () => { } });
 
       const resolvedY = anchorY ?? windowHeight / 2;
       const resolvedX = anchorX ?? SCREEN_WIDTH / 2;
@@ -4144,7 +4135,7 @@ const ChatScreen: React.FC = () => {
     const normalizedReply = replyContext ? resolveReplyMetadata(replyContext) : undefined;
     const encodedPayload = encodeMessagePayload(trimmedMessage, normalizedReply);
     const temporaryId = `temp-${Date.now()}`;
-  const attachmentsSnapshot = pendingAttachments.filter((attachment) => !attachment.uploadPending);
+    const attachmentsSnapshot = pendingAttachments.filter((attachment) => !attachment.uploadPending);
     const attachmentIds = attachmentsSnapshot
       .map((attachment) => attachment.id)
       .filter((id) => /^\d+$/.test(id));
@@ -4384,11 +4375,11 @@ const ChatScreen: React.FC = () => {
           const viewerReceipt =
             status === 'seen' && payload.viewerId
               ? {
-                  userId: String(payload.viewerId),
-                  username: payload.viewerUsername || payload.viewerName || null,
-                  avatarUrl: payload.viewerAvatar || null,
-                  seenAt: statusTimestamp,
-                }
+                userId: String(payload.viewerId),
+                username: payload.viewerUsername || payload.viewerName || null,
+                avatarUrl: payload.viewerAvatar || null,
+                seenAt: statusTimestamp,
+              }
               : undefined;
           updateOutgoingStatus(
             status,
@@ -5205,7 +5196,6 @@ const ChatScreen: React.FC = () => {
     );
   }
 
-  // Blocked user screen - don't load messages, just show blocked state
   if (isBlocked && !isGroupChat) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -5347,243 +5337,243 @@ const ChatScreen: React.FC = () => {
           </Animated.View>
         </View>
       ) : null}
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <KeyboardAvoidingView
-            style={styles.keyboardAvoidingView}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={keyboardOffset}>
-                {isThreadLoading ? (
-                  <View style={styles.loadingState}>
-                    <ActivityIndicator size="large" color="#2C82FF" />
-                    <Text style={styles.loadingStateText}>Loading conversation…</Text>
-                  </View>
-                ) : (
-                  <Animated.View style={styles.messagesWrapper}>
-                    <FlatList
-                      ref={flatListRef}
-                      data={decoratedData}
-                      extraData={isRemoteTyping}
-                      keyExtractor={(item) => item.id}
-                      renderItem={renderChatItem}
-                      contentContainerStyle={styles.messageList}
-                      ListHeaderComponent={listHeader}
-                      keyboardShouldPersistTaps="always"
-                      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-                      onLayout={handleListLayout}
-                      onContentSizeChange={handleContentSizeChange}
-                      onScroll={handleScroll}
-                      scrollEventThrottle={16}
-                      onViewableItemsChanged={onViewableItemsChanged}
-                      viewabilityConfig={viewabilityConfigRef.current}
-                      refreshControl={
-                        <RefreshControl
-                          tintColor="#2C82FF"
-                          titleColor="#2C82FF"
-                          progressViewOffset={80}
-                          refreshing={isRefreshing}
-                          onRefresh={handleRefresh}
-                        />
-                      }
-                    />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={keyboardOffset}>
+          {isThreadLoading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color="#2C82FF" />
+              <Text style={styles.loadingStateText}>Loading conversation…</Text>
+            </View>
+          ) : (
+            <Animated.View style={styles.messagesWrapper}>
+              <FlatList
+                ref={flatListRef}
+                data={decoratedData}
+                extraData={isRemoteTyping}
+                keyExtractor={(item) => item.id}
+                renderItem={renderChatItem}
+                contentContainerStyle={styles.messageList}
+                ListHeaderComponent={listHeader}
+                keyboardShouldPersistTaps="always"
+                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                onLayout={handleListLayout}
+                onContentSizeChange={handleContentSizeChange}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfigRef.current}
+                refreshControl={
+                  <RefreshControl
+                    tintColor="#2C82FF"
+                    titleColor="#2C82FF"
+                    progressViewOffset={80}
+                    refreshing={isRefreshing}
+                    onRefresh={handleRefresh}
+                  />
+                }
+              />
 
 
-                    {showScrollToBottomButton && (
-                      <Pressable
-                        style={styles.scrollToBottomButton}
-                        onPress={() => scrollToBottom(true, true)}
+              {showScrollToBottomButton && (
+                <Pressable
+                  style={styles.scrollToBottomButton}
+                  onPress={() => scrollToBottom(true, true)}
 
 
-                        accessibilityRole="button"
+                  accessibilityRole="button"
 
 
-                      >
+                >
 
 
-                        <Ionicons name="arrow-down" size={24} color="#FFFFFF" />
+                  <Ionicons name="arrow-down" size={24} color="#FFFFFF" />
 
 
-                      </Pressable>
+                </Pressable>
 
 
-                    )}
+              )}
 
 
-                  </Animated.View>
+            </Animated.View>
 
 
-                )}
+          )}
 
 
-        
-        {replyContext && (
-          <View
-            style={[
-              styles.replyPreview,
-              replyContext.senderId === currentUserId
-                ? styles.replyPreviewMine
-                : styles.replyPreviewTheirs,
-            ]}
-          >
+
+          {replyContext && (
             <View
               style={[
-                styles.replyPreviewGlyph,
+                styles.replyPreview,
                 replyContext.senderId === currentUserId
-                  ? styles.replyPreviewGlyphMine
-                  : styles.replyPreviewGlyphTheirs,
+                  ? styles.replyPreviewMine
+                  : styles.replyPreviewTheirs,
               ]}
             >
-              <Ionicons
-                name="return-down-back-outline"
-                size={18}
-                color={replyContext.senderId === currentUserId ? '#0B1120' : '#FFFFFF'}
-              />
-            </View>
-            <View style={styles.replyPreviewBody}>
-              <Text style={styles.replyPreviewLabel}>{replyContext.senderLabel}</Text>
-              {replyContext.preview ? (
-                <Text style={styles.replyPreviewText} numberOfLines={2}>
-                  {replyContext.preview}
-                </Text>
-              ) : null}
-            </View>
-            <Pressable
-              style={styles.replyPreviewClose}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => setReplyContext(null)}
-              accessibilityLabel="Cancel reply"
-              accessibilityRole="button"
-            >
-              <Ionicons name="close" size={16} color="#ffffff" />
-            </Pressable>
-          </View>
-        )}
-        {pendingAttachments.length > 0 ? (
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.attachmentPreviewContent}
-            style={styles.attachmentPreviewRow}
-            data={pendingAttachments}
-            keyExtractor={(item) => `pending-${item.id}`}
-            snapToInterval={260}
-            decelerationRate="fast"
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => handlePendingAttachmentPress(item)}
-                style={styles.attachmentChip}
+              <View
+                style={[
+                  styles.replyPreviewGlyph,
+                  replyContext.senderId === currentUserId
+                    ? styles.replyPreviewGlyphMine
+                    : styles.replyPreviewGlyphTheirs,
+                ]}
               >
                 <Ionicons
-                  name={
-                    item.isVideo
-                      ? 'videocam-outline'
-                      : item.isImage
-                        ? 'image-outline'
-                        : 'document-text-outline'
-                  }
-                  size={16}
-                  color="#ffffff"
+                  name="return-down-back-outline"
+                  size={18}
+                  color={replyContext.senderId === currentUserId ? '#0B1120' : '#FFFFFF'}
                 />
-                <View style={styles.attachmentChipBody}>
-                  <Text style={styles.attachmentChipName} numberOfLines={1}>
-                    {item.name}
+              </View>
+              <View style={styles.replyPreviewBody}>
+                <Text style={styles.replyPreviewLabel}>{replyContext.senderLabel}</Text>
+                {replyContext.preview ? (
+                  <Text style={styles.replyPreviewText} numberOfLines={2}>
+                    {replyContext.preview}
                   </Text>
-                  {item.uploadPending ? (
-                    <View style={styles.attachmentChipProgress}>
-                      <View style={styles.progressTrack}>
-                        <View
-                          style={[
-                            styles.progressBar,
-                            { width: `${Math.round((item.uploadProgress || 0) * 100)}%` },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.attachmentChipMeta}>
-                        {Math.round((item.uploadProgress || 0) * 100)}%
-                      </Text>
-                    </View>
-                  ) : item.uploadError ? (
-                    <View style={styles.attachmentChipProgress}>
-                      <Text style={styles.attachmentChipMeta}>Upload failed</Text>
-                      <Pressable
-                        onPress={() => handleRetryAttachment(item)}
-                        style={styles.retryButton}
-                      >
-                        <Text style={styles.retryButtonText}>Retry</Text>
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <Text style={styles.attachmentChipMeta}>{formatBytes(item.fileSize)}</Text>
-                  )}
-                </View>
-                <Pressable
-                  onPress={() => handleRemoveAttachment(item.id)}
-                  style={styles.attachmentChipRemove}
-                  hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
-                >
-                  <Ionicons name="close" size={12} color="#ffffff" />
-                </Pressable>
+                ) : null}
+              </View>
+              <Pressable
+                style={styles.replyPreviewClose}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => setReplyContext(null)}
+                accessibilityLabel="Cancel reply"
+                accessibilityRole="button"
+              >
+                <Ionicons name="close" size={16} color="#ffffff" />
               </Pressable>
-            )}
-          />
-        ) : null}
-        {editingMessage ? (
-          <View style={styles.editingBanner}>
-            <Ionicons name="create-outline" size={14} color="#ffffff" style={styles.editingBannerIcon} />
-            <Text style={styles.editingBannerText}>Editing message</Text>
-            <Pressable onPress={handleCancelEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={14} color="#ffffff" />
+            </View>
+          )}
+          {pendingAttachments.length > 0 ? (
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.attachmentPreviewContent}
+              style={styles.attachmentPreviewRow}
+              data={pendingAttachments}
+              keyExtractor={(item) => `pending-${item.id}`}
+              snapToInterval={260}
+              decelerationRate="fast"
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => handlePendingAttachmentPress(item)}
+                  style={styles.attachmentChip}
+                >
+                  <Ionicons
+                    name={
+                      item.isVideo
+                        ? 'videocam-outline'
+                        : item.isImage
+                          ? 'image-outline'
+                          : 'document-text-outline'
+                    }
+                    size={16}
+                    color="#ffffff"
+                  />
+                  <View style={styles.attachmentChipBody}>
+                    <Text style={styles.attachmentChipName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    {item.uploadPending ? (
+                      <View style={styles.attachmentChipProgress}>
+                        <View style={styles.progressTrack}>
+                          <View
+                            style={[
+                              styles.progressBar,
+                              { width: `${Math.round((item.uploadProgress || 0) * 100)}%` },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.attachmentChipMeta}>
+                          {Math.round((item.uploadProgress || 0) * 100)}%
+                        </Text>
+                      </View>
+                    ) : item.uploadError ? (
+                      <View style={styles.attachmentChipProgress}>
+                        <Text style={styles.attachmentChipMeta}>Upload failed</Text>
+                        <Pressable
+                          onPress={() => handleRetryAttachment(item)}
+                          style={styles.retryButton}
+                        >
+                          <Text style={styles.retryButtonText}>Retry</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <Text style={styles.attachmentChipMeta}>{formatBytes(item.fileSize)}</Text>
+                    )}
+                  </View>
+                  <Pressable
+                    onPress={() => handleRemoveAttachment(item.id)}
+                    style={styles.attachmentChipRemove}
+                    hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                  >
+                    <Ionicons name="close" size={12} color="#ffffff" />
+                  </Pressable>
+                </Pressable>
+              )}
+            />
+          ) : null}
+          {editingMessage ? (
+            <View style={styles.editingBanner}>
+              <Ionicons name="create-outline" size={14} color="#ffffff" style={styles.editingBannerIcon} />
+              <Text style={styles.editingBannerText}>Editing message</Text>
+              <Pressable onPress={handleCancelEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={14} color="#ffffff" />
+              </Pressable>
+            </View>
+          ) : null}
+
+          <View style={[styles.inputContainer, { paddingBottom: composerBottomPadding }]}>
+            <Pressable
+              onPress={handleAttachmentTrigger}
+              style={[
+                styles.attachButton,
+                (attachmentPickerBusy || Boolean(editingMessage)) && styles.attachButtonDisabled,
+              ]}
+              disabled={attachmentPickerBusy || Boolean(editingMessage)}
+              accessibilityRole="button"
+            >
+              {attachmentPickerBusy ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Ionicons name="attach" size={18} color="#ffffff" />
+              )}
+            </Pressable>
+            <View style={styles.composerColumn}>
+              <TextInput
+                ref={composerRef}
+                style={styles.textInput}
+                value={newMessage}
+                onChangeText={handleComposerChange}
+                maxLength={MESSAGE_CHAR_LIMIT}
+                placeholder="Message…"
+                placeholderTextColor="rgba(255, 255, 255, 0.45)"
+                multiline
+              />
+            </View>
+
+            <Pressable
+              onPress={handleSendMessage}
+              style={({ pressed }) => [
+                styles.sendButton,
+                !sendButtonDisabled && styles.sendButtonActive,
+                pressed && !sendButtonDisabled && styles.sendButtonPressed,
+              ]}
+              disabled={sendButtonDisabled}
+              accessibilityRole="button"
+            >
+              {isSendingMessage ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Ionicons name="paper-plane" size={20} color="#ffffff" />
+              )}
             </Pressable>
           </View>
-        ) : null}
-
-        <View style={[styles.inputContainer, { paddingBottom: composerBottomPadding }]}>
-          <Pressable
-            onPress={handleAttachmentTrigger}
-            style={[
-              styles.attachButton,
-              (attachmentPickerBusy || Boolean(editingMessage)) && styles.attachButtonDisabled,
-            ]}
-            disabled={attachmentPickerBusy || Boolean(editingMessage)}
-            accessibilityRole="button"
-          >
-            {attachmentPickerBusy ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <Ionicons name="attach" size={18} color="#ffffff" />
-            )}
-          </Pressable>
-          <View style={styles.composerColumn}>
-            <TextInput
-              ref={composerRef}
-              style={styles.textInput}
-              value={newMessage}
-              onChangeText={handleComposerChange}
-              maxLength={MESSAGE_CHAR_LIMIT}
-              placeholder="Message…"
-              placeholderTextColor="rgba(255, 255, 255, 0.45)"
-              multiline
-            />
-          </View>
-
-          <Pressable
-            onPress={handleSendMessage}
-            style={({ pressed }) => [
-              styles.sendButton,
-              !sendButtonDisabled && styles.sendButtonActive,
-              pressed && !sendButtonDisabled && styles.sendButtonPressed,
-            ]}
-            disabled={sendButtonDisabled}
-            accessibilityRole="button"
-          >
-            {isSendingMessage ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <Ionicons name="paper-plane" size={20} color="#ffffff" />
-            )}
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-        </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
       <GroupMemberPicker
         visible={memberPickerVisible}
         title={memberPickerMode === 'create' ? 'Create a group chat' : 'Add members'}
