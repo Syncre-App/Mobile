@@ -3962,6 +3962,72 @@ const ChatScreen: React.FC = () => {
     );
   }, []);
 
+  const handleReportUser = useCallback(async () => {
+    const targetId = otherUserIdRef.current;
+    if (!targetId) {
+      NotificationService.show('error', 'Unable to identify user');
+      return;
+    }
+    Alert.alert(
+      'Report User',
+      'Are you sure you want to report this user for inappropriate behavior? This will be reviewed by our team.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await StorageService.getAuthToken();
+              if (!token) {
+                NotificationService.show('error', 'Missing authentication token');
+                return;
+              }
+              const response = await ApiService.post(
+                '/user/report',
+                {
+                  targetUserId: targetId,
+                  reason: 'Reported user from chat',
+                  context: `Chat ID: ${chatId}`,
+                },
+                token
+              );
+              if (response.success) {
+                NotificationService.show('success', 'Report submitted');
+              } else {
+                NotificationService.show('error', response.error || 'Failed to submit report');
+              }
+            } catch (error) {
+              console.error('Failed to report user:', error);
+              NotificationService.show('error', 'Failed to submit report');
+            }
+          },
+        },
+      ]
+    );
+  }, [chatId]);
+
+  const handleShowChatOptions = useCallback(() => {
+    const targetId = otherUserIdRef.current;
+    if (!targetId) return;
+
+    Alert.alert(
+      'Chat Options',
+      undefined,
+      [
+        {
+          text: 'Report User',
+          style: 'destructive',
+          onPress: handleReportUser,
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  }, [handleReportUser]);
+
   const handleCopyAttachmentLink = useCallback(async (attachment?: MessageAttachment | null) => {
     if (!attachment) {
       NotificationService.show('info', 'No attachment to copy');
@@ -5256,6 +5322,15 @@ const ChatScreen: React.FC = () => {
             accessibilityRole="button"
           >
             <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
+          </Pressable>
+        ) : !isGroupChat && otherUserIdRef.current ? (
+          <Pressable
+            onPress={handleShowChatOptions}
+            style={styles.headerActionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Chat options"
+          >
+            <Ionicons name="ellipsis-vertical" size={22} color="#FFFFFF" />
           </Pressable>
         ) : shouldShowAddButton ? (
           <Pressable

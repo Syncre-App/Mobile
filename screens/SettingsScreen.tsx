@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Alert,
+  Linking,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -196,6 +197,42 @@ export const SettingsScreen: React.FC = () => {
             handleClearCache,
             undefined,
             false
+          )}
+        </GlassCard>
+
+        {/* Safety & Reporting Section */}
+        <GlassCard width="100%" style={styles.section} variant="subtle">
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Safety & Reporting</Text>
+          </View>
+          
+          {renderSettingItem(
+            'ban',
+            'Blocked Users',
+            'Manage blocked users',
+            () => router.push('/settings/blocked-users'),
+            undefined,
+            false
+          )}
+
+          {renderSettingItem(
+            'flag',
+            'Report Content',
+            'Long-press any message to report',
+            () => {
+              Alert.alert(
+                'How to Report Content',
+                'To report objectionable content or users:\n\n• Long-press on any message in a chat\n• Select "Report" from the menu\n• Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
+                [{ text: 'Got it', style: 'default' }]
+              );
+            }
+          )}
+
+          {renderSettingItem(
+            'shield-checkmark',
+            'Community Guidelines',
+            'View our content policies',
+            () => Linking.openURL('https://syncre.app/terms')
           )}
         </GlassCard>
 
