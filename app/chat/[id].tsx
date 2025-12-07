@@ -5897,35 +5897,38 @@ const ChatScreen: React.FC = () => {
           >
             <View style={[styles.messageActionArrow, { left: messageActionArrowLeft, top: messageActionArrowTop }]} />
             <View style={styles.messageActionBubble}>
-              <Text style={styles.messageActionPreview} numberOfLines={2}>
-                {messageActionContext.message.content || 'Attachment'}
-              </Text>
-              <View style={styles.messageActionChipColumn}>
-                {messageActionContext.actions.map((action) => (
-                  <Pressable
-                    key={`${messageActionContext.message.id}-${action.label}`}
-                    style={({ pressed }) => [
-                      styles.messageActionRow,
-                      action.destructive && styles.messageActionRowDestructive,
-                      pressed && styles.messageActionRowPressed,
-                    ]}
-                    onPress={() => handleMessageActionSelect(action)}
-                  >
-                    <Ionicons
-                      name={resolveActionIcon(action.label) as any}
-                      size={16}
-                      color={action.destructive ? '#ffb4b4' : '#e7ecff'}
-                    />
-                    <Text
-                      style={[
-                        styles.messageActionRowText,
-                        action.destructive && styles.messageActionRowTextDestructive,
+              <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
+              <View style={styles.messageActionBubbleContent}>
+                <Text style={styles.messageActionPreview} numberOfLines={2}>
+                  {messageActionContext.message.content || 'Attachment'}
+                </Text>
+                <View style={styles.messageActionChipColumn}>
+                  {messageActionContext.actions.map((action) => (
+                    <Pressable
+                      key={`${messageActionContext.message.id}-${action.label}`}
+                      style={({ pressed }) => [
+                        styles.messageActionRow,
+                        action.destructive && styles.messageActionRowDestructive,
+                        pressed && styles.messageActionRowPressed,
                       ]}
+                      onPress={() => handleMessageActionSelect(action)}
                     >
-                      {action.label}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Ionicons
+                        name={resolveActionIcon(action.label) as any}
+                        size={16}
+                        color={action.destructive ? '#ffb4b4' : '#e7ecff'}
+                      />
+                      <Text
+                        style={[
+                          styles.messageActionRowText,
+                          action.destructive && styles.messageActionRowTextDestructive,
+                        ]}
+                      >
+                        {action.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
             </View>
           </Animated.View>
@@ -7122,16 +7125,19 @@ const styles = StyleSheet.create({
   messageActionBubble: {
     width: 280,
     borderRadius: 22,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(14, 16, 25, 0.88)',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     shadowColor: '#000',
-    shadowOpacity: 0.32,
+    shadowOpacity: 0.35,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
+    overflow: 'hidden',
+  },
+  messageActionBubbleContent: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   messageActionArrow: {
     position: 'absolute',
@@ -7139,7 +7145,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 3,
-    backgroundColor: 'rgba(12, 14, 22, 0.82)',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
     transform: [{ rotate: '45deg' }],
     borderLeftWidth: 0,
     borderTopWidth: 0,
@@ -7184,13 +7190,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    backgroundColor: 'rgba(20, 25, 40, 0.92)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 16,
+    elevation: 12,
   },
   attachmentSheetBlur: {
     flex: 1,
@@ -7199,6 +7204,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     gap: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
   },
   attachmentSheetTitle: {
     color: 'rgba(255,255,255,0.5)',

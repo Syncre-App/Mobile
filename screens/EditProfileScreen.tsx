@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   headerButton: {
     width: HEADER_BUTTON_DIMENSION,
     height: HEADER_BUTTON_DIMENSION,
-    borderRadius: radii.md,
+    borderRadius: radii.xxl,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',

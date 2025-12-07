@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeBlur, BlurPresets } from './NativeBlur';
 import { UserAvatar } from './UserAvatar';
 
 interface Friend {
@@ -182,7 +183,8 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
       <View style={styles.overlay}>
         <Pressable style={styles.backdropPress} onPress={onClose} />
         <View style={styles.sheet}>
-          <View style={styles.sheetContent}>
+          <NativeBlur {...BlurPresets.modal} style={styles.blurView}>
+            <View style={styles.sheetContent}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{title}</Text>
               <Pressable style={styles.closeButton} onPress={onClose} accessibilityRole="button">
@@ -255,8 +257,9 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
                 </Pressable>
               </View>
             </View>
-          </View>
+          </NativeBlur>
         </View>
+      </View>
     </Modal>
   );
 };
@@ -277,15 +280,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     maxHeight: '80%',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    backgroundColor: 'rgba(20, 25, 40, 0.92)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
-    elevation: 16,
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  blurView: {
+    overflow: 'hidden',
   },
   sheetContent: {
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20,
