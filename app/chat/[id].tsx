@@ -5956,7 +5956,7 @@ const ChatScreen: React.FC = () => {
               },
             ]}
           >
-            <GlassCard width="100%" padding={0} style={styles.attachmentSheet}>
+            <GlassCard width="100%" padding={0}>
               <View style={styles.attachmentSheetContent}>
                 <Text style={styles.attachmentSheetTitle}>ADD ATTACHMENT</Text>
                 <Pressable
@@ -7165,9 +7165,6 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     bottom: 24,
-  },
-  attachmentSheet: {
-    // GlassCard handles styling
   },
   attachmentSheetContent: {
     paddingVertical: 16,

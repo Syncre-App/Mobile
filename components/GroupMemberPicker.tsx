@@ -267,7 +267,7 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.0)',
     justifyContent: 'flex-end',
     paddingBottom: 24,
     paddingHorizontal: 16,
@@ -280,7 +280,6 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
   },
   sheetContent: {
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20,
