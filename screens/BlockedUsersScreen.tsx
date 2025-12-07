@@ -5,18 +5,18 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
-import { ApiService, API_BASE_URL } from '../services/ApiService';
+import { ApiService } from '../services/ApiService';
 import { AppBackground } from '../components/AppBackground';
+import { UserAvatar } from '../components/UserAvatar';
 import { palette, radii, spacing } from '../theme/designSystem';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
@@ -45,8 +45,8 @@ export const BlockedUsersScreen: React.FC = () => {
       if (!token) return;
       
       const response = await ApiService.get('/user/blocked', token);
-      if (response.success && response.blockedUsers) {
-        setBlockedUsers(response.blockedUsers);
+      if (response.success && response.data?.blockedUsers) {
+        setBlockedUsers(response.data.blockedUsers);
       }
     } catch (error) {
       console.error('Error loading blocked users:', error);
@@ -115,20 +115,14 @@ export const BlockedUsersScreen: React.FC = () => {
   };
 
   const renderBlockedUser = ({ item }: { item: BlockedUser }) => {
-    const profileUri = item.profile_picture
-      ? `${API_BASE_URL}${item.profile_picture}`
-      : null;
-
     return (
       <View style={styles.userItem}>
         <View style={styles.userInfo}>
-          {profileUri ? (
-            <Image source={{ uri: profileUri }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Ionicons name="person" size={24} color={palette.textMuted} />
-            </View>
-          )}
+          <UserAvatar
+            uri={item.profile_picture}
+            name={item.display_name || item.username}
+            size={48}
+          />
           <View style={styles.userTexts}>
             <Text style={styles.displayName}>
               {item.display_name || item.username}
