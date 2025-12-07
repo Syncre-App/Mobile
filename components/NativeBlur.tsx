@@ -10,13 +10,6 @@ interface NativeBlurProps {
   children?: React.ReactNode;
 }
 
-/**
- * Cross-platform blur component that uses native iOS blur on iOS
- * and falls back to expo-blur on Android.
- * 
- * iOS: Uses @react-native-community/blur for true native UIVisualEffectView
- * Android: Uses expo-blur which renders a blurred snapshot
- */
 export const NativeBlur: React.FC<NativeBlurProps> = ({
   intensity = 50,
   tint = 'dark',

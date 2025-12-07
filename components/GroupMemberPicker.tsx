@@ -267,7 +267,7 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.0)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
     paddingBottom: 24,
     paddingHorizontal: 16,
