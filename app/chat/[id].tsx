@@ -5954,27 +5954,31 @@ const ChatScreen: React.FC = () => {
               },
             ]}
           >
-            <Text style={styles.attachmentSheetTitle}>Add attachment</Text>
-            <Pressable
-              style={styles.attachmentSheetButton}
-              onPress={handlePickPhoto}
-            >
-              <Ionicons name="images-outline" size={18} color="#ffffff" />
-              <View style={styles.attachmentSheetLabelColumn}>
-                <Text style={styles.attachmentSheetButtonLabel}>Photos & Videos</Text>
-                <Text style={styles.attachmentSheetButtonHint}>Camera roll</Text>
+            <NativeBlur intensity={60} tint="dark" style={styles.attachmentSheetBlur}>
+              <View style={styles.attachmentSheetContent}>
+                <Text style={styles.attachmentSheetTitle}>ADD ATTACHMENT</Text>
+                <Pressable
+                  style={styles.attachmentSheetButton}
+                  onPress={handlePickPhoto}
+                >
+                  <Ionicons name="images-outline" size={20} color="#ffffff" />
+                  <View style={styles.attachmentSheetLabelColumn}>
+                    <Text style={styles.attachmentSheetButtonLabel}>Photos & Videos</Text>
+                    <Text style={styles.attachmentSheetButtonHint}>Camera roll</Text>
+                  </View>
+                </Pressable>
+                <Pressable
+                  style={styles.attachmentSheetButton}
+                  onPress={handlePickDocument}
+                >
+                  <Ionicons name="document-text-outline" size={20} color="#ffffff" />
+                  <View style={styles.attachmentSheetLabelColumn}>
+                    <Text style={styles.attachmentSheetButtonLabel}>Files</Text>
+                    <Text style={styles.attachmentSheetButtonHint}>Browse documents</Text>
+                  </View>
+                </Pressable>
               </View>
-            </Pressable>
-            <Pressable
-              style={styles.attachmentSheetButton}
-              onPress={handlePickDocument}
-            >
-              <Ionicons name="document-text-outline" size={18} color="#ffffff" />
-              <View style={styles.attachmentSheetLabelColumn}>
-                <Text style={styles.attachmentSheetButtonLabel}>Files</Text>
-                <Text style={styles.attachmentSheetButtonHint}>Browse documents</Text>
-              </View>
-            </Pressable>
+            </NativeBlur>
           </Animated.View>
         </Animated.View>
       ) : null}
@@ -7178,10 +7182,22 @@ const styles = StyleSheet.create({
     right: 16,
     bottom: 24,
     borderRadius: 20,
-    backgroundColor: '#0B1023',
-    paddingVertical: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  attachmentSheetBlur: {
+    flex: 1,
+  },
+  attachmentSheetContent: {
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    gap: 8,
+    gap: 4,
   },
   attachmentSheetTitle: {
     color: 'rgba(255,255,255,0.6)',

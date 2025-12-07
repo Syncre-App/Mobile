@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserAvatar } from './UserAvatar';
+import { NativeBlur } from './NativeBlur';
 
 interface Friend {
   id: string;
@@ -181,77 +182,81 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            <Pressable style={styles.closeButton} onPress={onClose} accessibilityRole="button">
-              <Ionicons name="close" size={18} color="#ffffff" />
-            </Pressable>
-          </View>
+          <NativeBlur intensity={60} tint="dark" style={styles.sheetBlur}>
+            <View style={styles.sheetContent}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>{title}</Text>
+                <Pressable style={styles.closeButton} onPress={onClose} accessibilityRole="button">
+                  <Ionicons name="close" size={18} color="#ffffff" />
+                </Pressable>
+              </View>
 
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search friends"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
-            value={search}
-            onChangeText={setSearch}
-          />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search friends"
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                value={search}
+                onChangeText={setSearch}
+              />
 
-          {lockedParticipants.length ? (
-            <View style={styles.lockedSection}>
-              <Text style={styles.lockedLabel}>Already included</Text>
-              {lockedParticipants.map((participant) => (
-                <View key={participant.id} style={styles.lockedChip}>
-                  <UserAvatar
-                    uri={participant.profile_picture || undefined}
-                    name={participant.username}
-                    size={28}
-                    style={styles.lockedAvatar}
-                  />
-                  <Text style={styles.lockedName}>{participant.username}</Text>
+              {lockedParticipants.length ? (
+                <View style={styles.lockedSection}>
+                  <Text style={styles.lockedLabel}>Already included</Text>
+                  {lockedParticipants.map((participant) => (
+                    <View key={participant.id} style={styles.lockedChip}>
+                      <UserAvatar
+                        uri={participant.profile_picture || undefined}
+                        name={participant.username}
+                        size={28}
+                        style={styles.lockedAvatar}
+                      />
+                      <Text style={styles.lockedName}>{participant.username}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          ) : null}
+              ) : null}
 
-          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+              {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-          {isLoading ? (
-            <View style={styles.loadingState}>
-              <ActivityIndicator color="#FFFFFF" />
-            </View>
-          ) : (
-            <FlatList
-              data={filteredFriends}
-              keyExtractor={(item) => item.id?.toString?.() ?? String(item.id)}
-              renderItem={renderFriend}
-              contentContainerStyle={styles.friendList}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>No friends available for this action.</Text>
-              }
-            />
-          )}
-
-          <View style={styles.sheetFooter}>
-            <Text style={styles.counterText}>
-              {totalWithOwner}/{maxTotal} people
-            </Text>
-            <Pressable
-              style={[
-                styles.confirmButton,
-                (!minSatisfied || isSubmitting) && styles.confirmButtonDisabled,
-              ]}
-              disabled={!minSatisfied || isSubmitting}
-              onPress={handleConfirm}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#0B1630" />
+              {isLoading ? (
+                <View style={styles.loadingState}>
+                  <ActivityIndicator color="#FFFFFF" />
+                </View>
               ) : (
-                <Text style={styles.confirmButtonText}>
-                  {mode === 'create' ? 'Continue' : 'Add'}
-                </Text>
+                <FlatList
+                  data={filteredFriends}
+                  keyExtractor={(item) => item.id?.toString?.() ?? String(item.id)}
+                  renderItem={renderFriend}
+                  contentContainerStyle={styles.friendList}
+                  ListEmptyComponent={
+                    <Text style={styles.emptyText}>No friends available for this action.</Text>
+                  }
+                />
               )}
-            </Pressable>
-          </View>
+
+              <View style={styles.sheetFooter}>
+                <Text style={styles.counterText}>
+                  {totalWithOwner}/{maxTotal} people
+                </Text>
+                <Pressable
+                  style={[
+                    styles.confirmButton,
+                    (!minSatisfied || isSubmitting) && styles.confirmButtonDisabled,
+                  ]}
+                  disabled={!minSatisfied || isSubmitting}
+                  onPress={handleConfirm}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#0B1630" />
+                  ) : (
+                    <Text style={styles.confirmButtonText}>
+                      {mode === 'create' ? 'Continue' : 'Add'}
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </NativeBlur>
         </View>
       </View>
     </Modal>
@@ -265,13 +270,23 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#060A16',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    overflow: 'hidden',
+    maxHeight: '85%',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+  },
+  sheetBlur: {
+    flex: 1,
+  },
+  sheetContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 24,
-    maxHeight: '85%',
+    flex: 1,
   },
   sheetHeader: {
     flexDirection: 'row',

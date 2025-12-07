@@ -7,6 +7,7 @@ import {
   DeviceEventEmitter,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UserAvatar } from '../../../components/UserAvatar';
 import { GroupMemberPicker } from '../../../components/GroupMemberPicker';
+import { AppBackground } from '../../../components/AppBackground';
 import { ChatService, UploadableAsset } from '../../../services/ChatService';
 import { ApiService } from '../../../services/ApiService';
 import { NotificationService } from '../../../services/NotificationService';
@@ -282,9 +284,13 @@ export default function GroupEditScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <AppBackground />
       <ScrollView contentContainerStyle={styles.content}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={20} color="#ffffff" />
+          <View style={styles.backButtonIcon}>
+            <Ionicons name="chevron-back" size={20} color="#ffffff" />
+          </View>
           <Text style={styles.backText}>Back</Text>
         </Pressable>
 
@@ -395,11 +401,21 @@ const styles = StyleSheet.create({
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 16,
+  },
+  backButtonIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backText: {
     color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
   },
   avatarSection: {
     alignItems: 'center',
