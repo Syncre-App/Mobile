@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassCard } from './GlassCard';
+import { NativeBlur, BlurPresets } from './NativeBlur';
 import { UserAvatar } from './UserAvatar';
 
 interface Friend {
@@ -181,8 +181,9 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Pressable style={styles.backdropPress} onPress={onClose} />
-        <GlassCard width="100%" style={styles.sheet} padding={0}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+        <View style={styles.sheetContainer}>
+          <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
           <View style={styles.sheetContent}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{title}</Text>
@@ -257,7 +258,7 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
               </Pressable>
             </View>
           </View>
-        </GlassCard>
+        </View>
       </View>
     </Modal>
   );
@@ -271,13 +272,15 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingHorizontal: 16,
   },
-  backdropPress: {
-    flex: 1,
-  },
-  sheet: {
+  sheetContainer: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     maxHeight: '80%',
   },
   sheetContent: {
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20,
