@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserAvatar } from './UserAvatar';
-import { NativeBlur } from './NativeBlur';
 
 interface Friend {
   id: string;
@@ -181,15 +180,15 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
+        <Pressable style={styles.backdropPress} onPress={onClose} />
         <View style={styles.sheet}>
-          <NativeBlur intensity={60} tint="dark" style={styles.sheetBlur}>
-            <View style={styles.sheetContent}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>{title}</Text>
-                <Pressable style={styles.closeButton} onPress={onClose} accessibilityRole="button">
-                  <Ionicons name="close" size={18} color="#ffffff" />
-                </Pressable>
-              </View>
+          <View style={styles.sheetContent}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{title}</Text>
+              <Pressable style={styles.closeButton} onPress={onClose} accessibilityRole="button">
+                <Ionicons name="close" size={18} color="#ffffff" />
+              </Pressable>
+            </View>
 
               <TextInput
                 style={styles.searchInput}
@@ -256,9 +255,8 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
                 </Pressable>
               </View>
             </View>
-          </NativeBlur>
+          </View>
         </View>
-      </View>
     </Modal>
   );
 };
@@ -269,6 +267,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
+  backdropPress: {
+    flex: 1,
+  },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -277,16 +278,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderBottomWidth: 0,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-  },
-  sheetBlur: {
-    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
   },
   sheetContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 24,
-    flex: 1,
   },
   sheetHeader: {
     flexDirection: 'row',

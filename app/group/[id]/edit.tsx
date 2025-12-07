@@ -289,9 +289,8 @@ export default function GroupEditScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <View style={styles.backButtonIcon}>
-            <Ionicons name="chevron-back" size={20} color="#ffffff" />
+            <Ionicons name="chevron-back" size={22} color="#ffffff" />
           </View>
-          <Text style={styles.backText}>Back</Text>
         </Pressable>
 
         {isLoading ? (
@@ -401,21 +400,15 @@ const styles = StyleSheet.create({
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
     marginBottom: 16,
   },
   backButtonIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '500',
   },
   avatarSection: {
     alignItems: 'center',
