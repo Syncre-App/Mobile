@@ -13,7 +13,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassCard } from '../components/GlassCard';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { ApiService, API_BASE_URL } from '../services/ApiService';
@@ -216,7 +215,7 @@ const styles = StyleSheet.create({
     width: HEADER_BUTTON_DIMENSION,
     height: HEADER_BUTTON_DIMENSION,
     padding: spacing.sm,
-    borderRadius: radii.md,
+    borderRadius: radii.xxl,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',

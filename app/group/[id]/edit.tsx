@@ -286,12 +286,16 @@ export default function GroupEditScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <AppBackground />
-      <ScrollView contentContainerStyle={styles.content}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <View style={styles.backButtonIcon}>
-            <Ionicons name="chevron-back" size={22} color="#ffffff" />
-          </View>
+      
+      <View style={styles.header}>
+        <Pressable style={styles.headerButton} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color="#ffffff" />
         </Pressable>
+        <Text style={styles.headerTitle}>Edit Group</Text>
+        <View style={styles.headerButtonPlaceholder} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
 
         {isLoading ? (
           <ActivityIndicator color="#ffffff" />
@@ -393,22 +397,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#03040A',
   },
-  content: {
-    padding: 24,
-    gap: 16,
-  },
-  backButton: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  backButtonIcon: {
+  headerButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerButtonPlaceholder: {
+    width: 44,
+    height: 44,
+  },
+  headerTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  content: {
+    padding: 24,
+    gap: 16,
   },
   avatarSection: {
     alignItems: 'center',

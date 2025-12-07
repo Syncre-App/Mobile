@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     width: HEADER_BUTTON_DIMENSION,
     height: HEADER_BUTTON_DIMENSION,
     padding: spacing.sm,
-    borderRadius: radii.md,
+    borderRadius: radii.xxl,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
