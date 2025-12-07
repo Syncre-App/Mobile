@@ -1053,17 +1053,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <Text style={styles.senderMetaName} numberOfLines={1}>
                   {message.senderName || 'Member'}
                 </Text>
-                {badgeKeys.length ? (
-                  <View style={styles.badgeRow}>
-                    {badgeKeys.map((badge, idx) => (
-                      <BadgeIcon
-                        key={`${message.id}-${badge}-${idx}`}
-                        type={badge as any}
-                        size={14}
-                      />
-                    ))}
-                  </View>
-                ) : null}
               </View>
             </View>
           ) : null}
