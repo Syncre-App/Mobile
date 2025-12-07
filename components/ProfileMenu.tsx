@@ -99,7 +99,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
                 {/* Menu Items */}
                 <View style={styles.separator} />
-                <Link href="/edit-profile" asChild>
+                <Link href="/settings/edit-profile" asChild>
                   <TouchableOpacity
                     style={styles.menuItem}
                     activeOpacity={0.7}
