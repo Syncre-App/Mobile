@@ -24,8 +24,6 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
   children,
 }) => {
   if (Platform.OS === 'ios') {
-    // Map tint to native iOS blur types
-    // iOS 26+ supports enhanced blur materials
     const blurType = tint === 'light' 
       ? 'light' 
       : tint === 'dark' 
@@ -37,7 +35,7 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
         <NativeBlurView
           style={StyleSheet.absoluteFillObject}
           blurType={blurType}
-          blurAmount={Math.min(intensity / 5, 25)} // Native blur uses 0-25 range
+          blurAmount={Math.min(intensity / 5, 25)}
           reducedTransparencyFallbackColor="rgba(15, 23, 42, 0.9)"
         />
         <View style={styles.content}>
@@ -47,7 +45,6 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
     );
   }
 
-  // Android fallback using expo-blur
   return (
     <ExpoBlurView
       intensity={intensity}
@@ -59,19 +56,11 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
   );
 };
 
-/**
- * Preset blur configurations for common UI patterns
- */
 export const BlurPresets = {
-  /** Light glass effect for cards */
   card: { intensity: 40, tint: 'dark' as const },
-  /** Medium glass effect for modals */
   modal: { intensity: 60, tint: 'dark' as const },
-  /** Heavy glass effect for overlays */
   overlay: { intensity: 80, tint: 'dark' as const },
-  /** Subtle glass for navigation bars */
   navigation: { intensity: 50, tint: 'dark' as const },
-  /** Toast notifications */
   toast: { intensity: 55, tint: 'dark' as const },
 } as const;
 
