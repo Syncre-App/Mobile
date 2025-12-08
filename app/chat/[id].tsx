@@ -4,6 +4,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { NativeBlur, BlurPresets } from '../../components/NativeBlur';
 import { GlassCard } from '../../components/GlassCard';
 import * as Haptics from 'expo-haptics';
@@ -898,12 +899,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       isDeletedMessage
         ? []
         :
-      attachments.filter(
-        (attachment) =>
-          attachment.isImage &&
-          attachment.status !== 'expired' &&
-          (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
-      ),
+        attachments.filter(
+          (attachment) =>
+            attachment.isImage &&
+            attachment.status !== 'expired' &&
+            (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
+        ),
     [attachments, isDeletedMessage]
   );
   const previewableVideoAttachments = useMemo(
@@ -911,12 +912,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       isDeletedMessage
         ? []
         :
-      attachments.filter(
-        (attachment) =>
-          attachment.isVideo &&
-          attachment.status !== 'expired' &&
-          (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
-      ),
+        attachments.filter(
+          (attachment) =>
+            attachment.isVideo &&
+            attachment.status !== 'expired' &&
+            (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
+        ),
     [attachments, isDeletedMessage]
   );
   const combinedPreviewable = useMemo(
@@ -1521,6 +1522,12 @@ const ChatScreen: React.FC = () => {
   const currentPreviewAttachment = previewContext
     ? previewContext.attachments[Math.min(previewIndex, previewContext.attachments.length - 1)]
     : null;
+  const previewPositionLabel = useMemo(() => {
+    if (!previewContext?.attachments?.length) {
+      return null;
+    }
+    return `${previewIndex + 1}/${previewContext.attachments.length}`;
+  }, [previewContext, previewIndex]);
   const togglePreviewChrome = useCallback(() => {
     const next = !previewChromeVisible;
     setPreviewChromeVisible(next);
@@ -1761,22 +1768,6 @@ const ChatScreen: React.FC = () => {
     const left = Math.max(12, Math.min(rawLeft, SCREEN_WIDTH - ACTION_CARD_WIDTH - 12));
     return { top, left };
   }, [ACTION_CARD_HEIGHT, ACTION_CARD_WIDTH, SCREEN_WIDTH, messageActionContext, windowHeight]);
-
-  const messageActionArrowLeft = useMemo(() => {
-    if (!messageActionContext) {
-      return ACTION_CARD_WIDTH / 2 - 6;
-    }
-    const offset = messageActionContext.anchorX - messageActionAnchor.left - 6;
-    return Math.max(14, Math.min(offset, ACTION_CARD_WIDTH - 26));
-  }, [ACTION_CARD_WIDTH, messageActionAnchor.left, messageActionContext]);
-
-  const messageActionArrowTop = useMemo(() => {
-    if (!messageActionContext) {
-      return -6;
-    }
-    const placeAbove = messageActionContext.above ?? messageActionContext.anchorY > windowHeight * 0.55;
-    return placeAbove ? ACTION_CARD_HEIGHT - 6 : -6;
-  }, [ACTION_CARD_HEIGHT, messageActionContext, windowHeight]);
 
   const dismissMessageActions = useCallback(
     (onFinished?: () => void) => {
@@ -5817,6 +5808,26 @@ const ChatScreen: React.FC = () => {
         onRequestClose={handleClosePreview}
       >
         <View style={styles.attachmentModalOverlay} {...previewPanResponder.panHandlers}>
+          {currentPreviewAttachment?.previewUrl || currentPreviewAttachment?.publicViewUrl || currentPreviewAttachment?.localUri ? (
+            <Image
+              source={{
+                uri:
+                  currentPreviewAttachment.previewUrl ||
+                  currentPreviewAttachment.publicViewUrl ||
+                  currentPreviewAttachment.localUri,
+              }}
+              style={styles.attachmentModalBackdrop}
+              blurRadius={36}
+              contentFit="cover"
+            />
+          ) : null}
+          <LinearGradient
+            colors={['rgba(3,4,10,0.92)', 'rgba(3,4,10,0.55)', 'rgba(3,4,10,0.9)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            pointerEvents="none"
+            style={styles.attachmentModalBackdropTint}
+          />
           <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
           <Animated.View
             style={[
@@ -5837,22 +5848,33 @@ const ChatScreen: React.FC = () => {
             ]}
             pointerEvents={previewChromeVisible ? 'auto' : 'none'}
           >
-            <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
-              <Ionicons name="chevron-down" size={22} color="#ffffff" />
-            </Pressable>
-            <View style={styles.attachmentModalTitleWrap}>
-              <Text style={styles.attachmentModalTitle} numberOfLines={1}>
-                {currentPreviewAttachment?.name || 'Attachment'}
-              </Text>
-              {currentPreviewAttachment?.fileSize ? (
-                <Text style={styles.attachmentModalFileMeta}>
-                  {formatBytes(currentPreviewAttachment.fileSize)}
+            <NativeBlur {...BlurPresets.navigation} style={StyleSheet.absoluteFillObject} />
+            <View style={styles.attachmentModalTopRow}>
+              <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
+                <Ionicons name="arrow-back" size={22} color="#ffffff" />
+              </Pressable>
+              <View style={styles.attachmentModalTitleWrap}>
+                <Text style={styles.attachmentModalTitle} numberOfLines={1}>
+                  {currentPreviewAttachment?.name || 'Attachment'}
                 </Text>
-              ) : null}
+                <View style={styles.attachmentModalTitleMeta}>
+                  {currentPreviewAttachment?.fileSize ? (
+                    <Text style={styles.attachmentModalFileMeta} numberOfLines={1}>
+                      {formatBytes(currentPreviewAttachment.fileSize)}
+                      {currentPreviewAttachment?.mimeType ? ` • ${currentPreviewAttachment.mimeType}` : ''}
+                    </Text>
+                  ) : null}
+                  {previewPositionLabel ? (
+                    <View style={styles.attachmentModalBadge}>
+                      <Text style={styles.attachmentModalBadgeText}>{previewPositionLabel}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+              <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
+                <Ionicons name="close" size={18} color="#ffffff" />
+              </Pressable>
             </View>
-            <Pressable onPress={handleClosePreview} style={styles.attachmentModalIconButton}>
-              <Ionicons name="close" size={18} color="#ffffff" />
-            </Pressable>
           </Animated.View>
           <FlatList
             style={styles.attachmentModalCarousel}
@@ -5939,29 +5961,39 @@ const ChatScreen: React.FC = () => {
           >
             <NativeBlur {...BlurPresets.navigation} style={StyleSheet.absoluteFillObject} />
             <View style={styles.attachmentModalFileMetaRow}>
-              <Text style={styles.attachmentModalFileName} numberOfLines={1}>
-                {currentPreviewAttachment?.name || 'Attachment'}
-              </Text>
-              {currentPreviewAttachment?.fileSize ? (
-                <Text style={styles.attachmentModalFileMeta}>
-                  {formatBytes(currentPreviewAttachment.fileSize)}
+              <View style={styles.attachmentModalMetaColumn}>
+                <Text style={styles.attachmentModalFileName} numberOfLines={1}>
+                  {currentPreviewAttachment?.name || 'Attachment'}
                 </Text>
+                <Text style={styles.attachmentModalFileMeta} numberOfLines={1}>
+                  {currentPreviewAttachment?.fileSize
+                    ? formatBytes(currentPreviewAttachment.fileSize)
+                    : 'Tap image to toggle chrome'}
+                  {currentPreviewAttachment?.mimeType ? ` • ${currentPreviewAttachment.mimeType}` : ''}
+                </Text>
+              </View>
+              {previewPositionLabel ? (
+                <View style={[styles.attachmentModalBadge, styles.attachmentModalBadgeMuted]}>
+                  <Text style={styles.attachmentModalBadgeText}>{previewPositionLabel}</Text>
+                </View>
               ) : null}
             </View>
             <View style={styles.attachmentModalActions}>
               <Pressable
-                style={styles.attachmentModalButton}
+                style={[styles.attachmentModalButton, styles.attachmentModalButtonPrimary]}
                 onPress={() => handleDownloadAttachment(currentPreviewAttachment)}
               >
                 <Ionicons name="download-outline" size={18} color="#03040A" />
                 <Text style={styles.attachmentModalButtonText}>Download</Text>
               </Pressable>
               <Pressable
-                style={styles.attachmentModalButton}
+                style={[styles.attachmentModalButton, styles.attachmentModalButtonGhost]}
                 onPress={() => handleShareAttachment(currentPreviewAttachment)}
               >
-                <Ionicons name="share-outline" size={18} color="#03040A" />
-                <Text style={styles.attachmentModalButtonText}>Share</Text>
+                <Ionicons name="share-outline" size={18} color="#ffffff" />
+                <Text style={[styles.attachmentModalButtonText, styles.attachmentModalButtonTextGhost]}>
+                  Share
+                </Text>
               </Pressable>
             </View>
           </Animated.View>
@@ -7121,6 +7153,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  attachmentModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.35,
+  },
+  attachmentModalBackdropTint: {
+    ...StyleSheet.absoluteFillObject,
   },
   attachmentModalTopBar: {
     paddingHorizontal: 16,
@@ -7128,6 +7168,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+  },
+  attachmentModalTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    marginBottom: 12,
   },
   attachmentModalIconButton: {
     width: 38,
@@ -7141,12 +7188,35 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     gap: 4,
+    justifyContent: 'center',
   },
   attachmentModalTitle: {
     color: '#ffffff',
     fontSize: 17,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  attachmentModalTitleMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  attachmentModalBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  attachmentModalBadgeMuted: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  attachmentModalBadgeText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 12,
   },
   attachmentModalCarousel: {
     flex: 1,
@@ -7174,6 +7244,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     columnGap: 12,
+    marginBottom: -12,
   },
   attachmentPreviewSlide: {
     width: Dimensions.get('window').width,
@@ -7212,15 +7283,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  attachmentModalMetaColumn: {
+    flex: 1,
+    marginRight: 12,
+  },
   attachmentModalButton: {
     flex: 1,
     borderRadius: 18,
-    backgroundColor: '#ffffff',
-    paddingVertical: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingVertical: 12,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  attachmentModalButtonPrimary: {
+    backgroundColor: '#ffffff',
+    borderColor: '#ffffff',
+  },
+  attachmentModalButtonGhost: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  attachmentModalButtonTextGhost: {
+    color: '#ffffff',
   },
   attachmentModalButtonText: {
     color: '#03040A',
