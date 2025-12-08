@@ -179,6 +179,37 @@ const resolveAttachmentUri = (attachment: MessageAttachment): string | undefined
   attachment.downloadUrl ||
   attachment.localUri;
 
+const resolveFileIcon = (
+  attachment: MessageAttachment
+): { name: keyof typeof Ionicons.glyphMap; color: string; badgeColor: string } => {
+  const ext = (attachment.name || attachment.mimeType || '')
+    .split('.')
+    .pop()
+    ?.toLowerCase()
+    ?.trim();
+  const mime = (attachment.mimeType || '').toLowerCase();
+
+  const isAudio = mime.startsWith('audio/') || ['mp3', 'wav', 'aac', 'flac', 'ogg'].includes(ext || '');
+  const isPdf = mime.includes('pdf') || ext === 'pdf';
+  const isDoc = ['doc', 'docx', 'rtf', 'txt', 'md'].includes(ext || '');
+  const isSheet = ['xls', 'xlsx', 'csv', 'tsv', 'numbers'].includes(ext || '') || mime.includes('spreadsheet');
+  const isSlides = ['ppt', 'pptx', 'key'].includes(ext || '') || mime.includes('presentation');
+  const isArchive = ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext || '') || mime.includes('zip');
+  const isCode = ['js', 'ts', 'tsx', 'json', 'py', 'rb', 'go', 'java', 'c', 'cpp', 'h', 'html', 'css'].includes(
+    ext || ''
+  );
+
+  if (isPdf) return { name: 'document-text-outline', color: '#ff6b6b', badgeColor: 'rgba(255,107,107,0.16)' };
+  if (isDoc) return { name: 'document-text-outline', color: '#69a8ff', badgeColor: 'rgba(105,168,255,0.16)' };
+  if (isSheet) return { name: 'grid-outline', color: '#4ade80', badgeColor: 'rgba(74,222,128,0.16)' };
+  if (isSlides) return { name: 'browsers-outline', color: '#f97316', badgeColor: 'rgba(249,115,22,0.16)' };
+  if (isArchive) return { name: 'archive-outline', color: '#fbbf24', badgeColor: 'rgba(251,191,36,0.16)' };
+  if (isAudio) return { name: 'musical-notes-outline', color: '#c084fc', badgeColor: 'rgba(192,132,252,0.16)' };
+  if (isCode) return { name: 'code-slash-outline', color: '#9ddcff', badgeColor: 'rgba(157,220,255,0.16)' };
+
+  return { name: 'document-attach-outline', color: '#e7ecff', badgeColor: 'rgba(231,236,255,0.12)' };
+};
+
 const mapServerReceipts = (raw?: any): SeenReceipt[] => {
   if (!Array.isArray(raw)) {
     return [];
@@ -635,6 +666,7 @@ interface MessageBubbleProps {
   onBubbleLongPress?: (event: GestureResponderEvent) => void;
   onAttachmentPress?: (attachment: MessageAttachment, attachments?: MessageAttachment[]) => void;
   onLinkPress?: (url: string) => void;
+  onDownloadAttachment?: (attachment: MessageAttachment) => void;
   isGroupChat: boolean;
   directRecipient?: ChatParticipant | null;
   seenOverride?: SeenReceipt[] | null;
@@ -661,6 +693,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onBubbleLongPress,
   onAttachmentPress,
   onLinkPress,
+  onDownloadAttachment,
   isGroupChat,
   directRecipient,
   seenOverride = null,
@@ -935,15 +968,24 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         : attachments.filter((attachment) => !previewableIds.has(attachment.id)),
     [attachments, isDeletedMessage, previewableIds]
   );
+  const isFileOnlyMessage =
+    fileAttachments.length > 0 &&
+    !hasPreviewableMedia &&
+    !hasContent &&
+    !message.replyTo &&
+    !message.isPlaceholder &&
+    !isDeletedMessage &&
+    !showExpiredBubble;
 
   const bubbleStyle = [
     styles.messageBubble,
-    isMediaOnlyMessage
-      ? styles.messageBubbleMediaOnly
-      : isMine
-        ? styles.myBubble
-        : styles.theirBubble,
+    isMediaOnlyMessage && styles.messageBubbleMediaOnly,
+    isFileOnlyMessage && styles.messageBubbleFileOnly,
     !isMediaOnlyMessage &&
+    !isFileOnlyMessage &&
+    (isMine ? styles.myBubble : styles.theirBubble),
+    !isMediaOnlyMessage &&
+    !isFileOnlyMessage &&
     (isMine
       ? isLastInGroup
         ? styles.myBubbleLast
@@ -1069,6 +1111,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             isMine ? styles.messageContentMine : styles.messageContentTheirs,
             message.replyTo && styles.messageContentWithReply,
             isMediaOnlyMessage && styles.messageContentMediaOnly,
+            isFileOnlyMessage && styles.messageContentFileOnly,
           ]}
           delayLongPress={120}
         >
@@ -1188,76 +1231,53 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                         >
                           {fileAttachments.map((attachment) => {
                             const isExpired = attachment.status === 'expired';
-                            const isPreviewable =
-                              (attachment.isImage || attachment.isVideo) &&
-                              (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri);
+                            const fileIcon = resolveFileIcon(attachment);
                             return (
                               <Pressable
                                 key={`${message.id}-file-${attachment.id}`}
-                                style={[
-                                  styles.attachmentCard,
-                                  isPreviewable ? styles.attachmentImageCardCompact : styles.attachmentFileCard,
+                                style={({ pressed }) => [
+                                  styles.fileAttachmentCard,
+                                  isMine ? styles.fileAttachmentCardMine : styles.fileAttachmentCardTheirs,
+                                  isExpired && styles.fileAttachmentCardDisabled,
+                                  pressed && !isExpired && styles.fileAttachmentCardPressed,
                                 ]}
-                                onPress={(event) => {
-                                  if (isExpired) return;
-                                  const siblings =
-                                    attachment.isImage || attachment.isVideo ? combinedPreviewable : [attachment];
-                                  handleAttachmentPress(event, attachment, siblings);
-                                }}
-                                onLongPress={handleAttachmentLongPress}
-                                delayLongPress={120}
                                 disabled={isExpired}
+                                onPress={() => onDownloadAttachment?.(attachment)}
                               >
-                                {isPreviewable ? (
-                                  attachment.isVideo ? (
-                                    <View style={styles.attachmentVideoThumb}>
-                                      {resolveAttachmentUri(attachment) ? (
-                                        <Video
-                                          source={{ uri: resolveAttachmentUri(attachment)! }}
-                                          style={StyleSheet.absoluteFillObject}
-                                          resizeMode={ResizeMode.COVER}
-                                          useNativeControls
-                                          shouldPlay={false}
-                                        />
-                                      ) : null}
-                                      <View style={styles.attachmentVideoOverlay}>
-                                        <Ionicons name="play" size={18} color="#ffffff" />
-                                      </View>
-                                    </View>
-                                  ) : (
-                                    <Image
-                                      source={{
-                                        uri: attachment.previewUrl || attachment.publicViewUrl || attachment.localUri,
-                                      }}
-                                      style={styles.attachmentImage}
-                                      contentFit="cover"
-                                    />
-                                  )
-                                ) : (
-                                  <View style={styles.attachmentFileRow}>
-                                    <Ionicons
-                                      name="document-text-outline"
-                                      size={18}
-                                      color="rgba(255,255,255,0.9)"
-                                      style={styles.attachmentFileIcon}
-                                    />
-                                    <View style={styles.attachmentFileBody}>
-                                      <Text style={styles.attachmentFileName} numberOfLines={1}>
-                                        {attachment.name}
-                                      </Text>
-                                      <Text style={styles.attachmentFileMeta}>
-                                        {formatBytes(attachment.fileSize)}
-                                      </Text>
-                                    </View>
+                                <View style={styles.fileAttachmentContent}>
+                                  <View
+                                    style={[
+                                      styles.fileAttachmentIconWrap,
+                                      { backgroundColor: fileIcon.badgeColor },
+                                    ]}
+                                  >
+                                    <Ionicons name={fileIcon.name} size={22} color={fileIcon.color} />
                                   </View>
-                                )}
-                                {isExpired ? (
-                                  <View style={styles.attachmentExpiredOverlay}>
-                                    <Ionicons name="alert-circle-outline" size={18} color="rgba(255,255,255,0.85)" />
-                                    <Text style={styles.attachmentExpiredTitle}>File unavailable</Text>
-                                    <Text style={styles.attachmentExpiredHint}>Attachment expired or was removed</Text>
+                                  <View style={styles.fileAttachmentBody}>
+                                    <Text style={styles.fileAttachmentName} numberOfLines={1}>
+                                      {attachment.name}
+                                    </Text>
+                                    <Text style={styles.fileAttachmentMeta} numberOfLines={1}>
+                                      {formatBytes(attachment.fileSize)}
+                                    </Text>
+                                    {isExpired ? (
+                                      <Text style={styles.fileAttachmentExpired} numberOfLines={1}>
+                                        File unavailable
+                                      </Text>
+                                    ) : null}
                                   </View>
-                                ) : null}
+                                  <Pressable
+                                    style={[
+                                      styles.fileAttachmentButton,
+                                      isExpired && styles.fileAttachmentButtonDisabled,
+                                    ]}
+                                    disabled={isExpired}
+                                    onPress={() => onDownloadAttachment?.(attachment)}
+                                  >
+                                    <Ionicons name="download-outline" size={16} color="#03040A" />
+                                    <Text style={styles.fileAttachmentButtonText}>Letöltés</Text>
+                                  </Pressable>
+                                </View>
                               </Pressable>
                             );
                           })}
@@ -5252,6 +5272,7 @@ const ChatScreen: React.FC = () => {
           onBubbleDoubleTap={(event) => handleBubbleDoubleTap(messageItem, event)}
           onBubbleLongPress={(event) => handleBubbleLongPress(messageItem, event)}
           onAttachmentPress={handleAttachmentTap}
+          onDownloadAttachment={handleDownloadAttachment}
           onLinkPress={handleOpenLink}
           isGroupChat={Boolean(chatDetails?.isGroup)}
           directRecipient={directRecipient}
@@ -6340,6 +6361,14 @@ const styles = StyleSheet.create({
       height: 4,
     },
   },
+  messageBubbleFileOnly: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+  },
   messageBubbleMediaOnly: {
     paddingHorizontal: 0,
     paddingVertical: 0,
@@ -6374,6 +6403,10 @@ const styles = StyleSheet.create({
   messageContent: {
     flexShrink: 1,
     maxWidth: '90%',
+  },
+  messageContentFileOnly: {
+    width: '100%',
+    maxWidth: '100%',
   },
   messageContentWithReply: {
     minWidth: '75%',
@@ -6859,6 +6892,81 @@ const styles = StyleSheet.create({
   },
   attachmentGroupTheirs: {
     justifyContent: 'flex-start',
+  },
+  fileAttachmentCard: {
+    width: '100%',
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  fileAttachmentCardMine: {
+    backgroundColor: 'rgba(46, 136, 255, 0.12)',
+    borderColor: 'rgba(46, 136, 255, 0.28)',
+  },
+  fileAttachmentCardTheirs: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  fileAttachmentCardDisabled: {
+    opacity: 0.55,
+  },
+  fileAttachmentCardPressed: {
+    transform: [{ translateY: 1 }],
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  fileAttachmentContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  fileAttachmentIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  fileAttachmentBody: {
+    flex: 1,
+  },
+  fileAttachmentName: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  fileAttachmentMeta: {
+    marginTop: 2,
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 12,
+  },
+  fileAttachmentExpired: {
+    marginTop: 4,
+    color: '#ffb3b3',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  fileAttachmentButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  fileAttachmentButtonDisabled: {
+    opacity: 0.55,
+  },
+  fileAttachmentButtonText: {
+    color: '#03040A',
+    fontWeight: '700',
+    fontSize: 13,
   },
   attachmentCard: {
     borderRadius: 18,
