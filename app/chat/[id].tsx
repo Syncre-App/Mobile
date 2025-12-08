@@ -870,8 +870,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   }, [fadeAnim]);
 
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
-  const hasAttachments = attachments.length > 0 && !isDeletedMessage;
-  const hasPreviewableMedia = !isDeletedMessage
+  const allAttachmentsExpired =
+    !isDeletedMessage && attachments.length > 0 && attachments.every((attachment) => attachment.status === 'expired');
+  const showExpiredBubble = allAttachmentsExpired;
+  const hasAttachments = attachments.length > 0 && !isDeletedMessage && !showExpiredBubble;
+  const hasPreviewableMedia = hasAttachments
     ? attachments.some(
       (attachment) =>
         (attachment.isImage || attachment.isVideo) &&
@@ -879,9 +882,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
     )
     : false;
-  const hasContent = Boolean((message.content || '').trim().length) && !isDeletedMessage;
+  const hasContent = Boolean((message.content || '').trim().length) && !isDeletedMessage && !showExpiredBubble;
   const isMediaOnlyMessage =
-    hasPreviewableMedia && !hasContent && !message.replyTo && !message.isPlaceholder && !isDeletedMessage;
+    hasPreviewableMedia && !hasContent && !message.replyTo && !message.isPlaceholder && !isDeletedMessage && !showExpiredBubble;
   const containerStyle = [
     styles.messageRow,
     isMine ? styles.messageRowMine : styles.messageRowTheirs,
@@ -1015,7 +1018,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const activeSeenReceipts = overrideSeenReceipts;
   const shouldShowSeenAvatars = activeSeenReceipts.length > 0;
   const MAX_SEEN_AVATARS = 2;
-  const reactions = isDeletedMessage ? [] : Array.isArray(message.reactions) ? message.reactions : [];
+  const reactions =
+    isDeletedMessage || showExpiredBubble ? [] : Array.isArray(message.reactions) ? message.reactions : [];
   const displayedSeenReceipts = (() => {
     if (!shouldShowSeenAvatars) {
       return [];
@@ -1083,7 +1087,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           ) : null}
           <View style={bubbleStyle}>
-            {!isDeletedMessage && isFiltered && !isRevealed ? (
+            {!isDeletedMessage && !showExpiredBubble && isFiltered && !isRevealed ? (
               <Pressable
                 style={styles.filteredOverlay}
                 onPress={() => setIsRevealed(true)}
@@ -1094,18 +1098,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   <Text style={styles.filteredHint}>Tap to reveal</Text>
                 </View>
               </Pressable>
-            ) : isDeletedMessage ? (
-              <View style={styles.deletedMessageCard}>
-                <View style={styles.deletedMessageIcon}>
-                  <Ionicons name="trash-outline" size={18} color="rgba(255, 255, 255, 0.9)" />
-                </View>
-                <View style={styles.deletedMessageCopy}>
-                  <Text style={styles.deletedMessageTitle}>Message removed</Text>
-                  <Text style={styles.deletedMessageSubtitle} numberOfLines={2}>
-                    {deletedLabel}
-                  </Text>
-                </View>
-              </View>
+            ) : isDeletedMessage || showExpiredBubble ? (
+              <Text style={[styles.messageText, styles.placeholderText]}>
+                {isDeletedMessage ? deletedLabel : 'File or media expired'}
+              </Text>
             ) : (
               <>
                 {message.replyTo && (
@@ -6446,37 +6442,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.65)',
     fontStyle: 'italic',
   },
-  deletedMessageCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  deletedMessageIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deletedMessageCopy: {
-    flex: 1,
-  },
-  deletedMessageTitle: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  deletedMessageSubtitle: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 13,
-    marginTop: 2,
-  },
-
   statusText: {
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
