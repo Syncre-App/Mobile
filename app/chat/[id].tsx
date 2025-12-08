@@ -3453,26 +3453,24 @@ const ChatScreen: React.FC = () => {
         }
       }
 
-      const image = await getImageAsync({ format: Clipboard.ImageFormat.PNG });
+      const image: any = await (getImageAsync as any)({ format: 'png' });
       const rawBase64 = image?.data || '';
       const cleanBase64 = rawBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '');
       const hasBase64 = cleanBase64 && cleanBase64.length > 8;
 
-      const fileName = image?.uri?.split('/').pop() || `paste-${Date.now()}.png`;
+      const fileName = `paste-${Date.now()}.png`;
       const targetUri = `${FileSystem.cacheDirectory}${fileName}`;
 
       if (hasBase64) {
         await FileSystem.writeAsStringAsync(targetUri, cleanBase64, {
           encoding: FileSystem.EncodingType.Base64,
         });
-      } else if (image?.uri) {
-        await FileSystem.copyAsync({ from: image.uri, to: targetUri });
       } else {
         NotificationService.show('info', 'No image found in the clipboard');
         return;
       }
 
-      const info = await FileSystem.getInfoAsync(targetUri, { size: true });
+      const info: any = await FileSystem.getInfoAsync(targetUri);
       if (!info.exists || !info.size || info.size < 8) {
         await FileSystem.deleteAsync(targetUri, { idempotent: true }).catch(() => null);
         NotificationService.show('error', 'Unable to paste image (empty clipboard data)');
@@ -3484,7 +3482,7 @@ const ChatScreen: React.FC = () => {
         {
           uri: targetUri,
           name: fileName,
-          type: image?.mimeType || 'image/png',
+          type: (image as any)?.mimeType || 'image/png',
           size: info.size || estimatedSize,
         },
       ]);
