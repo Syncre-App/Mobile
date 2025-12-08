@@ -3428,6 +3428,58 @@ const ChatScreen: React.FC = () => {
     }
   }, [handleUploadBatch]);
 
+  const handlePasteImage = useCallback(async () => {
+    closeAttachmentSheet();
+
+    if (attachmentPickerBusy) {
+      NotificationService.show('info', 'Please wait for the current upload to complete');
+      return;
+    }
+
+    try {
+      const supportsImageClipboard = typeof (Clipboard as any)?.getImageAsync === 'function';
+      if (!supportsImageClipboard) {
+        NotificationService.show('error', 'Image paste is not supported on this device');
+        return;
+      }
+
+      const hasImage =
+        typeof (Clipboard as any)?.hasImageAsync === 'function'
+          ? await (Clipboard as any).hasImageAsync()
+          : true;
+      if (!hasImage) {
+        NotificationService.show('info', 'No image found in the clipboard');
+        return;
+      }
+
+      const image = await (Clipboard as any).getImageAsync({ format: 'png' });
+      const base64 = image?.data;
+      if (!base64) {
+        NotificationService.show('info', 'No image found in the clipboard');
+        return;
+      }
+
+      const fileName = `paste-${Date.now()}.png`;
+      const targetUri = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.writeAsStringAsync(targetUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const estimatedSize = Math.floor((base64.length * 3) / 4);
+      await handleUploadBatch([
+        {
+          uri: targetUri,
+          name: fileName,
+          type: image?.mimeType || 'image/png',
+          size: estimatedSize,
+        },
+      ]);
+    } catch (error) {
+      console.error('Failed to paste image from clipboard:', error);
+      NotificationService.show('error', 'Unable to paste image');
+    }
+  }, [attachmentPickerBusy, closeAttachmentSheet, handleUploadBatch]);
+
   const handleAttachmentTrigger = useCallback(() => {
     if (!chatId) {
       NotificationService.show('error', 'This conversation is not available');
@@ -5977,6 +6029,16 @@ const ChatScreen: React.FC = () => {
                   <View style={styles.attachmentSheetLabelColumn}>
                     <Text style={styles.attachmentSheetButtonLabel}>Files</Text>
                     <Text style={styles.attachmentSheetButtonHint}>Browse documents</Text>
+                  </View>
+                </Pressable>
+                <Pressable
+                  style={styles.attachmentSheetButton}
+                  onPress={handlePasteImage}
+                >
+                  <Ionicons name="clipboard-outline" size={20} color="#ffffff" />
+                  <View style={styles.attachmentSheetLabelColumn}>
+                    <Text style={styles.attachmentSheetButtonLabel}>Paste image</Text>
+                    <Text style={styles.attachmentSheetButtonHint}>Add from clipboard</Text>
                   </View>
                 </Pressable>
               </View>
