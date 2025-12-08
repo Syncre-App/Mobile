@@ -1482,8 +1482,21 @@ const ChatScreen: React.FC = () => {
   const [previewChromeVisible, setPreviewChromeVisible] = useState(true);
   const previewChromeAnim = useRef(new Animated.Value(1)).current;
   const slideTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const previewTopChromeHeight = useMemo(() => {
+    const safeTop = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0);
+    return safeTop + 64;
+  }, [insets.top]);
+  const previewBottomChromeHeight = useMemo(() => Math.max(insets.bottom, 10) + 126, [insets.bottom]);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
+  const previewChromeTopPadding = useMemo(
+    () => (previewChromeVisible ? previewTopChromeHeight : 0),
+    [previewChromeVisible, previewTopChromeHeight]
+  );
+  const previewChromeBottomPadding = useMemo(
+    () => (previewChromeVisible ? previewBottomChromeHeight : 8),
+    [previewBottomChromeHeight, previewChromeVisible]
+  );
   const handleClosePreview = useCallback(() => {
     setPreviewContext(null);
     setPreviewChromeVisible(true);
@@ -5878,7 +5891,13 @@ const ChatScreen: React.FC = () => {
           </Animated.View>
           <FlatList
             style={styles.attachmentModalCarousel}
-            contentContainerStyle={styles.attachmentModalCarouselContent}
+            contentContainerStyle={[
+              styles.attachmentModalCarouselContent,
+              {
+                paddingTop: previewChromeTopPadding,
+                paddingBottom: previewChromeBottomPadding,
+              },
+            ]}
             ref={previewListRef}
             data={previewContext?.attachments || []}
             keyExtractor={(item) => item.id}
@@ -7152,7 +7171,6 @@ const styles = StyleSheet.create({
   attachmentModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'space-between',
     overflow: 'hidden',
   },
   attachmentModalBackdrop: {
@@ -7163,11 +7181,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   attachmentModalTopBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+    zIndex: 3,
   },
   attachmentModalTopRow: {
     flexDirection: 'row',
@@ -7270,12 +7293,17 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   attachmentModalFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: 16,
     paddingTop: 10,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     backgroundColor: 'rgba(16, 20, 37, 0.35)',
     overflow: 'hidden',
+    zIndex: 3,
   },
   attachmentModalFileMetaRow: {
     flexDirection: 'row',
