@@ -675,6 +675,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const singleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaLastTapRef = useRef(0);
+  const attachmentLongPressRef = useRef(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const textSegments = useMemo(() => splitTextByLinks(message.content || ''), [message.content]);
   const embeddableLink = useMemo(() => {
@@ -938,6 +939,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   ];
   const handleAttachmentPress = useCallback(
     (event: GestureResponderEvent, attachment: MessageAttachment, siblings?: MessageAttachment[]) => {
+      if (attachmentLongPressRef.current) {
+        attachmentLongPressRef.current = false;
+        return;
+      }
       if (!attachment) {
         return;
       }
@@ -965,6 +970,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       }, 220);
     },
     [onAttachmentPress, onBubbleDoubleTap]
+  );
+  const handleAttachmentLongPress = useCallback(
+    (event: GestureResponderEvent) => {
+      attachmentLongPressRef.current = true;
+      onBubbleLongPress?.(event);
+    },
+    [onBubbleLongPress]
   );
 
   const replyHintOpacity = useMemo(() => {
@@ -1110,6 +1122,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                           key={`${message.id}-hero-image`}
                           style={styles.heroImageCard}
                           onPress={(event) => handleAttachmentPress(event, primaryItem, combinedPreviewable)}
+                          onLongPress={handleAttachmentLongPress}
+                          delayLongPress={120}
                         >
                           {primaryItem.isVideo ? (
                             resolveAttachmentUri(primaryItem) ? (
@@ -1168,6 +1182,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                                     attachment.isImage || attachment.isVideo ? combinedPreviewable : [attachment];
                                   handleAttachmentPress(event, attachment, siblings);
                                 }}
+                                onLongPress={handleAttachmentLongPress}
+                                delayLongPress={120}
                                 disabled={isExpired}
                               >
                                 {isPreviewable ? (
