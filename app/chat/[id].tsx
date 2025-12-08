@@ -677,13 +677,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const mediaLastTapRef = useRef(0);
   const attachmentLongPressRef = useRef(false);
   const [isRevealed, setIsRevealed] = useState(false);
+  const isDeletedMessage = useMemo(() => Boolean(message.isDeleted), [message.isDeleted]);
+  const deletedLabel = useMemo(() => message.deletedLabel || 'Message deleted', [message.deletedLabel]);
   const textSegments = useMemo(() => splitTextByLinks(message.content || ''), [message.content]);
   const embeddableLink = useMemo(() => {
-    if (message.isPlaceholder || message.attachments?.length) {
+    if (isDeletedMessage || message.isPlaceholder || message.attachments?.length) {
       return null;
     }
     return findEmbeddableLink(message.content || '');
-  }, [message.attachments, message.content, message.isPlaceholder]);
+  }, [isDeletedMessage, message.attachments, message.content, message.isPlaceholder]);
   const [embedLoaded, setEmbedLoaded] = useState(false);
   const [embedFailed, setEmbedFailed] = useState(false);
   useEffect(() => {
@@ -868,16 +870,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   }, [fadeAnim]);
 
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
-  const hasAttachments = attachments.length > 0;
-  const hasPreviewableMedia = attachments.some(
-    (attachment) =>
-      (attachment.isImage || attachment.isVideo) &&
-      attachment.status !== 'expired' &&
-      (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
-  );
-  const hasContent = Boolean((message.content || '').trim().length);
+  const hasAttachments = attachments.length > 0 && !isDeletedMessage;
+  const hasPreviewableMedia = !isDeletedMessage
+    ? attachments.some(
+      (attachment) =>
+        (attachment.isImage || attachment.isVideo) &&
+        attachment.status !== 'expired' &&
+        (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
+    )
+    : false;
+  const hasContent = Boolean((message.content || '').trim().length) && !isDeletedMessage;
   const isMediaOnlyMessage =
-    hasPreviewableMedia && !hasContent && !message.replyTo && !message.isPlaceholder;
+    hasPreviewableMedia && !hasContent && !message.replyTo && !message.isPlaceholder && !isDeletedMessage;
   const containerStyle = [
     styles.messageRow,
     isMine ? styles.messageRowMine : styles.messageRowTheirs,
@@ -888,23 +892,29 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   ];
   const previewableImageAttachments = useMemo(
     () =>
+      isDeletedMessage
+        ? []
+        :
       attachments.filter(
         (attachment) =>
           attachment.isImage &&
           attachment.status !== 'expired' &&
           (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
       ),
-    [attachments]
+    [attachments, isDeletedMessage]
   );
   const previewableVideoAttachments = useMemo(
     () =>
+      isDeletedMessage
+        ? []
+        :
       attachments.filter(
         (attachment) =>
           attachment.isVideo &&
           attachment.status !== 'expired' &&
           (attachment.previewUrl || attachment.publicViewUrl || attachment.localUri)
       ),
-    [attachments]
+    [attachments, isDeletedMessage]
   );
   const combinedPreviewable = useMemo(
     () => [...previewableImageAttachments, ...previewableVideoAttachments],
@@ -915,8 +925,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     [combinedPreviewable]
   );
   const fileAttachments = useMemo(
-    () => attachments.filter((attachment) => !previewableIds.has(attachment.id)),
-    [attachments, previewableIds]
+    () =>
+      isDeletedMessage
+        ? []
+        : attachments.filter((attachment) => !previewableIds.has(attachment.id)),
+    [attachments, isDeletedMessage, previewableIds]
   );
 
   const bubbleStyle = [
@@ -1002,7 +1015,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const activeSeenReceipts = overrideSeenReceipts;
   const shouldShowSeenAvatars = activeSeenReceipts.length > 0;
   const MAX_SEEN_AVATARS = 2;
-  const reactions = Array.isArray(message.reactions) ? message.reactions : [];
+  const reactions = isDeletedMessage ? [] : Array.isArray(message.reactions) ? message.reactions : [];
   const displayedSeenReceipts = (() => {
     if (!shouldShowSeenAvatars) {
       return [];
@@ -1070,7 +1083,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
           ) : null}
           <View style={bubbleStyle}>
-            {isFiltered && !isRevealed ? (
+            {!isDeletedMessage && isFiltered && !isRevealed ? (
               <Pressable
                 style={styles.filteredOverlay}
                 onPress={() => setIsRevealed(true)}
@@ -1081,6 +1094,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   <Text style={styles.filteredHint}>Tap to reveal</Text>
                 </View>
               </Pressable>
+            ) : isDeletedMessage ? (
+              <View style={styles.deletedMessageCard}>
+                <View style={styles.deletedMessageIcon}>
+                  <Ionicons name="trash-outline" size={18} color="rgba(255, 255, 255, 0.9)" />
+                </View>
+                <View style={styles.deletedMessageCopy}>
+                  <Text style={styles.deletedMessageTitle}>Message removed</Text>
+                  <Text style={styles.deletedMessageSubtitle} numberOfLines={2}>
+                    {deletedLabel}
+                  </Text>
+                </View>
+              </View>
             ) : (
               <>
                 {message.replyTo && (
@@ -1231,7 +1256,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                                 )}
                                 {isExpired ? (
                                   <View style={styles.attachmentExpiredOverlay}>
-                                    <Text style={styles.attachmentExpiredText}>File or media expired</Text>
+                                    <Ionicons name="alert-circle-outline" size={18} color="rgba(255,255,255,0.85)" />
+                                    <Text style={styles.attachmentExpiredTitle}>File unavailable</Text>
+                                    <Text style={styles.attachmentExpiredHint}>Attachment expired or was removed</Text>
                                   </View>
                                 ) : null}
                               </Pressable>
@@ -1312,7 +1339,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     })}
                   </View>
                 ) : null}
-                {message.isEdited && !message.isPlaceholder ? (
+                {message.isEdited && !message.isPlaceholder && !isDeletedMessage ? (
                   <Text style={styles.editedLabel}>Edited</Text>
                 ) : null}
               </>
@@ -1345,7 +1372,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               ) : null}
             </Pressable>
           ) : null}
-          {replyCount > 0 && onOpenThread && (
+          {replyCount > 0 && onOpenThread && !isDeletedMessage && (
             <Pressable
               style={[styles.threadSummaryButton, isMine && styles.threadSummaryButtonMine]}
               onPress={() => onOpenThread(message.id)}
@@ -6419,6 +6446,36 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.65)',
     fontStyle: 'italic',
   },
+  deletedMessageCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  deletedMessageIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deletedMessageCopy: {
+    flex: 1,
+  },
+  deletedMessageTitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  deletedMessageSubtitle: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 13,
+    marginTop: 2,
+  },
 
   statusText: {
     color: 'rgba(255, 255, 255, 0.5)',
@@ -6851,13 +6908,23 @@ const styles = StyleSheet.create({
   },
   attachmentExpiredOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(8, 10, 18, 0.85)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
+    gap: 4,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  attachmentExpiredText: {
+  attachmentExpiredTitle: {
     color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  attachmentExpiredHint: {
+    color: 'rgba(255, 255, 255, 0.78)',
     fontSize: 12,
     textAlign: 'center',
   },
