@@ -3437,41 +3437,55 @@ const ChatScreen: React.FC = () => {
     }
 
     try {
-      const supportsImageClipboard = typeof (Clipboard as any)?.getImageAsync === 'function';
-      if (!supportsImageClipboard) {
+      const hasImageAsync = typeof Clipboard.hasImageAsync === 'function' ? Clipboard.hasImageAsync : null;
+      const getImageAsync = typeof Clipboard.getImageAsync === 'function' ? Clipboard.getImageAsync : null;
+
+      if (!getImageAsync) {
         NotificationService.show('error', 'Image paste is not supported on this device');
         return;
       }
 
-      const hasImage =
-        typeof (Clipboard as any)?.hasImageAsync === 'function'
-          ? await (Clipboard as any).hasImageAsync()
-          : true;
-      if (!hasImage) {
-        NotificationService.show('info', 'No image found in the clipboard');
-        return;
+      if (hasImageAsync) {
+        const hasImage = await hasImageAsync();
+        if (!hasImage) {
+          NotificationService.show('info', 'No image found in the clipboard');
+          return;
+        }
       }
 
-      const image = await (Clipboard as any).getImageAsync({ format: 'png' });
-      const base64 = image?.data;
-      if (!base64) {
-        NotificationService.show('info', 'No image found in the clipboard');
-        return;
-      }
+      const image = await getImageAsync({ format: Clipboard.ImageFormat.PNG });
+      const rawBase64 = image?.data || '';
+      const cleanBase64 = rawBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '');
+      const hasBase64 = cleanBase64 && cleanBase64.length > 8;
 
-      const fileName = `paste-${Date.now()}.png`;
+      const fileName = image?.uri?.split('/').pop() || `paste-${Date.now()}.png`;
       const targetUri = `${FileSystem.cacheDirectory}${fileName}`;
-      await FileSystem.writeAsStringAsync(targetUri, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
 
-      const estimatedSize = Math.floor((base64.length * 3) / 4);
+      if (hasBase64) {
+        await FileSystem.writeAsStringAsync(targetUri, cleanBase64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      } else if (image?.uri) {
+        await FileSystem.copyAsync({ from: image.uri, to: targetUri });
+      } else {
+        NotificationService.show('info', 'No image found in the clipboard');
+        return;
+      }
+
+      const info = await FileSystem.getInfoAsync(targetUri, { size: true });
+      if (!info.exists || !info.size || info.size < 8) {
+        await FileSystem.deleteAsync(targetUri, { idempotent: true }).catch(() => null);
+        NotificationService.show('error', 'Unable to paste image (empty clipboard data)');
+        return;
+      }
+
+      const estimatedSize = hasBase64 ? Math.floor((cleanBase64.length * 3) / 4) : info.size || 0;
       await handleUploadBatch([
         {
           uri: targetUri,
           name: fileName,
           type: image?.mimeType || 'image/png',
-          size: estimatedSize,
+          size: info.size || estimatedSize,
         },
       ]);
     } catch (error) {
@@ -5660,16 +5674,18 @@ const ChatScreen: React.FC = () => {
               )}
             </Pressable>
             <View style={styles.composerColumn}>
-              <TextInput
-                ref={composerRef}
-                style={styles.textInput}
-                value={newMessage}
-                onChangeText={handleComposerChange}
-                maxLength={MESSAGE_CHAR_LIMIT}
-                placeholder="Message…"
-                placeholderTextColor="rgba(255, 255, 255, 0.45)"
-                multiline
-              />
+              <Pressable onPress={() => composerRef.current?.focus()} onLongPress={handlePasteImage}>
+                <TextInput
+                  ref={composerRef}
+                  style={styles.textInput}
+                  value={newMessage}
+                  onChangeText={handleComposerChange}
+                  maxLength={MESSAGE_CHAR_LIMIT}
+                  placeholder="Message…"
+                  placeholderTextColor="rgba(255, 255, 255, 0.45)"
+                  multiline
+                />
+              </Pressable>
             </View>
 
             <Pressable
