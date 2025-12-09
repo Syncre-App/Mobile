@@ -30,7 +30,7 @@ export const PrivacyScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const minTopPadding = spacing.lg;
   const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
-  
+
   const [contentFilter, setContentFilter] = useState<'standard' | 'none'>('standard');
   const [isRotatingKeys, setIsRotatingKeys] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
@@ -41,22 +41,22 @@ export const PrivacyScreen: React.FC = () => {
     const loadSettings = async () => {
       const filter = await StorageService.getContentFilter();
       setContentFilter(filter);
-      
+
       // Load bot status
       try {
         const token = await StorageService.getAuthToken();
-			if (token) {
-				const response = await ApiService.get('/user/bot-status', token) as {
-					success: boolean;
-					bot_status?: 'pending' | 'approved' | null;
-					role?: string;
-				};
-				if (response.success) {
-					const status = response.bot_status ?? (response.role === 'bot' ? 'approved' : null);
-					setBotStatus(status);
-				}
-			}
-		} catch (error) {
+        if (token) {
+          const response = await ApiService.get('/user/bot-status', token) as {
+            success: boolean;
+            bot_status?: 'pending' | 'approved' | null;
+            role?: string;
+          };
+          if (response.success) {
+            const status = response.bot_status ?? (response.role === 'bot' ? 'approved' : null);
+            setBotStatus(status);
+          }
+        }
+      } catch (error) {
         console.error('Failed to load bot status:', error);
       } finally {
         setIsLoadingBotStatus(false);
@@ -147,13 +147,13 @@ export const PrivacyScreen: React.FC = () => {
     );
   };
 
-	const handleRequestBotAccount = async (reason: string) => {
-		try {
-			const token = await StorageService.getAuthToken();
-			if (!token) {
-				NotificationService.show('error', 'Please log in again');
-				return;
-			}
+  const handleRequestBotAccount = async (reason: string) => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Please log in again');
+        return;
+      }
 
       const response = await ApiService.post('/user/request-bot', { reason }, token) as {
         success: boolean;
@@ -183,7 +183,7 @@ export const PrivacyScreen: React.FC = () => {
             [
               {
                 text: 'Copy again',
-                onPress: () => Clipboard.setStringAsync(botToken).catch(() => {}),
+                onPress: () => Clipboard.setStringAsync(botToken).catch(() => { }),
               },
               { text: 'Close', style: 'cancel' },
             ]
@@ -192,9 +192,9 @@ export const PrivacyScreen: React.FC = () => {
       } else {
         NotificationService.show('error', response.error || 'Failed to submit request');
       }
-		} catch (error) {
-			console.error('Failed to request bot account:', error);
-			NotificationService.show('error', 'Failed to submit request');
+    } catch (error) {
+      console.error('Failed to request bot account:', error);
+      NotificationService.show('error', 'Failed to submit request');
     }
   };
 
@@ -330,13 +330,13 @@ export const PrivacyScreen: React.FC = () => {
           {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
         </View>
       </View>
-      
+
       {rightComponent && (
         <View style={styles.settingRight}>
           {rightComponent}
         </View>
       )}
-      
+
       {onPress && !rightComponent && (
         <Ionicons
           name="chevron-forward"
@@ -353,7 +353,7 @@ export const PrivacyScreen: React.FC = () => {
       edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
+
       <AppBackground />
 
       {/* Header */}
@@ -379,7 +379,7 @@ export const PrivacyScreen: React.FC = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Content</Text>
           </View>
-          
+
           {renderSettingItem(
             'shield-checkmark-outline',
             'Content Filter',
@@ -395,7 +395,7 @@ export const PrivacyScreen: React.FC = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Blocked</Text>
           </View>
-          
+
           {renderSettingItem(
             'ban-outline',
             'Blocked Users',
@@ -411,7 +411,7 @@ export const PrivacyScreen: React.FC = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Account</Text>
           </View>
-          
+
           {renderSettingItem(
             'key-outline',
             'Rotate encryption keys',
@@ -451,17 +451,17 @@ export const PrivacyScreen: React.FC = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Developer</Text>
           </View>
-          
-			{renderSettingItem(
-				'hardware-chip-outline',
-				'Bot Account',
-				isLoadingBotStatus
-					? 'Loading...'
-					: botStatus === 'approved'
-						? 'SDK bot enabled'
-						: botStatus === 'pending'
-							? 'Pending bot activation...'
-							: 'Create a bot token for SDK integrations',
+
+          {renderSettingItem(
+            'hardware-chip-outline',
+            'Bot Account',
+            isLoadingBotStatus
+              ? 'Loading...'
+              : botStatus === 'approved'
+                ? 'SDK bot enabled'
+                : botStatus === 'pending'
+                  ? 'Pending bot activation...'
+                  : 'Create a bot token for SDK integrations',
             handleBotAccountPress,
             isLoadingBotStatus ? (
               <ActivityIndicator size="small" color={palette.accent} />
