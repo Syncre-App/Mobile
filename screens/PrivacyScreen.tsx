@@ -155,37 +155,43 @@ export const PrivacyScreen: React.FC = () => {
 				return;
 			}
 
-			const response = await ApiService.post('/user/request-bot', { reason }, token);
-			if (response.success) {
-				const nextStatus = (response.bot_status as 'pending' | 'approved' | null) ?? 'approved';
-				setBotStatus(nextStatus);
-				NotificationService.show('success', response.rotated ? 'Bot token rotated' : 'Bot account enabled');
+      const response = await ApiService.post('/user/request-bot', { reason }, token) as {
+        success: boolean;
+        bot_status?: 'pending' | 'approved' | null;
+        rotated?: boolean;
+        bot_token?: string;
+        error?: string;
+      };
+      if (response.success) {
+        const nextStatus = (response.bot_status ?? 'approved') as 'pending' | 'approved' | null;
+        setBotStatus(nextStatus);
+        NotificationService.show('success', response.rotated ? 'Bot token rotated' : 'Bot account enabled');
 
-				const botToken = response.bot_token as string | undefined;
-				if (botToken) {
-					let copied = false;
-					try {
-						await Clipboard.setStringAsync(botToken);
-						copied = true;
-					} catch (err) {
-						console.warn('Failed to copy bot token', err);
-					}
+        const botToken = response.bot_token as string | undefined;
+        if (botToken) {
+          let copied = false;
+          try {
+            await Clipboard.setStringAsync(botToken);
+            copied = true;
+          } catch (err) {
+            console.warn('Failed to copy bot token', err);
+          }
 
-					Alert.alert(
-						'Bot token created',
-						`${copied ? 'Token copied to clipboard.\n\n' : ''}${botToken}`,
-						[
-							{
-								text: 'Copy again',
-								onPress: () => Clipboard.setStringAsync(botToken).catch(() => {}),
-							},
-							{ text: 'Close', style: 'cancel' },
-						]
-					);
-				}
-			} else {
-				NotificationService.show('error', response.error || 'Failed to submit request');
-			}
+          Alert.alert(
+            'Bot token created',
+            `${copied ? 'Token copied to clipboard.\n\n' : ''}${botToken}`,
+            [
+              {
+                text: 'Copy again',
+                onPress: () => Clipboard.setStringAsync(botToken).catch(() => {}),
+              },
+              { text: 'Close', style: 'cancel' },
+            ]
+          );
+        }
+      } else {
+        NotificationService.show('error', response.error || 'Failed to submit request');
+      }
 		} catch (error) {
 			console.error('Failed to request bot account:', error);
 			NotificationService.show('error', 'Failed to submit request');
