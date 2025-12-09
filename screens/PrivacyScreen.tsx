@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
 import {
   ActivityIndicator,
   Alert,
@@ -44,13 +45,18 @@ export const PrivacyScreen: React.FC = () => {
       // Load bot status
       try {
         const token = await StorageService.getAuthToken();
-        if (token) {
-          const response = await ApiService.get('/user/bot-status', token) as { success: boolean; bot_status?: 'pending' | 'approved' | null };
-          if (response.success) {
-            setBotStatus(response.bot_status ?? null);
-          }
-        }
-      } catch (error) {
+			if (token) {
+				const response = await ApiService.get('/user/bot-status', token) as {
+					success: boolean;
+					bot_status?: 'pending' | 'approved' | null;
+					role?: string;
+				};
+				if (response.success) {
+					const status = response.bot_status ?? (response.role === 'bot' ? 'approved' : null);
+					setBotStatus(status);
+				}
+			}
+		} catch (error) {
         console.error('Failed to load bot status:', error);
       } finally {
         setIsLoadingBotStatus(false);
@@ -85,8 +91,15 @@ export const PrivacyScreen: React.FC = () => {
     if (botStatus === 'approved') {
       Alert.alert(
         'Bot Account',
-        'This account is a verified bot account. Bot accounts can be used for automated services and integrations.',
-        [{ text: 'OK' }]
+        'This account is enabled for SDK access. Rotate the bot token to invalidate old integrations and generate a fresh one.',
+        [
+          { text: 'Close' },
+          {
+            text: 'Rotate token',
+            style: 'destructive',
+            onPress: () => handleRequestBotAccount('Rotate bot token from device settings'),
+          },
+        ]
       );
       return;
     }
@@ -94,7 +107,7 @@ export const PrivacyScreen: React.FC = () => {
     if (botStatus === 'pending') {
       Alert.alert(
         'Verification Pending',
-        'Your bot account request is being reviewed. This usually takes 1-2 business days.',
+        'Your previous bot request is still marked as pending. You can cancel it, then request again to auto-generate a bot token.',
         [
           { text: 'OK' },
           {
@@ -110,11 +123,11 @@ export const PrivacyScreen: React.FC = () => {
     // No bot status - show request dialog
     Alert.alert(
       'Bot Account',
-      'Mark this account as a bot account for SDK/API integrations.\n\nBot accounts:\n• Can use the Syncre SDK\n• Are marked with a Bot badge\n• Cannot be used for regular messaging\n\nThis requires manual verification.',
+      'Turn this account into an SDK bot.\n\nBot accounts:\n• Use a one-time bot token (auto-copied)\n• Are marked with a Bot badge\n• Login is limited to the SDK (email/password disabled)',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Request Bot Status',
+          text: 'Create bot token',
           onPress: () => {
             Alert.prompt(
               'Bot Request Reason',
@@ -134,24 +147,48 @@ export const PrivacyScreen: React.FC = () => {
     );
   };
 
-  const handleRequestBotAccount = async (reason: string) => {
-    try {
-      const token = await StorageService.getAuthToken();
-      if (!token) {
-        NotificationService.show('error', 'Please log in again');
-        return;
-      }
+	const handleRequestBotAccount = async (reason: string) => {
+		try {
+			const token = await StorageService.getAuthToken();
+			if (!token) {
+				NotificationService.show('error', 'Please log in again');
+				return;
+			}
 
-      const response = await ApiService.post('/user/request-bot', { reason }, token);
-      if (response.success) {
-        setBotStatus('pending');
-        NotificationService.show('success', 'Bot account request submitted');
-      } else {
-        NotificationService.show('error', response.error || 'Failed to submit request');
-      }
-    } catch (error) {
-      console.error('Failed to request bot account:', error);
-      NotificationService.show('error', 'Failed to submit request');
+			const response = await ApiService.post('/user/request-bot', { reason }, token);
+			if (response.success) {
+				const nextStatus = (response.bot_status as 'pending' | 'approved' | null) ?? 'approved';
+				setBotStatus(nextStatus);
+				NotificationService.show('success', response.rotated ? 'Bot token rotated' : 'Bot account enabled');
+
+				const botToken = response.bot_token as string | undefined;
+				if (botToken) {
+					let copied = false;
+					try {
+						await Clipboard.setStringAsync(botToken);
+						copied = true;
+					} catch (err) {
+						console.warn('Failed to copy bot token', err);
+					}
+
+					Alert.alert(
+						'Bot token created',
+						`${copied ? 'Token copied to clipboard.\n\n' : ''}${botToken}`,
+						[
+							{
+								text: 'Copy again',
+								onPress: () => Clipboard.setStringAsync(botToken).catch(() => {}),
+							},
+							{ text: 'Close', style: 'cancel' },
+						]
+					);
+				}
+			} else {
+				NotificationService.show('error', response.error || 'Failed to submit request');
+			}
+		} catch (error) {
+			console.error('Failed to request bot account:', error);
+			NotificationService.show('error', 'Failed to submit request');
     }
   };
 
@@ -409,16 +446,16 @@ export const PrivacyScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Developer</Text>
           </View>
           
-          {renderSettingItem(
-            'hardware-chip-outline',
-            'Bot Account',
-            isLoadingBotStatus
-              ? 'Loading...'
-              : botStatus === 'approved'
-                ? 'Verified bot account'
-                : botStatus === 'pending'
-                  ? 'Verification pending...'
-                  : 'Request bot status for SDK integrations',
+			{renderSettingItem(
+				'hardware-chip-outline',
+				'Bot Account',
+				isLoadingBotStatus
+					? 'Loading...'
+					: botStatus === 'approved'
+						? 'SDK bot enabled'
+						: botStatus === 'pending'
+							? 'Pending bot activation...'
+							: 'Create a bot token for SDK integrations',
             handleBotAccountPress,
             isLoadingBotStatus ? (
               <ActivityIndicator size="small" color={palette.accent} />
