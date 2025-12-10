@@ -50,6 +50,12 @@ interface DecryptionResult {
   plaintext: string;
 }
 
+export interface EncryptedLocationPayload {
+  ciphertext: string;
+  nonce: string;
+  version: number;
+}
+
 const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 const fromBase64 = (value: string): Uint8Array => new Uint8Array(Buffer.from(value, 'base64'));
 const utf8ToBytes = (value: string): Uint8Array => new Uint8Array(Buffer.from(value, 'utf8'));
@@ -443,6 +449,30 @@ async function decryptEnvelope(options: {
   }
 }
 
+const derivePersonalKey = async (purpose: string): Promise<Uint8Array> => {
+  const { privateKeyBytes } = await getSenderIdentity();
+  const info = utf8ToBytes(`${KEY_INFO_CONTEXT}:${purpose}`);
+  const salt = new Uint8Array(HKDF_KEY_LENGTH);
+  const hkdf = new HKDF(SHA256, privateKeyBytes, salt, info);
+  const key = hkdf.expand(HKDF_KEY_LENGTH);
+  hkdf.clean();
+  return key;
+};
+
+async function encryptWithPersonalKey(payload: any, purpose: string): Promise<EncryptedLocationPayload> {
+  const key = await derivePersonalKey(purpose);
+  const cipher = new XChaCha20Poly1305(key);
+  const nonce = randomBytes(24);
+  const encoded = utf8ToBytes(JSON.stringify(payload));
+  const sealed = cipher.seal(nonce, encoded);
+
+  return {
+    ciphertext: toBase64(sealed),
+    nonce: toBase64(nonce),
+    version: 1,
+  };
+}
+
 export const CryptoService = {
   bootstrapIdentity,
 
@@ -574,5 +604,20 @@ export const CryptoService = {
 
   async fetchRecipientPublicKey(userId: string, token: string): Promise<string> {
     return getRecipientPublicKey(userId, token);
+  },
+
+  async encryptLocationPayload(payload: {
+    latitude: number | null;
+    longitude: number | null;
+    timezone: string | null;
+    recordedAt?: string;
+  }): Promise<EncryptedLocationPayload> {
+    const normalizedPayload = {
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      timezone: payload.timezone,
+      recordedAt: payload.recordedAt || new Date().toISOString(),
+    };
+    return encryptWithPersonalKey(normalizedPayload, 'location-v1');
   },
 };
