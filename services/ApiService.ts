@@ -151,6 +151,18 @@ export class ApiService {
     }
 
     const response = await this.get(`/user/${userId}`, token);
+    if (!response.success && response.statusCode === 404) {
+      const placeholder = {
+        id: userId,
+        username: 'Unknown user',
+        email: '',
+        profile_picture: null,
+        status: null,
+        last_seen: null,
+        missing: true,
+      };
+      UserCacheService.addUser(placeholder as any);
+    }
     if (response.success && response.data) {
       UserCacheService.addUser(response.data);
     }
