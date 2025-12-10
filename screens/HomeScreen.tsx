@@ -44,6 +44,7 @@ export const HomeScreen: React.FC = () => {
   const incomingRequestsRef = useRef<any[]>([]);
   const outgoingRequestsRef = useRef<any[]>([]);
   const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -666,6 +667,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleRespondToRequest = useCallback(async (friendId: string, action: 'accept' | 'reject', options?: { notificationId?: string }) => {
     try {
+      setRequestError(null);
       setRequestProcessingId(friendId);
       const token = await StorageService.getAuthToken();
       if (!token) {
@@ -690,10 +692,12 @@ export const HomeScreen: React.FC = () => {
 
         await Promise.all([loadFriendData(), loadNotifications(), loadUnreadSummary()]);
       } else {
+        setRequestError(response.error || 'Failed to update request');
         NotificationService.show('error', response.error || 'Failed to update request');
       }
     } catch (error) {
       console.error('Failed to respond to friend request:', error);
+      setRequestError('Could not update the friend request. Please try again.');
       NotificationService.show('error', 'Failed to update request');
     } finally {
       setRequestProcessingId(null);
@@ -1061,6 +1065,7 @@ export const HomeScreen: React.FC = () => {
                   onReject={(friendId) => handleRespondToRequest(friendId, 'reject')}
                   processingId={requestProcessingId}
                 />
+                {requestError ? <Text style={styles.requestError}>{requestError}</Text> : null}
               </View>
             )}
 
@@ -1323,5 +1328,11 @@ const styles = StyleSheet.create({
     color: palette.accentSecondary,
     fontSize: 13,
     fontFamily: 'SpaceGrotesk-Medium',
+  },
+  requestError: {
+    marginTop: spacing.sm,
+    color: palette.error,
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
 });
