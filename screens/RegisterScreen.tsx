@@ -27,6 +27,7 @@ export const RegisterScreen: React.FC = () => {
   const [password2, setPassword2] = useState('');
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleRegister = async () => {
     const u = username.trim();
@@ -35,18 +36,25 @@ export const RegisterScreen: React.FC = () => {
     const p2 = password2;
 
     if (!u || !e || !p || !p2) {
-        notificationService.show('error', 'All fields are required', 'Error');
+      const message = 'All fields are required';
+      setErrorMessage(message);
+      notificationService.show('error', message, 'Error');
       return;
     }
     if (p !== p2) {
-        notificationService.show('error', 'Passwords do not match', 'Error');
+      const message = 'Passwords do not match';
+      setErrorMessage(message);
+      notificationService.show('error', message, 'Error');
       return;
     }
     if (!acceptedTerms) {
-        notificationService.show('error', 'You must accept the Terms of Service to continue', 'Error');
+      const message = 'You must accept the Terms of Service to continue';
+      setErrorMessage(message);
+      notificationService.show('error', message, 'Error');
       return;
     }
 
+    setErrorMessage(null);
     setLoading(true);
     console.log('📝 Starting registration for:', e, '(username:', u, ')');
 
@@ -66,14 +74,14 @@ export const RegisterScreen: React.FC = () => {
 
         if (!verified) {
           console.log('📧 User needs verification, redirecting to verify screen');
-            notificationService.show('success', 'Please check your email for a verification code.', 'Registration successful');
+          notificationService.show('success', 'Please check your email for a verification code.', 'Registration successful');
           router.replace({
             pathname: '/verify' as any,
             params: { email: e },
           } as any);
         } else {
           console.log('✅ User already verified, registration complete');
-            notificationService.show('success', 'Registration completed successfully!', 'Registration successful');
+          notificationService.show('success', 'Registration completed successfully!', 'Registration successful');
           router.replace({
             pathname: '/verify' as any,
             params: { email: e },
@@ -82,17 +90,22 @@ export const RegisterScreen: React.FC = () => {
       } else {
         console.log('❌ Registration failed:', response.error);
         const errorMessage = response.error || 'Registration error occurred';
-          notificationService.show('error', errorMessage || 'Registration failed', 'Error');
+        setErrorMessage(errorMessage);
+        notificationService.show('error', errorMessage || 'Registration failed', 'Error');
       }
     } catch (error: any) {
       console.log('❌ Registration exception:', error);
       const msg = error.toString();
       if (msg.includes('Connection refused') || msg.includes('Network Error')) {
-          notificationService.show('error', `Connection error: server not reachable (${ApiService.baseUrl})`, 'Error');
+        const message = `Connection error: server not reachable (${ApiService.baseUrl})`;
+        setErrorMessage(message);
+        notificationService.show('error', message, 'Error');
       } else {
-          notificationService.show('error', `Error: ${error.message || error}`, 'Error');
+        const message = `Error: ${error.message || error}`;
+        setErrorMessage(message);
+        notificationService.show('error', message, 'Error');
       }
-  } finally {
+    } finally {
       setLoading(false);
     }
   };
@@ -191,6 +204,12 @@ export const RegisterScreen: React.FC = () => {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+            {errorMessage ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            ) : null}
 
             <TouchableOpacity onPress={goToLogin} style={styles.loginLink}>
               <Text style={styles.loginLinkText}>
@@ -330,5 +349,20 @@ const styles = StyleSheet.create({
   loginLinkHighlight: {
     color: palette.accentSecondary,
     fontFamily: 'PlusJakartaSans-SemiBold',
+  },
+  errorBox: {
+    width: '100%',
+    backgroundColor: '#ef44441a',
+    borderColor: '#ef4444',
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  errorText: {
+    color: '#fecdd3',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

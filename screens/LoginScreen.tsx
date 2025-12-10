@@ -26,18 +26,22 @@ export const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [obscurePassword, setObscurePassword] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
+      setErrorMessage('Please fill in both email and password fields');
       notificationService.show('error', 'Please fill in both email and password fields', 'Error');
       return;
     }
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!emailValid) {
+      setErrorMessage('Please enter a valid email address');
       notificationService.show('error', 'Please enter a valid email address', 'Error');
       return;
     }
 
+    setErrorMessage(null);
     setIsLoading(true);
     try {
       const response = await ApiService.post('/auth/login', {
@@ -85,6 +89,7 @@ export const LoginScreen: React.FC = () => {
             router.replace('/home' as any);
           }
         } else {
+          setErrorMessage('Missing authentication token');
           notificationService.show('error', 'Missing authentication token', 'Error');
         }
       } else {
@@ -93,23 +98,27 @@ export const LoginScreen: React.FC = () => {
         const deleteAfter = (response.data as any)?.delete_after;
         if (bannedUntil) {
           const until = new Date(bannedUntil);
+          setErrorMessage(`Your account is banned until ${until.toLocaleString()}.`);
           notificationService.show(
             'error',
             `Your account is banned until ${until.toLocaleString()}.`,
             'Login blocked'
           );
         } else if (deleteAfter) {
+          setErrorMessage('Account deletion is pending. Try again after the 24h grace window or contact support.');
           notificationService.show(
             'error',
             'Account deletion is pending. Try again after the 24h grace window or contact support.',
             'Login blocked'
           );
         } else {
+          setErrorMessage(response.error || 'Login failed');
           notificationService.show('error', response.error || 'Login failed', 'Error');
         }
       }
     } catch (error: any) {
       console.error('Login error:', error);
+      setErrorMessage('Network error or server issue');
       notificationService.show('error', 'Network error or server issue', 'Error');
     } finally {
       setIsLoading(false);
@@ -177,6 +186,12 @@ export const LoginScreen: React.FC = () => {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+            {errorMessage ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            ) : null}
 
             <TouchableOpacity onPress={() => router.push('/register' as any)} style={styles.registerLink}>
               <Text style={styles.registerText}>
@@ -266,4 +281,15 @@ const styles = StyleSheet.create({
   registerLink: { alignItems: 'center', paddingVertical: spacing.xs, marginTop: spacing.xs },
   registerText: { color: palette.textMuted, fontSize: 14 },
   registerTextHighlight: { color: palette.accentSecondary, fontFamily: 'PlusJakartaSans-SemiBold' },
+  errorBox: {
+    width: '100%',
+    backgroundColor: '#ef44441a',
+    borderColor: '#ef4444',
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  errorText: { color: '#fecdd3', fontSize: 14, textAlign: 'center' },
 });
