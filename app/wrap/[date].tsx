@@ -21,6 +21,7 @@ import * as FileSystem from 'expo-file-system';
 
 type TopContact = {
   userId: string;
+  id?: string;
   username?: string | null;
   profile_picture?: string | null;
   badges?: string[];
@@ -59,7 +60,7 @@ export default function DailyWrapScreen() {
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
-        setError('Hiányzik az authentikáció.');
+        setError('Missing authentication.');
         setLoading(false);
         return;
       }
@@ -88,10 +89,10 @@ export default function DailyWrapScreen() {
         }
         setWrap(normalized);
       } else {
-        setError(response.error || 'Nem sikerült betölteni a wrapet.');
+        setError(response.error || 'Failed to load wrap.');
       }
     } catch (err: any) {
-      setError(err?.message || 'Nem sikerült betölteni a wrapet.');
+      setError(err?.message || 'Failed to load wrap.');
     } finally {
       setLoading(false);
     }
@@ -111,27 +112,34 @@ export default function DailyWrapScreen() {
     try {
       const svgNode: any = shareSvgRef.current;
       if (!svgNode || typeof svgNode.toDataURL !== 'function') {
-        setError('A megosztás nem elérhető ezen az eszközön.');
+        setError('Sharing is not available on this device.');
         return;
       }
       const dataUrl: string = await new Promise((resolve) => svgNode.toDataURL(resolve));
       const base64 = dataUrl.replace('data:image/png;base64,', '');
-      const fileUri = `${FileSystem.cacheDirectory}wrap-${wrap.statDate || 'today'}.png`;
-      await FileSystem.writeAsStringAsync(fileUri, base64, {
-        encoding: FileSystem.EncodingType.Base64,
+      const cacheDir =
+        (FileSystem as any).cacheDirectory ||
+        FileSystem.documentDirectory ||
+        '';
+      const fileUri = `${cacheDir}wrap-${wrap.statDate || 'today'}.png`;
+      const encoding: any =
+        (FileSystem as any).EncodingType?.Base64 ||
+        'base64';
+      await (FileSystem as any).writeAsStringAsync(fileUri, base64, {
+        encoding,
       });
       await Share.share({
         url: fileUri,
-        message: `Napi wrap (${wrap.statDate}): ${wrap.totalMessages} üzenet 🌟`,
+        message: `Daily wrap (${wrap.statDate}): ${wrap.totalMessages} messages 🌟`,
       });
     } catch (err: any) {
-      setError(err?.message || 'Nem sikerült megosztani a wrapet.');
+      setError(err?.message || 'Failed to share wrap.');
     }
   }, [wrap]);
 
   const renderHourChart = () => {
     if (!wrap?.hourHistogram?.length) {
-      return <Text style={styles.muted}>Nincs aktivitás erre a napra.</Text>;
+      return <Text style={styles.muted}>No activity for this day.</Text>;
     }
     const bars = wrap.hourHistogram.slice(0, 24);
     return (
@@ -152,7 +160,7 @@ export default function DailyWrapScreen() {
 
   const renderTopContacts = () => {
     if (!wrap?.topContacts?.length) {
-      return <Text style={styles.muted}>Nem volt aktivitás.</Text>;
+      return <Text style={styles.muted}>No conversations this day.</Text>;
     }
     return wrap.topContacts.map((contact) => {
       const id = contact.userId || contact.id;
@@ -160,12 +168,12 @@ export default function DailyWrapScreen() {
         <View key={id} style={styles.topContactRow}>
           <UserAvatar
             uri={contact.profile_picture}
-            name={contact.username || 'Ismeretlen'}
+            name={contact.username || 'Unknown'}
             size={46}
           />
           <View style={styles.topContactBody}>
-            <Text style={styles.topContactName}>{contact.username || 'Ismeretlen'}</Text>
-            <Text style={styles.topContactCount}>{contact.count} üzenet</Text>
+            <Text style={styles.topContactName}>{contact.username || 'Unknown'}</Text>
+            <Text style={styles.topContactCount}>{contact.count} messages</Text>
           </View>
         </View>
       );
@@ -176,19 +184,19 @@ export default function DailyWrapScreen() {
     <View style={styles.container}>
       <AppBackground />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Napi Wrap</Text>
+        <Text style={styles.title}>Daily Wrap</Text>
         <Text style={styles.subtitle}>{formatDateLabel(wrap?.statDate || targetDate)}</Text>
 
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color={palette.accent} />
-            <Text style={styles.muted}>Összegyűjtjük a statokat...</Text>
+            <Text style={styles.muted}>Crunching your stats...</Text>
           </View>
         ) : error ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={fetchWrap}>
-              <Text style={styles.retryText}>Próbáld újra</Text>
+              <Text style={styles.retryText}>Try again</Text>
             </TouchableOpacity>
           </View>
         ) : wrap ? (
@@ -196,15 +204,15 @@ export default function DailyWrapScreen() {
             <GlassCard width="100%" style={styles.card}>
               <View style={styles.statRow}>
                 <View style={styles.statBlock}>
-                  <Text style={styles.statLabel}>Összes üzenet</Text>
+                  <Text style={styles.statLabel}>Total messages</Text>
                   <Text style={styles.statValue}>{wrap.totalMessages}</Text>
                 </View>
                 <View style={styles.statBlock}>
-                  <Text style={styles.statLabel}>Küldött</Text>
+                  <Text style={styles.statLabel}>Sent</Text>
                   <Text style={styles.statValue}>{wrap.messagesSent}</Text>
                 </View>
                 <View style={styles.statBlock}>
-                  <Text style={styles.statLabel}>Kapott</Text>
+                  <Text style={styles.statLabel}>Received</Text>
                   <Text style={styles.statValue}>{wrap.messagesReceived}</Text>
                 </View>
               </View>
@@ -215,13 +223,13 @@ export default function DailyWrapScreen() {
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Aktivitás óránként</Text>
+                <Text style={styles.sectionTitle}>Hourly activity</Text>
                 {renderHourChart()}
               </View>
             </GlassCard>
 
             <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-              <Text style={styles.shareButtonText}>Megosztás menő kártyával</Text>
+              <Text style={styles.shareButtonText}>Share wrap card</Text>
             </TouchableOpacity>
           </>
         ) : null}
@@ -250,16 +258,16 @@ export default function DailyWrapScreen() {
             fontWeight="600"
           >{`syncre • ${wrap.statDate}`}</SvgText>
           <SvgText x="60" y="230" fill="#FFFFFF" fontSize="64" fontWeight="700">
-            Napi Wrap
+            Daily Wrap
           </SvgText>
           <SvgText x="60" y="320" fill="#FFFFFF" fontSize="120" fontWeight="800">
-            {wrap.totalMessages} üzenet
+            {wrap.totalMessages} msgs
           </SvgText>
           <SvgText x="60" y="400" fill="#9CA3AF" fontSize="40" fontWeight="500">
-            {`Küldött: ${wrap.messagesSent} • Kapott: ${wrap.messagesReceived}`}
+            {`Sent: ${wrap.messagesSent} • Received: ${wrap.messagesReceived}`}
           </SvgText>
           <SvgText x="60" y="500" fill="#FFFFFF" fontSize="48" fontWeight="700">
-            Top beszélgetések
+            Top chats
           </SvgText>
           {(wrap.topContacts || []).slice(0, 5).map((contact, idx) => (
             <SvgText
@@ -270,17 +278,17 @@ export default function DailyWrapScreen() {
               fontSize="38"
               fontWeight="600"
             >
-              {`${idx + 1}. ${contact.username || 'Ismeretlen'} — ${contact.count} üzi`}
+              {`${idx + 1}. ${contact.username || 'Unknown'} — ${contact.count} msgs`}
             </SvgText>
           ))}
           <SvgText x="60" y="980" fill="#FFFFFF" fontSize="48" fontWeight="700">
-            Aktivitás
+            Activity
           </SvgText>
           <SvgText x="60" y="1040" fill="#9CA3AF" fontSize="32">
-            Legpörgősebb óra: {wrap.hourHistogram?.length ? wrap.hourHistogram.indexOf(maxHourValue) : 0}:00
+            Peak hour: {wrap.hourHistogram?.length ? wrap.hourHistogram.indexOf(maxHourValue) : 0}:00
           </SvgText>
           <SvgText x="60" y="1500" fill="#9CA3AF" fontSize="34">
-            Oszd meg a napi wrappedet a barátokkal! @syncre
+            Share your daily wrap with friends! @syncre
           </SvgText>
         </Svg>
       ) : null}

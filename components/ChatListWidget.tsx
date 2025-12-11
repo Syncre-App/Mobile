@@ -403,6 +403,19 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     );
   }
 
+  const renderHeaderActions = () => (
+    <View style={styles.headerActionsRow}>
+      <TouchableOpacity
+        style={styles.createGroupButton}
+        onPress={() => router.push('/group/create' as any)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="people-outline" size={18} color={palette.text} />
+        <Text style={styles.createGroupLabel}>New group</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <FlatList
       data={chats}
@@ -432,6 +445,28 @@ const styles = StyleSheet.create({
   },
   chatItem: {
     marginBottom: spacing.sm,
+  },
+  headerActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  createGroupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  createGroupLabel: {
+    color: palette.text,
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   chatCard: {
     paddingHorizontal: spacing.sm,

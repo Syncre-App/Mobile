@@ -4138,11 +4138,16 @@ const ChatScreen: React.FC = () => {
   const handleShowChatOptions = useCallback(() => {
     const targetId = otherUserIdRef.current;
     if (!targetId) return;
+    const createGroupParams = encodeURIComponent(JSON.stringify([targetId.toString()]));
 
     Alert.alert(
       'Chat Options',
       undefined,
       [
+        {
+          text: 'Create group',
+          onPress: () => router.push(`/group/create?members=${createGroupParams}` as any),
+        },
         {
           text: 'Report User',
           style: 'destructive',
