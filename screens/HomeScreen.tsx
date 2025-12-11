@@ -44,6 +44,8 @@ export const HomeScreen: React.FC = () => {
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
   const [chatUnreadCounts, setChatUnreadCounts] = useState<Record<string, number>>({});
   const [totalUnreadChats, setTotalUnreadChats] = useState(0);
+  const [userStatuses, setUserStatuses] = useState<any>({});
+  const [isOnline, setIsOnline] = useState(false);
   const unreadCount = useMemo(
     () => notifications.filter((notification) => !notification.read).length,
     [notifications]
