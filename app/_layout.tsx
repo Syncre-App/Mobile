@@ -74,18 +74,27 @@ export default function RootLayout() {
     return data?.chatId || data?.chat_id || data?.chatID || null;
   };
 
+  const extractWrapDateFromNotification = (response: Notifications.NotificationResponse | null) => {
+    const data = response?.notification?.request?.content?.data as any;
+    if (!data || data?.type !== 'daily_wrap') return null;
+    return data?.date || data?.day || null;
+  };
+
   useEffect(() => {
     let mounted = true;
 
     const bootstrapNavigation = async () => {
       const lastResponse = await Notifications.getLastNotificationResponseAsync().catch(() => null);
       const pendingChatId = extractChatIdFromNotification(lastResponse);
+      const pendingWrapDate = extractWrapDateFromNotification(lastResponse);
       const initialRoute = await resolveInitialRoute();
       if (!mounted) {
         return;
       }
 
-      if (pendingChatId && initialRoute.allowChatNavigation) {
+      if (pendingWrapDate && initialRoute.allowChatNavigation) {
+        router.replace(`/wrap/${pendingWrapDate}` as any);
+      } else if (pendingChatId && initialRoute.allowChatNavigation) {
         router.replace(`/chat/${pendingChatId}`);
       } else {
         router.replace(initialRoute.path as any);
@@ -96,7 +105,10 @@ export default function RootLayout() {
 
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
       const chatId = extractChatIdFromNotification(response);
-      if (chatId) {
+      const wrapDate = extractWrapDateFromNotification(response);
+      if (wrapDate) {
+        router.push(`/wrap/${wrapDate}` as any);
+      } else if (chatId) {
         router.push(`/chat/${chatId}`);
       }
     });

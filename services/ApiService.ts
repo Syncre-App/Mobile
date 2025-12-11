@@ -194,6 +194,11 @@ export class ApiService {
     return response;
   }
 
+  static async getDailyWrap(date?: string, token?: string): Promise<ApiResponse<any>> {
+    const suffix = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this.get(`/user/wrap/daily${suffix}`, token);
+  }
+
   static async put<T = any>(endpoint: string, data: any, token?: string): Promise<ApiResponse<T>> {
     try {
       const headers = this.buildHeaders(token);
