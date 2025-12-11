@@ -13,21 +13,32 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { GroupMemberPicker } from '../../components/GroupMemberPicker';
 import { UserAvatar } from '../../components/UserAvatar';
 import { ChatService, UploadableAsset } from '../../services/ChatService';
 import { ApiService } from '../../services/ApiService';
 import { NotificationService } from '../../services/NotificationService';
 import { StorageService } from '../../services/StorageService';
 import { UserCacheService } from '../../services/UserCacheService';
+import { UserStatus } from '../../services/WebSocketService';
 
-const MIN_GROUP_MEMBERS = 3;
+const MIN_GROUP_MEMBERS = 2;
+const MAX_GROUP_MEMBERS = 10;
+
+type Friend = {
+  id: string;
+  username: string;
+  email?: string;
+  profile_picture?: string | null;
+  status?: string | null;
+  last_seen?: string | null;
+};
 
 export default function CreateGroupScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ members?: string }>();
   const memberParam = Array.isArray(params.members) ? params.members[0] : params.members;
-  const memberIds = useMemo<string[]>(() => {
+  const initialMemberIds = useMemo<string[]>(() => {
     if (!memberParam) return [];
     try {
       const parsed = JSON.parse(memberParam);
@@ -36,7 +47,6 @@ export default function CreateGroupScreen() {
       }
       return [];
     } catch (error) {
-      console.warn('[group/create] Failed to parse members', error);
       return [];
     }
   }, [memberParam]);
@@ -44,45 +54,48 @@ export default function CreateGroupScreen() {
   const [groupName, setGroupName] = useState('');
   const [avatar, setAvatar] = useState<UploadableAsset | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [memberProfiles, setMemberProfiles] = useState<any[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>(initialMemberIds);
 
-  const hydrateMembers = useCallback(async () => {
-    if (!memberIds.length) {
-      setMemberProfiles([]);
-      return;
-    }
-    setLoadingMembers(true);
+  const hydrateFriends = useCallback(async () => {
+    setLoadingFriends(true);
     try {
       const token = await StorageService.getAuthToken();
-      const profiles: any[] = [];
-      for (const memberId of memberIds) {
-        const cached = UserCacheService.getUser(memberId);
-        if (cached) {
-          profiles.push(cached);
-          continue;
-        }
-        if (!token) continue;
-        const response = await ApiService.getUserById(memberId, token);
-        if (response.success && response.data) {
-          profiles.push(response.data);
-          UserCacheService.addUser({
-            ...response.data,
-            id: response.data.id?.toString?.() ?? String(response.data.id),
-          });
-        }
+      if (!token) {
+        setFriends([]);
+        return;
       }
-      setMemberProfiles(profiles);
-    } catch (error) {
-      console.error('Failed to hydrate member profiles', error);
+      const response = await ApiService.get('/user/friends', token);
+      if (response.success && response.data?.friends) {
+        const normalized = (response.data.friends as any[]).map((f) => ({
+          ...f,
+          id: f.id?.toString?.() ?? String(f.id),
+        }));
+        setFriends(normalized);
+        UserCacheService.addUsers(normalized);
+      } else {
+        setFriends([]);
+      }
+    } catch {
+      setFriends([]);
     } finally {
-      setLoadingMembers(false);
+      setLoadingFriends(false);
     }
-  }, [memberIds]);
+  }, []);
 
   useEffect(() => {
-    hydrateMembers();
-  }, [hydrateMembers]);
+    hydrateFriends();
+  }, [hydrateFriends]);
+
+  const resolveUser = (id: string) => {
+    const cached = UserCacheService.getUser(id);
+    if (cached) return cached as any;
+    const friend = friends.find((f) => f.id === id);
+    if (friend) return friend;
+    return { id, username: 'Member', email: '', profile_picture: null };
+  };
 
   const handlePickAvatar = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -107,9 +120,14 @@ export default function CreateGroupScreen() {
     }
   }, []);
 
+  const handleConfirmMembers = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+    setPickerVisible(false);
+  }, []);
+
   const handleCreateGroup = useCallback(async () => {
-    if (memberIds.length + 1 < MIN_GROUP_MEMBERS) {
-      NotificationService.show('error', 'Select at least two friends to start a group');
+    if (selectedIds.length + 1 < MIN_GROUP_MEMBERS) {
+      NotificationService.show('error', 'Select at least one friend to start a group');
       return;
     }
 
@@ -118,7 +136,7 @@ export default function CreateGroupScreen() {
       const response = await ChatService.createGroupChat(
         {
           name: groupName.trim(),
-          members: memberIds,
+          members: selectedIds,
           avatar,
         },
       );
@@ -135,23 +153,11 @@ export default function CreateGroupScreen() {
 
       NotificationService.show('error', response.error || 'Failed to create group');
     } catch (error) {
-      console.error('Failed to create group', error);
       NotificationService.show('error', 'Unexpected error creating group');
     } finally {
       setIsSubmitting(false);
     }
-  }, [avatar, groupName, memberIds, router]);
-
-  if (!memberIds.length) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>Select friends before creating a group.</Text>
-        <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
-          <Text style={styles.secondaryButtonText}>Go back</Text>
-        </Pressable>
-      </SafeAreaView>
-    );
-  }
+  }, [avatar, groupName, selectedIds, router]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -179,20 +185,35 @@ export default function CreateGroupScreen() {
           maxLength={60}
         />
 
-        <Text style={styles.sectionLabel}>Members ({memberIds.length + 1})</Text>
-        {loadingMembers ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          memberProfiles.map((member) => (
-            <View key={member.id} style={styles.memberRow}>
-              <UserAvatar uri={member.profile_picture} name={member.username} size={48} />
-              <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>{member.username}</Text>
-                <Text style={styles.memberMeta}>{member.email || member.status || ''}</Text>
+        <Text style={styles.sectionLabel}>Members ({selectedIds.length + 1})</Text>
+        {selectedIds.length ? (
+          selectedIds.map((id) => {
+            const member = resolveUser(id);
+            return (
+              <View key={id} style={styles.memberRow}>
+                <UserAvatar uri={member.profile_picture} name={member.username} size={48} />
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberName}>{member.username}</Text>
+                  <Text style={styles.memberMeta}>{member.email || member.status || ''}</Text>
+                </View>
               </View>
-            </View>
-          ))
+            );
+          })
+        ) : (
+          <Text style={styles.emptyMembers}>No members selected yet.</Text>
         )}
+
+        <Pressable
+          style={[styles.primaryButton, loadingFriends && styles.primaryButtonDisabled]}
+          onPress={() => setPickerVisible(true)}
+          disabled={loadingFriends}
+        >
+          {loadingFriends ? (
+            <ActivityIndicator color="#0B1630" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Add members</Text>
+          )}
+        </Pressable>
 
         <Pressable
           style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
@@ -210,6 +231,22 @@ export default function CreateGroupScreen() {
           <Text style={styles.secondaryButtonText}>Cancel</Text>
         </Pressable>
       </ScrollView>
+
+      <GroupMemberPicker
+        visible={pickerVisible}
+        title="Add members"
+        friends={friends}
+        lockedIds={[]}
+        excludedIds={[]}
+        minimumTotal={MIN_GROUP_MEMBERS}
+        maxTotal={MAX_GROUP_MEMBERS}
+        isLoading={loadingFriends}
+        isSubmitting={isSubmitting}
+        errorMessage={null}
+        mode="create"
+        onClose={() => setPickerVisible(false)}
+        onConfirm={handleConfirmMembers}
+      />
     </SafeAreaView>
   );
 }
@@ -218,13 +255,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#03040A',
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#03040A',
-    padding: 24,
   },
   content: {
     padding: 24,
@@ -286,6 +316,10 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
   },
+  emptyMembers: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 13,
+  },
   primaryButton: {
     backgroundColor: '#ffffff',
     borderRadius: 24,
@@ -318,4 +352,3 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 });
-
