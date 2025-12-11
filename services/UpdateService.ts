@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { ApkInstaller } from './ApkInstaller';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const appConfigJson = require('../app.json');
 const resolvedAppConfig = appConfigJson?.expo ? appConfigJson : appConfigJson?.default || {};
@@ -8,6 +9,9 @@ export interface ReleaseInfo {
   notes: string;
   url: string;
   publishedAt?: string;
+  assetUrl?: string;
+  assetName?: string;
+  assetSize?: number;
 }
 
 let pendingMandatoryUpdate: ReleaseInfo | null = null;
@@ -69,16 +73,32 @@ export const UpdateService = {
         return null;
       }
 
+      const assets = Array.isArray(payload?.assets) ? payload.assets : [];
+      const apkAsset =
+        assets.find((asset: any) => asset?.name?.toLowerCase?.().endsWith('.apk')) ||
+        assets.find((asset: any) => asset?.content_type === 'application/vnd.android.package-archive');
+
       return {
         version,
         notes: payload?.body || 'New version available.',
         url: payload?.html_url || 'https://github.com/Syncre-App/Mobile/releases/latest',
         publishedAt: payload?.published_at,
+        assetUrl: apkAsset?.browser_download_url,
+        assetName: apkAsset?.name,
+        assetSize: apkAsset?.size,
       };
     } catch (error) {
       console.warn('[UpdateService] Failed to fetch latest release:', error);
       return null;
     }
+  },
+
+  async downloadAndInstallLatest(onProgress?: (progress: number) => void) {
+    const latestRelease = await this.fetchLatestRelease();
+    if (!latestRelease?.assetUrl) {
+      throw new Error('Nem található APK asset a legutóbbi kiadásban');
+    }
+    await ApkInstaller.downloadAndInstall(latestRelease.assetUrl, onProgress);
   },
 
   async checkForMandatoryUpdate(): Promise<{ requiresUpdate: boolean; release?: ReleaseInfo | null }> {
