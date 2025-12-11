@@ -50,6 +50,9 @@ export const HomeScreen: React.FC = () => {
   const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
   const incomingRequestsRef = useRef<any[]>([]);
   const outgoingRequestsRef = useRef<any[]>([]);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
+  const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
   const unreadCount = useMemo(
     () => notifications.filter((notification) => !notification.read).length,
     [notifications]
