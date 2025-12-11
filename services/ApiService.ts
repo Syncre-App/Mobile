@@ -131,10 +131,16 @@ export class ApiService {
   static async getUserById(userId: string, token: string): Promise<ApiResponse<any>> {
     const cachedUser = UserCacheService.getUser(userId);
     const shouldRevalidate = UserCacheService.isStale(userId);
+    const missingCriticalFields =
+      !cachedUser ||
+      cachedUser.last_seen === undefined ||
+      cachedUser.badges === undefined ||
+      cachedUser.status === undefined;
 
     if (cachedUser) {
-      // Return cached immediately; refresh in background if stale to keep names/avatars current
-      if (shouldRevalidate) {
+      // If we have cache but it's missing important fields, do a blocking refresh.
+      if (!missingCriticalFields && shouldRevalidate) {
+        // Return cached immediately; refresh in background if stale to keep names/avatars current
         this.get(`/user/${userId}`, token)
           .then((response) => {
             if (response.success && response.data) {
@@ -142,12 +148,20 @@ export class ApiService {
             }
           })
           .catch((err) => console.warn('[ApiService] Background user refresh failed:', err));
+        return {
+          success: true,
+          data: cachedUser,
+          statusCode: 200,
+        };
       }
-      return {
-        success: true,
-        data: cachedUser,
-        statusCode: 200,
-      };
+
+      if (!missingCriticalFields) {
+        return {
+          success: true,
+          data: cachedUser,
+          statusCode: 200,
+        };
+      }
     }
 
     const response = await this.get(`/user/${userId}`, token);
@@ -165,6 +179,16 @@ export class ApiService {
     }
     if (response.success && response.data) {
       UserCacheService.addUser(response.data);
+      return response;
+    }
+
+    // If network fetch failed but we had a cached user, return it to avoid breaking UI.
+    if (cachedUser) {
+      return {
+        success: true,
+        data: cachedUser,
+        statusCode: 200,
+      };
     }
 
     return response;
