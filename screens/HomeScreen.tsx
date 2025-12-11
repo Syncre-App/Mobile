@@ -53,8 +53,10 @@ export const HomeScreen: React.FC = () => {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
-  const [isLoadingUnread, setIsLoadingUnread] = useState(false);
   const unreadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const chatsLoadingRef = useRef(false);
+  const unreadLoadingRef = useRef(false);
+  const validationStartedRef = useRef(false);
   const unreadCount = useMemo(
     () => notifications.filter((notification) => !notification.read).length,
     [notifications]
@@ -111,7 +113,7 @@ export const HomeScreen: React.FC = () => {
   );
 
   const loadUnreadSummary = useCallback(async (skipDebounce = false) => {
-    if (isLoadingUnread && !skipDebounce) {
+    if (unreadLoadingRef.current && !skipDebounce) {
       console.log('loadUnreadSummary: skipping - already loading');
       return;
     }
@@ -129,7 +131,7 @@ export const HomeScreen: React.FC = () => {
       return;
     }
 
-    setIsLoadingUnread(true);
+    unreadLoadingRef.current = true;
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
@@ -176,9 +178,9 @@ export const HomeScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to load unread summary:', error);
     } finally {
-      setIsLoadingUnread(false);
+      unreadLoadingRef.current = false;
     }
-  }, [isLoadingUnread]);
+  }, []);
   type UnreadMap = Record<string, number>;
   const computeUnreadTotal = (map: UnreadMap) =>
     Object.values(map).reduce((sum: number, val: number) => sum + val, 0);
@@ -264,11 +266,12 @@ export const HomeScreen: React.FC = () => {
 
   const loadChats = useCallback(async (skipLoadingCheck = false) => {
     // Prevent concurrent loads during initial load
-    if (!skipLoadingCheck && chatsLoading) {
+    if (!skipLoadingCheck && chatsLoadingRef.current) {
       console.log('loadChats: skipping - already loading');
       return;
     }
     
+    chatsLoadingRef.current = true;
     setChatsLoading(true);
     try {
       const token = await StorageService.getAuthToken();
@@ -302,9 +305,10 @@ export const HomeScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to load chats:', error);
     } finally {
+      chatsLoadingRef.current = false;
       setChatsLoading(false);
     }
-  }, [chatsLoading]);
+  }, []);
 
   const loadFriendData = useCallback(async () => {
     try {
@@ -528,6 +532,10 @@ export const HomeScreen: React.FC = () => {
   }, [cacheUsers]);
   
   useEffect(() => {
+    if (validationStartedRef.current) {
+      return;
+    }
+    validationStartedRef.current = true;
     validateTokenAndInit();
   }, [validateTokenAndInit]);
 
