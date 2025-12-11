@@ -36,18 +36,9 @@ export const HomeScreen: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [chats, setChats] = useState<any[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
-  const [userStatuses, setUserStatuses] = useState<any>({});
-  const [isValidatingToken, setIsValidatingToken] = useState(true);
-  const [isOnline, setIsOnline] = useState(false);
-  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
-  const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
-  const incomingRequestsRef = useRef<any[]>([]);
-  const outgoingRequestsRef = useRef<any[]>([]);
-  const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
-  const [requestError, setRequestError] = useState<string | null>(null);
-  const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [friendDataLoading, setFriendDataLoading] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
   const [chatUnreadCounts, setChatUnreadCounts] = useState<Record<string, number>>({});
   const [totalUnreadChats, setTotalUnreadChats] = useState(0);
@@ -237,7 +228,13 @@ export const HomeScreen: React.FC = () => {
     );
   }, [cacheUsers]);
 
-  const loadChats = useCallback(async () => {
+  const loadChats = useCallback(async (skipLoadingCheck = false) => {
+    // Prevent concurrent loads during initial load
+    if (!skipLoadingCheck && chatsLoading) {
+      console.log('loadChats: skipping - already loading');
+      return;
+    }
+    
     setChatsLoading(true);
     try {
       const token = await StorageService.getAuthToken();
@@ -273,7 +270,7 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setChatsLoading(false);
     }
-  }, []);
+  }, [chatsLoading]);
 
   const loadFriendData = useCallback(async () => {
     try {
@@ -417,10 +414,11 @@ export const HomeScreen: React.FC = () => {
         }
       }
       
-      await loadChats();
+      await loadChats(true); // Skip loading check for initial load
       await loadFriendData();
       await loadNotifications();
       await loadUnreadSummary();
+      setIsInitialLoadComplete(true);
     } catch (error) {
       console.error('Failed to load user data:', error);
     }
@@ -882,7 +880,10 @@ export const HomeScreen: React.FC = () => {
       case 'chat_members_removed':
       case 'chat_deleted':
       case 'chat_removed': {
-        loadChats();
+        // Only refresh chats after initial load is complete to prevent double loading
+        if (isInitialLoadComplete) {
+          loadChats();
+        }
         break;
       }
       case 'message_envelope':
@@ -897,7 +898,7 @@ export const HomeScreen: React.FC = () => {
       default:
         break;
     }
-  }, [handleFriendStateChanged, handleRespondToRequest, loadNotifications, loadUnreadSummary]);
+  }, [handleFriendStateChanged, handleRespondToRequest, loadNotifications, loadUnreadSummary, isInitialLoadComplete]);
 
   useEffect(() => {
     const wsService = WebSocketService.getInstance();
