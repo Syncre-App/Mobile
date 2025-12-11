@@ -115,7 +115,7 @@ export const HomeScreen: React.FC = () => {
   const loadUnreadSummary = useCallback(async (skipDebounce = false) => {
     if (unreadLoadingRef.current && !skipDebounce) {
       console.log('loadUnreadSummary: skipping - already loading');
-      return;
+      return false;
     }
 
     // Clear existing timeout
@@ -128,10 +128,11 @@ export const HomeScreen: React.FC = () => {
       unreadTimeoutRef.current = setTimeout(() => {
         loadUnreadSummary(true);
       }, 1000);
-      return;
+      return false;
     }
 
     unreadLoadingRef.current = true;
+    let success = false;
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
@@ -142,7 +143,7 @@ export const HomeScreen: React.FC = () => {
         } catch (err) {
           console.warn('[HomeScreen] Failed to update badge count:', err);
         }
-        return;
+        return false;
       }
 
       const response = await ApiService.get('/chat/unread/summary', token);
@@ -175,11 +176,14 @@ export const HomeScreen: React.FC = () => {
           console.warn('[HomeScreen] Failed to reset badge count:', err);
         }
       }
+      success = true;
     } catch (error) {
       console.error('Failed to load unread summary:', error);
+      success = false;
     } finally {
       unreadLoadingRef.current = false;
     }
+    return success;
   }, []);
   type UnreadMap = Record<string, number>;
   const computeUnreadTotal = (map: UnreadMap) =>
@@ -268,11 +272,12 @@ export const HomeScreen: React.FC = () => {
     // Prevent concurrent loads during initial load
     if (!skipLoadingCheck && chatsLoadingRef.current) {
       console.log('loadChats: skipping - already loading');
-      return;
+      return false;
     }
     
     chatsLoadingRef.current = true;
     setChatsLoading(true);
+    let success = false;
     try {
       const token = await StorageService.getAuthToken();
       console.log('loadChats: token=', !!token);
@@ -281,6 +286,7 @@ export const HomeScreen: React.FC = () => {
         const response = await ApiService.get('/chat', token);
         console.log('loadChats: response=', response);
         if (response.success && response.data) {
+          success = true;
           // API returns { chats: [...] } according to documentation
           setChats(response.data.chats || []);
           if (Array.isArray(response.data.chats)) {
@@ -308,17 +314,20 @@ export const HomeScreen: React.FC = () => {
       chatsLoadingRef.current = false;
       setChatsLoading(false);
     }
+    return success;
   }, []);
 
   const loadFriendData = useCallback(async () => {
+    let success = false;
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
-        return;
+        return false;
       }
 
       const response = await ApiService.get('/user/friends', token);
       if (response.success && response.data) {
+        success = true;
         const pending = response.data.pending || {};
         const incoming = Array.isArray(pending.incoming) ? pending.incoming : [];
         const outgoing = Array.isArray(pending.outgoing) ? pending.outgoing : [];
@@ -346,11 +355,14 @@ export const HomeScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load friend data:', error);
+      success = false;
     }
+    return success;
   }, [cacheUsers]);
 
   const loadNotifications = useCallback(async () => {
     setNotificationsLoading(true);
+    let success = false;
     const buildFallbackNotifications = () => {
       const incoming = incomingRequestsRef.current.map((item: any) => ({
         id: `incoming-${item?.id}`,
@@ -389,18 +401,19 @@ export const HomeScreen: React.FC = () => {
         if (!cachedNotifications) {
           setNotifications(buildFallbackNotifications());
         }
-        return;
+        return false;
       }
 
       const response = await ApiService.get('/user/notifications', token);
       if (response.success && response.data) {
+        success = true;
         const items = Array.isArray(response.data.notifications) ? response.data.notifications : [];
         console.log('🔔 Notifications response data:', response.data);
         console.log('🔔 Notifications fetched:', items);
         await ensureNotificationUsers(items, token);
         setNotifications(items);
         persistNotifications(items);
-        return;
+        return true;
       }
 
       if (response.statusCode === 404 || response.statusCode === 401) {
@@ -409,7 +422,7 @@ export const HomeScreen: React.FC = () => {
         await ensureNotificationUsers(fallback, token);
         setNotifications(fallback);
         persistNotifications(fallback);
-        return;
+        return false;
       }
 
       console.warn('🔔 Failed to fetch notifications:', response.error);
@@ -428,9 +441,11 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setNotificationsLoading(false);
     }
+    return success;
   }, [ensureNotificationUsers, persistNotifications, cacheUsers]);
 
   const initializeScreen = useCallback(async () => {
+    setIsInitialLoadComplete(false);
     try {
       const userData: any = await StorageService.getObject('user_data');
       setUser(userData);
@@ -452,13 +467,20 @@ export const HomeScreen: React.FC = () => {
         }
       }
       
-      await loadChats(true); // Skip loading check for initial load
-      await loadFriendData();
-      await loadNotifications();
-      await loadUnreadSummary();
-      setIsInitialLoadComplete(true);
+      const [chatsOk, friendsOk, notificationsOk, unreadOk] = await Promise.all([
+        loadChats(true), // Skip loading check for initial load
+        loadFriendData(),
+        loadNotifications(),
+        loadUnreadSummary(true),
+      ]);
+
+      const allOk = Boolean(chatsOk && friendsOk && notificationsOk && unreadOk);
+      setIsInitialLoadComplete(allOk);
+      return allOk;
     } catch (error) {
       console.error('Failed to load user data:', error);
+      setIsInitialLoadComplete(false);
+      return false;
     }
   }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary, cacheUsers]);
 
@@ -961,10 +983,10 @@ export const HomeScreen: React.FC = () => {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <AppBackground />
       
-      {isValidatingToken ? (
+      {isValidatingToken || !isInitialLoadComplete ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={palette.accent} />
-          <Text style={styles.loadingText}>Validating session...</Text>
+          <Text style={styles.loadingText}>Loading your chats...</Text>
         </View>
       ) : (
         <SafeAreaView
