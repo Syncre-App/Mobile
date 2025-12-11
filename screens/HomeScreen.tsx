@@ -776,10 +776,6 @@ export const HomeScreen: React.FC = () => {
     await Promise.all([loadChats(), loadFriendData(), loadNotifications(), loadUnreadSummary()]);
   }, [loadChats, loadFriendData, loadNotifications, loadUnreadSummary]);
 
-  useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
-
   const handleNotificationsPress = useCallback(() => {
     setIsNotificationsVisible((prev) => !prev);
   }, []);
@@ -789,9 +785,21 @@ export const HomeScreen: React.FC = () => {
       if (notification.type === 'friend_request') {
         return;
       }
+      const chatId =
+        notification?.chatId ??
+        notification?.chat_id ??
+        notification?.chatID ??
+        notification?.data?.chatId ??
+        notification?.data?.chat_id ??
+        notification?.data?.chatID;
+      if (chatId) {
+        const normalized = chatId?.toString?.() ?? String(chatId);
+        setIsNotificationsVisible(false);
+        router.push(`/chat/${normalized}` as any);
+      }
       markNotificationAsRead(notification.id);
     },
-    [markNotificationAsRead]
+    [markNotificationAsRead, router]
   );
 
   useEffect(() => {

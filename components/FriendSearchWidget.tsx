@@ -8,6 +8,7 @@ import { UserCacheService } from '../services/UserCacheService';
 import { layout, palette, radii, spacing } from '../theme/designSystem';
 import { TransparentField } from './TransparentField';
 import { UserAvatar } from './UserAvatar';
+import BadgeIcon from './BadgeIcon';
 
 interface User {
   id: string;
@@ -67,6 +68,7 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
           ...candidate,
           id: candidate.id?.toString?.() ?? String(candidate.id),
           friendship_status: candidate.friendship_status || candidate.status || 'available',
+          badges: Array.isArray(candidate.badges) ? candidate.badges : [],
         }));
 
         console.log('🔍 Found', normalized.length, 'users');
@@ -238,7 +240,18 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
           style={styles.avatarContainer}
         />
         <View style={styles.searchResultInfo}>
-          <Text style={styles.searchResultUsername}>{item.username}</Text>
+          <View style={styles.searchResultTitleRow}>
+            <Text style={styles.searchResultUsername}>{item.username}</Text>
+            {Array.isArray(item.badges) && item.badges.length > 0 ? (
+              <View style={styles.badgeContainer}>
+                {item.badges.slice(0, 3).map((badge: string, idx: number) => (
+                  <View key={`${item.id}-badge-${badge}-${idx}`} style={styles.badgeWrapper}>
+                    <BadgeIcon type={badge as any} size={20} />
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.searchResultMeta}>{renderStatusText(status)}</Text>
         </View>
         {icon}
@@ -337,10 +350,27 @@ const styles = StyleSheet.create({
   searchResultInfo: {
     flex: 1,
   },
+  searchResultTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   searchResultUsername: {
     color: palette.text,
     fontSize: 16,
     fontFamily: 'PlusJakartaSans-SemiBold',
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  badgeWrapper: {
+    shadowColor: '#ffffff',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 1,
   },
   searchResultMeta: {
     color: palette.textMuted,
