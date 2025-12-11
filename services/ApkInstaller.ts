@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Platform } from 'react-native';
 
@@ -7,9 +7,9 @@ type ProgressCallback = (progress: number) => void;
 
 const APK_FILE_NAME = 'syncre-update.apk';
 const APK_MIME = 'application/vnd.android.package-archive';
-const INSTALL_FLAGS =
-	IntentLauncher.AndroidIntentFlags.FLAG_ACTIVITY_NEW_TASK |
-	IntentLauncher.AndroidIntentFlags.FLAG_GRANT_READ_URI_PERMISSION;
+const FLAG_GRANT_READ_URI_PERMISSION = 1;
+const FLAG_ACTIVITY_NEW_TASK = 268435456; 
+const INSTALL_FLAGS = FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK;
 
 const getPackageId = () =>
 	Constants.expoConfig?.android?.package ||
@@ -59,20 +59,17 @@ const launchInstaller = async (apkUri: string) => {
 
 	const contentUri = await FileSystem.getContentUriAsync(apkUri);
 	try {
-		await IntentLauncher.startActivityAsync(IntentLauncher.ACTION_VIEW, {
-			data: contentUri,
-			flags: INSTALL_FLAGS,
-			type: APK_MIME,
-		});
+	await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+		data: contentUri,
+		flags: INSTALL_FLAGS,
+		type: APK_MIME,
+	});
 	} catch (error) {
 		try {
-			await IntentLauncher.startActivityAsync(
-				'android.settings.MANAGE_UNKNOWN_APP_SOURCES',
-				{
-					data: `package:${getPackageId()}`,
-					flags: IntentLauncher.AndroidIntentFlags.FLAG_ACTIVITY_NEW_TASK,
-				}
-			);
+			await IntentLauncher.startActivityAsync('android.settings.MANAGE_UNKNOWN_APP_SOURCES', {
+				data: `package:${getPackageId()}`,
+				flags: FLAG_ACTIVITY_NEW_TASK,
+			});
 		} catch {
 			// ignore secondary failure
 		}
