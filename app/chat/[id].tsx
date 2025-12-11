@@ -12,7 +12,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode } from 'expo-video';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';

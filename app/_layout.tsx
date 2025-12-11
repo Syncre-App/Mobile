@@ -176,12 +176,15 @@ export default function RootLayout() {
           <Stack.Screen name="identity" />
           <Stack.Screen name="maintenance" />
           <Stack.Screen name="update" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="edit-profile" />
           <Stack.Screen name="profile" />
           <Stack.Screen name="chat/[id]" />
-          <Stack.Screen name="group/[id]" />
-          <Stack.Screen name="share" />
+          <Stack.Screen name="group/create" />
+          <Stack.Screen name="group/[id]/edit" />
+          <Stack.Screen name="settings/index" options={{ title: 'Settings' }} />
+          <Stack.Screen name="settings/edit-profile" options={{ title: 'Edit Profile' }} />
+          <Stack.Screen name="settings/privacy" options={{ title: 'Privacy' }} />
+          <Stack.Screen name="settings/blocked-users" options={{ title: 'Blocked Users' }} />
+          <Stack.Screen name="share/index" />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

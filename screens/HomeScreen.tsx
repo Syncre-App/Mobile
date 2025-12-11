@@ -37,7 +37,9 @@ export const HomeScreen: React.FC = () => {
   const [chats, setChats] = useState<any[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
   const [friendDataLoading, setFriendDataLoading] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [isValidatingToken, setIsValidatingToken] = useState(true);
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
   const [chatUnreadCounts, setChatUnreadCounts] = useState<Record<string, number>>({});
@@ -442,6 +444,7 @@ export const HomeScreen: React.FC = () => {
       
       if (!token) {
         console.log('❌ HomeScreen: No token found - redirect to login');
+        setIsValidatingToken(false);
         router.replace('/');
         return;
       }
@@ -457,12 +460,14 @@ export const HomeScreen: React.FC = () => {
         PushService.registerForPushNotifications();
       } else {
         console.log('❌ HomeScreen: Token invalid - clearing and redirect to login');
+        setIsValidatingToken(false);
         await StorageService.removeAuthToken();
         await StorageService.removeItem('user_data');
         router.replace('/');
       }
     } catch (error) {
       console.error('❌ HomeScreen: Token validation error:', error);
+      setIsValidatingToken(false);
       await StorageService.removeAuthToken();
       await StorageService.removeItem('user_data');
       router.replace('/');
