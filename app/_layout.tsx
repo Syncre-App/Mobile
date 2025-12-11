@@ -2,7 +2,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiService } from '../services/ApiService';
@@ -22,27 +22,24 @@ export default function RootLayout() {
   const [maintenance, setMaintenance] = useState<boolean>(false);
   const router = useRouter();
 
-  const checkMaintenance = async () => {
+  const resolveInitialRoute = useCallback(async () => {
     const maintenanceFlag = isMaintenanceEnabled();
     if (maintenanceFlag) {
       setMaintenance(true);
-      router.replace('/maintenance');
-      return;
+      return { path: '/maintenance', allowChatNavigation: false };
     }
 
     try {
       const apiStatus = await ApiService.get('/health');
       if (!apiStatus.success) {
         setMaintenance(true);
-        router.replace('/maintenance');
-        return;
+        return { path: '/maintenance', allowChatNavigation: false };
       }
 
       const updateStatus = await UpdateService.checkForMandatoryUpdate();
       if (updateStatus.requiresUpdate) {
         setMaintenance(false);
-        router.replace('/update');
-        return;
+        return { path: '/update', allowChatNavigation: false };
       }
 
       const token = await StorageService.getAuthToken();
@@ -52,53 +49,64 @@ export default function RootLayout() {
 
         if (needsIdentitySetup) {
           setMaintenance(false);
-          router.replace('/identity?mode=setup');
-          return;
+          return { path: '/identity?mode=setup', allowChatNavigation: false };
         }
 
         if (!hasLocalIdentity) {
           setMaintenance(false);
-          router.replace('/identity?mode=unlock');
-          return;
+          return { path: '/identity?mode=unlock', allowChatNavigation: false };
         }
 
         setMaintenance(false);
-        router.replace('/home');
-        return;
+        return { path: '/home', allowChatNavigation: true };
       }
 
       setMaintenance(false);
-      router.replace('/');
+      return { path: '/', allowChatNavigation: false };
     } catch {
       setMaintenance(true);
-      router.replace('/maintenance');
+      return { path: '/maintenance', allowChatNavigation: false };
     }
+  }, []);
+
+  const extractChatIdFromNotification = (response: Notifications.NotificationResponse | null) => {
+    const data = response?.notification?.request?.content?.data as any;
+    return data?.chatId || data?.chat_id || data?.chatID || null;
   };
 
   useEffect(() => {
-    checkMaintenance();
-  }, []);
+    let mounted = true;
 
-  useEffect(() => {
-    // Handle notification taps -> navigate to the target chat
-    const handleNotificationResponse = (response: Notifications.NotificationResponse | null) => {
-      const data = response?.notification?.request?.content?.data as any;
-      const chatId = data?.chatId || data?.chat_id || data?.chatID;
-      if (chatId) {
-        router.push(`/chat/${chatId}`);
+    const bootstrapNavigation = async () => {
+      const lastResponse = await Notifications.getLastNotificationResponseAsync().catch(() => null);
+      const pendingChatId = extractChatIdFromNotification(lastResponse);
+      const initialRoute = await resolveInitialRoute();
+      if (!mounted) {
+        return;
+      }
+
+      // Prefer opening the chat from the push payload when the user can reach chats
+      if (pendingChatId && initialRoute.allowChatNavigation) {
+        router.replace(`/chat/${pendingChatId}`);
+      } else {
+        router.replace(initialRoute.path as any);
       }
     };
 
-    Notifications.getLastNotificationResponseAsync()
-      .then(handleNotificationResponse)
-      .catch(() => {});
+    bootstrapNavigation();
 
-    const responseSub = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const chatId = extractChatIdFromNotification(response);
+      if (chatId) {
+        router.push(`/chat/${chatId}`);
+      }
+    });
 
     return () => {
+      mounted = false;
       responseSub.remove();
     };
-  }, [router]);
+  }, [resolveInitialRoute, router]);
 
   useEffect(() => {
     ShareIntentService.init();
