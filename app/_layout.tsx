@@ -85,7 +85,6 @@ export default function RootLayout() {
         return;
       }
 
-      // Prefer opening the chat from the push payload when the user can reach chats
       if (pendingChatId && initialRoute.allowChatNavigation) {
         router.replace(`/chat/${pendingChatId}`);
       } else {
