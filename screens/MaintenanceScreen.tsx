@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { palette, spacing } from '../theme/designSystem';
 
 export const MaintenanceScreen: React.FC = () => {
   return (
@@ -12,7 +12,6 @@ export const MaintenanceScreen: React.FC = () => {
       <AppBackground />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.overline}>Hang tight</Text>
           <Text style={styles.title}>We&apos;re polishing things</Text>
           <Text style={styles.message}>

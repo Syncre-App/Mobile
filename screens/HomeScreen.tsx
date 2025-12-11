@@ -53,6 +53,8 @@ export const HomeScreen: React.FC = () => {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
+  const [isLoadingUnread, setIsLoadingUnread] = useState(false);
+  const unreadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const unreadCount = useMemo(
     () => notifications.filter((notification) => !notification.read).length,
     [notifications]
@@ -108,7 +110,26 @@ export const HomeScreen: React.FC = () => {
     [persistNotifications]
   );
 
-  const loadUnreadSummary = useCallback(async () => {
+  const loadUnreadSummary = useCallback(async (skipDebounce = false) => {
+    if (isLoadingUnread && !skipDebounce) {
+      console.log('loadUnreadSummary: skipping - already loading');
+      return;
+    }
+
+    // Clear existing timeout
+    if (unreadTimeoutRef.current) {
+      clearTimeout(unreadTimeoutRef.current);
+    }
+
+    // Debounce the call to avoid rapid API calls
+    if (!skipDebounce) {
+      unreadTimeoutRef.current = setTimeout(() => {
+        loadUnreadSummary(true);
+      }, 1000);
+      return;
+    }
+
+    setIsLoadingUnread(true);
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
@@ -154,8 +175,10 @@ export const HomeScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load unread summary:', error);
+    } finally {
+      setIsLoadingUnread(false);
     }
-  }, []);
+  }, [isLoadingUnread]);
   type UnreadMap = Record<string, number>;
   const computeUnreadTotal = (map: UnreadMap) =>
     Object.values(map).reduce((sum: number, val: number) => sum + val, 0);
@@ -819,8 +842,9 @@ export const HomeScreen: React.FC = () => {
       loadNotifications();
       loadUnreadSummary();
     });
+
     return unsubscribe;
-  }, [loadNotifications, loadUnreadSummary]);
+  }, [loadNotifications]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('unread:refresh', () => {
@@ -829,7 +853,7 @@ export const HomeScreen: React.FC = () => {
     return () => {
       subscription.remove();
     };
-  }, [loadUnreadSummary]);
+  }, []);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('chats:refresh', () => {
