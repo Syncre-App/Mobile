@@ -1,7 +1,6 @@
 import * as Location from 'expo-location';
 import * as Localization from 'expo-localization';
 import { ApiService } from './ApiService';
-import { CryptoService, EncryptedLocationPayload } from './CryptoService';
 import { StorageService } from './StorageService';
 import { TimezoneService } from './TimezoneService';
 
@@ -48,24 +47,16 @@ export const LocationSyncService = {
         console.warn('LocationSyncService: location request failed', locationError);
       }
 
-      let encryptedLocation: EncryptedLocationPayload | null = null;
-      try {
-        encryptedLocation = await CryptoService.encryptLocationPayload({
-          latitude: coords?.latitude ?? null,
-          longitude: coords?.longitude ?? null,
-          timezone,
-        });
-      } catch (cryptoError) {
-        console.warn('LocationSyncService: failed to encrypt location payload', cryptoError);
-      }
-
-      if (!encryptedLocation) {
-        return;
-      }
-
       await ApiService.post(
         '/user/location',
-        { encryptedLocation },
+        {
+          location: {
+            latitude: coords?.latitude ?? null,
+            longitude: coords?.longitude ?? null,
+            timezone,
+            recordedAt: new Date().toISOString(),
+          },
+        },
         token
       );
     } catch (error) {
