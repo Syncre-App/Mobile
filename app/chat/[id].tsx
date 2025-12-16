@@ -27,7 +27,6 @@ import { ChatService, type UploadableAsset } from '../../services/ChatService';
 import { GroupMemberPicker } from '../../components/GroupMemberPicker';
 import { UserAvatar } from '../../components/UserAvatar';
 import { AppBackground } from '../../components/AppBackground';
-import BadgeIcon from '../../components/BadgeIcon';
 import { EphemeralOptions, type EphemeralDuration } from '../../components/EphemeralOptions';
 import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
 import { CreatePollSheet } from '../../components/CreatePollSheet';
@@ -5137,7 +5136,7 @@ const ChatScreen: React.FC = () => {
                 ...existing.poll,
                 votes: payload.votes || existing.poll.votes,
                 totalVotes: payload.totalVotes ?? existing.poll.totalVotes,
-                isClosed: type === 'poll_closed' ? true : existing.poll.isClosed,
+                isClosed: message.type === 'poll_closed' ? true : existing.poll.isClosed,
               },
             });
             return newMap;
@@ -5583,6 +5582,25 @@ const ChatScreen: React.FC = () => {
       const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
       const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
+      // Render PollMessage for poll type messages
+      if (messageItem.isPoll && messageItem.poll) {
+        const pollDataEntry = pollsData.get(messageItem.id);
+        const userVotes = pollDataEntry?.userVotes || [];
+        const isCreator = messageItem.poll.creatorId === currentUserId;
+
+        return (
+          <PollMessage
+            key={messageItem.id}
+            poll={messageItem.poll}
+            userVotes={userVotes}
+            onVote={(optionId) => handlePollVote(messageItem.id, messageItem.poll!.id, optionId)}
+            onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, messageItem.poll!.id, optionId)}
+            onClose={() => handleClosePoll(messageItem.id, messageItem.poll!.id)}
+            isCreator={isCreator}
+          />
+        );
+      }
+
       return (
         <MessageBubble
           key={messageItem.id}
@@ -5641,6 +5659,10 @@ const ChatScreen: React.FC = () => {
       contentFilterMode,
       typingUsers,
       formatTypingLabel,
+      pollsData,
+      handlePollVote,
+      handlePollRemoveVote,
+      handleClosePoll,
     ]
   );
 
