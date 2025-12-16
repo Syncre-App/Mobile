@@ -45,6 +45,7 @@ export const HomeScreen: React.FC = () => {
   const [chatUnreadCounts, setChatUnreadCounts] = useState<Record<string, number>>({});
   const [totalUnreadChats, setTotalUnreadChats] = useState(0);
   const [userStatuses, setUserStatuses] = useState<any>({});
+  const [chatStreaks, setChatStreaks] = useState<Record<string, any>>({});
   const [isOnline, setIsOnline] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
@@ -288,9 +289,10 @@ export const HomeScreen: React.FC = () => {
         if (response.success && response.data) {
           success = true;
           // API returns { chats: [...] } according to documentation
-          setChats(response.data.chats || []);
-          if (Array.isArray(response.data.chats)) {
-            response.data.chats.forEach((chat: any) => {
+          const chatList = response.data.chats || [];
+          setChats(chatList);
+          if (Array.isArray(chatList)) {
+            chatList.forEach((chat: any) => {
               if (Array.isArray(chat.participants)) {
                 UserCacheService.addUsers(
                   chat.participants.map((participant: any) => ({
@@ -300,6 +302,19 @@ export const HomeScreen: React.FC = () => {
                 );
               }
             });
+
+            // Fetch streaks for all chats
+            const chatIds = chatList.map((chat: any) => chat.id);
+            if (chatIds.length > 0) {
+              try {
+                const streaksResponse = await ApiService.getStreaksForChats(chatIds, token);
+                if (streaksResponse.success && streaksResponse.data?.streaks) {
+                  setChatStreaks(streaksResponse.data.streaks);
+                }
+              } catch (streakErr) {
+                console.warn('Failed to fetch streaks:', streakErr);
+              }
+            }
           }
         } else {
           console.warn('loadChats: failed to fetch chats:', response.error);
@@ -963,6 +978,22 @@ export const HomeScreen: React.FC = () => {
         loadUnreadSummary();
         break;
       }
+      case 'streak_update': {
+        const { chatId, currentStreak, longestStreak, participantsActive, lastActivityDate } = message as any;
+        if (chatId) {
+          setChatStreaks((prev) => ({
+            ...prev,
+            [chatId.toString()]: {
+              chatId,
+              currentStreak,
+              longestStreak,
+              participantsActive,
+              lastActivityDate,
+            },
+          }));
+        }
+        break;
+      }
       default:
         break;
     }
@@ -1158,6 +1189,7 @@ export const HomeScreen: React.FC = () => {
                 blockedUserIds={blockedSet}
                 removingFriendId={removingFriendId}
                 unreadCounts={chatUnreadCounts}
+                streaks={chatStreaks}
                 onEditGroup={handleEditGroup}
                 onDeleteGroup={handleDeleteGroup}
                 onLeaveGroup={handleLeaveGroup}

@@ -30,6 +30,14 @@ interface Chat {
   unreadCount?: number;
 }
 
+interface StreakData {
+  chatId: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastActivityDate: string | null;
+  participantsActive: Record<string, boolean>;
+}
+
 interface User {
   id: string;
   username: string;
@@ -51,6 +59,7 @@ interface ChatListWidgetProps {
   blockedUserIds?: Set<string>;
   removingFriendId?: string | null;
   unreadCounts?: Record<string, number>;
+  streaks?: Record<string, StreakData>;
   onEditGroup?: (chat: Chat) => void;
   onDeleteGroup?: (chat: Chat) => void;
   onLeaveGroup?: (chat: Chat) => void;
@@ -68,6 +77,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   blockedUserIds,
   removingFriendId = null,
   unreadCounts = {},
+  streaks = {},
   onEditGroup = () => {},
   onDeleteGroup = () => {},
   onLeaveGroup = () => {},
@@ -310,6 +320,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const userBadges = !isGroupChat && cachedUser?.badges
       ? (Array.isArray(cachedUser.badges) ? cachedUser.badges : [])
       : [];
+    const chatStreak = streaks[chatIdKey];
+    const streakCount = chatStreak?.currentStreak || 0;
 
     return (
       <TouchableOpacity
@@ -349,6 +361,11 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
               {hasUnread && (
                 <View style={styles.chatUnreadPill}>
                   <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
+                </View>
+              )}
+              {streakCount > 0 && (
+                <View style={styles.streakBadge}>
+                  <Text style={styles.streakText}>🔥 {streakCount}</Text>
                 </View>
               )}
             </View>
@@ -530,6 +547,21 @@ const styles = StyleSheet.create({
   },
   chatUnreadText: {
     color: palette.text,
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans-Bold',
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(251, 146, 60, 0.2)',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 146, 60, 0.4)',
+  },
+  streakText: {
+    color: '#FB923C',
     fontSize: 12,
     fontFamily: 'PlusJakartaSans-Bold',
   },

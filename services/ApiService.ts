@@ -289,4 +289,13 @@ export class ApiService {
       };
     }
   }
+
+  // Streak methods
+  static async getStreakForChat(chatId: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/chat/${chatId}/streak`, token);
+  }
+
+  static async getStreaksForChats(chatIds: (string | number)[], token: string): Promise<ApiResponse> {
+    return this.post('/chat/streaks', { chatIds }, token);
+  }
 }
