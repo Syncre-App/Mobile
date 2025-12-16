@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
@@ -9,6 +10,7 @@ import { UserStatus } from '../services/WebSocketService';
 import { palette, radii, spacing } from '../theme/designSystem';
 import { UserAvatar } from './UserAvatar';
 import BadgeIcon from './BadgeIcon';
+import { ProfileCard } from './ProfileCard';
 
 interface Chat {
   id: number;
@@ -86,6 +88,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [userDetails, setUserDetails] = useState<{ [key: string]: User }>({});
+  const [profileCardUser, setProfileCardUser] = useState<User | null>(null);
+  const [profileCardVisible, setProfileCardVisible] = useState(false);
   
   const getCurrentUserId = async () => {
     try {
@@ -257,33 +261,29 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       return;
     }
 
+    // For DM chats, show ProfileCard instead of Alert
     const otherUserId = getOtherUserId(chat);
     if (!otherUserId) return;
 
-    const displayName = getChatDisplayName(chat);
-    const isBlocked = blockedUserIds?.has(otherUserId.toString()) ?? false;
+    const cachedUser = userDetails[otherUserId];
+    if (cachedUser) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setProfileCardUser(cachedUser);
+      setProfileCardVisible(true);
+    }
+  };
 
-    Alert.alert(
-      'Chat Options',
-      displayName,
-      [
-        {
-          text: 'Remove Friend',
-          style: 'destructive',
-          onPress: () => onRemoveFriend(otherUserId),
-        },
-        {
-          text: 'Report User',
-          style: 'destructive',
-          onPress: () => onReportUser(otherUserId),
-        },
-        {
-          text: isBlocked ? 'Unblock User' : 'Block User',
-          onPress: () => onToggleBlock(otherUserId, isBlocked),
-        },
-        ...commonActions,
-      ],
-    );
+  const handleProfileCardClose = () => {
+    setProfileCardVisible(false);
+    setProfileCardUser(null);
+  };
+
+  const getPresenceForUser = (userId: string): 'online' | 'idle' | 'offline' => {
+    const statusValue = userStatuses[userId] || userDetails[userId]?.status;
+    const normalized = statusValue ? String(statusValue).toLowerCase() : 'offline';
+    if (normalized === 'online') return 'online';
+    if (normalized === 'idle') return 'idle';
+    return 'offline';
   };
 
   const renderChatItem = ({ item: chat }: { item: Chat }) => {
@@ -434,23 +434,36 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   );
 
   return (
-    <FlatList
-      data={chats}
-      keyExtractor={(item) => String(item.id)}
-      renderItem={renderChatItem}
-      ListEmptyComponent={renderEmptyState}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor={palette.accent}
-          colors={[palette.accent]}
-        />
-      }
-      contentContainerStyle={styles.listContainer}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    />
+    <>
+      <FlatList
+        data={chats}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderChatItem}
+        ListEmptyComponent={renderEmptyState}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+          />
+        }
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
+
+      <ProfileCard
+        visible={profileCardVisible}
+        user={profileCardUser}
+        onClose={handleProfileCardClose}
+        onRemoveFriend={onRemoveFriend}
+        onBlockUser={(userId) => onToggleBlock(userId, blockedUserIds?.has(userId) ?? false)}
+        onReportUser={onReportUser}
+        isBlocked={profileCardUser ? (blockedUserIds?.has(profileCardUser.id) ?? false) : false}
+        presence={profileCardUser ? getPresenceForUser(profileCardUser.id) : 'offline'}
+      />
+    </>
   );
 };
 

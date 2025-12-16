@@ -30,6 +30,8 @@ import { AppBackground } from '../../components/AppBackground';
 import BadgeIcon from '../../components/BadgeIcon';
 import { EphemeralOptions, type EphemeralDuration } from '../../components/EphemeralOptions';
 import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
+import { CreatePollSheet } from '../../components/CreatePollSheet';
+import { PollMessage, type PollData } from '../../components/PollMessage';
 import leo from 'leo-profanity';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -97,6 +99,8 @@ interface Message {
   reactions?: Array<{ reaction: string; count: number; userIds: string[] }>;
   expiresAt?: string | null;
   isEphemeral?: boolean;
+  poll?: PollData | null;
+  isPoll?: boolean;
 }
 
 interface ChatParticipant {
@@ -1646,6 +1650,9 @@ const ChatScreen: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [ephemeralDuration, setEphemeralDuration] = useState<EphemeralDuration>(null);
   const [showScheduleSheet, setShowScheduleSheet] = useState(false);
+  const [showPollSheet, setShowPollSheet] = useState(false);
+  const [isCreatingPoll, setIsCreatingPoll] = useState(false);
+  const [pollsData, setPollsData] = useState<Map<string, { poll: PollData; userVotes: number[] }>>(new Map());
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
@@ -4512,6 +4519,146 @@ const ChatScreen: React.FC = () => {
     }
   }, [chatId, currentUserId, newMessage, pendingAttachments, replyContext]);
 
+  const handleCreatePoll = useCallback(async (data: { question: string; options: string[]; multiSelect: boolean }) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    setIsCreatingPoll(true);
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const response = await ApiService.createPoll(chatId, data, token);
+
+      if (response.success) {
+        NotificationService.show('success', 'Szavazás létrehozva');
+        setShowPollSheet(false);
+      } else {
+        throw new Error(response.error || 'Szavazás létrehozása sikertelen');
+      }
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      NotificationService.show('error', 'Nem sikerült létrehozni a szavazást');
+    } finally {
+      setIsCreatingPoll(false);
+    }
+  }, [chatId, currentUserId]);
+
+  const handlePollVote = useCallback(async (messageId: string, pollId: number, optionId: number) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const response = await ApiService.votePoll(chatId, pollId, [optionId], token);
+
+      if (response.success && response.data) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(messageId, {
+            poll: response.data.poll,
+            userVotes: response.data.userVotes || [],
+          });
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+      NotificationService.show('error', 'Nem sikerült szavazni');
+    }
+  }, [chatId, currentUserId]);
+
+  const handlePollRemoveVote = useCallback(async (messageId: string, pollId: number, optionId: number) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const response = await ApiService.removeVotePoll(chatId, pollId, optionId, token);
+
+      if (response.success && response.data) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(messageId, {
+            poll: response.data.poll,
+            userVotes: response.data.userVotes || [],
+          });
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error('Error removing vote:', error);
+      NotificationService.show('error', 'Nem sikerült visszavonni a szavazatot');
+    }
+  }, [chatId, currentUserId]);
+
+  const handleClosePoll = useCallback(async (messageId: string, pollId: number) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const response = await ApiService.closePoll(chatId, pollId, token);
+
+      if (response.success && response.data) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          const existing = prev.get(messageId);
+          newMap.set(messageId, {
+            poll: response.data.poll,
+            userVotes: existing?.userVotes || [],
+          });
+          return newMap;
+        });
+        NotificationService.show('success', 'Szavazás lezárva');
+      }
+    } catch (error) {
+      console.error('Error closing poll:', error);
+      NotificationService.show('error', 'Nem sikerült lezárni a szavazást');
+    }
+  }, [chatId, currentUserId]);
+
+  const fetchPollData = useCallback(async (messageId: string) => {
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) return;
+
+      const response = await ApiService.getPollByMessageId(messageId, token);
+
+      if (response.success && response.data?.poll) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(messageId, {
+            poll: response.data.poll,
+            userVotes: response.data.userVotes || [],
+          });
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching poll:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (replyContext) {
       requestAnimationFrame(() => composerRef.current?.focus());
@@ -4917,6 +5064,84 @@ const ChatScreen: React.FC = () => {
             return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
           });
           scrollToBottom();
+          return;
+        }
+        case 'poll_created': {
+          const targetChat = String(payload.chatId ?? '');
+          if (targetChat !== targetChatId) {
+            return;
+          }
+          const newEntry: Message = {
+            id: String(payload.messageId),
+            senderId: String(payload.creatorId ?? ''),
+            receiverId: '',
+            senderName: payload.creatorUsername || null,
+            senderAvatar: payload.creatorAvatar || null,
+            senderBadges: [],
+            content: `[Szavazás] ${payload.question || ''}`,
+            timestamp: payload.createdAt || new Date().toISOString(),
+            status: 'delivered',
+            isPoll: true,
+            poll: {
+              id: payload.pollId,
+              messageId: payload.messageId,
+              chatId: parseInt(targetChat),
+              creatorId: String(payload.creatorId ?? ''),
+              question: payload.question || '',
+              options: payload.options || [],
+              multiSelect: Boolean(payload.multiSelect),
+              isClosed: false,
+              votes: (payload.options || []).map((opt: { id: number }) => ({
+                optionId: opt.id,
+                count: 0,
+                voters: [],
+              })),
+              totalVotes: 0,
+            },
+          };
+          setPollsData((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(String(payload.messageId), {
+              poll: newEntry.poll!,
+              userVotes: [],
+            });
+            return newMap;
+          });
+          setMessagesAnimated((prev) => {
+            const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
+            if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+              return withoutPlaceholders;
+            }
+            return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
+          });
+          scrollToBottom();
+          return;
+        }
+        case 'poll_vote':
+        case 'poll_closed': {
+          const targetChat = String(payload.chatId ?? '');
+          if (targetChat !== targetChatId) {
+            return;
+          }
+          const messageId = String(payload.messageId ?? '');
+          if (!messageId) return;
+
+          setPollsData((prev) => {
+            const existing = prev.get(messageId);
+            if (!existing) return prev;
+
+            const newMap = new Map(prev);
+            newMap.set(messageId, {
+              ...existing,
+              poll: {
+                ...existing.poll,
+                votes: payload.votes || existing.poll.votes,
+                totalVotes: payload.totalVotes ?? existing.poll.totalVotes,
+                isClosed: type === 'poll_closed' ? true : existing.poll.isClosed,
+              },
+            });
+            return newMap;
+          });
           return;
         }
         case 'message_reaction': {
@@ -5869,6 +6094,20 @@ const ChatScreen: React.FC = () => {
                 />
               </Pressable>
             )}
+            {!editingMessage && (
+              <Pressable
+                onPress={() => setShowPollSheet(true)}
+                style={styles.scheduleButton}
+                accessibilityLabel="Szavazás létrehozása"
+                accessibilityRole="button"
+              >
+                <Ionicons
+                  name="stats-chart-outline"
+                  size={20}
+                  color="rgba(255, 255, 255, 0.6)"
+                />
+              </Pressable>
+            )}
             <View style={styles.composerColumn}>
               <Pressable onPress={() => composerRef.current?.focus()} onLongPress={handlePasteImage}>
                 <TextInput
@@ -5923,6 +6162,12 @@ const ChatScreen: React.FC = () => {
         onClose={() => setShowScheduleSheet(false)}
         onSchedule={handleScheduleMessage}
         messagePreview={newMessage.trim() || undefined}
+      />
+      <CreatePollSheet
+        visible={showPollSheet}
+        onClose={() => setShowPollSheet(false)}
+        onCreatePoll={handleCreatePoll}
+        isCreating={isCreatingPoll}
       />
       <Modal
         visible={Boolean(threadRootId)}

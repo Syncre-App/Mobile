@@ -338,4 +338,68 @@ export class ApiService {
   static async cancelScheduledMessage(id: string | number, token: string): Promise<ApiResponse> {
     return this.delete(`/chat/scheduled/${id}`, token);
   }
+
+  // Poll methods
+  static async createPoll(
+    chatId: string | number,
+    data: {
+      question: string;
+      options: string[];
+      multiSelect?: boolean;
+    },
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/poll`, data, token);
+  }
+
+  static async getPollByMessageId(messageId: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/chat/message/${messageId}/poll`, token);
+  }
+
+  static async votePoll(
+    chatId: string | number,
+    pollId: string | number,
+    optionIds: number[],
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/poll/${pollId}/vote`, { optionIds }, token);
+  }
+
+  static async removeVotePoll(
+    chatId: string | number,
+    pollId: string | number,
+    optionId: number,
+    token: string
+  ): Promise<ApiResponse> {
+    return this.delete(`/chat/${chatId}/poll/${pollId}/vote?optionId=${optionId}`, token);
+  }
+
+  static async closePoll(
+    chatId: string | number,
+    pollId: string | number,
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/poll/${pollId}/close`, {}, token);
+  }
+
+  // Spotify methods
+  static async getSpotifyStatus(token: string): Promise<ApiResponse> {
+    return this.get('/spotify/status', token);
+  }
+
+  static async getSpotifyAuthUrl(token: string): Promise<ApiResponse> {
+    return this.get('/spotify/auth', token);
+  }
+
+  static async disconnectSpotify(token: string): Promise<ApiResponse> {
+    return this.post('/spotify/disconnect', {}, token);
+  }
+
+  static async getSpotifyNowPlaying(token: string): Promise<ApiResponse> {
+    return this.get('/spotify/now-playing', token);
+  }
+
+  static async getUserActivity(userId: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/spotify/activity/${userId}`, token);
+  }
 }
