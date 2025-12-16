@@ -12,7 +12,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
-import { Video, ResizeMode } from 'expo-video';
+import { Video } from 'expo-video';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
@@ -1195,7 +1195,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                               <Video
                                 source={{ uri: resolveAttachmentUri(primaryItem)! }}
                                 style={styles.heroVideo}
-                                resizeMode={ResizeMode.COVER}
+                                contentFit="cover"
                                 useNativeControls
                                 shouldPlay={false}
                                 isLooping={false}
@@ -1321,7 +1321,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                       <Video
                         source={{ uri: embeddableLink.url }}
                         style={styles.embedVideo}
-                        resizeMode={ResizeMode.COVER}
+                        contentFit="cover"
                         useNativeControls
                         shouldPlay={false}
                         onLoadStart={() => setEmbedLoaded(false)}
@@ -5959,7 +5959,7 @@ const ChatScreen: React.FC = () => {
                   <Video
                     source={{ uri: resolveAttachmentUri(item)! }}
                     style={styles.attachmentModalVideo}
-                    resizeMode={ResizeMode.CONTAIN}
+                    contentFit="contain"
                     useNativeControls
                     shouldPlay={false}
                   />
