@@ -28,6 +28,7 @@ import { GroupMemberPicker } from '../../components/GroupMemberPicker';
 import { UserAvatar } from '../../components/UserAvatar';
 import { AppBackground } from '../../components/AppBackground';
 import BadgeIcon from '../../components/BadgeIcon';
+import { EphemeralOptions, type EphemeralDuration } from '../../components/EphemeralOptions';
 import leo from 'leo-profanity';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -93,6 +94,8 @@ interface Message {
   deletedLabel?: string | null;
   seenBy?: SeenReceipt[];
   reactions?: Array<{ reaction: string; count: number; userIds: string[] }>;
+  expiresAt?: string | null;
+  isEphemeral?: boolean;
 }
 
 interface ChatParticipant {
@@ -1359,6 +1362,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {message.isEdited && !message.isPlaceholder && !isDeletedMessage ? (
                   <Text style={styles.editedLabel}>Edited</Text>
                 ) : null}
+                {message.isEphemeral && !message.isPlaceholder && !isDeletedMessage ? (
+                  <View style={styles.ephemeralIndicator}>
+                    <Ionicons name="timer-outline" size={12} color="#FB923C" />
+                  </View>
+                ) : null}
               </>
             )}
           </View>
@@ -1635,6 +1643,7 @@ const ChatScreen: React.FC = () => {
   } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [ephemeralDuration, setEphemeralDuration] = useState<EphemeralDuration>(null);
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
@@ -4340,6 +4349,7 @@ const ChatScreen: React.FC = () => {
       replyTo: normalizedReply,
       attachments: attachmentsSnapshot,
       seenBy: [],
+      isEphemeral: Boolean(ephemeralDuration),
     };
 
     setMessagesAnimated((prev) => {
@@ -4351,6 +4361,7 @@ const ChatScreen: React.FC = () => {
     });
     setNewMessage('');
     setReplyContext(null);
+    setEphemeralDuration(null);
     if (attachmentsSnapshot.length) {
       setPendingAttachments((prev) => prev.filter((attachment) => attachment.uploadPending));
     }
@@ -4400,6 +4411,7 @@ const ChatScreen: React.FC = () => {
         replyMetadata: normalizedReply,
         attachments: attachmentIds,
         preview: previewText,
+        expiresIn: ephemeralDuration,
       });
 
     } catch (error) {
@@ -4431,6 +4443,7 @@ const ChatScreen: React.FC = () => {
     scrollToBottom,
     setMessagesAnimated,
     wsService,
+    ephemeralDuration,
   ]);
 
   const handleThreadClose = useCallback(() => {
@@ -4808,6 +4821,14 @@ const ChatScreen: React.FC = () => {
               };
             })
           );
+          return;
+        }
+        case 'message_expired': {
+          const expiredId = String(payload.messageId ?? payload.id ?? '');
+          if (!expiredId) {
+            return;
+          }
+          setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== expiredId));
           return;
         }
         case 'message_reaction': {
@@ -5740,6 +5761,12 @@ const ChatScreen: React.FC = () => {
                 <Ionicons name="attach" size={18} color="#ffffff" />
               )}
             </Pressable>
+            {!editingMessage && (
+              <EphemeralOptions
+                selectedDuration={ephemeralDuration}
+                onSelectDuration={setEphemeralDuration}
+              />
+            )}
             <View style={styles.composerColumn}>
               <Pressable onPress={() => composerRef.current?.focus()} onLongPress={handlePasteImage}>
                 <TextInput
@@ -7112,6 +7139,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.65)',
     alignSelf: 'flex-end',
+  },
+  ephemeralIndicator: {
+    marginTop: 4,
+    marginLeft: 6,
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   attachmentPreviewRow: {
     maxHeight: 72,
