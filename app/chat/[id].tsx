@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  ComponentProps,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ActivityIndicator, Alert, Animated, BackHandler, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable, Linking, Share, GestureResponderEvent, Dimensions, Easing } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
@@ -31,6 +38,7 @@ import { EphemeralOptions, type EphemeralDuration } from '../../components/Ephem
 import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
 import { CreatePollSheet } from '../../components/CreatePollSheet';
 import { PollMessage, type PollData } from '../../components/PollMessage';
+import { palette, radii, spacing } from '../../theme/designSystem';
 import leo from 'leo-profanity';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -115,6 +123,8 @@ type ChatListItem =
   | { kind: 'message'; id: string; message: Message }
   | { kind: 'date'; id: string; label: string }
   | { kind: 'typing'; id: string };
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const MESSAGE_PAYLOAD_VERSION = 1;
 const API_ROOT = ApiService.baseUrl.replace(/\/v1\/?$/i, '');
@@ -1607,13 +1617,14 @@ const ChatScreen: React.FC = () => {
     },
     [togglePreviewChrome]
   );
-  const closeAttachmentSheet = useCallback(() => {
+  const closeAttachmentSheet = useCallback((onFinished?: () => void) => {
     Animated.timing(attachmentSheetAnim, {
       toValue: 0,
       duration: 160,
       useNativeDriver: true,
     }).start(() => {
       setAttachmentSheetVisible(false);
+      onFinished?.();
     });
   }, [attachmentSheetAnim]);
   const resolveActionIcon = useCallback((label: string): any => {
@@ -1682,6 +1693,7 @@ const ChatScreen: React.FC = () => {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const windowHeight = Dimensions.get('window').height;
   const ACTION_CARD_WIDTH = 280;
+  const ATTACHMENT_DROPDOWN_WIDTH = 260;
   const ACTION_CARD_HEIGHT = 240;
   const SCREEN_WIDTH = Dimensions.get('window').width;
   const reactionAnim = useRef(new Animated.Value(0)).current;
@@ -3433,7 +3445,6 @@ const ChatScreen: React.FC = () => {
   );
 
   const handlePickDocument = useCallback(async () => {
-    closeAttachmentSheet();
     try {
       const pickerResult = await DocumentPicker.getDocumentAsync({
         multiple: true,
@@ -3470,7 +3481,6 @@ const ChatScreen: React.FC = () => {
   }, [handleUploadBatch]);
 
   const handlePickPhoto = useCallback(async () => {
-    closeAttachmentSheet();
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (permission.status !== 'granted') {
@@ -3509,7 +3519,6 @@ const ChatScreen: React.FC = () => {
   }, [handleUploadBatch]);
 
   const handlePasteImage = useCallback(async () => {
-    closeAttachmentSheet();
 
     if (attachmentPickerBusy) {
       NotificationService.show('info', 'Please wait for the current upload to complete');
@@ -3570,7 +3579,7 @@ const ChatScreen: React.FC = () => {
       console.error('Failed to paste image from clipboard:', error);
       NotificationService.show('error', 'Unable to paste image');
     }
-  }, [attachmentPickerBusy, closeAttachmentSheet, handleUploadBatch]);
+  }, [attachmentPickerBusy, handleUploadBatch]);
 
   const handleAttachmentTrigger = useCallback(() => {
     if (!chatId) {
@@ -5711,6 +5720,55 @@ const ChatScreen: React.FC = () => {
       hasUploadingAttachments ||
       isBlocked);
 
+  interface AttachmentOption {
+    key: string;
+    icon: IoniconName;
+    label: string;
+    hint: string;
+    onPress: () => void;
+  }
+
+  const attachmentMenuOptions = useMemo<AttachmentOption[]>(
+    () => [
+      {
+        key: 'photos',
+        icon: 'images-outline',
+        label: 'Photos & Videos',
+        hint: 'Camera roll',
+        onPress: handlePickPhoto,
+      },
+      {
+        key: 'files',
+        icon: 'document-text-outline',
+        label: 'Files',
+        hint: 'Browse documents',
+        onPress: handlePickDocument,
+      },
+      {
+        key: 'paste',
+        icon: 'clipboard-outline',
+        label: 'Paste image',
+        hint: 'Add from clipboard',
+        onPress: handlePasteImage,
+      },
+      {
+        key: 'schedule',
+        icon: 'calendar-outline',
+        label: 'Schedule message',
+        hint: 'Send later',
+        onPress: () => setShowScheduleSheet(true),
+      },
+      {
+        key: 'poll',
+        icon: 'stats-chart-outline',
+        label: 'Create poll',
+        hint: 'Start a vote',
+        onPress: () => setShowPollSheet(true),
+      },
+    ],
+    [handlePasteImage, handlePickDocument, handlePickPhoto, setShowPollSheet, setShowScheduleSheet]
+  );
+
   const isGroupChat = Boolean(chatDetails?.isGroup);
   const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
   const shouldShowAddButton = !isGroupChat && Boolean(otherUserIdRef.current);
@@ -6089,11 +6147,12 @@ const ChatScreen: React.FC = () => {
               ]}
               disabled={attachmentPickerBusy || Boolean(editingMessage)}
               accessibilityRole="button"
+              accessibilityLabel="Open quick actions"
             >
               {attachmentPickerBusy ? (
                 <ActivityIndicator size="small" color="#ffffff" />
               ) : (
-                <Ionicons name="attach" size={18} color="#ffffff" />
+                <Ionicons name="add" size={20} color="#ffffff" />
               )}
             </Pressable>
             {!editingMessage && (
@@ -6101,34 +6160,6 @@ const ChatScreen: React.FC = () => {
                 selectedDuration={ephemeralDuration}
                 onSelectDuration={setEphemeralDuration}
               />
-            )}
-            {!editingMessage && (
-              <Pressable
-                onPress={() => setShowScheduleSheet(true)}
-                style={styles.scheduleButton}
-                accessibilityLabel="Üzenet ütemezése"
-                accessibilityRole="button"
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={22}
-                  color="rgba(255, 255, 255, 0.6)"
-                />
-              </Pressable>
-            )}
-            {!editingMessage && (
-              <Pressable
-                onPress={() => setShowPollSheet(true)}
-                style={styles.scheduleButton}
-                accessibilityLabel="Szavazás létrehozása"
-                accessibilityRole="button"
-              >
-                <Ionicons
-                  name="stats-chart-outline"
-                  size={20}
-                  color="rgba(255, 255, 255, 0.6)"
-                />
-              </Pressable>
             )}
             <View style={styles.composerColumn}>
               <Pressable onPress={() => composerRef.current?.focus()} onLongPress={handlePasteImage}>
@@ -6522,17 +6553,20 @@ const ChatScreen: React.FC = () => {
           style={[styles.messageActionOverlay, { opacity: attachmentSheetAnim }]}
           pointerEvents="box-none"
         >
-          <Pressable style={styles.messageActionBackdrop} onPress={closeAttachmentSheet} />
+          <Pressable
+            style={styles.messageActionBackdrop}
+            onPress={() => closeAttachmentSheet()}
+          />
           <Animated.View
             style={[
-              styles.attachmentSheetWrapper,
-              { bottom: attachmentSheetBottom },
+              styles.attachmentDropdownWrapper,
+              { bottom: attachmentSheetBottom + 8 },
               {
                 transform: [
                   {
                     translateY: attachmentSheetAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [40, 0],
+                      outputRange: [18, 0],
                     }),
                   },
                 ],
@@ -6540,39 +6574,27 @@ const ChatScreen: React.FC = () => {
               },
             ]}
           >
-            <GlassCard width="100%" padding={0}>
-              <View style={styles.attachmentSheetContent}>
-                <Text style={styles.attachmentSheetTitle}>ADD ATTACHMENT</Text>
-                <Pressable
-                  style={styles.attachmentSheetButton}
-                  onPress={handlePickPhoto}
-                >
-                  <Ionicons name="images-outline" size={20} color="#ffffff" />
-                  <View style={styles.attachmentSheetLabelColumn}>
-                    <Text style={styles.attachmentSheetButtonLabel}>Photos & Videos</Text>
-                    <Text style={styles.attachmentSheetButtonHint}>Camera roll</Text>
-                  </View>
-                </Pressable>
-                <Pressable
-                  style={styles.attachmentSheetButton}
-                  onPress={handlePickDocument}
-                >
-                  <Ionicons name="document-text-outline" size={20} color="#ffffff" />
-                  <View style={styles.attachmentSheetLabelColumn}>
-                    <Text style={styles.attachmentSheetButtonLabel}>Files</Text>
-                    <Text style={styles.attachmentSheetButtonHint}>Browse documents</Text>
-                  </View>
-                </Pressable>
-                <Pressable
-                  style={styles.attachmentSheetButton}
-                  onPress={handlePasteImage}
-                >
-                  <Ionicons name="clipboard-outline" size={20} color="#ffffff" />
-                  <View style={styles.attachmentSheetLabelColumn}>
-                    <Text style={styles.attachmentSheetButtonLabel}>Paste image</Text>
-                    <Text style={styles.attachmentSheetButtonHint}>Add from clipboard</Text>
-                  </View>
-                </Pressable>
+            <GlassCard width={ATTACHMENT_DROPDOWN_WIDTH} padding={0} variant="default">
+              <View style={styles.attachmentDropdownContent}>
+                <Text style={styles.attachmentDropdownTitle}>Quick actions</Text>
+                <View style={styles.attachmentDropdownList}>
+                  {attachmentMenuOptions.map((option) => (
+                    <Pressable
+                      key={option.key}
+                      style={({ pressed }) => [
+                        styles.attachmentDropdownOption,
+                        pressed && styles.attachmentDropdownOptionPressed,
+                      ]}
+                      onPress={() => closeAttachmentSheet(() => option.onPress())}
+                    >
+                      <Ionicons name={option.icon} size={20} color="#ffffff" />
+                      <View style={styles.attachmentDropdownLabelColumn}>
+                        <Text style={styles.attachmentDropdownLabel}>{option.label}</Text>
+                        <Text style={styles.attachmentDropdownHint}>{option.hint}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
             </GlassCard>
           </Animated.View>
@@ -7690,10 +7712,6 @@ const styles = StyleSheet.create({
   attachButtonDisabled: {
     opacity: 0.4,
   },
-  scheduleButton: {
-    padding: 6,
-    borderRadius: 12,
-  },
   attachmentModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
@@ -7925,44 +7943,49 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     paddingHorizontal: 0,
   },
-  attachmentSheetWrapper: {
+  attachmentDropdownWrapper: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 24,
+    left: spacing.lg,
+    zIndex: 40,
   },
-  attachmentSheetContent: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    gap: 4,
+  attachmentDropdownContent: {
+    padding: spacing.sm,
+    gap: spacing.xs,
   },
-  attachmentSheetTitle: {
-    color: 'rgba(255,255,255,0.5)',
+  attachmentDropdownTitle: {
+    color: 'rgba(255,255,255,0.65)',
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontWeight: '700',
   },
-  attachmentSheetButton: {
+  attachmentDropdownList: {
+    gap: spacing.xs,
+  },
+  attachmentDropdownOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.02)',
   },
-  attachmentSheetLabelColumn: {
+  attachmentDropdownOptionPressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  attachmentDropdownLabelColumn: {
     flex: 1,
   },
-  attachmentSheetButtonLabel: {
-    color: '#ffffff',
+  attachmentDropdownLabel: {
+    color: palette.text,
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-Medium',
   },
-  attachmentSheetButtonHint: {
-    color: 'rgba(255,255,255,0.6)',
+  attachmentDropdownHint: {
+    color: palette.textMuted,
     fontSize: 12,
+    marginTop: 2,
   },
   scrollToBottomButton: {
     position: 'absolute',

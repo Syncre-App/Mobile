@@ -105,20 +105,20 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   };
 
   const formatLastSeen = (lastSeen?: string | null): string => {
-    if (!lastSeen) return 'Ismeretlen';
+    if (!lastSeen) return 'Unknown';
     const parsed = Date.parse(lastSeen);
-    if (Number.isNaN(parsed)) return 'Ismeretlen';
+    if (Number.isNaN(parsed)) return 'Unknown';
 
     const diffMs = Date.now() - parsed;
     const minutes = Math.floor(diffMs / 60000);
 
-    if (minutes < 1) return 'Most aktív';
-    if (minutes < 60) return `${minutes} perce aktív`;
+    if (minutes < 1) return 'Active now';
+    if (minutes < 60) return `${minutes} minutes ago`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} órája aktív`;
+    if (hours < 24) return `${hours} hours ago`;
     const days = Math.floor(hours / 24);
-    if (days === 1) return 'Tegnap';
-    return `${days} napja aktív`;
+    if (days === 1) return 'Yesterday';
+    return `${days} days ago`;
   };
 
   const getPresenceColor = () => {
@@ -137,7 +137,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       case 'online':
         return 'Online';
       case 'idle':
-        return 'Tétlen';
+        return 'Idle';
       default:
         return formatLastSeen(user?.last_seen);
     }

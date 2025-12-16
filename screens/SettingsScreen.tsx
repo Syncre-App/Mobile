@@ -20,6 +20,7 @@ import { StorageService } from '../services/StorageService';
 import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
 import { palette, radii, spacing } from '../theme/designSystem';
+import { SpotifyConnection } from '../components/SpotifyConnection';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
@@ -261,6 +262,16 @@ export const SettingsScreen: React.FC = () => {
           )}
         </GlassCard>
 
+        {/* Integrations Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Integrations</Text>
+          </View>
+          <View style={styles.integrationCardWrapper}>
+            <SpotifyConnection />
+          </View>
+        </View>
+
         {/* Updates Section */}
         <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
@@ -354,6 +365,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 440,
     alignSelf: 'center',
+  },
+  integrationCardWrapper: {
+    width: '100%',
+    marginTop: spacing.xs,
   },
   sectionHeader: {
     paddingHorizontal: spacing.lg,
