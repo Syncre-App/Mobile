@@ -12,7 +12,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
-import { Video, ResizeMode } from 'expo-video';
+import { Video, ResizeMode } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiService } from '../../services/ApiService';
@@ -1211,7 +1211,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                                 uri: primaryItem.previewUrl || primaryItem.publicViewUrl || primaryItem.localUri,
                               }}
                               style={styles.heroImage}
-                              contentFit="cover"
+                              resizeMode={ResizeMode.COVER}
                             />
                           )}
                           {remainingPreviewItems.length ? (
@@ -1312,7 +1312,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                       <Image
                         source={{ uri: embeddableLink.url }}
                         style={styles.embedImage}
-                        contentFit="cover"
+                        resizeMode={ResizeMode.COVER}
                         transition={300}
                         onLoad={() => setEmbedLoaded(true)}
                         onError={() => setEmbedFailed(true)}
@@ -5857,7 +5857,7 @@ const ChatScreen: React.FC = () => {
               }}
               style={styles.attachmentModalBackdrop}
               blurRadius={36}
-              contentFit="cover"
+              resizeMode={ResizeMode.COVER}
             />
           ) : null}
           <LinearGradient
@@ -5952,7 +5952,7 @@ const ChatScreen: React.FC = () => {
                     <Image
                       source={{ uri: item.previewUrl || item.publicViewUrl || item.localUri }}
                       style={styles.attachmentZoomImage}
-                      contentFit="contain"
+                      resizeMode={ResizeMode.CONTAIN}
                     />
                   </ScrollView>
                 ) : item.isVideo && resolveAttachmentUri(item) ? (
