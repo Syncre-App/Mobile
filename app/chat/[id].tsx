@@ -29,6 +29,7 @@ import { UserAvatar } from '../../components/UserAvatar';
 import { AppBackground } from '../../components/AppBackground';
 import BadgeIcon from '../../components/BadgeIcon';
 import { EphemeralOptions, type EphemeralDuration } from '../../components/EphemeralOptions';
+import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
 import leo from 'leo-profanity';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -1644,6 +1645,7 @@ const ChatScreen: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [ephemeralDuration, setEphemeralDuration] = useState<EphemeralDuration>(null);
+  const [showScheduleSheet, setShowScheduleSheet] = useState(false);
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
@@ -4459,6 +4461,57 @@ const ChatScreen: React.FC = () => {
     scrollToMessageById(target);
   }, [scrollToMessageById, threadRootId]);
 
+  const handleScheduleMessage = useCallback(async (scheduledFor: Date) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    const trimmedMessage = newMessage.trim();
+    if (!trimmedMessage && pendingAttachments.length === 0) {
+      NotificationService.show('error', 'Nincs üzenet az ütemezéshez');
+      return;
+    }
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const attachmentIds = pendingAttachments
+        .filter((a) => !a.uploadPending)
+        .map((a) => a.id)
+        .filter((id) => /^\d+$/.test(id))
+        .map(Number);
+
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      const response = await ApiService.scheduleMessage(
+        chatId,
+        {
+          content: trimmedMessage,
+          attachments: attachmentIds,
+          replyTo: replyContext?.messageId ? Number(replyContext.messageId) : undefined,
+          scheduledFor: scheduledFor.toISOString(),
+          timezone,
+        },
+        token
+      );
+
+      if (response.success) {
+        NotificationService.show('success', `Üzenet ütemezve: ${scheduledFor.toLocaleString('hu-HU')}`);
+        setNewMessage('');
+        setReplyContext(null);
+        setPendingAttachments([]);
+      } else {
+        throw new Error(response.error || 'Ütemezés sikertelen');
+      }
+    } catch (error) {
+      console.error('Error scheduling message:', error);
+      NotificationService.show('error', 'Nem sikerült ütemezni az üzenetet');
+    }
+  }, [chatId, currentUserId, newMessage, pendingAttachments, replyContext]);
+
   useEffect(() => {
     if (replyContext) {
       requestAnimationFrame(() => composerRef.current?.focus());
@@ -4829,6 +4882,41 @@ const ChatScreen: React.FC = () => {
             return;
           }
           setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== expiredId));
+          return;
+        }
+        case 'scheduled_message_sent': {
+          // Notification that our scheduled message was sent
+          NotificationService.show('info', 'Ütemezett üzenet elküldve');
+          return;
+        }
+        case 'message_scheduled_delivery': {
+          // A scheduled message was delivered to this chat
+          const targetChat = String(payload.chatId ?? '');
+          if (targetChat !== targetChatId) {
+            return;
+          }
+          const newEntry: Message = {
+            id: String(payload.messageId),
+            senderId: String(payload.senderId ?? ''),
+            receiverId: '',
+            senderName: payload.senderUsername || null,
+            senderAvatar: payload.senderAvatar || null,
+            senderBadges: payload.senderBadges || [],
+            content: payload.content || '',
+            timestamp: payload.createdAt || payload.created_at || new Date().toISOString(),
+            status: 'delivered',
+            replyTo: payload.reply || undefined,
+            attachments: mapServerAttachments(payload.attachments),
+            seenBy: [],
+          };
+          setMessagesAnimated((prev) => {
+            const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
+            if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+              return withoutPlaceholders;
+            }
+            return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
+          });
+          scrollToBottom();
           return;
         }
         case 'message_reaction': {
@@ -5767,6 +5855,20 @@ const ChatScreen: React.FC = () => {
                 onSelectDuration={setEphemeralDuration}
               />
             )}
+            {!editingMessage && (
+              <Pressable
+                onPress={() => setShowScheduleSheet(true)}
+                style={styles.scheduleButton}
+                accessibilityLabel="Üzenet ütemezése"
+                accessibilityRole="button"
+              >
+                <Ionicons
+                  name="calendar-outline"
+                  size={22}
+                  color="rgba(255, 255, 255, 0.6)"
+                />
+              </Pressable>
+            )}
             <View style={styles.composerColumn}>
               <Pressable onPress={() => composerRef.current?.focus()} onLongPress={handlePasteImage}>
                 <TextInput
@@ -5815,6 +5917,12 @@ const ChatScreen: React.FC = () => {
         errorMessage={memberPickerError}
         onClose={handleMemberPickerClose}
         onConfirm={handleMemberPickerConfirm}
+      />
+      <ScheduleMessageSheet
+        visible={showScheduleSheet}
+        onClose={() => setShowScheduleSheet(false)}
+        onSchedule={handleScheduleMessage}
+        messagePreview={newMessage.trim() || undefined}
       />
       <Modal
         visible={Boolean(threadRootId)}
@@ -7314,6 +7422,10 @@ const styles = StyleSheet.create({
   },
   attachButtonDisabled: {
     opacity: 0.4,
+  },
+  scheduleButton: {
+    padding: 6,
+    borderRadius: 12,
   },
   attachmentModalOverlay: {
     flex: 1,

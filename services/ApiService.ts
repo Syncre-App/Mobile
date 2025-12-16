@@ -298,4 +298,44 @@ export class ApiService {
   static async getStreaksForChats(chatIds: (string | number)[], token: string): Promise<ApiResponse> {
     return this.post('/chat/streaks', { chatIds }, token);
   }
+
+  // Scheduled message methods
+  static async scheduleMessage(
+    chatId: string | number,
+    data: {
+      content: string;
+      attachments?: number[];
+      replyTo?: number;
+      scheduledFor: string;
+      timezone?: string;
+    },
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/schedule`, data, token);
+  }
+
+  static async getScheduledMessages(token: string, status: string = 'pending'): Promise<ApiResponse> {
+    return this.get(`/chat/scheduled/list?status=${status}`, token);
+  }
+
+  static async getScheduledMessage(id: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/chat/scheduled/${id}`, token);
+  }
+
+  static async updateScheduledMessage(
+    id: string | number,
+    data: {
+      content?: string;
+      attachments?: number[];
+      scheduledFor?: string;
+      timezone?: string;
+    },
+    token: string
+  ): Promise<ApiResponse> {
+    return this.put(`/chat/scheduled/${id}`, data, token);
+  }
+
+  static async cancelScheduledMessage(id: string | number, token: string): Promise<ApiResponse> {
+    return this.delete(`/chat/scheduled/${id}`, token);
+  }
 }
