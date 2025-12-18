@@ -21,7 +21,7 @@ import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
 import { GlassCard } from '../components/GlassCard';
 import { UserAvatar } from '../components/UserAvatar';
-import { layout, palette, radii, spacing } from '../theme/designSystem';
+import { font, layout, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { ChatService } from '../services/ChatService';
 import { NotificationService } from '../services/NotificationService';
@@ -1227,7 +1227,7 @@ const styles = StyleSheet.create({
     color: palette.text,
     marginTop: spacing.sm,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   topBar: {
     flexDirection: 'row',
@@ -1266,7 +1266,7 @@ const styles = StyleSheet.create({
   notificationBadgeText: {
     color: '#fff',
     fontSize: 10,
-    fontFamily: 'PlusJakartaSans-Bold',
+    ...font('bold'),
   },
   notificationSkeletons: {
     gap: spacing.sm,
@@ -1345,7 +1345,7 @@ const styles = StyleSheet.create({
   notificationsTitle: {
     color: palette.text,
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   notificationsEmpty: {
     color: palette.textMuted,
@@ -1371,7 +1371,7 @@ const styles = StyleSheet.create({
   notificationItemTitle: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     marginBottom: 4,
   },
   notificationTimestamp: {
@@ -1406,7 +1406,7 @@ const styles = StyleSheet.create({
   notificationActionText: {
     color: palette.text,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   notificationDeclineText: {
     color: palette.error,
@@ -1436,12 +1436,12 @@ const styles = StyleSheet.create({
   sectionBadgeText: {
     color: palette.accentSecondary,
     fontSize: 13,
-    fontFamily: 'SpaceGrotesk-Medium',
+    ...font('displayMedium'),
   },
   requestError: {
     marginTop: spacing.sm,
     color: palette.error,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
 });

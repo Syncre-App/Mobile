@@ -18,7 +18,7 @@ import { notificationService } from '../services/NotificationService';
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 
 export const RegisterScreen: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   },
   overline: {
     color: palette.textSubtle,
-    fontFamily: 'SpaceGrotesk-Medium',
+    ...font('displayMedium'),
     letterSpacing: 4,
     fontSize: 12,
     textTransform: 'uppercase',
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   title: {
     color: palette.text,
     fontSize: 28,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
     letterSpacing: -0.3,
     textAlign: 'center',
   },
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
   },
   registerButtonText: {
     color: 'white',
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     fontSize: 16,
   },
   loginLink: {
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   },
   loginLinkHighlight: {
     color: palette.accentSecondary,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   errorBox: {
     width: '100%',

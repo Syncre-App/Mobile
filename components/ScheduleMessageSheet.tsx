@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { GlassCard } from './GlassCard';
 
 interface ScheduleMessageSheetProps {
@@ -28,13 +28,13 @@ const formatDate = (date: Date): string => {
   const isTomorrow = date.toDateString() === tomorrow.toDateString();
 
   if (isToday) {
-    return 'Ma';
+    return 'Today';
   }
   if (isTomorrow) {
-    return 'Holnap';
+    return 'Tomorrow';
   }
 
-  return date.toLocaleDateString('hu-HU', {
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     weekday: 'short',
@@ -42,7 +42,7 @@ const formatDate = (date: Date): string => {
 };
 
 const formatTime = (date: Date): string => {
-  return date.toLocaleTimeString('hu-HU', {
+  return date.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -112,10 +112,10 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   };
 
   const quickScheduleOptions = [
-    { label: '30 perc', minutes: 30 },
-    { label: '1 óra', minutes: 60 },
-    { label: '3 óra', minutes: 180 },
-    { label: 'Holnap reggel', preset: 'tomorrow_morning' },
+    { label: '30 min', minutes: 30 },
+    { label: '1 hour', minutes: 60 },
+    { label: '3 hours', minutes: 180 },
+    { label: 'Tomorrow morning', preset: 'tomorrow_morning' },
   ];
 
   const handleQuickSchedule = (option: typeof quickScheduleOptions[0]) => {
@@ -146,7 +146,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
             <View style={styles.content}>
               <View style={styles.header}>
                 <Ionicons name="calendar-outline" size={24} color={palette.text} />
-                <Text style={styles.title}>Üzenet ütemezése</Text>
+                <Text style={styles.title}>Schedule message</Text>
                 <Pressable onPress={onClose} style={styles.closeButton}>
                   <Ionicons name="close" size={20} color={palette.textMuted} />
                 </Pressable>
@@ -154,14 +154,14 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
 
               {messagePreview ? (
                 <View style={styles.previewContainer}>
-                  <Text style={styles.previewLabel}>Üzenet:</Text>
+                  <Text style={styles.previewLabel}>Message:</Text>
                   <Text style={styles.previewText} numberOfLines={2}>
                     {messagePreview}
                   </Text>
                 </View>
               ) : null}
 
-              <Text style={styles.sectionLabel}>Gyors választás</Text>
+              <Text style={styles.sectionLabel}>Quick picks</Text>
               <View style={styles.quickOptions}>
                 {quickScheduleOptions.map((option) => (
                   <Pressable
@@ -174,7 +174,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                 ))}
               </View>
 
-              <Text style={styles.sectionLabel}>Egyéni időpont</Text>
+              <Text style={styles.sectionLabel}>Custom time</Text>
               <View style={styles.dateTimeRow}>
                 <Pressable style={styles.dateTimeButton} onPress={openDatePicker}>
                   <Ionicons name="calendar" size={18} color={palette.accent} />
@@ -194,7 +194,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                     display="spinner"
                     onChange={handleDateChange}
                     minimumDate={new Date()}
-                    locale="hu-HU"
+                    locale="en-US"
                     textColor={palette.text}
                   />
                 </View>
@@ -222,7 +222,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
 
               <View style={styles.footer}>
                 <Pressable style={styles.cancelButton} onPress={onClose}>
-                  <Text style={styles.cancelButtonText}>Mégse</Text>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
                 </Pressable>
                 <Pressable
                   style={[
@@ -233,13 +233,13 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                   disabled={!isValidDate}
                 >
                   <Ionicons name="send" size={16} color="#ffffff" />
-                  <Text style={styles.scheduleButtonText}>Ütemezés</Text>
+                  <Text style={styles.scheduleButtonText}>Schedule</Text>
                 </Pressable>
               </View>
 
               {!isValidDate && (
                 <Text style={styles.errorText}>
-                  Az időpontnak a jövőben kell lennie
+                  Time must be in the future
                 </Text>
               )}
             </View>
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: palette.text,
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   closeButton: {
     padding: spacing.xs,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   dateTimeText: {
     color: palette.text,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   pickerContainer: {
     marginBottom: spacing.md,
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: palette.textMuted,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   scheduleButton: {
     flex: 1,
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   scheduleButtonText: {
     color: '#ffffff',
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   errorText: {
     color: '#EF4444',

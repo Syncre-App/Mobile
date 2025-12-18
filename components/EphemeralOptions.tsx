@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { GlassCard } from './GlassCard';
 
 export type EphemeralDuration = '5m' | '1h' | '24h' | '7d' | null;
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: palette.text,
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   modalDescription: {
     color: palette.textMuted,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   optionLabel: {
     color: palette.text,
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   optionDescription: {
     color: palette.textMuted,

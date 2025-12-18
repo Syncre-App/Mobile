@@ -7,7 +7,7 @@ import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
 import { UserStatus } from '../services/WebSocketService';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { UserAvatar } from './UserAvatar';
 import BadgeIcon from './BadgeIcon';
 import { ProfileCard } from './ProfileCard';
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   createGroupLabel: {
     color: palette.text,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   chatCard: {
     paddingHorizontal: spacing.sm,
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
   chatName: {
     color: palette.text,
     fontSize: 17,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     marginBottom: 2,
     flexShrink: 1,
   },
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
   chatUnreadText: {
     color: palette.text,
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans-Bold',
+    ...font('bold'),
   },
   streakBadge: {
     flexDirection: 'row',
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   streakText: {
     color: '#FB923C',
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans-Bold',
+    ...font('bold'),
   },
   rightColumn: {
     justifyContent: 'center',
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },

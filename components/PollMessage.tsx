@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { UserAvatar } from './UserAvatar';
 
 interface PollVoter {
@@ -103,7 +103,7 @@ export const PollMessage: React.FC<PollMessageProps> = ({
       </View>
 
       {poll.multiSelect && !poll.isClosed && (
-        <Text style={styles.multiSelectHint}>Több válasz is választható</Text>
+        <Text style={styles.multiSelectHint}>Multiple answers allowed</Text>
       )}
 
       <View style={styles.optionsContainer}>
@@ -166,16 +166,16 @@ export const PollMessage: React.FC<PollMessageProps> = ({
 
       <View style={styles.footer}>
         <Text style={styles.totalVotes}>
-          {totalVotes} szavazat
+          {totalVotes} votes
         </Text>
         {poll.isClosed ? (
           <View style={styles.closedBadge}>
             <Ionicons name="lock-closed" size={12} color="#EF4444" />
-            <Text style={styles.closedText}>Lezárva</Text>
+            <Text style={styles.closedText}>Closed</Text>
           </View>
         ) : isCreator && onClose ? (
           <Pressable style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Szavazás lezárása</Text>
+            <Text style={styles.closeButtonText}>Close poll</Text>
           </Pressable>
         ) : null}
       </View>
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: palette.text,
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     lineHeight: 20,
   },
   multiSelectHint: {
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   optionTextVoted: {
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   optionRight: {
     flexDirection: 'row',
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   closedText: {
     color: '#EF4444',
     fontSize: 11,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   closeButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',

@@ -1,4 +1,35 @@
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+
+const IOS_FONT_WEIGHTS = {
+  regular: '400',
+  medium: '500',
+  semibold: '600',
+  bold: '700',
+  display: '700',
+  displayMedium: '600',
+} as const;
+
+const FONT_FAMILIES = {
+  regular: 'PlusJakartaSans-Regular',
+  medium: 'PlusJakartaSans-Medium',
+  semibold: 'PlusJakartaSans-SemiBold',
+  bold: 'PlusJakartaSans-Bold',
+  display: 'SpaceGrotesk-SemiBold',
+  displayMedium: 'SpaceGrotesk-Medium',
+} as const;
+
+export const font = (variant: keyof typeof FONT_FAMILIES) => {
+  if (Platform.OS === 'ios') {
+    return {
+      fontFamily: 'System',
+      fontWeight: IOS_FONT_WEIGHTS[variant],
+    } as const;
+  }
+
+  return {
+    fontFamily: FONT_FAMILIES[variant],
+  } as const;
+};
 
 export const palette = {
   background: '#03040A',
@@ -66,29 +97,29 @@ export const shadows = {
 
 export const typography = StyleSheet.create({
   display: {
-    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 36,
     letterSpacing: -0.5,
     color: palette.text,
+    ...font('display'),
   },
   title: {
-    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 22,
     letterSpacing: -0.2,
     color: palette.text,
+    ...font('semibold'),
   },
   body: {
-    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 15,
     lineHeight: 22,
     color: palette.textMuted,
+    ...font('regular'),
   },
   label: {
-    fontFamily: 'SpaceGrotesk-Medium',
     fontSize: 12,
     letterSpacing: 4,
     textTransform: 'uppercase',
     color: palette.textSubtle,
+    ...font('displayMedium'),
   },
 });
 

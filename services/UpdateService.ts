@@ -96,7 +96,7 @@ export const UpdateService = {
   async downloadAndInstallLatest(onProgress?: (progress: number) => void) {
     const latestRelease = await this.fetchLatestRelease();
     if (!latestRelease?.assetUrl) {
-      throw new Error('Nem található APK asset a legutóbbi kiadásban');
+      throw new Error('No APK asset found in the latest release');
     }
     await ApkInstaller.downloadAndInstall(latestRelease.assetUrl, onProgress);
   },

@@ -22,7 +22,7 @@ import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
-import { palette, spacing, radii } from '../theme/designSystem';
+import { font, palette, spacing, radii } from '../theme/designSystem';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 const MAX_PROFILE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 16,
     marginTop: spacing.md,
-    fontFamily: 'PlusJakartaSans-Regular',
+    ...font('regular'),
   },
   header: {
     position: 'relative',
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: 'white',
     fontSize: 20,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   content: {
     flex: 1,
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: palette.text,
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   avatarRow: {
     flexDirection: 'row',
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   avatarTitle: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   avatarSubtitle: {
     color: palette.textMuted,
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   settingTitle: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   settingSubtitle: {
     color: palette.textMuted,

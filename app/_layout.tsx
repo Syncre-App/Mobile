@@ -131,6 +131,14 @@ export default function RootLayout() {
       try {
         const parsed = Linking.parse(url);
         const path = (parsed?.path || '').replace(/^\//, '').toLowerCase();
+        if (path.startsWith('spotify/callback')) {
+          const params = parsed?.queryParams || {};
+          router.replace({
+            pathname: '/spotify/callback',
+            params,
+          } as any);
+          return true;
+        }
         if (path.startsWith('reset')) {
           const params = parsed?.queryParams || {};
           router.replace({
@@ -196,6 +204,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings/edit-profile" options={{ title: 'Edit Profile' }} />
           <Stack.Screen name="settings/privacy" options={{ title: 'Privacy' }} />
           <Stack.Screen name="settings/blocked-users" options={{ title: 'Blocked Users' }} />
+          <Stack.Screen name="spotify/callback" />
           <Stack.Screen name="share/index" />
         </Stack>
       </SafeAreaProvider>

@@ -20,7 +20,7 @@ import { CryptoService } from '../services/CryptoService';
 import { IdentityService } from '../services/IdentityService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 
 export const PasswordResetScreen: React.FC = () => {
   const params = useLocalSearchParams<{ email?: string; code?: string; token?: string }>();
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   overline: {
     color: palette.textSubtle,
-    fontFamily: 'SpaceGrotesk-Medium',
+    ...font('displayMedium'),
     letterSpacing: 4,
     fontSize: 12,
     textTransform: 'uppercase',
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 24,
     textAlign: 'center',
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   description: {
     color: palette.textMuted,

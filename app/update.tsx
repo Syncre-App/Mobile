@@ -58,7 +58,7 @@ export default function UpdateScreen() {
           {isLoading ? (
             <View style={styles.loading}>
               <ActivityIndicator size="large" color="#2C82FF" />
-              <Text style={styles.loadingText}>Checking for updates…</Text>
+              <Text style={styles.loadingText}>Checking for updates...</Text>
             </View>
           ) : release ? (
             <>

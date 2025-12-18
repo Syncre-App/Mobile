@@ -3,19 +3,23 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { palette, radii, spacing } from '../theme/designSystem';
+import * as WebBrowser from 'expo-web-browser';
+import { useRouter } from 'expo-router';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
 import { GlassCard } from './GlassCard';
+
+WebBrowser.maybeCompleteAuthSession();
 
 interface SpotifyTrack {
   id: string;
@@ -34,6 +38,7 @@ interface SpotifyConnectionProps {
 export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
   compact = false,
 }) => {
+  const router = useRouter();
   const [isConnected, setIsConnected] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,26 +99,46 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
 
       const response = await ApiService.getSpotifyAuthUrl(token);
       if (response.success && response.data?.url) {
-        await Linking.openURL(response.data.url);
+        const redirectUrl = Linking.createURL('spotify/callback');
+        const result = await WebBrowser.openAuthSessionAsync(
+          response.data.url,
+          redirectUrl
+        );
+        if (result.type === 'success' && result.url) {
+          const parsed = Linking.parse(result.url);
+          const params = parsed?.queryParams || {};
+          const success = params.success === 'true' || params.success === '1';
+          const error = params.error ? String(params.error) : '';
+          const userId = params.userId ? String(params.userId) : '';
+          router.replace({
+            pathname: '/spotify/callback',
+            params: {
+              success: success ? 'true' : 'false',
+              error,
+              userId,
+            },
+          } as any);
+          fetchStatus();
+        }
       } else {
         throw new Error('Failed to get authorization URL');
       }
     } catch (err: any) {
       console.error('Error connecting to Spotify:', err);
-      NotificationService.show('error', err.message || 'Nem sikerült csatlakozni');
+      NotificationService.show('error', err.message || 'Failed to connect to Spotify');
     } finally {
       setIsConnecting(false);
     }
-  }, []);
+  }, [fetchStatus, router]);
 
   const handleDisconnect = useCallback(() => {
     Alert.alert(
-      'Spotify lecsatlakoztatása',
-      'Biztosan le szeretnéd csatlakoztatni a Spotify fiókodat?',
+      'Disconnect Spotify',
+      'Are you sure you want to disconnect your Spotify account?',
       [
-        { text: 'Mégse', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Lecsatlakoztatás',
+          text: 'Disconnect',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -124,10 +149,10 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
               setIsConnected(false);
               setIsEnabled(false);
               setNowPlaying(null);
-              NotificationService.show('success', 'Spotify lecsatlakoztatva');
+              NotificationService.show('success', 'Spotify disconnected');
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (err) {
-              NotificationService.show('error', 'Nem sikerült lecsatlakoztatni');
+              NotificationService.show('error', 'Failed to disconnect Spotify');
             }
           },
         },
@@ -158,7 +183,7 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
         <View style={styles.compactContent}>
           <Text style={styles.compactTitle}>Spotify</Text>
           <Text style={styles.compactSubtitle}>
-            {isConnected ? 'Csatlakoztatva' : 'Nincs csatlakoztatva'}
+            {isConnected ? 'Connected' : 'Not connected'}
           </Text>
         </View>
         {isConnecting ? (
@@ -185,7 +210,7 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
             <View>
               <Text style={styles.title}>Spotify</Text>
               <Text style={styles.subtitle}>
-                {isConnected ? 'Csatlakoztatva' : 'Csatlakoztasd a Spotify fiókodat'}
+                {isConnected ? 'Connected' : 'Connect your Spotify account'}
               </Text>
             </View>
           </View>
@@ -201,7 +226,7 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
               <Text style={styles.actionButtonText}>
-                {isConnected ? 'Lecsatlakozás' : 'Csatlakozás'}
+                {isConnected ? 'Disconnect' : 'Connect'}
               </Text>
             )}
           </Pressable>
@@ -216,7 +241,7 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
                 color="#1DB954"
               />
               <Text style={styles.nowPlayingLabel}>
-                {isPlaying ? 'Most játszik' : 'Szünetel'}
+                {isPlaying ? 'Now playing' : 'Paused'}
               </Text>
             </View>
             <View style={styles.nowPlayingContent}>
@@ -242,7 +267,7 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
         {isConnected && !nowPlaying && (
           <View style={styles.noPlayingContainer}>
             <Ionicons name="musical-note-outline" size={20} color={palette.textMuted} />
-            <Text style={styles.noPlayingText}>Jelenleg nem játszik zene</Text>
+            <Text style={styles.noPlayingText}>No music playing right now</Text>
           </View>
         )}
       </View>
@@ -282,7 +307,7 @@ const styles = StyleSheet.create({
   title: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   subtitle: {
     color: palette.textMuted,
@@ -305,7 +330,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: '#ffffff',
     fontSize: 13,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   nowPlayingContainer: {
     borderTopWidth: 1,
@@ -321,7 +346,7 @@ const styles = StyleSheet.create({
   nowPlayingLabel: {
     color: '#1DB954',
     fontSize: 11,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -341,7 +366,7 @@ const styles = StyleSheet.create({
   trackName: {
     color: palette.text,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   trackArtist: {
     color: palette.textMuted,
@@ -384,7 +409,7 @@ const styles = StyleSheet.create({
   compactTitle: {
     color: palette.text,
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   compactSubtitle: {
     color: palette.textMuted,

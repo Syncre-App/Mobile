@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
-import { palette, spacing } from '../theme/designSystem';
+import { font, palette, spacing } from '../theme/designSystem';
 
 export const MaintenanceScreen: React.FC = () => {
   return (
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   logo: { width: 120, height: 120 },
   overline: {
     color: palette.textSubtle,
-    fontFamily: 'SpaceGrotesk-Medium',
+    ...font('displayMedium'),
     letterSpacing: 4,
     textTransform: 'uppercase',
     fontSize: 12,
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   title: {
     color: palette.text,
     fontSize: 28,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
     textAlign: 'center',
   },
   message: {

@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { NativeBlur } from './NativeBlur';
 import { UserAvatar } from './UserAvatar';
 import { BadgeRow } from './BadgeIcon';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 
@@ -207,7 +207,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                       color="#1DB954"
                     />
                     <Text style={styles.spotifyLabel}>
-                      {spotifyActivity.isPlaying ? 'Spotify-on hallgat' : 'Spotify - Szünetel'}
+                      {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
                     </Text>
                   </View>
                   <View style={styles.spotifyContent}>
@@ -238,7 +238,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 >
                   <Ionicons name="person-remove-outline" size={20} color={palette.error} />
                   <Text style={[styles.actionText, { color: palette.error }]}>
-                    Barát eltávolítása
+                    Remove friend
                   </Text>
                 </Pressable>
 
@@ -252,7 +252,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                     color={palette.warning}
                   />
                   <Text style={[styles.actionText, { color: palette.warning }]}>
-                    {isBlocked ? 'Feloldás' : 'Tiltás'}
+                    {isBlocked ? 'Unblock' : 'Block'}
                   </Text>
                 </Pressable>
 
@@ -262,7 +262,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 >
                   <Ionicons name="flag-outline" size={20} color={palette.textMuted} />
                   <Text style={[styles.actionText, { color: palette.textMuted }]}>
-                    Jelentés
+                    Report
                   </Text>
                 </Pressable>
               </View>
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   username: {
     color: palette.text,
     fontSize: 24,
-    fontFamily: 'PlusJakartaSans-Bold',
+    ...font('bold'),
     textAlign: 'center',
   },
   badges: {
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   spotifyContainer: {
     backgroundColor: 'rgba(29, 185, 84, 0.1)',
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   spotifyLabel: {
     color: '#1DB954',
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   trackName: {
     color: palette.text,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   trackArtist: {
     color: palette.textMuted,
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
 });
 

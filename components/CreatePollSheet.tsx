@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { GlassCard } from './GlassCard';
 
 const MAX_OPTIONS = 10;
@@ -110,7 +110,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
           <View style={styles.content}>
             <View style={styles.header}>
               <Ionicons name="stats-chart" size={24} color={palette.accent} />
-              <Text style={styles.title}>Szavazás létrehozása</Text>
+              <Text style={styles.title}>Create poll</Text>
               <Pressable onPress={handleClose} style={styles.closeButton}>
                 <Ionicons name="close" size={22} color={palette.textMuted} />
               </Pressable>
@@ -121,12 +121,12 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <Text style={styles.label}>Kérdés</Text>
+              <Text style={styles.label}>Question</Text>
               <TextInput
                 style={styles.questionInput}
                 value={question}
                 onChangeText={(text) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
-                placeholder="Mi legyen a kérdés?"
+                placeholder="What's the question?"
                 placeholderTextColor="rgba(255, 255, 255, 0.4)"
                 multiline
                 maxLength={MAX_QUESTION_LENGTH}
@@ -135,7 +135,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
                 {question.length}/{MAX_QUESTION_LENGTH}
               </Text>
 
-              <Text style={styles.label}>Válaszlehetőségek</Text>
+              <Text style={styles.label}>Options</Text>
               {options.map((option, index) => (
                 <View key={index} style={styles.optionRow}>
                   <View style={styles.optionNumber}>
@@ -145,7 +145,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
                     style={styles.optionInput}
                     value={option}
                     onChangeText={(text) => handleOptionChange(index, text)}
-                    placeholder={`${index + 1}. opció`}
+                    placeholder={`${index + 1}. option`}
                     placeholderTextColor="rgba(255, 255, 255, 0.4)"
                     maxLength={MAX_OPTION_LENGTH}
                   />
@@ -163,7 +163,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
               {options.length < MAX_OPTIONS && (
                 <Pressable style={styles.addOptionButton} onPress={handleAddOption}>
                   <Ionicons name="add-circle-outline" size={20} color={palette.accent} />
-                  <Text style={styles.addOptionText}>Opció hozzáadása</Text>
+                  <Text style={styles.addOptionText}>Add option</Text>
                 </Pressable>
               )}
 
@@ -177,13 +177,13 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
                 <View style={[styles.checkbox, multiSelect && styles.checkboxChecked]}>
                   {multiSelect && <Ionicons name="checkmark" size={14} color="#ffffff" />}
                 </View>
-                <Text style={styles.multiSelectText}>Több válasz engedélyezése</Text>
+                <Text style={styles.multiSelectText}>Allow multiple answers</Text>
               </Pressable>
             </ScrollView>
 
             <View style={styles.footer}>
               <Pressable style={styles.cancelButton} onPress={handleClose}>
-                <Text style={styles.cancelButtonText}>Mégse</Text>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
               <Pressable
                 style={[
@@ -195,7 +195,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
               >
                 <Ionicons name="stats-chart" size={18} color="#ffffff" />
                 <Text style={styles.createButtonText}>
-                  {isCreating ? 'Létrehozás...' : 'Létrehozás'}
+                  {isCreating ? 'Creating...' : 'Create'}
                 </Text>
               </Pressable>
             </View>
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: palette.text,
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   closeButton: {
     padding: spacing.xs,
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   optionNumberText: {
     color: palette.accent,
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   optionInput: {
     flex: 1,
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: palette.textMuted,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   createButton: {
     flex: 1,
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   createButtonText: {
     color: '#ffffff',
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
 });
 

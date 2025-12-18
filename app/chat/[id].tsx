@@ -38,7 +38,7 @@ import { EphemeralOptions, type EphemeralDuration } from '../../components/Ephem
 import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
 import { CreatePollSheet } from '../../components/CreatePollSheet';
 import { PollMessage, type PollData } from '../../components/PollMessage';
-import { palette, radii, spacing } from '../../theme/designSystem';
+import { font, palette, radii, spacing } from '../../theme/designSystem';
 import leo from 'leo-profanity';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -321,7 +321,7 @@ const normalizePreviewText = (value: string): string => {
   }
   const condensed = value.replace(/\s+/g, ' ').trim();
   if (condensed.length > 140) {
-    return `${condensed.slice(0, 140)}…`;
+    return `${condensed.slice(0, 140)}...`;
   }
   return condensed;
 };
@@ -1292,7 +1292,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                                     onPress={() => onDownloadAttachment?.(attachment)}
                                   >
                                     <Ionicons name="download-outline" size={16} color="#03040A" />
-                                    <Text style={styles.fileAttachmentButtonText}>Letöltés</Text>
+                                    <Text style={styles.fileAttachmentButtonText}>Download</Text>
                                   </Pressable>
                                 </View>
                               </Pressable>
@@ -1349,7 +1349,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     {!embedLoaded ? (
                       <View style={styles.embedPlaceholder}>
                         <ActivityIndicator size="small" color="#ffffff" />
-                        <Text style={styles.embedPlaceholderText}>Previewing…</Text>
+                        <Text style={styles.embedPlaceholderText}>Previewing...</Text>
                       </View>
                     ) : null}
                   </Pressable>
@@ -1446,7 +1446,7 @@ const ChatScreen: React.FC = () => {
   const contentHeightRef = useRef(0);
   const composerLimitWarningRef = useRef(false);
   const initialScrollDoneRef = useRef(false);
-  const receiverNameRef = useRef('Loading…');
+  const receiverNameRef = useRef('Loading...');
   const otherUserIdRef = useRef<string | null>(null);
   const participantIdsRef = useRef<string[]>([]);
   const authTokenRef = useRef<string | null>(null);
@@ -1639,7 +1639,7 @@ const ChatScreen: React.FC = () => {
     return 'ellipsis-horizontal';
   }, []);
 
-  const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
+  const [receiverUsername, setReceiverUsername] = useState<string>('Loading...');
   const [chatDetails, setChatDetails] = useState<{
     id: string;
     isGroup: boolean;
@@ -1946,9 +1946,9 @@ const ChatScreen: React.FC = () => {
   const formatTypingLabel = useCallback((entries: Array<{ id: string; name: string }>) => {
     if (!entries.length) return '';
     const names = entries.map((entry) => entry.name || 'Someone');
-    if (names.length === 1) return `${names[0]} is typing…`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
-    return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing…`;
+    if (names.length === 1) return `${names[0]} is typing...`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`;
+    return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing...`;
   }, []);
 
   const resolveNamesFromPayload = useCallback(
@@ -2952,7 +2952,7 @@ const ChatScreen: React.FC = () => {
       await loadMessagesForChat(token, chatId, displayName, otherParticipantId);
     } catch (error) {
       console.error(`Error loading chat ${chatId}:`, error);
-      const fallbackName = receiverNameRef.current === 'Loading…' ? 'your friend' : receiverNameRef.current;
+      const fallbackName = receiverNameRef.current === 'Loading...' ? 'your friend' : receiverNameRef.current;
       setMessagesAnimated(() => generatePlaceholderMessages(fallbackName));
       setHasMore(false);
       nextCursorRef.current = null;
@@ -3605,10 +3605,10 @@ const ChatScreen: React.FC = () => {
       }
       try {
         await ChatService.deleteAttachment(attachmentId);
-        NotificationService.show('success', 'Fájl törölve a tárhelyről');
+        NotificationService.show('success', 'File deleted from storage');
       } catch (error) {
         console.error('Failed to remove attachment', error);
-        NotificationService.show('error', 'Nem sikerült törölni a fájlt a tárhelyről');
+        NotificationService.show('error', 'Failed to delete file from storage');
       }
     },
     []
@@ -4326,7 +4326,7 @@ const ChatScreen: React.FC = () => {
 
     const isSocketReady = await ensureWebSocketReady();
     if (!isSocketReady) {
-      NotificationService.show('error', 'Nem sikerült csatlakozni a chat szerverhez. Próbáld újra.');
+      NotificationService.show('error', 'Failed to connect to the chat server. Please try again.');
       return;
     }
 
@@ -4483,7 +4483,7 @@ const ChatScreen: React.FC = () => {
 
     const trimmedMessage = newMessage.trim();
     if (!trimmedMessage && pendingAttachments.length === 0) {
-      NotificationService.show('error', 'Nincs üzenet az ütemezéshez');
+      NotificationService.show('error', 'No message to schedule');
       return;
     }
 
@@ -4514,16 +4514,16 @@ const ChatScreen: React.FC = () => {
       );
 
       if (response.success) {
-        NotificationService.show('success', `Üzenet ütemezve: ${scheduledFor.toLocaleString('hu-HU')}`);
+        NotificationService.show('success', `Message scheduled: ${scheduledFor.toLocaleString('en-US')}`);
         setNewMessage('');
         setReplyContext(null);
         setPendingAttachments([]);
       } else {
-        throw new Error(response.error || 'Ütemezés sikertelen');
+        throw new Error(response.error || 'Scheduling failed');
       }
     } catch (error) {
       console.error('Error scheduling message:', error);
-      NotificationService.show('error', 'Nem sikerült ütemezni az üzenetet');
+      NotificationService.show('error', 'Failed to schedule message');
     }
   }, [chatId, currentUserId, newMessage, pendingAttachments, replyContext]);
 
@@ -4543,14 +4543,14 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.createPoll(chatId, data, token);
 
       if (response.success) {
-        NotificationService.show('success', 'Szavazás létrehozva');
+        NotificationService.show('success', 'Poll created');
         setShowPollSheet(false);
       } else {
-        throw new Error(response.error || 'Szavazás létrehozása sikertelen');
+        throw new Error(response.error || 'Failed to create poll');
       }
     } catch (error) {
       console.error('Error creating poll:', error);
-      NotificationService.show('error', 'Nem sikerült létrehozni a szavazást');
+      NotificationService.show('error', 'Failed to create poll');
     } finally {
       setIsCreatingPoll(false);
     }
@@ -4581,7 +4581,7 @@ const ChatScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error voting on poll:', error);
-      NotificationService.show('error', 'Nem sikerült szavazni');
+      NotificationService.show('error', 'Failed to vote');
     }
   }, [chatId, currentUserId]);
 
@@ -4610,7 +4610,7 @@ const ChatScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error removing vote:', error);
-      NotificationService.show('error', 'Nem sikerült visszavonni a szavazatot');
+      NotificationService.show('error', 'Failed to remove vote');
     }
   }, [chatId, currentUserId]);
 
@@ -4637,11 +4637,11 @@ const ChatScreen: React.FC = () => {
           });
           return newMap;
         });
-        NotificationService.show('success', 'Szavazás lezárva');
+        NotificationService.show('success', 'Poll closed');
       }
     } catch (error) {
       console.error('Error closing poll:', error);
-      NotificationService.show('error', 'Nem sikerült lezárni a szavazást');
+      NotificationService.show('error', 'Failed to close poll');
     }
   }, [chatId, currentUserId]);
 
@@ -5041,7 +5041,7 @@ const ChatScreen: React.FC = () => {
         }
         case 'scheduled_message_sent': {
           // Notification that our scheduled message was sent
-          NotificationService.show('info', 'Ütemezett üzenet elküldve');
+          NotificationService.show('info', 'Scheduled message sent');
           return;
         }
         case 'message_scheduled_delivery': {
@@ -5086,7 +5086,7 @@ const ChatScreen: React.FC = () => {
             senderName: payload.creatorUsername || null,
             senderAvatar: payload.creatorAvatar || null,
             senderBadges: [],
-            content: `[Szavazás] ${payload.question || ''}`,
+            content: `[Poll] ${payload.question || ''}`,
             timestamp: payload.createdAt || new Date().toISOString(),
             status: 'delivered',
             isPoll: true,
@@ -5957,7 +5957,7 @@ const ChatScreen: React.FC = () => {
           {isThreadLoading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator size="large" color="#2C82FF" />
-              <Text style={styles.loadingStateText}>Loading conversation…</Text>
+              <Text style={styles.loadingStateText}>Loading conversation...</Text>
             </View>
           ) : (
             <Animated.View style={styles.messagesWrapper}>
@@ -6169,7 +6169,7 @@ const ChatScreen: React.FC = () => {
                   value={newMessage}
                   onChangeText={handleComposerChange}
                   maxLength={MESSAGE_CHAR_LIMIT}
-                  placeholder="Message…"
+                  placeholder="Message..."
                   placeholderTextColor="rgba(255, 255, 255, 0.45)"
                   multiline
                 />
@@ -6333,7 +6333,7 @@ const ChatScreen: React.FC = () => {
                   {currentPreviewAttachment?.fileSize ? (
                     <Text style={styles.attachmentModalFileMeta} numberOfLines={1}>
                       {formatBytes(currentPreviewAttachment.fileSize)}
-                      {currentPreviewAttachment?.mimeType ? ` • ${currentPreviewAttachment.mimeType}` : ''}
+                      {currentPreviewAttachment?.mimeType ? ` - ${currentPreviewAttachment.mimeType}` : ''}
                     </Text>
                   ) : null}
                   {previewPositionLabel ? (
@@ -6447,7 +6447,7 @@ const ChatScreen: React.FC = () => {
                   {currentPreviewAttachment?.fileSize
                     ? formatBytes(currentPreviewAttachment.fileSize)
                     : 'Tap image to toggle chrome'}
-                  {currentPreviewAttachment?.mimeType ? ` • ${currentPreviewAttachment.mimeType}` : ''}
+                  {currentPreviewAttachment?.mimeType ? ` - ${currentPreviewAttachment.mimeType}` : ''}
                 </Text>
               </View>
               {previewPositionLabel ? (
@@ -7980,7 +7980,7 @@ const styles = StyleSheet.create({
   attachmentDropdownLabel: {
     color: palette.text,
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   attachmentDropdownHint: {
     color: palette.textMuted,

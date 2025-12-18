@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { gradients, palette } from '../theme/designSystem';
+import { font, gradients, palette } from '../theme/designSystem';
 
 type Presence = 'online' | 'offline' | 'busy' | 'away' | 'idle' | null | undefined;
 type PresencePlacement = 'overlay' | 'left';
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   initials: {
     color: palette.text,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   overlayPresence: {
     position: 'absolute',

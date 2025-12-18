@@ -17,7 +17,7 @@ import { StorageService } from '../services/StorageService';
 import { ApiService } from '../services/ApiService';
 import { AppBackground } from '../components/AppBackground';
 import { UserAvatar } from '../components/UserAvatar';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   headerCentered: {
     position: 'absolute',
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   displayName: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   username: {
     color: palette.textMuted,
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   unblockButtonText: {
     color: palette.text,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   separator: {
     height: 1,
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
     marginTop: spacing.lg,
   },
   emptySubtitle: {

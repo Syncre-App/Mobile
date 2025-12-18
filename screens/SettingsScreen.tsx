@@ -19,7 +19,7 @@ import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { SpotifyConnection } from '../components/SpotifyConnection';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
@@ -74,16 +74,16 @@ export const SettingsScreen: React.FC = () => {
     if (updateInProgress) return;
     setUpdateInProgress(true);
     setUpdateProgress(0);
-    setUpdateStatus('Frissítés ellenőrzése...');
+    setUpdateStatus('Checking for updates...');
 
     try {
       await UpdateService.downloadAndInstallLatest((progress) => {
         setUpdateProgress(progress);
-        setUpdateStatus(`Letöltés: ${Math.round(progress * 100)}%`);
+        setUpdateStatus(`Downloading: ${Math.round(progress * 100)}%`);
       });
-      setUpdateStatus('Letöltés kész, telepítő indítása...');
+      setUpdateStatus('Download complete, launching installer...');
     } catch (error: any) {
-      NotificationService.show('error', error?.message || 'Frissítés sikertelen');
+      NotificationService.show('error', error?.message || 'Update failed');
       setUpdateStatus(null);
     } finally {
       setUpdateInProgress(false);
@@ -248,7 +248,7 @@ export const SettingsScreen: React.FC = () => {
             () => {
               Alert.alert(
                 'How to Report Content',
-                'To report objectionable content or users:\n\n• Long-press on any message in a chat\n• Select "Report" from the menu\n• Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
+                'To report objectionable content or users:\n\n- Long-press on any message in a chat\n- Select "Report" from the menu\n- Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
                 [{ text: 'Got it', style: 'default' }]
               );
             }
@@ -280,8 +280,8 @@ export const SettingsScreen: React.FC = () => {
 
           {renderSettingItem(
             'cloud-download',
-            'Android APK frissítés',
-            updateStatus || 'Letöltés és telepítés közvetlenül GitHubról',
+            'Android APK update',
+            updateStatus || 'Download and install directly from GitHub',
             handleInstallApkUpdate,
             updateInProgress ? (
               <View style={styles.progressRow}>
@@ -292,7 +292,7 @@ export const SettingsScreen: React.FC = () => {
               </View>
             ) : (
               <View style={styles.pillButton}>
-                <Text style={styles.pillButtonText}>Frissítés</Text>
+                <Text style={styles.pillButtonText}>Update</Text>
               </View>
             ),
             false
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   content: {
     flex: 1,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: palette.text,
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   settingItem: {
     flexDirection: 'row',
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
   settingTitle: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   settingSubtitle: {
     color: palette.textMuted,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   },
   pillButtonText: {
     color: 'white',
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     fontSize: 14,
   },
 });
