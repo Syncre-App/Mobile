@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   ScrollView,
@@ -32,9 +31,6 @@ export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
   const [selectedLanguage, setSelectedLanguage] = useState('English');
-  const [updateInProgress, setUpdateInProgress] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState(0);
-  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
@@ -70,26 +66,6 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
-  const handleInstallApkUpdate = async () => {
-    if (updateInProgress) return;
-    setUpdateInProgress(true);
-    setUpdateProgress(0);
-    setUpdateStatus('Checking for updates...');
-
-    try {
-      await UpdateService.downloadAndInstallLatest((progress) => {
-        setUpdateProgress(progress);
-        setUpdateStatus(`Downloading: ${Math.round(progress * 100)}%`);
-      });
-      setUpdateStatus('Download complete, launching installer...');
-    } catch (error: any) {
-      NotificationService.show('error', error?.message || 'Update failed');
-      setUpdateStatus(null);
-    } finally {
-      setUpdateInProgress(false);
-      setTimeout(() => setUpdateProgress(0), 800);
-    }
-  };
 
   const renderSettingItem = (
     icon: string | null,
@@ -272,33 +248,6 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Updates Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Updates</Text>
-          </View>
-
-          {renderSettingItem(
-            'cloud-download',
-            'Android APK update',
-            updateStatus || 'Download and install directly from GitHub',
-            handleInstallApkUpdate,
-            updateInProgress ? (
-              <View style={styles.progressRow}>
-                <ActivityIndicator color={palette.text} />
-                <Text style={styles.progressText}>
-                  {`${Math.round(updateProgress * 100)}%`}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.pillButton}>
-                <Text style={styles.pillButtonText}>Update</Text>
-              </View>
-            ),
-            false
-          )}
-        </GlassCard>
-
         {/* About Section */}
         <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
@@ -424,25 +373,5 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progressText: {
-    color: palette.text,
-    fontSize: 14,
-    marginLeft: spacing.xs,
-  },
-  pillButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.xl,
-    backgroundColor: palette.accent,
-  },
-  pillButtonText: {
-    color: 'white',
-    ...font('semibold'),
-    fontSize: 14,
   },
 });
