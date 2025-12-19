@@ -5,6 +5,7 @@ import {
   Dimensions,
   Modal,
   Pressable,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -154,7 +155,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       statusBarTranslucent
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <NativeBlur intensity={80} tint="dark" style={styles.blurOverlay}>
+        <NativeBlur intensity={80} tint={Platform.OS === 'ios' ? 'default' : 'dark'} style={styles.blurOverlay}>
           <Pressable style={styles.cardContainer} onPress={(e) => e.stopPropagation()}>
             <LinearGradient
               colors={['rgba(30, 41, 59, 0.95)', 'rgba(15, 23, 42, 0.98)']}

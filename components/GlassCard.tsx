@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { View, StyleSheet, ViewStyle, DimensionValue, StyleProp, ColorValue } from 'react-native';
+import { View, StyleSheet, ViewStyle, DimensionValue, StyleProp, ColorValue, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeBlur } from './NativeBlur';
 import { gradients, palette, radii, shadows, tokens } from '../theme/designSystem';
@@ -21,17 +21,22 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   variant = 'default',
   padding = 20,
 }) => {
+  const isIOS = Platform.OS === 'ios';
   const isHero = variant === 'hero';
   const isSubtle = variant === 'subtle';
 
   const borderColor = isHero
-    ? 'rgba(59, 130, 246, 0.45)'
+    ? isIOS
+      ? 'rgba(10, 132, 255, 0.4)'
+      : 'rgba(255, 255, 255, 0.28)'
     : isSubtle
     ? 'rgba(255, 255, 255, 0.12)'
     : palette.border;
 
   const gradientColors: [ColorValue, ColorValue] = isHero
-    ? ['rgba(37, 99, 235, 0.22)', 'rgba(99, 102, 241, 0.12)']
+    ? isIOS
+      ? ['rgba(10, 132, 255, 0.22)', 'rgba(94, 92, 230, 0.12)']
+      : ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.06)']
     : ['rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.02)'];
 
   return (
@@ -44,7 +49,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
         style,
       ]}
     >
-      <NativeBlur intensity={intensity} tint="dark" style={styles.blur}>
+      <NativeBlur intensity={intensity} tint={isIOS ? 'default' : 'dark'} style={styles.blur}>
         <LinearGradient
           colors={gradientColors}
           start={{ x: 0, y: 0 }}
@@ -84,11 +89,11 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
   heroShadow: {
-    shadowColor: '#1E2A78',
-    shadowOpacity: 0.55,
-    shadowRadius: 45,
-    shadowOffset: { width: 0, height: 25 },
-    elevation: 24,
+    shadowColor: Platform.OS === 'ios' ? '#0A84FF' : '#000000',
+    shadowOpacity: Platform.OS === 'ios' ? 0.45 : 0.3,
+    shadowRadius: Platform.OS === 'ios' ? 40 : 24,
+    shadowOffset: { width: 0, height: Platform.OS === 'ios' ? 22 : 16 },
+    elevation: Platform.OS === 'ios' ? 20 : 16,
   },
   subtleShadow: {
     shadowOpacity: 0.18,

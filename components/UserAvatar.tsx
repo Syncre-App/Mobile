@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Image, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Image, StyleSheet, Text, View, ViewStyle, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { font, gradients, palette } from '../theme/designSystem';
 
@@ -10,7 +10,7 @@ interface UserAvatarProps {
   uri?: string | null;
   name?: string | null;
   size?: number;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   presence?: Presence;
   presenceColor?: string;
   presencePlacement?: PresencePlacement;

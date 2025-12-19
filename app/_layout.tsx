@@ -12,6 +12,7 @@ import { IdentityService } from '../services/IdentityService';
 import { StorageService } from '../services/StorageService';
 import { CryptoService } from '../services/CryptoService';
 import { ShareIntentService } from '../services/ShareIntentService';
+import { palette } from '../theme/designSystem';
 
 const isMaintenanceEnabled = (): boolean => {
   const raw = Constants.expoConfig?.extra?.maintenance;
@@ -176,15 +177,15 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#03040A' }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.background }}>
       <SafeAreaProvider>
-        <StatusBar style="light" backgroundColor="#03040A" />
+        <StatusBar style="light" backgroundColor={palette.background} />
         <Stack
           screenOptions={{
             headerShown: false,
             gestureEnabled: true,
             animation: 'slide_from_right',
-            contentStyle: { backgroundColor: '#03040A' },
+            contentStyle: { backgroundColor: palette.background },
           }}
         >
           <Stack.Screen name="index" />
