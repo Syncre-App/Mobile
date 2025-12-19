@@ -2,73 +2,17 @@ import { Stack, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ApiService } from '../services/ApiService';
-import Constants from 'expo-constants';
-import { UpdateService } from '../services/UpdateService';
-import { IdentityService } from '../services/IdentityService';
-import { StorageService } from '../services/StorageService';
-import { CryptoService } from '../services/CryptoService';
+import { ThemeProvider, useTheme } from '../theme/designSystem';
+import { NotificationProvider } from '../components/NotificationCenter';
+import NotificationBridge from '../components/NotificationBridge';
 import { ShareIntentService } from '../services/ShareIntentService';
-import { palette } from '../theme/designSystem';
 
-const isMaintenanceEnabled = (): boolean => {
-  const raw = Constants.expoConfig?.extra?.maintenance;
-  return raw === true || raw === 'true';
-};
-
-export default function RootLayout() {
-  const [maintenance, setMaintenance] = useState<boolean>(false);
+const RootLayoutContent = () => {
   const router = useRouter();
-
-  const resolveInitialRoute = useCallback(async () => {
-    const maintenanceFlag = isMaintenanceEnabled();
-    if (maintenanceFlag) {
-      setMaintenance(true);
-      return { path: '/maintenance', allowChatNavigation: false };
-    }
-
-    try {
-      const apiStatus = await ApiService.get('/health');
-      if (!apiStatus.success) {
-        setMaintenance(true);
-        return { path: '/maintenance', allowChatNavigation: false };
-      }
-
-      const updateStatus = await UpdateService.checkForMandatoryUpdate();
-      if (updateStatus.requiresUpdate) {
-        setMaintenance(false);
-        return { path: '/update', allowChatNavigation: false };
-      }
-
-      const token = await StorageService.getAuthToken();
-      if (token) {
-        const needsIdentitySetup = await IdentityService.requiresBootstrap(token);
-        const hasLocalIdentity = Boolean(await CryptoService.getStoredIdentity());
-
-        if (needsIdentitySetup) {
-          setMaintenance(false);
-          return { path: '/identity?mode=setup', allowChatNavigation: false };
-        }
-
-        if (!hasLocalIdentity) {
-          setMaintenance(false);
-          return { path: '/identity?mode=unlock', allowChatNavigation: false };
-        }
-
-        setMaintenance(false);
-        return { path: '/home', allowChatNavigation: true };
-      }
-
-      setMaintenance(false);
-      return { path: '/', allowChatNavigation: false };
-    } catch {
-      setMaintenance(true);
-      return { path: '/maintenance', allowChatNavigation: false };
-    }
-  }, []);
+  const { theme } = useTheme();
 
   const extractChatIdFromNotification = (response: Notifications.NotificationResponse | null) => {
     const data = response?.notification?.request?.content?.data as any;
@@ -82,47 +26,6 @@ export default function RootLayout() {
   };
 
   useEffect(() => {
-    let mounted = true;
-
-    const bootstrapNavigation = async () => {
-      const lastResponse = await Notifications.getLastNotificationResponseAsync().catch(() => null);
-      const pendingChatId = extractChatIdFromNotification(lastResponse);
-      const pendingWrapDate = extractWrapDateFromNotification(lastResponse);
-      const initialRoute = await resolveInitialRoute();
-      if (!mounted) {
-        return;
-      }
-
-      if (pendingWrapDate && initialRoute.allowChatNavigation) {
-        router.replace(`/wrap/${pendingWrapDate}` as any);
-      } else if (pendingChatId && initialRoute.allowChatNavigation) {
-        router.replace(`/chat/${pendingChatId}`);
-      } else {
-        router.replace(initialRoute.path as any);
-      }
-    };
-
-    bootstrapNavigation();
-
-    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const chatId = extractChatIdFromNotification(response);
-      const wrapDate = extractWrapDateFromNotification(response);
-      if (wrapDate) {
-        router.push(`/wrap/${wrapDate}` as any);
-      } else if (chatId) {
-        router.push(`/chat/${chatId}`);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      responseSub.remove();
-    };
-  }, [resolveInitialRoute, router]);
-
-  useEffect(() => {
-    ShareIntentService.init();
-
     const handleIncomingUrl = (url?: string | null) => {
       if (!url) return false;
       if (ShareIntentService.handleIncomingUrl(url)) {
@@ -152,63 +55,78 @@ export default function RootLayout() {
           } as any);
           return true;
         }
-      } catch (err) {
-        console.warn('[linking] Failed to parse incoming url', err);
+      } catch {
+        return false;
       }
       return false;
     };
 
-    const unsubscribeShare = ShareIntentService.subscribe((payload) => {
+    ShareIntentService.init();
+    const shareSub = ShareIntentService.subscribe((payload) => {
       if (payload) router.replace('/share');
     });
 
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        const chatId = extractChatIdFromNotification(response);
+        const wrapDate = extractWrapDateFromNotification(response);
+        if (wrapDate) {
+          router.replace(`/wrap/${wrapDate}` as any);
+        } else if (chatId) {
+          router.replace(`/chat/${chatId}` as any);
+        }
+      })
+      .catch(() => {});
+
     const linkingSub = Linking.addEventListener('url', (event) => {
-      if (handleIncomingUrl(event.url)) return;
+      handleIncomingUrl(event.url);
     });
 
-    Linking.getInitialURL().then((url) => {
-      handleIncomingUrl(url);
-    }).catch(() => { });
+    Linking.getInitialURL()
+      .then((url) => handleIncomingUrl(url))
+      .catch(() => {});
+
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const chatId = extractChatIdFromNotification(response);
+      const wrapDate = extractWrapDateFromNotification(response);
+      if (wrapDate) {
+        router.push(`/wrap/${wrapDate}` as any);
+      } else if (chatId) {
+        router.push(`/chat/${chatId}` as any);
+      }
+    });
 
     return () => {
-      unsubscribeShare();
+      shareSub();
       linkingSub.remove();
+      responseSub.remove();
     };
-  }, []);
+  }, [router]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.background }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.palette.background }}>
       <SafeAreaProvider>
-        <StatusBar style="light" backgroundColor={palette.background} />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            gestureEnabled: true,
-            animation: 'slide_from_right',
-            contentStyle: { backgroundColor: palette.background },
-          }}
-        >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="home" />
-          <Stack.Screen name="register" />
-          <Stack.Screen name="verify" />
-          <Stack.Screen name="reset" />
-          <Stack.Screen name="terms" />
-          <Stack.Screen name="identity" />
-          <Stack.Screen name="maintenance" />
-          <Stack.Screen name="update" />
-          <Stack.Screen name="profile" />
-          <Stack.Screen name="chat/[id]" />
-          <Stack.Screen name="group/create" />
-          <Stack.Screen name="group/[id]/edit" />
-          <Stack.Screen name="settings/index" options={{ title: 'Settings' }} />
-          <Stack.Screen name="settings/edit-profile" options={{ title: 'Edit Profile' }} />
-          <Stack.Screen name="settings/privacy" options={{ title: 'Privacy' }} />
-          <Stack.Screen name="settings/blocked-users" options={{ title: 'Blocked Users' }} />
-          <Stack.Screen name="spotify/callback" />
-          <Stack.Screen name="share/index" />
-        </Stack>
+        <NotificationProvider>
+          <NotificationBridge />
+          <StatusBar style={theme.isDark ? 'light' : 'dark'} />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              gestureEnabled: true,
+              animation: 'slide_from_right',
+              contentStyle: { backgroundColor: theme.palette.background },
+            }}
+          />
+        </NotificationProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+};
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutContent />
+    </ThemeProvider>
   );
 }

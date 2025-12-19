@@ -1,75 +1,64 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { NativeBlur, BlurPresets } from './NativeBlur';
+import { useTheme } from '../theme/designSystem';
+import { NativeBlur } from './NativeBlur';
 
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
-type Notification = { id: string; type: NotificationType; title?: string; message: string };
+type Notification = {
+  id: string;
+  type: NotificationType;
+  title?: string;
+  message: string;
+};
 
 const NotificationContext = createContext<{ push: (n: Notification) => void } | null>(null);
 
 export const useNotifications = () => {
   const ctx = useContext(NotificationContext);
-  if (!ctx) throw new Error('useNotifications must be used within NotificationProvider');
+  if (!ctx) {
+    throw new Error('useNotifications must be used within NotificationProvider');
+  }
   return ctx;
 };
 
-const ICON_MAP: Record<NotificationType, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
-  success: { name: 'checkmark-circle', color: '#4ADE80' },
-  error: { name: 'close-circle', color: '#F87171' },
-  warning: { name: 'warning', color: '#FBBF24' },
-  info: { name: 'information-circle', color: '#60A5FA' },
-};
-
-const BORDER_COLORS: Record<NotificationType, string> = {
-  success: 'rgba(74, 222, 128, 0.3)',
-  error: 'rgba(248, 113, 113, 0.3)',
-  warning: 'rgba(251, 191, 36, 0.3)',
-  info: 'rgba(96, 165, 250, 0.3)',
+const ICONS: Record<NotificationType, keyof typeof Ionicons.glyphMap> = {
+  success: 'checkmark-circle',
+  error: 'close-circle',
+  warning: 'warning',
+  info: 'information-circle',
 };
 
 const ToastItem: React.FC<{ notification: Notification }> = ({ notification }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(-20)).current;
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const fade = useRef(new Animated.Value(0)).current;
+  const translate = useRef(new Animated.Value(-12)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fade, { toValue: 1, duration: 240, useNativeDriver: true }),
+      Animated.timing(translate, { toValue: 0, duration: 240, useNativeDriver: true }),
     ]).start();
-  }, []);
-
-  const icon = ICON_MAP[notification.type] || ICON_MAP.info;
-  const borderColor = BORDER_COLORS[notification.type] || BORDER_COLORS.info;
+  }, [fade, translate]);
 
   return (
     <Animated.View
       style={[
-        styles.toastContainer,
+        styles.toast,
         {
-          opacity: fadeAnim,
-          transform: [{ translateY }],
-          borderColor,
+          opacity: fade,
+          transform: [{ translateY: translate }],
         },
       ]}
     >
-      <NativeBlur {...BlurPresets.toast} style={styles.blurView}>
+      <NativeBlur intensity={theme.tokens.blur.toast} style={styles.toastBlur}>
         <View style={styles.toastContent}>
-          <Ionicons name={icon.name} size={22} color={icon.color} style={styles.icon} />
-          <View style={styles.textContainer}>
-            {notification.title ? (
-              <Text style={styles.title}>{notification.title}</Text>
-            ) : null}
-            <Text style={styles.message} numberOfLines={3}>{notification.message}</Text>
+          <Ionicons name={ICONS[notification.type]} size={20} color={theme.palette.accent} />
+          <View style={styles.toastText}>
+            {notification.title ? <Text style={styles.toastTitle}>{notification.title}</Text> : null}
+            <Text style={styles.toastMessage}>{notification.message}</Text>
           </View>
         </View>
       </NativeBlur>
@@ -80,19 +69,19 @@ const ToastItem: React.FC<{ notification: Notification }> = ({ notification }) =
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [list, setList] = useState<Notification[]>([]);
 
-  const push = (n: Notification) => {
-    setList((s) => [n, ...s]);
+  const push = (notification: Notification) => {
+    setList((prev) => [notification, ...prev]);
     setTimeout(() => {
-      setList((s) => s.filter((x) => x.id !== n.id));
-    }, 3500);
+      setList((prev) => prev.filter((item) => item.id !== notification.id));
+    }, 3200);
   };
 
   return (
     <NotificationContext.Provider value={{ push }}>
       {children}
       <View pointerEvents="box-none" style={styles.container}>
-        {list.map((n) => (
-          <ToastItem key={n.id} notification={n} />
+        {list.map((item) => (
+          <ToastItem key={item.id} notification={item} />
         ))}
       </View>
     </NotificationContext.Provider>
@@ -102,48 +91,47 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 50,
+    top: 48,
     left: 16,
     right: 16,
     zIndex: 9999,
   },
-  toastContainer: {
-    marginBottom: 10,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  blurView: {
-    overflow: 'hidden',
-  },
-  toastContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
-  },
-  icon: {
-    marginRight: 12,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  message: {
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 13,
-    lineHeight: 18,
-  },
 });
+
+const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
+  StyleSheet.create({
+    toast: {
+      borderRadius: theme.radii.lg,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.palette.border,
+      marginBottom: 10,
+      backgroundColor: theme.palette.surfaceSoft,
+      ...theme.shadows.card,
+    },
+    toastBlur: {
+      borderRadius: theme.radii.lg,
+    },
+    toastContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      gap: 10,
+      backgroundColor: theme.palette.surfaceInverse,
+    },
+    toastText: {
+      flex: 1,
+    },
+    toastTitle: {
+      color: theme.palette.text,
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    toastMessage: {
+      color: theme.palette.textMuted,
+      fontSize: 12,
+    },
+  });
 
 export default NotificationProvider;

@@ -1,223 +1,103 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppBackground } from '../components/AppBackground';
-import { GlassCard } from '../components/GlassCard';
-import { NotificationService, notificationService } from '../services/NotificationService';
+import { GlassPanel } from '../components/GlassPanel';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { font, spacing, useTheme } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
-import { font, palette, radii, spacing } from '../theme/designSystem';
+import { NotificationService } from '../services/NotificationService';
+import { Screen } from '../components/Screen';
 
-export default function TermsAcceptScreen() {
+export default function TermsScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loadingUser, setLoadingUser] = useState(true);
-  const [acceptedAt, setAcceptedAt] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const user = await StorageService.getObject<any>('user_data');
-      setAcceptedAt(user?.terms_accepted_at || null);
-      setLoadingUser(false);
-    })();
-  }, []);
-
-  const handleOpenTerms = useCallback(() => {
-    Linking.openURL('https://syncre.xyz/terms').catch(() => {
-      notificationService.show('error', 'Could not open terms page');
-    });
-  }, []);
-
-  const handleAccept = useCallback(async () => {
-    if (isSubmitting) return;
+  const handleAccept = async () => {
     setIsSubmitting(true);
     try {
       const token = await StorageService.getAuthToken();
       if (!token) {
-        NotificationService.show('error', 'Please log in again to continue');
-        router.replace('/' as any);
+        router.replace('/login');
         return;
       }
       const response = await ApiService.post('/user/accept-terms', {}, token);
-      if (response.success) {
-        const nextAccepted = (response.data as any)?.terms_accepted_at || new Date().toISOString();
-        setAcceptedAt(nextAccepted);
-        const user = await StorageService.getObject<any>('user_data');
-        if (user) {
-          user.terms_accepted_at = nextAccepted;
-          user.requires_terms_acceptance = false;
-          await StorageService.setObject('user_data', user);
-        }
-        NotificationService.show('success', 'Thanks for accepting the latest terms.');
-        router.replace('/home' as any);
-      } else {
-        NotificationService.show('error', response.error || 'Failed to record acceptance');
+      if (!response.success) {
+        NotificationService.show('error', response.error || 'Failed to accept terms.');
+        return;
       }
-    } catch (error: any) {
-      NotificationService.show('error', error?.message || 'Failed to record acceptance');
+      const me = await ApiService.get('/user/me', token);
+      if (me.success && me.data) {
+        await StorageService.setObject('user_data', me.data);
+      }
+      NotificationService.show('success', 'Terms accepted.');
+      router.replace('/home');
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting]);
+  };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+    <Screen>
       <AppBackground />
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        <GlassCard width="100%" variant="subtle" style={styles.card} padding={spacing.lg}>
-          <View style={styles.header}>
-            <View style={styles.iconBadge}>
-              <Ionicons name="shield-checkmark" size={22} color="#0b1220" />
-            </View>
-            <Text style={styles.title}>Accept updated Terms</Text>
-            <Text style={styles.subtitle}>
-              Apple requires showing the latest End User License Agreement. Review the terms on the web, then confirm to continue.
-            </Text>
-          </View>
+      <View style={styles.hero}>
+        <Text style={styles.overline}>Terms</Text>
+        <Text style={styles.title}>Before you continue</Text>
+        <Text style={styles.subtitle}>Please accept the terms to continue using Syncre.</Text>
+      </View>
 
-          <TouchableOpacity onPress={handleOpenTerms} style={styles.linkButton}>
-            <Text style={styles.linkButtonText}>View Terms of Service</Text>
-            <Ionicons name="open-outline" size={16} color="#93c5fd" />
-          </TouchableOpacity>
-
-          <View style={styles.meta}>
-            <Text style={styles.metaLabel}>Current status</Text>
-            {loadingUser ? (
-              <ActivityIndicator color="#a5b4fc" />
-            ) : acceptedAt ? (
-              <Text style={styles.metaValue}>Accepted at {new Date(acceptedAt).toLocaleString()}</Text>
-            ) : (
-              <Text style={styles.metaValue}>Not accepted</Text>
-            )}
-          </View>
-
-          <TouchableOpacity
-            style={[styles.acceptButton, isSubmitting && styles.acceptButtonDisabled]}
-            onPress={handleAccept}
-            disabled={isSubmitting}
-            activeOpacity={0.9}
-          >
-            <LinearGradient
-              colors={['#2563EB', '#0EA5E9']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.acceptGradient}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.acceptButtonText}>Accept & Continue</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-        </GlassCard>
-      </ScrollView>
-    </View>
+      <GlassPanel style={styles.panel} glassEffectStyle="regular">
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <Text style={styles.body}>
+            Syncre is a secure messaging platform. By continuing, you agree to follow the community
+            guidelines, respect privacy, and use the service responsibly. Full terms are available
+            on our website.
+          </Text>
+        </ScrollView>
+        <PrimaryButton title="Accept terms" onPress={handleAccept} loading={isSubmitting} />
+      </GlassPanel>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: palette.background,
-  },
-  scroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xxl,
-  },
-  card: {
-    alignSelf: 'center',
-    maxWidth: 520,
-  },
-  header: {
-    gap: spacing.sm,
-    alignItems: 'center',
-  },
-  iconBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: '#a5b4fc',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    color: palette.text,
-    fontSize: 24,
-    ...font('display'),
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: palette.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  linkButton: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(147, 197, 253, 0.4)',
-    backgroundColor: 'rgba(147, 197, 253, 0.08)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  linkButtonText: {
-    color: '#93c5fd',
-    fontSize: 15,
-    ...font('semibold'),
-  },
-  meta: {
-    marginTop: spacing.lg,
-    gap: 4,
-  },
-  metaLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  metaValue: {
-    color: palette.text,
-    fontSize: 15,
-  },
-  acceptButton: {
-    marginTop: spacing.xl,
-    borderRadius: radii.pill,
-    overflow: 'hidden',
-  },
-  acceptButtonDisabled: {
-    opacity: 0.7,
-  },
-  acceptGradient: {
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.pill,
-  },
-  acceptButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    ...font('bold'),
-  },
-});
+const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
+  StyleSheet.create({
+    hero: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.xxl,
+      gap: spacing.xs,
+    },
+    overline: {
+      color: theme.palette.textSubtle,
+      ...font('displayMedium'),
+      letterSpacing: 3,
+      textTransform: 'uppercase',
+      fontSize: 12,
+    },
+    title: {
+      color: theme.palette.text,
+      fontSize: 30,
+      ...font('display'),
+    },
+    subtitle: {
+      color: theme.palette.textMuted,
+      fontSize: 14,
+      ...font('regular'),
+    },
+    panel: {
+      marginTop: spacing.xl,
+      marginHorizontal: spacing.lg,
+      flex: 1,
+    },
+    scroll: {
+      paddingBottom: spacing.lg,
+    },
+    body: {
+      color: theme.palette.textMuted,
+      fontSize: 14,
+      lineHeight: 22,
+      marginBottom: spacing.lg,
+    },
+  });

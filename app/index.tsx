@@ -1,89 +1,119 @@
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import NotificationBridge from '../components/NotificationBridge';
-import { NotificationProvider } from '../components/NotificationCenter';
+import Constants from 'expo-constants';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { AppBackground } from '../components/AppBackground';
-import { LoginScreen } from '../screens/LoginScreen';
+import { useTheme } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
-import { palette } from '../theme/designSystem';
+import { UpdateService } from '../services/UpdateService';
+import { IdentityService } from '../services/IdentityService';
+import { CryptoService } from '../services/CryptoService';
+
+const isMaintenanceEnabled = (): boolean => {
+  const raw = Constants.expoConfig?.extra?.maintenance;
+  return raw === true || raw === 'true';
+};
 
 export default function Index() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const [status, setStatus] = useState<'loading' | 'error'>('loading');
 
   useEffect(() => {
-    validateTokenAndNavigate();
-  }, []);
-
-  const validateTokenAndNavigate = async () => {
-    try {
-      console.log('🔍 Checking for existing token...');
-      const token = await StorageService.getAuthToken();
-      
-      if (!token) {
-        console.log('❌ No token found - show login');
-        setIsAuthenticated(false);
-        setIsLoading(false);
+    let mounted = true;
+    const bootstrap = async () => {
+      if (isMaintenanceEnabled()) {
+        router.replace('/maintenance');
         return;
       }
 
-      console.log('✅ Token found - validating...');
-      // Test the token by making a simple API call
-      const response = await ApiService.get('/user/me', token);
-      
-      if (response.success) {
-        await StorageService.setObject('user_data', response.data);
-        if (response.data?.requires_terms_acceptance || !response.data?.terms_accepted_at) {
-          console.log('⚖️ Terms require re-acceptance - navigating to terms');
-          setIsAuthenticated(true);
-          router.replace('/terms' as any);
-          return;
-        }
-        console.log('✅ Token is valid - navigating to home');
-        // Token is valid, navigate to home screen
-        setIsAuthenticated(true);
-        router.replace('/home' as any);
-      } else {
-        console.log('❌ Token is invalid - clearing and show login');
-        // Token is invalid, clear it and show login
+      const apiStatus = await ApiService.get('/health');
+      if (!apiStatus.success) {
+        router.replace('/maintenance');
+        return;
+      }
+
+      const updateStatus = await UpdateService.checkForMandatoryUpdate();
+      if (updateStatus.requiresUpdate) {
+        router.replace('/update');
+        return;
+      }
+
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
+
+      const me = await ApiService.get('/user/me', token);
+      if (!me.success || !me.data) {
         await StorageService.removeAuthToken();
         await StorageService.removeItem('user_data');
-        setIsAuthenticated(false);
+        router.replace('/login');
+        return;
       }
-    } catch (error) {
-      console.error('❌ Error validating token:', error);
-      // On error, clear token and show login
-      await StorageService.removeAuthToken();
-      await StorageService.removeItem('user_data');
-      setIsAuthenticated(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  if (isLoading) {
-    return (
-      <NotificationProvider>
-        <NotificationBridge />
-        <View style={{ flex: 1, backgroundColor: palette.background }}>
-          <AppBackground />
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={palette.accent} />
-          </View>
-        </View>
-      </NotificationProvider>
-    );
-  }
+      await StorageService.setObject('user_data', me.data);
+      if (me.data?.requires_terms_acceptance || !me.data?.terms_accepted_at) {
+        router.replace('/terms');
+        return;
+      }
+
+      const [needsSetup, localIdentity] = await Promise.all([
+        IdentityService.requiresBootstrap(token),
+        CryptoService.getStoredIdentity(),
+      ]);
+
+      if (needsSetup) {
+        router.replace('/identity?mode=setup');
+        return;
+      }
+
+      if (!localIdentity) {
+        router.replace('/identity?mode=unlock');
+        return;
+      }
+
+      router.replace('/home');
+    };
+
+    bootstrap().catch(() => {
+      if (mounted) {
+        setStatus('error');
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
-    <NotificationProvider>
-      <NotificationBridge />
-      <View style={{ flex: 1, backgroundColor: palette.background }}>
-        <AppBackground />
-        <LoginScreen />
+    <View style={styles.container}>
+      <AppBackground />
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={theme.palette.accent} />
+        {status === 'error' ? <Text style={styles.error}>Unable to start the app.</Text> : null}
       </View>
-    </NotificationProvider>
+    </View>
   );
 }
+
+const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.palette.background,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+    },
+    error: {
+      color: theme.palette.textMuted,
+      fontSize: 14,
+    },
+  });
