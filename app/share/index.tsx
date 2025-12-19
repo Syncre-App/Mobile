@@ -131,7 +131,7 @@ const resolveChatTitle = (chat: ShareableChat, currentUserId?: string | null): s
     if (chat.displayName && chat.displayName.length) {
       return chat.displayName;
     }
-    return 'Csoportos beszélgetés';
+    return 'Group chat';
   }
 
   const participants: any[] = Array.isArray(chat.participants) ? chat.participants : [];
@@ -145,7 +145,7 @@ const resolveChatTitle = (chat: ShareableChat, currentUserId?: string | null): s
         counterpart.username ||
         counterpart.displayName ||
         counterpart.email ||
-        'Ismerős'
+        'Contact'
       );
     }
   }
@@ -160,7 +160,7 @@ const resolveChatTitle = (chat: ShareableChat, currentUserId?: string | null): s
     }
   }
 
-  return chat.name || chat.displayName || 'Privát chat';
+  return chat.name || chat.displayName || 'Direct chat';
 };
 
 const resolveChatSubtitle = (chat: ShareableChat, currentUserId?: string | null): string => {
@@ -265,7 +265,7 @@ const ShareScreen: React.FC = () => {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      NotificationService.show('warning', 'Jelentkezz be, hogy megoszthass tartalmat');
+      NotificationService.show('warning', 'Sign in to share content');
       router.replace('/identity?mode=unlock&redirect=share');
     }
   }, [authLoading, user, router]);
@@ -307,34 +307,34 @@ const ShareScreen: React.FC = () => {
 
   const handleSendShare = useCallback(async () => {
     if (!payload) {
-      NotificationService.show('error', 'Nincs megosztandó tartalom');
+      NotificationService.show('error', 'Nothing to share');
       return;
     }
     if (!selectedChat) {
-      NotificationService.show('error', 'Válassz egy chatet');
+      NotificationService.show('error', 'Choose a chat');
       return;
     }
     if (!currentUserId) {
-      NotificationService.show('error', 'Nincs aktív felhasználói fiók');
+      NotificationService.show('error', 'No active user account');
       return;
     }
 
     const trimmedMessage = message.trim();
     if (!trimmedMessage && fileAttachments.length === 0) {
-      NotificationService.show('error', 'Üzenet vagy melléklet nélkül nem lehet megosztani');
+      NotificationService.show('error', 'You need a message or attachment to share');
       return;
     }
 
     const chatId = normalizeChatId(selectedChat);
     if (!chatId) {
-      NotificationService.show('error', 'A kiválasztott chat nem elérhető');
+      NotificationService.show('error', 'The selected chat is not available');
       return;
     }
 
     const participantIds = extractParticipantIds(selectedChat);
     const recipientIds = participantIds.filter((id) => id && id !== currentUserId);
     if (!recipientIds.length) {
-      NotificationService.show('error', 'Ehhez a beszélgetéshez nem találhatók címzettek');
+      NotificationService.show('error', 'No recipients found for this chat');
       return;
     }
 
@@ -342,7 +342,7 @@ const ShareScreen: React.FC = () => {
       setSending(true);
       const token = await StorageService.getAuthToken();
       if (!token) {
-        throw new Error('Nincs érvényes hitelesítési token');
+        throw new Error('No valid auth token');
       }
 
       const uploadedAttachmentIds: string[] = [];
@@ -356,7 +356,7 @@ const ShareScreen: React.FC = () => {
           !attachment.value.startsWith('content://')
         ) {
           throw new Error(
-            `Ismeretlen fájl elérési út: ${attachment.filename || attachment.id}`
+            `Unknown file path: ${attachment.filename || attachment.id}`
           );
         }
         const asset: UploadableAsset = {
@@ -367,13 +367,13 @@ const ShareScreen: React.FC = () => {
         };
         const response = await ChatService.uploadAttachment(chatId, asset, token);
         if (!response.success || !response.data?.attachment?.id) {
-          throw new Error(response.error || 'Nem sikerült feltölteni az egyik mellékletet');
+          throw new Error(response.error || 'Failed to upload one of the attachments');
         }
         uploadedAttachmentIds.push(response.data.attachment.id.toString());
       }
 
       if (!trimmedMessage && uploadedAttachmentIds.length === 0) {
-        throw new Error('Nincs elküldhető tartalom');
+        throw new Error('No content to send');
       }
 
       const wsService = wsServiceRef.current;
@@ -398,14 +398,14 @@ const ShareScreen: React.FC = () => {
         attachments: uploadedAttachmentIds,
       });
 
-      NotificationService.show('success', 'A tartalom megosztva a kiválasztott chatben');
+      NotificationService.show('success', 'Content shared to the selected chat');
       ShareIntentService.clearPayload();
       router.replace(`/chat/${chatId}`);
     } catch (error: any) {
       console.error('[ShareScreen] Failed to send share intent', error);
       NotificationService.show(
         'error',
-        error?.message || 'Ismeretlen hiba történt a megosztás során'
+        error?.message || 'An unknown error occurred while sharing'
       );
     } finally {
       setSending(false);
@@ -416,7 +416,7 @@ const ShareScreen: React.FC = () => {
     if (value.length > MESSAGE_CHAR_LIMIT) {
       NotificationService.show(
         'warning',
-        `Az üzenetek legfeljebb ${MESSAGE_CHAR_LIMIT} karakter hosszúak lehetnek`
+        `Messages can be at most ${MESSAGE_CHAR_LIMIT} characters long`
       );
       setMessage(value.slice(0, MESSAGE_CHAR_LIMIT));
       return;
@@ -440,7 +440,7 @@ const ShareScreen: React.FC = () => {
           {isSelected && <Ionicons name="checkmark-circle" size={20} color="#4ade80" />}
         </View>
         <Text style={styles.chatItemSubtitle} numberOfLines={1}>
-          {resolveChatSubtitle(item, currentUserId) || 'Nincs előzmény'}
+          {resolveChatSubtitle(item, currentUserId) || 'No history yet'}
         </Text>
       </TouchableOpacity>
     );
@@ -451,7 +451,7 @@ const ShareScreen: React.FC = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator color="#fff" size="large" />
-          <Text style={styles.loadingText}>Megosztás inicializálása...</Text>
+          <Text style={styles.loadingText}>Preparing share...</Text>
         </View>
       </SafeAreaView>
     );
@@ -462,13 +462,12 @@ const ShareScreen: React.FC = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.emptyState}>
           <Ionicons name="share-outline" size={48} color="#9CA3AF" />
-          <Text style={styles.emptyTitle}>Nincs átvett megosztás</Text>
+          <Text style={styles.emptyTitle}>No shared content</Text>
           <Text style={styles.emptySubtitle}>
-            A megosztási ablakot csak akkor tudod használni, ha egy másik alkalmazásból
-            indítod a Syncre megosztást.
+            You can only use the share sheet when sharing from another app into Syncre.
           </Text>
           <TouchableOpacity style={styles.emptyButton} onPress={onCancel}>
-            <Text style={styles.emptyButtonText}>Vissza a kezdőlapra</Text>
+            <Text style={styles.emptyButtonText}>Back to home</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -486,34 +485,34 @@ const ShareScreen: React.FC = () => {
             <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
               <Ionicons name="close" size={28} color="#F3F4F6" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Megosztás Syncre-be</Text>
+            <Text style={styles.headerTitle}>Share to Syncre</Text>
             <Text style={styles.headerSubtitle}>
-              Válaszd ki, melyik beszélgetésbe küldjük tovább a megosztott tartalmat.
+              Choose which chat to send the shared content to.
             </Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Megosztott tartalom</Text>
+            <Text style={styles.sectionTitle}>Shared content</Text>
             <ScrollView
               style={styles.previewContainer}
               contentContainerStyle={{ paddingVertical: 4 }}
             >
               {payload.title && (
                 <View style={styles.previewItem}>
-                  <Text style={styles.previewLabel}>Cím</Text>
+                  <Text style={styles.previewLabel}>Title</Text>
                   <Text style={styles.previewValue}>{payload.title}</Text>
                 </View>
               )}
               {payload.origin && (
                 <View style={styles.previewItem}>
-                  <Text style={styles.previewLabel}>Forrás</Text>
+                  <Text style={styles.previewLabel}>Source</Text>
                   <Text style={styles.previewValue}>{payload.origin}</Text>
                 </View>
               )}
               {textAttachments.map((attachment) => (
                 <View key={attachment.id} style={styles.previewCard}>
                   <Text style={styles.previewBadge}>
-                    {attachment.kind === 'url' ? 'Hivatkozás' : 'Szöveg'}
+                    {attachment.kind === 'url' ? 'Link' : 'Text'}
                   </Text>
                   <Text style={styles.previewContent}>{attachment.value}</Text>
                 </View>
@@ -528,28 +527,28 @@ const ShareScreen: React.FC = () => {
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.fileName} numberOfLines={1}>
-                      {attachment.filename || 'Csatolt fájl'}
+                      {attachment.filename || 'Attached file'}
                     </Text>
                     <Text style={styles.fileMeta}>
-                      {attachment.mimeType || 'ismeretlen típus'}
-                      {attachment.size ? ` • ${formatBytes(attachment.size)}` : ''}
+                      {attachment.mimeType || 'unknown type'}
+                      {attachment.size ? ` - ${formatBytes(attachment.size)}` : ''}
                     </Text>
                   </View>
                 </View>
               ))}
               {!textAttachments.length && !fileAttachments.length && (
-                <Text style={styles.previewPlaceholder}>Nincs részletes adat a megosztáshoz</Text>
+                <Text style={styles.previewPlaceholder}>No details available for this share</Text>
               )}
             </ScrollView>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Üzenet</Text>
+            <Text style={styles.sectionTitle}>Message</Text>
             <TextInput
               style={styles.messageInput}
               value={message}
               onChangeText={handleMessageChange}
-              placeholder="Írj kiegészítő üzenetet (opcionális)"
+              placeholder="Add a note (optional)"
               placeholderTextColor="#6B7280"
               multiline
               maxLength={MESSAGE_CHAR_LIMIT}
@@ -558,19 +557,19 @@ const ShareScreen: React.FC = () => {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Chat kiválasztása</Text>
+            <Text style={styles.sectionTitle}>Choose a chat</Text>
             <TextInput
               style={styles.searchInput}
               value={search}
               onChangeText={setSearch}
-              placeholder="Keresés a beszélgetések között"
+              placeholder="Search chats"
               placeholderTextColor="#6B7280"
             />
             <View style={styles.chatListContainer}>
               {chatsLoading ? (
                 <View style={styles.chatLoading}>
                   <ActivityIndicator color="#F3F4F6" />
-                  <Text style={styles.chatLoadingText}>Chat lista betöltése...</Text>
+                  <Text style={styles.chatLoadingText}>Loading chat list...</Text>
                 </View>
               ) : (
                 <FlatList
@@ -580,7 +579,7 @@ const ShareScreen: React.FC = () => {
                   ListEmptyComponent={
                     <View style={styles.emptyChats}>
                       <Text style={styles.emptyChatsText}>
-                        Nem találtunk a kereséshez illő beszélgetést.
+                        No chats match your search.
                       </Text>
                     </View>
                   }
@@ -592,7 +591,7 @@ const ShareScreen: React.FC = () => {
 
           <View style={styles.footer}>
             <TouchableOpacity style={styles.cancelButton} onPress={onCancel} disabled={sending}>
-              <Text style={styles.cancelButtonText}>Mégse</Text>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.sendButtonWrapper}
@@ -608,7 +607,7 @@ const ShareScreen: React.FC = () => {
                 {sending ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.sendButtonText}>Küldés</Text>
+                  <Text style={styles.sendButtonText}>Send</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>

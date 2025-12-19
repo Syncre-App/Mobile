@@ -12,6 +12,7 @@ import { IdentityService } from '../services/IdentityService';
 import { StorageService } from '../services/StorageService';
 import { CryptoService } from '../services/CryptoService';
 import { ShareIntentService } from '../services/ShareIntentService';
+import { palette } from '../theme/designSystem';
 
 const isMaintenanceEnabled = (): boolean => {
   const raw = Constants.expoConfig?.extra?.maintenance;
@@ -131,6 +132,14 @@ export default function RootLayout() {
       try {
         const parsed = Linking.parse(url);
         const path = (parsed?.path || '').replace(/^\//, '').toLowerCase();
+        if (path.startsWith('spotify/callback')) {
+          const params = parsed?.queryParams || {};
+          router.replace({
+            pathname: '/spotify/callback',
+            params,
+          } as any);
+          return true;
+        }
         if (path.startsWith('reset')) {
           const params = parsed?.queryParams || {};
           router.replace({
@@ -168,15 +177,15 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#03040A' }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.background }}>
       <SafeAreaProvider>
-        <StatusBar style="light" backgroundColor="#03040A" />
+        <StatusBar style="light" backgroundColor={palette.background} />
         <Stack
           screenOptions={{
             headerShown: false,
             gestureEnabled: true,
             animation: 'slide_from_right',
-            contentStyle: { backgroundColor: '#03040A' },
+            contentStyle: { backgroundColor: palette.background },
           }}
         >
           <Stack.Screen name="index" />
@@ -196,6 +205,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings/edit-profile" options={{ title: 'Edit Profile' }} />
           <Stack.Screen name="settings/privacy" options={{ title: 'Privacy' }} />
           <Stack.Screen name="settings/blocked-users" options={{ title: 'Blocked Users' }} />
+          <Stack.Screen name="spotify/callback" />
           <Stack.Screen name="share/index" />
         </Stack>
       </SafeAreaProvider>

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +18,8 @@ import { UpdateService, ReleaseInfo } from '../services/UpdateService';
 export default function UpdateScreen() {
   const [release, setRelease] = useState<ReleaseInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [installStatus, setInstallStatus] = useState<string | null>(null);
   const currentVersion = UpdateService.getCurrentVersion();
 
   useEffect(() => {
@@ -48,6 +51,26 @@ export default function UpdateScreen() {
     setIsLoading(false);
   };
 
+  const handleInstall = async () => {
+    if (isInstalling) return;
+    setIsInstalling(true);
+    setInstallStatus('Preparing download...');
+    try {
+      await UpdateService.downloadAndInstallLatest((progress) => {
+        const percent = Math.round(progress * 100);
+        setInstallStatus(`Downloading: ${percent}%`);
+      });
+      setInstallStatus('Download complete. Opening installer...');
+    } catch (error: any) {
+      setInstallStatus(error?.message || 'Update install failed');
+    } finally {
+      setIsInstalling(false);
+    }
+  };
+
+  const isAndroid = Platform.OS === 'android';
+  const canInstallApk = isAndroid && Boolean(release?.assetUrl);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -58,7 +81,7 @@ export default function UpdateScreen() {
           {isLoading ? (
             <View style={styles.loading}>
               <ActivityIndicator size="large" color="#2C82FF" />
-              <Text style={styles.loadingText}>Checking for updates…</Text>
+              <Text style={styles.loadingText}>Checking for updates...</Text>
             </View>
           ) : release ? (
             <>
@@ -81,9 +104,33 @@ export default function UpdateScreen() {
                 <Text style={styles.notesBody}>{release.notes.trim() || 'No details provided.'}</Text>
               </View>
 
-              <TouchableOpacity style={styles.primaryButton} onPress={handleOpenRelease}>
-                <Text style={styles.primaryButtonText}>Update Now</Text>
-              </TouchableOpacity>
+              {canInstallApk ? (
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={handleInstall}
+                  disabled={isInstalling}
+                >
+                  {isInstalling ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Install Update</Text>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.primaryButton} onPress={handleOpenRelease}>
+                  <Text style={styles.primaryButtonText}>Update Now</Text>
+                </TouchableOpacity>
+              )}
+
+              {canInstallApk && (
+                <TouchableOpacity style={styles.secondaryButton} onPress={handleOpenRelease}>
+                  <Text style={styles.secondaryButtonText}>Open Release Page</Text>
+                </TouchableOpacity>
+              )}
+
+              {installStatus ? (
+                <Text style={styles.installStatus}>{installStatus}</Text>
+              ) : null}
 
               <TouchableOpacity style={styles.secondaryButton} onPress={handleRetry}>
                 <Text style={styles.secondaryButtonText}>Refresh Release Info</Text>
@@ -176,6 +223,11 @@ const styles = StyleSheet.create({
   notesBody: {
     color: 'rgba(255, 255, 255, 0.85)',
     lineHeight: 20,
+  },
+  installStatus: {
+    marginTop: 12,
+    color: 'rgba(255, 255, 255, 0.75)',
+    textAlign: 'center',
   },
   primaryButton: {
     marginTop: 24,

@@ -12,7 +12,7 @@ import {
 import { AppBackground } from '../../components/AppBackground';
 import { GlassCard } from '../../components/GlassCard';
 import { UserAvatar } from '../../components/UserAvatar';
-import { layout, palette, radii, spacing } from '../../theme/designSystem';
+import { font, layout, palette, radii, spacing } from '../../theme/designSystem';
 import { ApiService } from '../../services/ApiService';
 import { StorageService } from '../../services/StorageService';
 import { UserCacheService } from '../../services/UserCacheService';
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   title: {
     color: palette.text,
     fontSize: 28,
-    fontFamily: 'PlusJakartaSans-Bold',
+    ...font('bold'),
   },
   subtitle: {
     color: palette.textMuted,
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
   statValue: {
     color: palette.text,
     fontSize: 22,
-    fontFamily: 'PlusJakartaSans-Bold',
+    ...font('bold'),
   },
   section: {
     marginTop: spacing.sm,
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: palette.text,
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     marginBottom: spacing.sm,
   },
   topContactRow: {
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   topContactName: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   topContactCount: {
     color: palette.textMuted,
@@ -435,6 +435,6 @@ const styles = StyleSheet.create({
   shareButtonText: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
 });

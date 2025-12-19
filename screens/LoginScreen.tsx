@@ -19,7 +19,7 @@ import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { IdentityService } from '../services/IdentityService';
 import { CryptoService } from '../services/CryptoService';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   logo: { width: 96, height: 96, marginBottom: spacing.sm },
   overline: {
     color: palette.textSubtle,
-    fontFamily: 'SpaceGrotesk-Medium',
+    ...font('displayMedium'),
     letterSpacing: 4,
     textTransform: 'uppercase',
     fontSize: 12,
@@ -232,20 +232,20 @@ const styles = StyleSheet.create({
   heroTitle: {
     color: palette.text,
     fontSize: 34,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
     letterSpacing: -0.5,
   },
   heroSubtitle: {
     color: palette.textMuted,
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans-Regular',
+    ...font('regular'),
   },
   card: { width: '100%', maxWidth: 420 },
   cardContent: { width: '100%' },
   title: {
     color: palette.text,
     fontSize: 22,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     letterSpacing: -0.2,
     marginBottom: spacing.xs,
     textAlign: 'center',
@@ -277,10 +277,10 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 8,
   },
-  loginButtonText: { color: '#fff', fontSize: 16, fontFamily: 'PlusJakartaSans-SemiBold' },
+  loginButtonText: { color: '#fff', fontSize: 16, ...font('semibold') },
   registerLink: { alignItems: 'center', paddingVertical: spacing.xs, marginTop: spacing.xs },
   registerText: { color: palette.textMuted, fontSize: 14 },
-  registerTextHighlight: { color: palette.accentSecondary, fontFamily: 'PlusJakartaSans-SemiBold' },
+  registerTextHighlight: { color: palette.accentSecondary, ...font('semibold') },
   errorBox: {
     width: '100%',
     backgroundColor: '#ef44441a',

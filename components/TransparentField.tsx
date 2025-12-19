@@ -8,7 +8,7 @@ import {
   KeyboardTypeOptions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { gradients, palette, radii, spacing } from '../theme/designSystem';
+import { font, gradients, palette, radii, spacing } from '../theme/designSystem';
 
 interface TransparentFieldProps {
   value: string;
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 15,
     paddingVertical: spacing.sm,
-    fontFamily: 'PlusJakartaSans-Regular',
+    ...font('regular'),
   },
   prefixIcon: {
     marginRight: spacing.sm,

@@ -14,7 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GlassCard } from '../components/GlassCard';
 import { AppBackground } from '../components/AppBackground';
 import { UpdateService } from '../services/UpdateService';
-import { palette, spacing, radii } from '../theme/designSystem';
+import { font, palette, spacing, radii } from '../theme/designSystem';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: 'white',
     fontSize: 20,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   content: {
     flex: 1,
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: 'white',
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   settingItem: {
     flexDirection: 'row',
@@ -289,13 +289,13 @@ const styles = StyleSheet.create({
   settingTitle: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   settingSubtitle: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 14,
     marginTop: 2,
-    fontFamily: 'PlusJakartaSans-Regular',
+    ...font('regular'),
   },
   settingRight: {
     marginLeft: spacing.md,

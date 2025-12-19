@@ -289,4 +289,117 @@ export class ApiService {
       };
     }
   }
+
+  // Streak methods
+  static async getStreakForChat(chatId: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/chat/${chatId}/streak`, token);
+  }
+
+  static async getStreaksForChats(chatIds: (string | number)[], token: string): Promise<ApiResponse> {
+    return this.post('/chat/streaks', { chatIds }, token);
+  }
+
+  // Scheduled message methods
+  static async scheduleMessage(
+    chatId: string | number,
+    data: {
+      content: string;
+      attachments?: number[];
+      replyTo?: number;
+      scheduledFor: string;
+      timezone?: string;
+    },
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/schedule`, data, token);
+  }
+
+  static async getScheduledMessages(token: string, status: string = 'pending'): Promise<ApiResponse> {
+    return this.get(`/chat/scheduled/list?status=${status}`, token);
+  }
+
+  static async getScheduledMessage(id: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/chat/scheduled/${id}`, token);
+  }
+
+  static async updateScheduledMessage(
+    id: string | number,
+    data: {
+      content?: string;
+      attachments?: number[];
+      scheduledFor?: string;
+      timezone?: string;
+    },
+    token: string
+  ): Promise<ApiResponse> {
+    return this.put(`/chat/scheduled/${id}`, data, token);
+  }
+
+  static async cancelScheduledMessage(id: string | number, token: string): Promise<ApiResponse> {
+    return this.delete(`/chat/scheduled/${id}`, token);
+  }
+
+  // Poll methods
+  static async createPoll(
+    chatId: string | number,
+    data: {
+      question: string;
+      options: string[];
+      multiSelect?: boolean;
+    },
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/poll`, data, token);
+  }
+
+  static async getPollByMessageId(messageId: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/chat/message/${messageId}/poll`, token);
+  }
+
+  static async votePoll(
+    chatId: string | number,
+    pollId: string | number,
+    optionIds: number[],
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/poll/${pollId}/vote`, { optionIds }, token);
+  }
+
+  static async removeVotePoll(
+    chatId: string | number,
+    pollId: string | number,
+    optionId: number,
+    token: string
+  ): Promise<ApiResponse> {
+    return this.delete(`/chat/${chatId}/poll/${pollId}/vote?optionId=${optionId}`, token);
+  }
+
+  static async closePoll(
+    chatId: string | number,
+    pollId: string | number,
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/poll/${pollId}/close`, {}, token);
+  }
+
+  // Spotify methods
+  static async getSpotifyStatus(token: string): Promise<ApiResponse> {
+    return this.get('/spotify/status', token);
+  }
+
+  static async getSpotifyAuthUrl(token: string): Promise<ApiResponse> {
+    return this.get('/spotify/auth', token);
+  }
+
+  static async disconnectSpotify(token: string): Promise<ApiResponse> {
+    return this.post('/spotify/disconnect', {}, token);
+  }
+
+  static async getSpotifyNowPlaying(token: string): Promise<ApiResponse> {
+    return this.get('/spotify/now-playing', token);
+  }
+
+  static async getUserActivity(userId: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/spotify/activity/${userId}`, token);
+  }
 }

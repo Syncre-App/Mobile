@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { GlassCard } from './GlassCard';
 import { UserAvatar } from './UserAvatar';
 
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   title: {
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     letterSpacing: -0.2,
   },
   section: {
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: palette.textSubtle,
     fontSize: 12,
-    fontFamily: 'SpaceGrotesk-Medium',
+    ...font('displayMedium'),
     marginBottom: spacing.sm,
     textTransform: 'uppercase',
     letterSpacing: 3,
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   requestName: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   requestEmail: {
     color: palette.textMuted,
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: palette.text,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   rejectButtonText: {
     color: palette.error,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: palette.textSubtle,
-    fontFamily: 'SpaceGrotesk-Medium',
+    ...font('displayMedium'),
     fontSize: 12,
     letterSpacing: 4,
     textTransform: 'uppercase',
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: palette.accentSecondary,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
     fontSize: 14,
   },
 });

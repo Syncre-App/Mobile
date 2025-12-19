@@ -17,7 +17,7 @@ import { GlassCard } from '../components/GlassCard';
 import { NotificationService, notificationService } from '../services/NotificationService';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 
 export default function TermsAcceptScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   title: {
     color: palette.text,
     fontSize: 24,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
     textAlign: 'center',
   },
   subtitle: {
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   linkButtonText: {
     color: '#93c5fd',
     fontSize: 15,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   meta: {
     marginTop: spacing.lg,
@@ -218,6 +218,6 @@ const styles = StyleSheet.create({
   acceptButtonText: {
     color: '#ffffff',
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-Bold',
+    ...font('bold'),
   },
 });

@@ -54,7 +54,7 @@ const downloadApk = async (url: string, onProgress?: ProgressCallback): Promise<
 
 const launchInstaller = async (apkUri: string) => {
 	if (Platform.OS !== 'android') {
-		throw new Error('APK install csak Androidon támogatott');
+		throw new Error('APK install is only supported on Android');
 	}
 
 	const contentUri = await FileSystem.getContentUriAsync(apkUri);
@@ -80,7 +80,7 @@ const launchInstaller = async (apkUri: string) => {
 export const ApkInstaller = {
 	async downloadAndInstall(url: string, onProgress?: ProgressCallback) {
 		if (!url) {
-			throw new Error('Hiányzó APK letöltési URL');
+			throw new Error('Missing APK download URL');
 		}
 		const apkUri = await downloadApk(url, onProgress);
 		await launchInstaller(apkUri);

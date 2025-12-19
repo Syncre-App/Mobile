@@ -3,6 +3,8 @@ import { Platform, StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { BlurView as NativeBlurView } from '@react-native-community/blur';
 
+const isIOS = Platform.OS === 'ios';
+
 interface NativeBlurProps {
   intensity?: number;
   tint?: 'light' | 'dark' | 'default';
@@ -10,18 +12,26 @@ interface NativeBlurProps {
   children?: React.ReactNode;
 }
 
+const defaultTint: NativeBlurProps['tint'] = isIOS ? 'default' : 'dark';
+
 export const NativeBlur: React.FC<NativeBlurProps> = ({
   intensity = 50,
-  tint = 'dark',
+  tint = defaultTint,
   style,
   children,
 }) => {
-  if (Platform.OS === 'ios') {
-    const blurType = tint === 'light' 
-      ? 'light' 
-      : tint === 'dark' 
-        ? 'dark' 
-        : 'regular';
+  if (isIOS) {
+    const blurType = tint === 'light'
+      ? 'ultraThinMaterialLight'
+      : tint === 'dark'
+        ? 'ultraThinMaterialDark'
+        : 'ultraThinMaterial';
+
+    const fallbackColor = tint === 'light'
+      ? 'rgba(255, 255, 255, 0.7)'
+      : tint === 'dark'
+        ? 'rgba(28, 28, 30, 0.8)'
+        : 'rgba(28, 28, 30, 0.75)';
 
     return (
       <View style={[styles.container, style]}>
@@ -29,7 +39,7 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
           style={StyleSheet.absoluteFillObject}
           blurType={blurType}
           blurAmount={Math.min(intensity / 5, 25)}
-          reducedTransparencyFallbackColor="rgba(15, 23, 42, 0.9)"
+          reducedTransparencyFallbackColor={fallbackColor}
         />
         <View style={styles.content}>
           {children}
@@ -50,11 +60,11 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
 };
 
 export const BlurPresets = {
-  card: { intensity: 40, tint: 'dark' as const },
-  modal: { intensity: 60, tint: 'dark' as const },
-  overlay: { intensity: 80, tint: 'dark' as const },
-  navigation: { intensity: 50, tint: 'dark' as const },
-  toast: { intensity: 55, tint: 'dark' as const },
+  card: { intensity: isIOS ? 28 : 40, tint: defaultTint },
+  modal: { intensity: isIOS ? 42 : 60, tint: defaultTint },
+  overlay: { intensity: isIOS ? 58 : 80, tint: defaultTint },
+  navigation: { intensity: isIOS ? 32 : 50, tint: defaultTint },
+  toast: { intensity: isIOS ? 36 : 55, tint: defaultTint },
 } as const;
 
 const styles = StyleSheet.create({

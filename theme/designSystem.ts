@@ -1,31 +1,95 @@
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
-export const palette = {
-  background: '#03040A',
-  backgroundMuted: '#05060F',
-  surface: 'rgba(255, 255, 255, 0.03)',
-  surfaceStrong: 'rgba(15, 23, 42, 0.58)',
-  surfaceSoft: 'rgba(15, 23, 42, 0.38)',
-  border: 'rgba(148, 163, 184, 0.24)',
-  borderStrong: 'rgba(148, 163, 184, 0.35)',
+const IOS_FONT_WEIGHTS = {
+  regular: '400',
+  medium: '500',
+  semibold: '600',
+  bold: '700',
+  display: '700',
+  displayMedium: '600',
+} as const;
+
+const FONT_FAMILIES = {
+  regular: 'PlusJakartaSans-Regular',
+  medium: 'PlusJakartaSans-Medium',
+  semibold: 'PlusJakartaSans-SemiBold',
+  bold: 'PlusJakartaSans-Bold',
+  display: 'SpaceGrotesk-SemiBold',
+  displayMedium: 'SpaceGrotesk-Medium',
+} as const;
+
+export const font = (variant: keyof typeof FONT_FAMILIES) => {
+  if (Platform.OS === 'ios') {
+    return {
+      fontFamily: 'System',
+      fontWeight: IOS_FONT_WEIGHTS[variant],
+    } as const;
+  }
+
+  return {
+    fontFamily: FONT_FAMILIES[variant],
+  } as const;
+};
+
+const isIOS = Platform.OS === 'ios';
+
+const iosPalette = {
+  background: '#0B0E14',
+  backgroundMuted: '#0E1219',
+  surface: 'rgba(255, 255, 255, 0.14)',
+  surfaceStrong: 'rgba(255, 255, 255, 0.2)',
+  surfaceSoft: 'rgba(255, 255, 255, 0.08)',
+  border: 'rgba(255, 255, 255, 0.18)',
+  borderStrong: 'rgba(255, 255, 255, 0.28)',
   text: '#F8FAFC',
-  textMuted: 'rgba(248, 250, 252, 0.65)',
-  textSubtle: 'rgba(226, 232, 240, 0.55)',
-  accent: '#2563EB',
-  accentSecondary: '#0EA5E9',
-  accentTertiary: '#7C3AED',
-  success: '#22C55E',
-  warning: '#F59E0B',
-  error: '#FB7185',
+  textMuted: 'rgba(248, 250, 252, 0.72)',
+  textSubtle: 'rgba(248, 250, 252, 0.52)',
+  accent: '#0A84FF',
+  accentSecondary: '#5AC8FA',
+  accentTertiary: '#5E5CE6',
+  success: '#34C759',
+  warning: '#FF9F0A',
+  error: '#FF453A',
 };
 
-export const gradients = {
-  backgroundBase: ['#05030B', '#03030F', '#010104'],
-  buttonPrimary: ['#2563EB', '#0EA5E9', '#8B5CF6'],
-  buttonMuted: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)'],
-  cardStroke: ['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.04)'],
-  avatarRing: ['#CBD5F5', '#94A3B8', '#64748B'],
+const androidPalette = {
+  background: '#000000',
+  backgroundMuted: '#0A0A0A',
+  surface: 'rgba(255, 255, 255, 0.06)',
+  surfaceStrong: 'rgba(255, 255, 255, 0.12)',
+  surfaceSoft: 'rgba(255, 255, 255, 0.04)',
+  border: 'rgba(255, 255, 255, 0.12)',
+  borderStrong: 'rgba(255, 255, 255, 0.18)',
+  text: '#FFFFFF',
+  textMuted: 'rgba(255, 255, 255, 0.65)',
+  textSubtle: 'rgba(255, 255, 255, 0.4)',
+  accent: '#1C1C1E',
+  accentSecondary: '#FFFFFF',
+  accentTertiary: '#D6D6D6',
+  success: '#FFFFFF',
+  warning: '#D6D6D6',
+  error: '#F2F2F2',
 };
+
+export const palette = isIOS ? iosPalette : androidPalette;
+
+const iosGradients = {
+  backgroundBase: ['#0E1117', '#0B0E14', '#070A0F'],
+  buttonPrimary: ['rgba(10, 132, 255, 0.9)', 'rgba(94, 92, 230, 0.9)'],
+  buttonMuted: ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.06)'],
+  cardStroke: ['rgba(255,255,255,0.35)', 'rgba(255,255,255,0.1)'],
+  avatarRing: ['#FFFFFF', '#D7DBE4', '#B0B7C3'],
+};
+
+const androidGradients = {
+  backgroundBase: ['#000000', '#050505', '#000000'],
+  buttonPrimary: ['#1C1C1E', '#2C2C2E'],
+  buttonMuted: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)'],
+  cardStroke: ['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.06)'],
+  avatarRing: ['#FFFFFF', '#DADADA', '#BFBFBF'],
+};
+
+export const gradients = isIOS ? iosGradients : androidGradients;
 
 export const radii = {
   xs: 8,
@@ -34,6 +98,7 @@ export const radii = {
   lg: 20,
   xl: 28,
   xxl: 36,
+  full: 999,
   pill: 999,
 };
 
@@ -47,48 +112,67 @@ export const spacing = {
   xxl: 40,
 };
 
-export const shadows = {
+const iosShadows = {
   card: {
-    shadowColor: '#010103',
-    shadowOpacity: 0.65,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 18 },
-    elevation: 30,
+    shadowColor: '#0B0E14',
+    shadowOpacity: 0.35,
+    shadowRadius: 26,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 20,
   },
   floating: {
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.45,
-    shadowRadius: 40,
-    shadowOffset: { width: 0, height: 30 },
-    elevation: 16,
+    shadowColor: '#0B0E14',
+    shadowOpacity: 0.4,
+    shadowRadius: 34,
+    shadowOffset: { width: 0, height: 22 },
+    elevation: 14,
   },
 };
 
+const androidShadows = {
+  card: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 18,
+  },
+  floating: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.4,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 20 },
+    elevation: 12,
+  },
+};
+
+export const shadows = isIOS ? iosShadows : androidShadows;
+
 export const typography = StyleSheet.create({
   display: {
-    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 36,
     letterSpacing: -0.5,
     color: palette.text,
+    ...font('display'),
   },
   title: {
-    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 22,
     letterSpacing: -0.2,
     color: palette.text,
+    ...font('semibold'),
   },
   body: {
-    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 15,
     lineHeight: 22,
     color: palette.textMuted,
+    ...font('regular'),
   },
   label: {
-    fontFamily: 'SpaceGrotesk-Medium',
     fontSize: 12,
     letterSpacing: 4,
     textTransform: 'uppercase',
     color: palette.textSubtle,
+    ...font('displayMedium'),
   },
 });
 
@@ -96,8 +180,16 @@ export const layout = {
   maxContentWidth: 440,
 };
 
-export const tokens = {
+const iosTokens = {
   blur: {
-    card: 24,
+    card: 26,
   },
 };
+
+const androidTokens = {
+  blur: {
+    card: 34,
+  },
+};
+
+export const tokens = isIOS ? iosTokens : androidTokens;

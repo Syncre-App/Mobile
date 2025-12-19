@@ -5,7 +5,7 @@ import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
-import { layout, palette, radii, spacing } from '../theme/designSystem';
+import { font, layout, palette, radii, spacing } from '../theme/designSystem';
 import { TransparentField } from './TransparentField';
 import { UserAvatar } from './UserAvatar';
 import BadgeIcon from './BadgeIcon';
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
   searchResultUsername: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   badgeContainer: {
     flexDirection: 'row',
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: palette.textSubtle,
-    fontFamily: 'SpaceGrotesk-Medium',
+    ...font('displayMedium'),
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 4,
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   title: {
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     marginBottom: spacing.sm,
   },
 });

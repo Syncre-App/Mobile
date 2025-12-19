@@ -2,13 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
 import { UserStatus } from '../services/WebSocketService';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { UserAvatar } from './UserAvatar';
 import BadgeIcon from './BadgeIcon';
+import { ProfileCard } from './ProfileCard';
 
 interface Chat {
   id: number;
@@ -28,6 +30,14 @@ interface Chat {
     sender_id: string;
   };
   unreadCount?: number;
+}
+
+interface StreakData {
+  chatId: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastActivityDate: string | null;
+  participantsActive: Record<string, boolean>;
 }
 
 interface User {
@@ -51,6 +61,7 @@ interface ChatListWidgetProps {
   blockedUserIds?: Set<string>;
   removingFriendId?: string | null;
   unreadCounts?: Record<string, number>;
+  streaks?: Record<string, StreakData>;
   onEditGroup?: (chat: Chat) => void;
   onDeleteGroup?: (chat: Chat) => void;
   onLeaveGroup?: (chat: Chat) => void;
@@ -68,6 +79,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   blockedUserIds,
   removingFriendId = null,
   unreadCounts = {},
+  streaks = {},
   onEditGroup = () => {},
   onDeleteGroup = () => {},
   onLeaveGroup = () => {},
@@ -76,6 +88,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [userDetails, setUserDetails] = useState<{ [key: string]: User }>({});
+  const [profileCardUser, setProfileCardUser] = useState<User | null>(null);
+  const [profileCardVisible, setProfileCardVisible] = useState(false);
   
   const getCurrentUserId = async () => {
     try {
@@ -247,33 +261,29 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       return;
     }
 
+    // For DM chats, show ProfileCard instead of Alert
     const otherUserId = getOtherUserId(chat);
     if (!otherUserId) return;
 
-    const displayName = getChatDisplayName(chat);
-    const isBlocked = blockedUserIds?.has(otherUserId.toString()) ?? false;
+    const cachedUser = userDetails[otherUserId];
+    if (cachedUser) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setProfileCardUser(cachedUser);
+      setProfileCardVisible(true);
+    }
+  };
 
-    Alert.alert(
-      'Chat Options',
-      displayName,
-      [
-        {
-          text: 'Remove Friend',
-          style: 'destructive',
-          onPress: () => onRemoveFriend(otherUserId),
-        },
-        {
-          text: 'Report User',
-          style: 'destructive',
-          onPress: () => onReportUser(otherUserId),
-        },
-        {
-          text: isBlocked ? 'Unblock User' : 'Block User',
-          onPress: () => onToggleBlock(otherUserId, isBlocked),
-        },
-        ...commonActions,
-      ],
-    );
+  const handleProfileCardClose = () => {
+    setProfileCardVisible(false);
+    setProfileCardUser(null);
+  };
+
+  const getPresenceForUser = (userId: string): 'online' | 'idle' | 'offline' => {
+    const statusValue = userStatuses[userId] || userDetails[userId]?.status;
+    const normalized = statusValue ? String(statusValue).toLowerCase() : 'offline';
+    if (normalized === 'online') return 'online';
+    if (normalized === 'idle') return 'idle';
+    return 'offline';
   };
 
   const renderChatItem = ({ item: chat }: { item: Chat }) => {
@@ -310,6 +320,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const userBadges = !isGroupChat && cachedUser?.badges
       ? (Array.isArray(cachedUser.badges) ? cachedUser.badges : [])
       : [];
+    const chatStreak = streaks[chatIdKey];
+    const streakCount = chatStreak?.currentStreak || 0;
 
     return (
       <TouchableOpacity
@@ -349,6 +361,11 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
               {hasUnread && (
                 <View style={styles.chatUnreadPill}>
                   <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
+                </View>
+              )}
+              {streakCount > 0 && (
+                <View style={styles.streakBadge}>
+                  <Text style={styles.streakText}>🔥 {streakCount}</Text>
                 </View>
               )}
             </View>
@@ -417,23 +434,36 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   );
 
   return (
-    <FlatList
-      data={chats}
-      keyExtractor={(item) => String(item.id)}
-      renderItem={renderChatItem}
-      ListEmptyComponent={renderEmptyState}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor={palette.accent}
-          colors={[palette.accent]}
-        />
-      }
-      contentContainerStyle={styles.listContainer}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    />
+    <>
+      <FlatList
+        data={chats}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderChatItem}
+        ListEmptyComponent={renderEmptyState}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+          />
+        }
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
+
+      <ProfileCard
+        visible={profileCardVisible}
+        user={profileCardUser}
+        onClose={handleProfileCardClose}
+        onRemoveFriend={onRemoveFriend}
+        onBlockUser={(userId) => onToggleBlock(userId, blockedUserIds?.has(userId) ?? false)}
+        onReportUser={onReportUser}
+        isBlocked={profileCardUser ? (blockedUserIds?.has(profileCardUser.id) ?? false) : false}
+        presence={profileCardUser ? getPresenceForUser(profileCardUser.id) : 'offline'}
+      />
+    </>
   );
 };
 
@@ -466,7 +496,7 @@ const styles = StyleSheet.create({
   createGroupLabel: {
     color: palette.text,
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   chatCard: {
     paddingHorizontal: spacing.sm,
@@ -501,7 +531,7 @@ const styles = StyleSheet.create({
   chatName: {
     color: palette.text,
     fontSize: 17,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     marginBottom: 2,
     flexShrink: 1,
   },
@@ -531,7 +561,22 @@ const styles = StyleSheet.create({
   chatUnreadText: {
     color: palette.text,
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans-Bold',
+    ...font('bold'),
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(251, 146, 60, 0.2)',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 146, 60, 0.4)',
+  },
+  streakText: {
+    color: '#FB923C',
+    fontSize: 12,
+    ...font('bold'),
   },
   rightColumn: {
     justifyContent: 'center',
@@ -547,7 +592,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },

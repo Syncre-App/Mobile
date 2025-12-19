@@ -21,7 +21,7 @@ import { ApiService } from '../services/ApiService';
 import { CryptoService } from '../services/CryptoService';
 import { IdentityService } from '../services/IdentityService';
 import { AppBackground } from '../components/AppBackground';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
@@ -240,7 +240,7 @@ export const PrivacyScreen: React.FC = () => {
             setIsRotatingKeys(true);
             try {
               await CryptoService.rotateDeviceIdentity();
-              NotificationService.show('success', 'Keys rotated. Rebooting identity…');
+              NotificationService.show('success', 'Keys rotated. Rebooting identity...');
               setIsBootstrapping(true);
               const needsBootstrap = await IdentityService.requiresBootstrap();
               if (needsBootstrap) {
@@ -416,9 +416,9 @@ export const PrivacyScreen: React.FC = () => {
             'key-outline',
             'Rotate encryption keys',
             isRotatingKeys
-              ? 'Rotating…'
+              ? 'Rotating...'
               : isBootstrapping
-                ? 'Bootstrapping…'
+                ? 'Bootstrapping...'
                 : 'Refresh device keys',
             handleRotateKeys,
             (isRotatingKeys || isBootstrapping) ? (
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   headerCentered: {
     position: 'absolute',
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: palette.text,
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   settingItem: {
     flexDirection: 'row',
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
   settingTitle: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   settingSubtitle: {
     color: palette.textMuted,

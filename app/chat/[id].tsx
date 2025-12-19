@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  ComponentProps,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ActivityIndicator, Alert, Animated, BackHandler, DeviceEventEmitter, FlatList, Keyboard, KeyboardAvoidingView, LayoutAnimation, InteractionManager, Modal, PanResponder, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableWithoutFeedback, UIManager, View, NativeSyntheticEvent, NativeScrollEvent, Pressable, Linking, Share, GestureResponderEvent, Dimensions, Easing } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
@@ -27,7 +34,11 @@ import { ChatService, type UploadableAsset } from '../../services/ChatService';
 import { GroupMemberPicker } from '../../components/GroupMemberPicker';
 import { UserAvatar } from '../../components/UserAvatar';
 import { AppBackground } from '../../components/AppBackground';
-import BadgeIcon from '../../components/BadgeIcon';
+import { EphemeralOptions, type EphemeralDuration } from '../../components/EphemeralOptions';
+import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
+import { CreatePollSheet } from '../../components/CreatePollSheet';
+import { PollMessage, type PollData } from '../../components/PollMessage';
+import { font, palette, radii, spacing } from '../../theme/designSystem';
 import leo from 'leo-profanity';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -93,6 +104,10 @@ interface Message {
   deletedLabel?: string | null;
   seenBy?: SeenReceipt[];
   reactions?: Array<{ reaction: string; count: number; userIds: string[] }>;
+  expiresAt?: string | null;
+  isEphemeral?: boolean;
+  poll?: PollData | null;
+  isPoll?: boolean;
 }
 
 interface ChatParticipant {
@@ -108,6 +123,8 @@ type ChatListItem =
   | { kind: 'message'; id: string; message: Message }
   | { kind: 'date'; id: string; label: string }
   | { kind: 'typing'; id: string };
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const MESSAGE_PAYLOAD_VERSION = 1;
 const API_ROOT = ApiService.baseUrl.replace(/\/v1\/?$/i, '');
@@ -304,7 +321,7 @@ const normalizePreviewText = (value: string): string => {
   }
   const condensed = value.replace(/\s+/g, ' ').trim();
   if (condensed.length > 140) {
-    return `${condensed.slice(0, 140)}…`;
+    return `${condensed.slice(0, 140)}...`;
   }
   return condensed;
 };
@@ -1275,7 +1292,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                                     onPress={() => onDownloadAttachment?.(attachment)}
                                   >
                                     <Ionicons name="download-outline" size={16} color="#03040A" />
-                                    <Text style={styles.fileAttachmentButtonText}>Letöltés</Text>
+                                    <Text style={styles.fileAttachmentButtonText}>Download</Text>
                                   </Pressable>
                                 </View>
                               </Pressable>
@@ -1332,7 +1349,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     {!embedLoaded ? (
                       <View style={styles.embedPlaceholder}>
                         <ActivityIndicator size="small" color="#ffffff" />
-                        <Text style={styles.embedPlaceholderText}>Previewing…</Text>
+                        <Text style={styles.embedPlaceholderText}>Previewing...</Text>
                       </View>
                     ) : null}
                   </Pressable>
@@ -1358,6 +1375,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 ) : null}
                 {message.isEdited && !message.isPlaceholder && !isDeletedMessage ? (
                   <Text style={styles.editedLabel}>Edited</Text>
+                ) : null}
+                {message.isEphemeral && !message.isPlaceholder && !isDeletedMessage ? (
+                  <View style={styles.ephemeralIndicator}>
+                    <Ionicons name="timer-outline" size={12} color="#FB923C" />
+                  </View>
                 ) : null}
               </>
             )}
@@ -1424,7 +1446,7 @@ const ChatScreen: React.FC = () => {
   const contentHeightRef = useRef(0);
   const composerLimitWarningRef = useRef(false);
   const initialScrollDoneRef = useRef(false);
-  const receiverNameRef = useRef('Loading…');
+  const receiverNameRef = useRef('Loading...');
   const otherUserIdRef = useRef<string | null>(null);
   const participantIdsRef = useRef<string[]>([]);
   const authTokenRef = useRef<string | null>(null);
@@ -1595,13 +1617,14 @@ const ChatScreen: React.FC = () => {
     },
     [togglePreviewChrome]
   );
-  const closeAttachmentSheet = useCallback(() => {
+  const closeAttachmentSheet = useCallback((onFinished?: () => void) => {
     Animated.timing(attachmentSheetAnim, {
       toValue: 0,
       duration: 160,
       useNativeDriver: true,
     }).start(() => {
       setAttachmentSheetVisible(false);
+      onFinished?.();
     });
   }, [attachmentSheetAnim]);
   const resolveActionIcon = useCallback((label: string): any => {
@@ -1616,7 +1639,7 @@ const ChatScreen: React.FC = () => {
     return 'ellipsis-horizontal';
   }, []);
 
-  const [receiverUsername, setReceiverUsername] = useState<string>('Loading…');
+  const [receiverUsername, setReceiverUsername] = useState<string>('Loading...');
   const [chatDetails, setChatDetails] = useState<{
     id: string;
     isGroup: boolean;
@@ -1635,6 +1658,11 @@ const ChatScreen: React.FC = () => {
   } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [ephemeralDuration, setEphemeralDuration] = useState<EphemeralDuration>(null);
+  const [showScheduleSheet, setShowScheduleSheet] = useState(false);
+  const [showPollSheet, setShowPollSheet] = useState(false);
+  const [isCreatingPoll, setIsCreatingPoll] = useState(false);
+  const [pollsData, setPollsData] = useState<Map<string, { poll: PollData; userVotes: number[] }>>(new Map());
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
@@ -1665,6 +1693,7 @@ const ChatScreen: React.FC = () => {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const windowHeight = Dimensions.get('window').height;
   const ACTION_CARD_WIDTH = 280;
+  const ATTACHMENT_DROPDOWN_WIDTH = 260;
   const ACTION_CARD_HEIGHT = 240;
   const SCREEN_WIDTH = Dimensions.get('window').width;
   const reactionAnim = useRef(new Animated.Value(0)).current;
@@ -1917,9 +1946,9 @@ const ChatScreen: React.FC = () => {
   const formatTypingLabel = useCallback((entries: Array<{ id: string; name: string }>) => {
     if (!entries.length) return '';
     const names = entries.map((entry) => entry.name || 'Someone');
-    if (names.length === 1) return `${names[0]} is typing…`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
-    return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing…`;
+    if (names.length === 1) return `${names[0]} is typing...`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`;
+    return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing...`;
   }, []);
 
   const resolveNamesFromPayload = useCallback(
@@ -2923,7 +2952,7 @@ const ChatScreen: React.FC = () => {
       await loadMessagesForChat(token, chatId, displayName, otherParticipantId);
     } catch (error) {
       console.error(`Error loading chat ${chatId}:`, error);
-      const fallbackName = receiverNameRef.current === 'Loading…' ? 'your friend' : receiverNameRef.current;
+      const fallbackName = receiverNameRef.current === 'Loading...' ? 'your friend' : receiverNameRef.current;
       setMessagesAnimated(() => generatePlaceholderMessages(fallbackName));
       setHasMore(false);
       nextCursorRef.current = null;
@@ -3416,7 +3445,6 @@ const ChatScreen: React.FC = () => {
   );
 
   const handlePickDocument = useCallback(async () => {
-    closeAttachmentSheet();
     try {
       const pickerResult = await DocumentPicker.getDocumentAsync({
         multiple: true,
@@ -3453,7 +3481,6 @@ const ChatScreen: React.FC = () => {
   }, [handleUploadBatch]);
 
   const handlePickPhoto = useCallback(async () => {
-    closeAttachmentSheet();
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (permission.status !== 'granted') {
@@ -3492,7 +3519,6 @@ const ChatScreen: React.FC = () => {
   }, [handleUploadBatch]);
 
   const handlePasteImage = useCallback(async () => {
-    closeAttachmentSheet();
 
     if (attachmentPickerBusy) {
       NotificationService.show('info', 'Please wait for the current upload to complete');
@@ -3553,7 +3579,7 @@ const ChatScreen: React.FC = () => {
       console.error('Failed to paste image from clipboard:', error);
       NotificationService.show('error', 'Unable to paste image');
     }
-  }, [attachmentPickerBusy, closeAttachmentSheet, handleUploadBatch]);
+  }, [attachmentPickerBusy, handleUploadBatch]);
 
   const handleAttachmentTrigger = useCallback(() => {
     if (!chatId) {
@@ -3579,10 +3605,10 @@ const ChatScreen: React.FC = () => {
       }
       try {
         await ChatService.deleteAttachment(attachmentId);
-        NotificationService.show('success', 'Fájl törölve a tárhelyről');
+        NotificationService.show('success', 'File deleted from storage');
       } catch (error) {
         console.error('Failed to remove attachment', error);
-        NotificationService.show('error', 'Nem sikerült törölni a fájlt a tárhelyről');
+        NotificationService.show('error', 'Failed to delete file from storage');
       }
     },
     []
@@ -4300,7 +4326,7 @@ const ChatScreen: React.FC = () => {
 
     const isSocketReady = await ensureWebSocketReady();
     if (!isSocketReady) {
-      NotificationService.show('error', 'Nem sikerült csatlakozni a chat szerverhez. Próbáld újra.');
+      NotificationService.show('error', 'Failed to connect to the chat server. Please try again.');
       return;
     }
 
@@ -4340,6 +4366,7 @@ const ChatScreen: React.FC = () => {
       replyTo: normalizedReply,
       attachments: attachmentsSnapshot,
       seenBy: [],
+      isEphemeral: Boolean(ephemeralDuration),
     };
 
     setMessagesAnimated((prev) => {
@@ -4351,6 +4378,7 @@ const ChatScreen: React.FC = () => {
     });
     setNewMessage('');
     setReplyContext(null);
+    setEphemeralDuration(null);
     if (attachmentsSnapshot.length) {
       setPendingAttachments((prev) => prev.filter((attachment) => attachment.uploadPending));
     }
@@ -4400,6 +4428,7 @@ const ChatScreen: React.FC = () => {
         replyMetadata: normalizedReply,
         attachments: attachmentIds,
         preview: previewText,
+        expiresIn: ephemeralDuration,
       });
 
     } catch (error) {
@@ -4431,6 +4460,7 @@ const ChatScreen: React.FC = () => {
     scrollToBottom,
     setMessagesAnimated,
     wsService,
+    ephemeralDuration,
   ]);
 
   const handleThreadClose = useCallback(() => {
@@ -4445,6 +4475,197 @@ const ChatScreen: React.FC = () => {
     setThreadRootId(null);
     scrollToMessageById(target);
   }, [scrollToMessageById, threadRootId]);
+
+  const handleScheduleMessage = useCallback(async (scheduledFor: Date) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    const trimmedMessage = newMessage.trim();
+    if (!trimmedMessage && pendingAttachments.length === 0) {
+      NotificationService.show('error', 'No message to schedule');
+      return;
+    }
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const attachmentIds = pendingAttachments
+        .filter((a) => !a.uploadPending)
+        .map((a) => a.id)
+        .filter((id) => /^\d+$/.test(id))
+        .map(Number);
+
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      const response = await ApiService.scheduleMessage(
+        chatId,
+        {
+          content: trimmedMessage,
+          attachments: attachmentIds,
+          replyTo: replyContext?.messageId ? Number(replyContext.messageId) : undefined,
+          scheduledFor: scheduledFor.toISOString(),
+          timezone,
+        },
+        token
+      );
+
+      if (response.success) {
+        NotificationService.show('success', `Message scheduled: ${scheduledFor.toLocaleString('en-US')}`);
+        setNewMessage('');
+        setReplyContext(null);
+        setPendingAttachments([]);
+      } else {
+        throw new Error(response.error || 'Scheduling failed');
+      }
+    } catch (error) {
+      console.error('Error scheduling message:', error);
+      NotificationService.show('error', 'Failed to schedule message');
+    }
+  }, [chatId, currentUserId, newMessage, pendingAttachments, replyContext]);
+
+  const handleCreatePoll = useCallback(async (data: { question: string; options: string[]; multiSelect: boolean }) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    setIsCreatingPoll(true);
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const response = await ApiService.createPoll(chatId, data, token);
+
+      if (response.success) {
+        NotificationService.show('success', 'Poll created');
+        setShowPollSheet(false);
+      } else {
+        throw new Error(response.error || 'Failed to create poll');
+      }
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      NotificationService.show('error', 'Failed to create poll');
+    } finally {
+      setIsCreatingPoll(false);
+    }
+  }, [chatId, currentUserId]);
+
+  const handlePollVote = useCallback(async (messageId: string, pollId: number, optionId: number) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const response = await ApiService.votePoll(chatId, pollId, [optionId], token);
+
+      if (response.success && response.data) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(messageId, {
+            poll: response.data.poll,
+            userVotes: response.data.userVotes || [],
+          });
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+      NotificationService.show('error', 'Failed to vote');
+    }
+  }, [chatId, currentUserId]);
+
+  const handlePollRemoveVote = useCallback(async (messageId: string, pollId: number, optionId: number) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const response = await ApiService.removeVotePoll(chatId, pollId, optionId, token);
+
+      if (response.success && response.data) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(messageId, {
+            poll: response.data.poll,
+            userVotes: response.data.userVotes || [],
+          });
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error('Error removing vote:', error);
+      NotificationService.show('error', 'Failed to remove vote');
+    }
+  }, [chatId, currentUserId]);
+
+  const handleClosePoll = useCallback(async (messageId: string, pollId: number) => {
+    if (!currentUserId || !chatId) {
+      return;
+    }
+
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const response = await ApiService.closePoll(chatId, pollId, token);
+
+      if (response.success && response.data) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          const existing = prev.get(messageId);
+          newMap.set(messageId, {
+            poll: response.data.poll,
+            userVotes: existing?.userVotes || [],
+          });
+          return newMap;
+        });
+        NotificationService.show('success', 'Poll closed');
+      }
+    } catch (error) {
+      console.error('Error closing poll:', error);
+      NotificationService.show('error', 'Failed to close poll');
+    }
+  }, [chatId, currentUserId]);
+
+  const fetchPollData = useCallback(async (messageId: string) => {
+    try {
+      const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+      if (!token) return;
+
+      const response = await ApiService.getPollByMessageId(messageId, token);
+
+      if (response.success && response.data?.poll) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(messageId, {
+            poll: response.data.poll,
+            userVotes: response.data.userVotes || [],
+          });
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching poll:', error);
+    }
+  }, []);
 
   useEffect(() => {
     if (replyContext) {
@@ -4808,6 +5029,127 @@ const ChatScreen: React.FC = () => {
               };
             })
           );
+          return;
+        }
+        case 'message_expired': {
+          const expiredId = String(payload.messageId ?? payload.id ?? '');
+          if (!expiredId) {
+            return;
+          }
+          setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== expiredId));
+          return;
+        }
+        case 'scheduled_message_sent': {
+          // Notification that our scheduled message was sent
+          NotificationService.show('info', 'Scheduled message sent');
+          return;
+        }
+        case 'message_scheduled_delivery': {
+          // A scheduled message was delivered to this chat
+          const targetChat = String(payload.chatId ?? '');
+          if (targetChat !== targetChatId) {
+            return;
+          }
+          const newEntry: Message = {
+            id: String(payload.messageId),
+            senderId: String(payload.senderId ?? ''),
+            receiverId: '',
+            senderName: payload.senderUsername || null,
+            senderAvatar: payload.senderAvatar || null,
+            senderBadges: payload.senderBadges || [],
+            content: payload.content || '',
+            timestamp: payload.createdAt || payload.created_at || new Date().toISOString(),
+            status: 'delivered',
+            replyTo: payload.reply || undefined,
+            attachments: mapServerAttachments(payload.attachments),
+            seenBy: [],
+          };
+          setMessagesAnimated((prev) => {
+            const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
+            if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+              return withoutPlaceholders;
+            }
+            return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
+          });
+          scrollToBottom();
+          return;
+        }
+        case 'poll_created': {
+          const targetChat = String(payload.chatId ?? '');
+          if (targetChat !== targetChatId) {
+            return;
+          }
+          const newEntry: Message = {
+            id: String(payload.messageId),
+            senderId: String(payload.creatorId ?? ''),
+            receiverId: '',
+            senderName: payload.creatorUsername || null,
+            senderAvatar: payload.creatorAvatar || null,
+            senderBadges: [],
+            content: `[Poll] ${payload.question || ''}`,
+            timestamp: payload.createdAt || new Date().toISOString(),
+            status: 'delivered',
+            isPoll: true,
+            poll: {
+              id: payload.pollId,
+              messageId: payload.messageId,
+              chatId: parseInt(targetChat),
+              creatorId: String(payload.creatorId ?? ''),
+              question: payload.question || '',
+              options: payload.options || [],
+              multiSelect: Boolean(payload.multiSelect),
+              isClosed: false,
+              votes: (payload.options || []).map((opt: { id: number }) => ({
+                optionId: opt.id,
+                count: 0,
+                voters: [],
+              })),
+              totalVotes: 0,
+            },
+          };
+          setPollsData((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(String(payload.messageId), {
+              poll: newEntry.poll!,
+              userVotes: [],
+            });
+            return newMap;
+          });
+          setMessagesAnimated((prev) => {
+            const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
+            if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
+              return withoutPlaceholders;
+            }
+            return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
+          });
+          scrollToBottom();
+          return;
+        }
+        case 'poll_vote':
+        case 'poll_closed': {
+          const targetChat = String(payload.chatId ?? '');
+          if (targetChat !== targetChatId) {
+            return;
+          }
+          const messageId = String(payload.messageId ?? '');
+          if (!messageId) return;
+
+          setPollsData((prev) => {
+            const existing = prev.get(messageId);
+            if (!existing) return prev;
+
+            const newMap = new Map(prev);
+            newMap.set(messageId, {
+              ...existing,
+              poll: {
+                ...existing.poll,
+                votes: payload.votes || existing.poll.votes,
+                totalVotes: payload.totalVotes ?? existing.poll.totalVotes,
+                isClosed: message.type === 'poll_closed' ? true : existing.poll.isClosed,
+              },
+            });
+            return newMap;
+          });
           return;
         }
         case 'message_reaction': {
@@ -5249,6 +5591,25 @@ const ChatScreen: React.FC = () => {
       const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
       const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
+      // Render PollMessage for poll type messages
+      if (messageItem.isPoll && messageItem.poll) {
+        const pollDataEntry = pollsData.get(messageItem.id);
+        const userVotes = pollDataEntry?.userVotes || [];
+        const isCreator = messageItem.poll.creatorId === currentUserId;
+
+        return (
+          <PollMessage
+            key={messageItem.id}
+            poll={messageItem.poll}
+            userVotes={userVotes}
+            onVote={(optionId) => handlePollVote(messageItem.id, messageItem.poll!.id, optionId)}
+            onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, messageItem.poll!.id, optionId)}
+            onClose={() => handleClosePoll(messageItem.id, messageItem.poll!.id)}
+            isCreator={isCreator}
+          />
+        );
+      }
+
       return (
         <MessageBubble
           key={messageItem.id}
@@ -5307,6 +5668,10 @@ const ChatScreen: React.FC = () => {
       contentFilterMode,
       typingUsers,
       formatTypingLabel,
+      pollsData,
+      handlePollVote,
+      handlePollRemoveVote,
+      handleClosePoll,
     ]
   );
 
@@ -5354,6 +5719,55 @@ const ChatScreen: React.FC = () => {
       attachmentPickerBusy ||
       hasUploadingAttachments ||
       isBlocked);
+
+  interface AttachmentOption {
+    key: string;
+    icon: IoniconName;
+    label: string;
+    hint: string;
+    onPress: () => void;
+  }
+
+  const attachmentMenuOptions = useMemo<AttachmentOption[]>(
+    () => [
+      {
+        key: 'photos',
+        icon: 'images-outline',
+        label: 'Photos & Videos',
+        hint: 'Camera roll',
+        onPress: handlePickPhoto,
+      },
+      {
+        key: 'files',
+        icon: 'document-text-outline',
+        label: 'Files',
+        hint: 'Browse documents',
+        onPress: handlePickDocument,
+      },
+      {
+        key: 'paste',
+        icon: 'clipboard-outline',
+        label: 'Paste image',
+        hint: 'Add from clipboard',
+        onPress: handlePasteImage,
+      },
+      {
+        key: 'schedule',
+        icon: 'calendar-outline',
+        label: 'Schedule message',
+        hint: 'Send later',
+        onPress: () => setShowScheduleSheet(true),
+      },
+      {
+        key: 'poll',
+        icon: 'stats-chart-outline',
+        label: 'Create poll',
+        hint: 'Start a vote',
+        onPress: () => setShowPollSheet(true),
+      },
+    ],
+    [handlePasteImage, handlePickDocument, handlePickPhoto, setShowPollSheet, setShowScheduleSheet]
+  );
 
   const isGroupChat = Boolean(chatDetails?.isGroup);
   const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
@@ -5543,7 +5957,7 @@ const ChatScreen: React.FC = () => {
           {isThreadLoading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator size="large" color="#2C82FF" />
-              <Text style={styles.loadingStateText}>Loading conversation…</Text>
+              <Text style={styles.loadingStateText}>Loading conversation...</Text>
             </View>
           ) : (
             <Animated.View style={styles.messagesWrapper}>
@@ -5733,13 +6147,20 @@ const ChatScreen: React.FC = () => {
               ]}
               disabled={attachmentPickerBusy || Boolean(editingMessage)}
               accessibilityRole="button"
+              accessibilityLabel="Open quick actions"
             >
               {attachmentPickerBusy ? (
                 <ActivityIndicator size="small" color="#ffffff" />
               ) : (
-                <Ionicons name="attach" size={18} color="#ffffff" />
+                <Ionicons name="add" size={20} color="#ffffff" />
               )}
             </Pressable>
+            {!editingMessage && (
+              <EphemeralOptions
+                selectedDuration={ephemeralDuration}
+                onSelectDuration={setEphemeralDuration}
+              />
+            )}
             <View style={styles.composerColumn}>
               <Pressable onPress={() => composerRef.current?.focus()} onLongPress={handlePasteImage}>
                 <TextInput
@@ -5748,7 +6169,7 @@ const ChatScreen: React.FC = () => {
                   value={newMessage}
                   onChangeText={handleComposerChange}
                   maxLength={MESSAGE_CHAR_LIMIT}
-                  placeholder="Message…"
+                  placeholder="Message..."
                   placeholderTextColor="rgba(255, 255, 255, 0.45)"
                   multiline
                 />
@@ -5788,6 +6209,18 @@ const ChatScreen: React.FC = () => {
         errorMessage={memberPickerError}
         onClose={handleMemberPickerClose}
         onConfirm={handleMemberPickerConfirm}
+      />
+      <ScheduleMessageSheet
+        visible={showScheduleSheet}
+        onClose={() => setShowScheduleSheet(false)}
+        onSchedule={handleScheduleMessage}
+        messagePreview={newMessage.trim() || undefined}
+      />
+      <CreatePollSheet
+        visible={showPollSheet}
+        onClose={() => setShowPollSheet(false)}
+        onCreatePoll={handleCreatePoll}
+        isCreating={isCreatingPoll}
       />
       <Modal
         visible={Boolean(threadRootId)}
@@ -5900,7 +6333,7 @@ const ChatScreen: React.FC = () => {
                   {currentPreviewAttachment?.fileSize ? (
                     <Text style={styles.attachmentModalFileMeta} numberOfLines={1}>
                       {formatBytes(currentPreviewAttachment.fileSize)}
-                      {currentPreviewAttachment?.mimeType ? ` • ${currentPreviewAttachment.mimeType}` : ''}
+                      {currentPreviewAttachment?.mimeType ? ` - ${currentPreviewAttachment.mimeType}` : ''}
                     </Text>
                   ) : null}
                   {previewPositionLabel ? (
@@ -6014,7 +6447,7 @@ const ChatScreen: React.FC = () => {
                   {currentPreviewAttachment?.fileSize
                     ? formatBytes(currentPreviewAttachment.fileSize)
                     : 'Tap image to toggle chrome'}
-                  {currentPreviewAttachment?.mimeType ? ` • ${currentPreviewAttachment.mimeType}` : ''}
+                  {currentPreviewAttachment?.mimeType ? ` - ${currentPreviewAttachment.mimeType}` : ''}
                 </Text>
               </View>
               {previewPositionLabel ? (
@@ -6120,17 +6553,20 @@ const ChatScreen: React.FC = () => {
           style={[styles.messageActionOverlay, { opacity: attachmentSheetAnim }]}
           pointerEvents="box-none"
         >
-          <Pressable style={styles.messageActionBackdrop} onPress={closeAttachmentSheet} />
+          <Pressable
+            style={styles.messageActionBackdrop}
+            onPress={() => closeAttachmentSheet()}
+          />
           <Animated.View
             style={[
-              styles.attachmentSheetWrapper,
-              { bottom: attachmentSheetBottom },
+              styles.attachmentDropdownWrapper,
+              { bottom: attachmentSheetBottom + 8 },
               {
                 transform: [
                   {
                     translateY: attachmentSheetAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [40, 0],
+                      outputRange: [18, 0],
                     }),
                   },
                 ],
@@ -6138,39 +6574,27 @@ const ChatScreen: React.FC = () => {
               },
             ]}
           >
-            <GlassCard width="100%" padding={0}>
-              <View style={styles.attachmentSheetContent}>
-                <Text style={styles.attachmentSheetTitle}>ADD ATTACHMENT</Text>
-                <Pressable
-                  style={styles.attachmentSheetButton}
-                  onPress={handlePickPhoto}
-                >
-                  <Ionicons name="images-outline" size={20} color="#ffffff" />
-                  <View style={styles.attachmentSheetLabelColumn}>
-                    <Text style={styles.attachmentSheetButtonLabel}>Photos & Videos</Text>
-                    <Text style={styles.attachmentSheetButtonHint}>Camera roll</Text>
-                  </View>
-                </Pressable>
-                <Pressable
-                  style={styles.attachmentSheetButton}
-                  onPress={handlePickDocument}
-                >
-                  <Ionicons name="document-text-outline" size={20} color="#ffffff" />
-                  <View style={styles.attachmentSheetLabelColumn}>
-                    <Text style={styles.attachmentSheetButtonLabel}>Files</Text>
-                    <Text style={styles.attachmentSheetButtonHint}>Browse documents</Text>
-                  </View>
-                </Pressable>
-                <Pressable
-                  style={styles.attachmentSheetButton}
-                  onPress={handlePasteImage}
-                >
-                  <Ionicons name="clipboard-outline" size={20} color="#ffffff" />
-                  <View style={styles.attachmentSheetLabelColumn}>
-                    <Text style={styles.attachmentSheetButtonLabel}>Paste image</Text>
-                    <Text style={styles.attachmentSheetButtonHint}>Add from clipboard</Text>
-                  </View>
-                </Pressable>
+            <GlassCard width={ATTACHMENT_DROPDOWN_WIDTH} padding={0} variant="default">
+              <View style={styles.attachmentDropdownContent}>
+                <Text style={styles.attachmentDropdownTitle}>Quick actions</Text>
+                <View style={styles.attachmentDropdownList}>
+                  {attachmentMenuOptions.map((option) => (
+                    <Pressable
+                      key={option.key}
+                      style={({ pressed }) => [
+                        styles.attachmentDropdownOption,
+                        pressed && styles.attachmentDropdownOptionPressed,
+                      ]}
+                      onPress={() => closeAttachmentSheet(() => option.onPress())}
+                    >
+                      <Ionicons name={option.icon} size={20} color="#ffffff" />
+                      <View style={styles.attachmentDropdownLabelColumn}>
+                        <Text style={styles.attachmentDropdownLabel}>{option.label}</Text>
+                        <Text style={styles.attachmentDropdownHint}>{option.hint}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
             </GlassCard>
           </Animated.View>
@@ -7113,6 +7537,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.65)',
     alignSelf: 'flex-end',
   },
+  ephemeralIndicator: {
+    marginTop: 4,
+    marginLeft: 6,
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   attachmentPreviewRow: {
     maxHeight: 72,
   },
@@ -7512,44 +7943,49 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     paddingHorizontal: 0,
   },
-  attachmentSheetWrapper: {
+  attachmentDropdownWrapper: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 24,
+    left: spacing.lg,
+    zIndex: 40,
   },
-  attachmentSheetContent: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    gap: 4,
+  attachmentDropdownContent: {
+    padding: spacing.sm,
+    gap: spacing.xs,
   },
-  attachmentSheetTitle: {
-    color: 'rgba(255,255,255,0.5)',
+  attachmentDropdownTitle: {
+    color: 'rgba(255,255,255,0.65)',
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontWeight: '700',
   },
-  attachmentSheetButton: {
+  attachmentDropdownList: {
+    gap: spacing.xs,
+  },
+  attachmentDropdownOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.02)',
   },
-  attachmentSheetLabelColumn: {
+  attachmentDropdownOptionPressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  attachmentDropdownLabelColumn: {
     flex: 1,
   },
-  attachmentSheetButtonLabel: {
-    color: '#ffffff',
+  attachmentDropdownLabel: {
+    color: palette.text,
     fontSize: 15,
-    fontWeight: '600',
+    ...font('medium'),
   },
-  attachmentSheetButtonHint: {
-    color: 'rgba(255,255,255,0.6)',
+  attachmentDropdownHint: {
+    color: palette.textMuted,
     fontSize: 12,
+    marginTop: 2,
   },
   scrollToBottomButton: {
     position: 'absolute',

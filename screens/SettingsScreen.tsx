@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   ScrollView,
@@ -19,7 +18,8 @@ import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
+import { SpotifyConnection } from '../components/SpotifyConnection';
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
@@ -31,9 +31,6 @@ export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
   const [selectedLanguage, setSelectedLanguage] = useState('English');
-  const [updateInProgress, setUpdateInProgress] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState(0);
-  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
@@ -69,26 +66,6 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
-  const handleInstallApkUpdate = async () => {
-    if (updateInProgress) return;
-    setUpdateInProgress(true);
-    setUpdateProgress(0);
-    setUpdateStatus('Frissítés ellenőrzése...');
-
-    try {
-      await UpdateService.downloadAndInstallLatest((progress) => {
-        setUpdateProgress(progress);
-        setUpdateStatus(`Letöltés: ${Math.round(progress * 100)}%`);
-      });
-      setUpdateStatus('Letöltés kész, telepítő indítása...');
-    } catch (error: any) {
-      NotificationService.show('error', error?.message || 'Frissítés sikertelen');
-      setUpdateStatus(null);
-    } finally {
-      setUpdateInProgress(false);
-      setTimeout(() => setUpdateProgress(0), 800);
-    }
-  };
 
   const renderSettingItem = (
     icon: string | null,
@@ -247,7 +224,7 @@ export const SettingsScreen: React.FC = () => {
             () => {
               Alert.alert(
                 'How to Report Content',
-                'To report objectionable content or users:\n\n• Long-press on any message in a chat\n• Select "Report" from the menu\n• Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
+                'To report objectionable content or users:\n\n- Long-press on any message in a chat\n- Select "Report" from the menu\n- Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
                 [{ text: 'Got it', style: 'default' }]
               );
             }
@@ -261,32 +238,15 @@ export const SettingsScreen: React.FC = () => {
           )}
         </GlassCard>
 
-        {/* Updates Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
+        {/* Integrations Section */}
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Updates</Text>
+            <Text style={styles.sectionTitle}>Integrations</Text>
           </View>
-
-          {renderSettingItem(
-            'cloud-download',
-            'Android APK frissítés',
-            updateStatus || 'Letöltés és telepítés közvetlenül GitHubról',
-            handleInstallApkUpdate,
-            updateInProgress ? (
-              <View style={styles.progressRow}>
-                <ActivityIndicator color={palette.text} />
-                <Text style={styles.progressText}>
-                  {`${Math.round(updateProgress * 100)}%`}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.pillButton}>
-                <Text style={styles.pillButtonText}>Frissítés</Text>
-              </View>
-            ),
-            false
-          )}
-        </GlassCard>
+          <View style={styles.integrationCardWrapper}>
+            <SpotifyConnection />
+          </View>
+        </View>
 
         {/* About Section */}
         <GlassCard width="100%" style={styles.section} variant="subtle">
@@ -338,7 +298,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   content: {
     flex: 1,
@@ -355,6 +315,10 @@ const styles = StyleSheet.create({
     maxWidth: 440,
     alignSelf: 'center',
   },
+  integrationCardWrapper: {
+    width: '100%',
+    marginTop: spacing.xs,
+  },
   sectionHeader: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -363,7 +327,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: palette.text,
     fontSize: 18,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   settingItem: {
     flexDirection: 'row',
@@ -391,7 +355,7 @@ const styles = StyleSheet.create({
   settingTitle: {
     color: palette.text,
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
   },
   settingSubtitle: {
     color: palette.textMuted,
@@ -409,25 +373,5 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progressText: {
-    color: palette.text,
-    fontSize: 14,
-    marginLeft: spacing.xs,
-  },
-  pillButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.xl,
-    backgroundColor: palette.accent,
-  },
-  pillButtonText: {
-    color: 'white',
-    fontFamily: 'PlusJakartaSans-SemiBold',
-    fontSize: 14,
   },
 });

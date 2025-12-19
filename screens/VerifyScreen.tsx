@@ -17,7 +17,7 @@ import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
-import { palette, radii, spacing } from '../theme/designSystem';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 
 const CODE_LENGTH = 6;
 
@@ -78,7 +78,7 @@ export const VerifyScreen: React.FC = () => {
   const handleVerify = async () => {
     const code = codeDigits.join('').trim();
     if (code.length !== CODE_LENGTH) {
-      notificationService.show('error', 'Kérlek add meg a 6 számjegyű kódot', 'Error');
+      notificationService.show('error', 'Please enter the 6-digit code', 'Error');
       return;
     }
 
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   },
   overline: {
     color: palette.textSubtle,
-    fontFamily: 'SpaceGrotesk-Medium',
+    ...font('displayMedium'),
     letterSpacing: 4,
     fontSize: 12,
     textTransform: 'uppercase',
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 24,
     textAlign: 'center',
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   description: {
     color: palette.textMuted,
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: palette.text,
     fontSize: 20,
-    fontFamily: 'SpaceGrotesk-SemiBold',
+    ...font('display'),
   },
   codeInputFilled: {
     borderColor: palette.accent,
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   pasteText: {
     color: palette.textMuted,
     fontSize: 13,
-    fontFamily: 'PlusJakartaSans-Medium',
+    ...font('medium'),
   },
   verifyButton: {
     width: '100%',
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   },
   verifyButtonText: {
     color: 'white',
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    ...font('semibold'),
     fontSize: 16,
   },
 });
