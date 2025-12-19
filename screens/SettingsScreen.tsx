@@ -1,31 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Linking,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
+import { UpdateService } from '../services/UpdateService';
+import { AppBackground } from '../components/AppBackground';
+import { font, palette, radii, spacing } from '../theme/designSystem';
+import { SpotifyConnection } from '../components/SpotifyConnection';
+
+const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
 export const SettingsScreen: React.FC = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const minTopPadding = spacing.lg;
+  const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
   const [selectedLanguage, setSelectedLanguage] = useState('English');
+  const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
-  router.back();
+    router.back();
   };
 
   const handleClearCache = () => {
@@ -57,8 +66,9 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+
   const renderSettingItem = (
-    icon: string,
+    icon: string | null,
     title: string,
     subtitle?: string,
     onPress?: () => void,
@@ -71,8 +81,10 @@ export const SettingsScreen: React.FC = () => {
       style={[styles.settingItem, !hasTopBorder && styles.settingItemFirst]}
     >
       <View style={styles.settingLeft}>
-        <Ionicons name={icon as any} size={24} color="rgba(255, 255, 255, 0.7)" />
-        <View style={styles.settingTexts}>
+        {icon ? (
+          <Ionicons name={icon as any} size={24} color="rgba(255, 255, 255, 0.7)" />
+        ) : null}
+        <View style={[styles.settingTexts, !icon && styles.settingTextsNoIcon]}>
           <Text style={styles.settingTitle}>{title}</Text>
           {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
         </View>
@@ -95,16 +107,13 @@ export const SettingsScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { paddingTop: extraTopPadding }]}
+      edges={['top', 'left', 'right']}
+    >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
 
       {/* Header */}
       <View style={styles.header}>
@@ -117,7 +126,7 @@ export const SettingsScreen: React.FC = () => {
           <Text style={styles.headerTitle}>Settings</Text>
         </View>
 
-        <View style={styles.headerButton} />
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -126,7 +135,7 @@ export const SettingsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Notifications Section */}
-        <GlassCard width="100%" style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Notifications</Text>
           </View>
@@ -139,7 +148,7 @@ export const SettingsScreen: React.FC = () => {
             <Switch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
-              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#2C82FF' }}
+              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
               thumbColor="white"
             />,
             false
@@ -147,7 +156,7 @@ export const SettingsScreen: React.FC = () => {
         </GlassCard>
 
         {/* Appearance Section */}
-        <GlassCard width="100%" style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Appearance</Text>
           </View>
@@ -161,7 +170,7 @@ export const SettingsScreen: React.FC = () => {
               value={darkModeEnabled}
               onValueChange={setDarkModeEnabled}
               disabled={true} // Disabled for now
-              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#2C82FF' }}
+              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
               thumbColor="white"
             />,
             false
@@ -178,7 +187,7 @@ export const SettingsScreen: React.FC = () => {
         </GlassCard>
 
         {/* Storage Section */}
-        <GlassCard width="100%" style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Storage</Text>
           </View>
@@ -193,6 +202,68 @@ export const SettingsScreen: React.FC = () => {
           )}
         </GlassCard>
 
+        {/* Safety & Reporting Section */}
+        <GlassCard width="100%" style={styles.section} variant="subtle">
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Safety & Reporting</Text>
+          </View>
+          
+          {renderSettingItem(
+            'ban',
+            'Blocked Users',
+            'Manage blocked users',
+            () => router.push('/settings/blocked-users'),
+            undefined,
+            false
+          )}
+
+          {renderSettingItem(
+            'flag',
+            'Report Content',
+            'Long-press any message to report',
+            () => {
+              Alert.alert(
+                'How to Report Content',
+                'To report objectionable content or users:\n\n- Long-press on any message in a chat\n- Select "Report" from the menu\n- Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
+                [{ text: 'Got it', style: 'default' }]
+              );
+            }
+          )}
+
+          {renderSettingItem(
+            'shield-checkmark',
+            'Community Guidelines',
+            'View our content policies',
+            () => Linking.openURL('https://syncre.app/terms')
+          )}
+        </GlassCard>
+
+        {/* Integrations Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Integrations</Text>
+          </View>
+          <View style={styles.integrationCardWrapper}>
+            <SpotifyConnection />
+          </View>
+        </View>
+
+        {/* About Section */}
+        <GlassCard width="100%" style={styles.section} variant="subtle">
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>About</Text>
+          </View>
+
+          {renderSettingItem(
+            null,
+            'App Version',
+            appVersion,
+            undefined,
+            undefined,
+            false
+          )}
+        </GlassCard>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -201,57 +272,70 @@ export const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: palette.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     position: 'relative',
   },
   headerButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
+    padding: spacing.sm,
+    borderRadius: radii.xxl,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerPlaceholder: {
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
   },
   headerTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: palette.text,
+    fontSize: 20,
+    ...font('display'),
   },
   content: {
     flex: 1,
   },
   scrollContainer: {
-    paddingTop: 16,
-    paddingBottom: 32,
-    alignItems: 'center',
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'stretch',
   },
   section: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
     overflow: 'hidden',
-    alignSelf: 'center',
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 440,
+    alignSelf: 'center',
+  },
+  integrationCardWrapper: {
+    width: '100%',
+    marginTop: spacing.xs,
   },
   sectionHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
   },
   sectionTitle: {
-    color: 'white',
+    color: palette.text,
     fontSize: 18,
-    fontWeight: '600',
+    ...font('semibold'),
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
   },
   settingItemFirst: {
     borderTopWidth: 0,
@@ -262,21 +346,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTexts: {
-    marginLeft: 16,
+    marginLeft: spacing.md,
     flex: 1,
   },
+  settingTextsNoIcon: {
+    marginLeft: 0,
+  },
   settingTitle: {
-    color: 'white',
+    color: palette.text,
     fontSize: 16,
-    fontWeight: '500',
+    ...font('semibold'),
   },
   settingSubtitle: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 14,
     marginTop: 2,
   },
   settingRight: {
-    marginLeft: 16,
+    marginLeft: spacing.md,
   },
   headerCentered: {
     position: 'absolute',

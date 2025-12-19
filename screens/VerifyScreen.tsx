@@ -1,42 +1,94 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
-import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
+import { font, palette, radii, spacing } from '../theme/designSystem';
+
+const CODE_LENGTH = 6;
 
 export const VerifyScreen: React.FC = () => {
   const { email } = useLocalSearchParams();
-  const [code, setCode] = useState('');
+  const [codeDigits, setCodeDigits] = useState<string[]>(Array.from({ length: CODE_LENGTH }, () => ''));
   const [loading, setLoading] = useState(false);
+  const inputsRef = React.useRef<Array<TextInput | null>>([]);
+
+  useEffect(() => {
+    focusAt(0);
+  }, []);
+
+  const focusAt = (index: number) => {
+    const target = inputsRef.current[index];
+    if (target) {
+      target.focus();
+    }
+  };
+
+  const handleChangeAt = (value: string, index: number) => {
+    const sanitized = value.replace(/\D/g, '');
+    if (!sanitized.length) {
+      const next = [...codeDigits];
+      next[index] = '';
+      setCodeDigits(next);
+      return;
+    }
+
+    const next = [...codeDigits];
+    let cursor = index;
+    sanitized.split('').forEach((char) => {
+      if (cursor >= CODE_LENGTH) return;
+      next[cursor] = char;
+      cursor += 1;
+    });
+    setCodeDigits(next);
+    if (cursor < CODE_LENGTH) {
+      focusAt(cursor);
+    }
+  };
+
+  const handleKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace' && !codeDigits[index] && index > 0) {
+      const next = [...codeDigits];
+      next[index - 1] = '';
+      setCodeDigits(next);
+      focusAt(index - 1);
+    }
+  };
+
+  const handlePaste = (text: string) => {
+    const normalized = text.replace(/\D/g, '').slice(0, CODE_LENGTH);
+    const next = Array.from({ length: CODE_LENGTH }, (_, idx) => normalized[idx] ?? '');
+    setCodeDigits(next);
+  };
 
   const handleVerify = async () => {
-    const c = code.trim();
-    if (!c) {
-      notificationService.show('error', 'Please enter the verification code', 'Error');
+    const code = codeDigits.join('').trim();
+    if (code.length !== CODE_LENGTH) {
+      notificationService.show('error', 'Please enter the 6-digit code', 'Error');
       return;
     }
 
     setLoading(true);
-    console.log('✅ Starting verification for:', email, 'with code:', c);
+    console.log('✅ Starting verification for:', email, 'with code:', code);
 
     try {
       const response = await ApiService.post('/auth/verify', {
         email: email,
-        code: c,
+        code,
       });
 
       console.log('✅ Verify response:', response);
@@ -81,34 +133,47 @@ export const VerifyScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
 
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <GlassCard style={styles.card}>
+        <View style={styles.hero}>
+          <Text style={styles.overline}>Almost there</Text>
+          <Text style={styles.title}>Verify your account</Text>
+          <Text style={styles.description}>We sent a code to {email}</Text>
+        </View>
+
+        <GlassCard style={styles.card} variant="subtle" padding={spacing.lg}>
           <View style={styles.content}>
-            <Text style={styles.title}>VERIFY</Text>
-            <Text style={styles.description}>
-              A verification code was sent to {email}
-            </Text>
-            
-            <TransparentField
-              placeholder="Code"
-              value={code}
-              onChangeText={setCode}
-              keyboardType="numeric"
-              style={styles.inputField}
-            />
+            <View style={styles.codeRow}>
+              {Array.from({ length: CODE_LENGTH }).map((_, idx) => (
+                <TextInput
+                  key={idx}
+                  ref={(ref) => {
+                    inputsRef.current[idx] = ref;
+                  }}
+                  style={[
+                    styles.codeInput,
+                    codeDigits[idx] ? styles.codeInputFilled : undefined,
+                  ]}
+                  value={codeDigits[idx]}
+                  onChangeText={(text) => handleChangeAt(text, idx)}
+                  onKeyPress={(e) => handleKeyPress(e, idx)}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  textContentType="oneTimeCode"
+                  returnKeyType="done"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onSubmitEditing={handleVerify}
+                  onFocus={() => {
+                  }}
+                />
+              ))}
+            </View>
 
             <TouchableOpacity
               onPress={handleVerify}
@@ -141,48 +206,90 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 48,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xxl,
+    gap: spacing.lg,
+  },
+  hero: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  overline: {
+    color: palette.textSubtle,
+    ...font('displayMedium'),
+    letterSpacing: 4,
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  title: {
+    color: palette.text,
+    fontWeight: '600',
+    fontSize: 24,
+    textAlign: 'center',
+    ...font('display'),
+  },
+  description: {
+    color: palette.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    fontSize: 15,
   },
   card: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 420,
     alignSelf: 'center',
   },
   content: {
-    padding: 20,
+    gap: spacing.md,
   },
-  title: {
-    color: 'white',
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    fontSize: 16,
+  codeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  codeInput: {
+    flex: 1,
+    height: 58,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     textAlign: 'center',
-    marginBottom: 20,
+    color: palette.text,
+    fontSize: 20,
+    ...font('display'),
   },
-  description: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    marginBottom: 12,
-    fontSize: 14,
+  codeInputFilled: {
+    borderColor: palette.accent,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
   },
-  inputField: {
-    marginBottom: 12,
+  pasteChip: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.3)',
+  },
+  pasteText: {
+    color: palette.textMuted,
+    fontSize: 13,
+    ...font('medium'),
   },
   verifyButton: {
     width: '100%',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   verifyButtonGradient: {
-    paddingVertical: 14,
-    borderRadius: 24,
+    paddingVertical: spacing.md,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 46,
+    height: 48,
   },
   verifyButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    ...font('semibold'),
     fontSize: 16,
   },
 });

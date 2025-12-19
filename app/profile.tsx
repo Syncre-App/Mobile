@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
@@ -11,12 +10,20 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../components/GlassCard';
+import { AppBackground } from '../components/AppBackground';
+import { UpdateService } from '../services/UpdateService';
+import { font, palette, spacing, radii } from '../theme/designSystem';
+
+const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const appVersion = UpdateService.getCurrentVersion();
+  const insets = useSafeAreaInsets();
+  const minTopPadding = spacing.lg;
+  const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
 
   const handleBack = () => {
     router.back();
@@ -34,8 +41,16 @@ export default function ProfileScreen() {
         {
           text: 'Logout',
           onPress: async () => {
-            const { StorageService } = await import('../services/StorageService');
-            await StorageService.removeAuthToken();
+            const [{ StorageService }, { CryptoService }, { PinService }] = await Promise.all([
+              import('../services/StorageService'),
+              import('../services/CryptoService'),
+              import('../services/PinService'),
+            ]);
+            await Promise.all([
+              CryptoService.resetIdentity(),
+              PinService.clearPin(),
+              StorageService.removeAuthToken(),
+            ]);
             router.replace('/' as any);
           },
           style: 'destructive',
@@ -81,24 +96,24 @@ export default function ProfileScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { paddingTop: extraTopPadding }]}
+      edges={['top', 'left', 'right']}
+    >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#03040A', '#071026']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <AppBackground />
 
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.headerButton} />
+
+        <View style={styles.headerCentered} pointerEvents="none">
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView
@@ -106,8 +121,9 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.contentColumn}>
         {/* Account Section */}
-        <GlassCard style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Account</Text>
           </View>
@@ -117,7 +133,7 @@ export default function ProfileScreen() {
             'Edit Profile',
             'Update your profile information',
             () => {
-              router.push('/edit-profile' as any);
+              router.push('/settings/edit-profile' as any);
             }
           )}
           
@@ -135,13 +151,13 @@ export default function ProfileScreen() {
             'Privacy',
             'Manage your privacy settings',
             () => {
-              Alert.alert('Privacy', 'Privacy settings will be available in future updates');
+              router.push('/settings/privacy' as any);
             }
           )}
         </GlassCard>
 
         {/* About Section */}
-        <GlassCard style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>About</Text>
           </View>
@@ -149,11 +165,11 @@ export default function ProfileScreen() {
           {renderSettingItem(
             'information-circle',
             'About Syncre',
-            'Version 1.0.0',
+            `Version ${appVersion}`,
             () => {
               Alert.alert(
                 'About Syncre',
-                'Syncre is a modern chat application built with React Native and Expo.\n\nVersion: 1.0.0\nBuilt with ❤️ by the Syncre team'
+                `Syncre is a modern chat application built with React Native and Expo.\n\nVersion: ${appVersion}\nBuilt with ❤️ by the Syncre team`
               );
             }
           )}
@@ -169,7 +185,7 @@ export default function ProfileScreen() {
         </GlassCard>
 
         {/* Logout Section */}
-        <GlassCard style={styles.section}>
+        <GlassCard width="100%" style={styles.section} variant="subtle">
           {renderSettingItem(
             'log-out',
             'Logout',
@@ -177,6 +193,7 @@ export default function ProfileScreen() {
             handleLogout
           )}
         </GlassCard>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -185,50 +202,78 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: palette.background,
   },
   header: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  headerCentered: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerButton: {
-    padding: 8,
-    borderRadius: 8,
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
+    borderRadius: radii.xxl,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  headerPlaceholder: {
+    width: HEADER_BUTTON_DIMENSION,
+    height: HEADER_BUTTON_DIMENSION,
   },
   headerTitle: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    ...font('display'),
   },
   content: {
     flex: 1,
   },
   scrollContainer: {
-    padding: 16,
-    paddingBottom: 32,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.md,
+    alignItems: 'stretch',
+  },
+  contentColumn: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
   section: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
     overflow: 'hidden',
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
   },
   sectionHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
   },
   sectionTitle: {
     color: 'white',
     fontSize: 18,
-    fontWeight: '600',
+    ...font('semibold'),
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -238,20 +283,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTexts: {
-    marginLeft: 16,
+    marginLeft: spacing.md,
     flex: 1,
   },
   settingTitle: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '500',
+    ...font('medium'),
   },
   settingSubtitle: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 14,
     marginTop: 2,
+    ...font('regular'),
   },
   settingRight: {
-    marginLeft: 16,
+    marginLeft: spacing.md,
   },
 });

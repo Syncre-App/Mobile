@@ -9,7 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-
+import { NativeBlur, BlurPresets } from './NativeBlur';
 import { UserAvatar } from './UserAvatar';
 
 interface ProfileMenuProps {
@@ -73,7 +73,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
     >
       <Pressable style={styles.overlay} onPress={handleOverlayPress}>
         <View style={styles.menuContainer}>
-          <Pressable onPress={() => {}} style={styles.menuPanel}>
+          <View style={styles.menuPanel}>
+            <NativeBlur {...BlurPresets.modal} style={styles.blurView}>
+              <View style={styles.menuContent}>
                 {/* User Info Header */}
                 <View style={styles.userHeader}>
                   <UserAvatar
@@ -97,7 +99,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
                 {/* Menu Items */}
                 <View style={styles.separator} />
-                <Link href="/edit-profile" asChild>
+                <Link href="/settings/edit-profile" asChild>
                   <TouchableOpacity
                     style={styles.menuItem}
                     activeOpacity={0.7}
@@ -155,7 +157,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                     {'Logout'}
                   </Text>
                 </TouchableOpacity>
-            </Pressable>
+              </View>
+            </NativeBlur>
+          </View>
         </View>
       </Pressable>
     </Modal>
@@ -165,11 +169,11 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-  backgroundColor: 'rgba(0, 0, 0, 0.45)',
-  justifyContent: 'flex-start',
-  alignItems: 'flex-end',
-  paddingTop: 60,
-  paddingRight: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 60,
+    paddingRight: 12,
   },
   menuContainer: {
     alignSelf: 'flex-end',
@@ -179,9 +183,19 @@ const styles = StyleSheet.create({
     minWidth: 250,
     borderRadius: 18,
     overflow: 'hidden',
-    backgroundColor: 'rgba(9, 18, 36, 0.95)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  blurView: {
+    overflow: 'hidden',
+  },
+  menuContent: {
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
   },
   debugText: {
     color: '#FFFFFF',

@@ -8,8 +8,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-import { StorageService } from '../services/StorageService';
 import { UserStatus } from '../services/WebSocketService';
 
 interface User {
@@ -35,7 +33,7 @@ export const ProfileHeaderWidget: React.FC<ProfileHeaderWidgetProps> = ({
       [
         {
           text: 'Edit Profile',
-          onPress: () => router.push('/edit-profile' as any),
+          onPress: () => router.push('/settings/edit-profile' as any),
         },
         {
           text: 'Settings',
@@ -66,7 +64,16 @@ export const ProfileHeaderWidget: React.FC<ProfileHeaderWidgetProps> = ({
         {
           text: 'Logout',
           onPress: async () => {
-            await StorageService.removeAuthToken();
+            const [{ StorageService }, { CryptoService }, { PinService }] = await Promise.all([
+              import('../services/StorageService'),
+              import('../services/CryptoService'),
+              import('../services/PinService'),
+            ]);
+            await Promise.all([
+              CryptoService.resetIdentity(),
+              PinService.clearPin(),
+              StorageService.removeAuthToken(),
+            ]);
             router.replace('/' as any);
           },
           style: 'destructive',

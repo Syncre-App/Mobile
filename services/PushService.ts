@@ -2,37 +2,67 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-
+import appConfig from '../app.json';
 import { ApiService } from './ApiService';
 import { StorageService } from './StorageService';
 import { DeviceService } from './DeviceService';
 
 const LAST_REGISTERED_TOKEN_KEY = 'push_last_token';
+const DEFAULT_ANDROID_CHANNEL = 'default';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: false,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
     shouldShowBanner: true,
     shouldShowList: true,
   }),
 });
 
+const FALLBACK_PROJECT_ID =
+  (appConfig?.expo as any)?.extra?.eas?.projectId || process.env.EXPO_PROJECT_ID;
+
 const getExpoProjectId = (): string | undefined => {
+  const manifestExtra =
+    (Constants.manifest2 as any)?.extra ||
+    (Constants.manifest as any)?.extra ||
+    (Constants as any)?.manifestExtra ||
+    (Constants.expoConfig as any)?.extra;
+
   return (
-    Constants.expoConfig?.extra?.eas?.projectId ||
-    Constants.expoConfig?.extra?.projectId ||
     Constants.easConfig?.projectId ||
-    process.env.EXPO_PROJECT_ID
+    manifestExtra?.eas?.projectId ||
+    manifestExtra?.projectId ||
+    process.env.EXPO_PROJECT_ID ||
+    process.env.EXPO_PUBLIC_PROJECT_ID ||
+    FALLBACK_PROJECT_ID
   );
 };
 
 export const PushService = {
   async registerForPushNotifications() {
     try {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync(DEFAULT_ANDROID_CHANNEL, {
+          name: 'syncre',
+          importance: Notifications.AndroidImportance.MAX,
+          showBadge: true,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#2C82FF',
+        });
+      }
+
       if (!Device.isDevice) {
         console.warn('Push notifications are not supported on simulators');
+        return;
+      }
+
+      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      if (isExpoGo) {
+        console.warn(
+          'Expo Go (SDK 53+) does not support remote push notifications — build a development client to test pushes'
+        );
         return;
       }
 
@@ -57,6 +87,7 @@ export const PushService = {
 
       const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId });
       const expoToken = tokenResponse.data;
+      console.log('[PushService] Obtained Expo push token', expoToken);
 
       const authToken = await StorageService.getAuthToken();
       if (!authToken) {
@@ -103,10 +134,23 @@ export const PushService = {
   addNotificationListeners(onReceive?: (notification: Notifications.Notification) => void) {
     const subs: Notifications.Subscription[] = [];
 
-    if (onReceive) {
-      const listener = Notifications.addNotificationReceivedListener(onReceive);
-      subs.push(listener);
-    }
+    const listener = Notifications.addNotificationReceivedListener(async (notification) => {
+      try {
+        const providedBadge = notification.request?.content?.badge;
+        if (typeof providedBadge === 'number') {
+          await Notifications.setBadgeCountAsync(providedBadge);
+        } else {
+          const current = await Notifications.getBadgeCountAsync();
+          await Notifications.setBadgeCountAsync(current + 1);
+        }
+      } catch (error) {
+        console.warn('[PushService] Failed to sync badge count from notification:', error);
+      }
+      if (onReceive) {
+        onReceive(notification);
+      }
+    });
+    subs.push(listener);
 
     return () => subs.forEach((sub) => sub.remove());
   },

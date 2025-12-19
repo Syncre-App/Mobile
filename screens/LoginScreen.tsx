@@ -7,36 +7,41 @@ import {
     Image,
     ScrollView,
     StyleSheet,
-    Switch,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { AppBackground } from '../components/AppBackground';
 import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
+import { IdentityService } from '../services/IdentityService';
+import { CryptoService } from '../services/CryptoService';
+import { font, palette, radii, spacing } from '../theme/designSystem';
 
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(true);
   const [obscurePassword, setObscurePassword] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
+      setErrorMessage('Please fill in both email and password fields');
       notificationService.show('error', 'Please fill in both email and password fields', 'Error');
       return;
     }
-
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!emailValid) {
+      setErrorMessage('Please enter a valid email address');
       notificationService.show('error', 'Please enter a valid email address', 'Error');
       return;
     }
 
+    setErrorMessage(null);
     setIsLoading(true);
     try {
       const response = await ApiService.post('/auth/login', {
@@ -66,14 +71,54 @@ export const LoginScreen: React.FC = () => {
           console.warn('Login: server returned no user object');
         }
 
-        notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');
-        router.replace('/home' as any);
+        if (token) {
+          const [needsSetup, localIdentity] = await Promise.all([
+            IdentityService.requiresBootstrap(token),
+            CryptoService.getStoredIdentity(),
+          ]);
+
+          notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');
+
+          if (data?.requires_terms_acceptance || !user?.terms_accepted_at) {
+            router.replace('/terms' as any);
+          } else if (needsSetup) {
+            router.replace('/identity?mode=setup' as any);
+          } else if (!localIdentity) {
+            router.replace('/identity?mode=unlock' as any);
+          } else {
+            router.replace('/home' as any);
+          }
+        } else {
+          setErrorMessage('Missing authentication token');
+          notificationService.show('error', 'Missing authentication token', 'Error');
+        }
       } else {
         console.warn('Login failed response:', response);
-        notificationService.show('error', response.error || 'Login failed', 'Error');
+        const bannedUntil = (response.data as any)?.banned_until || (response.data as any)?.bannedUntil;
+        const deleteAfter = (response.data as any)?.delete_after;
+        if (bannedUntil) {
+          const until = new Date(bannedUntil);
+          setErrorMessage(`Your account is banned until ${until.toLocaleString()}.`);
+          notificationService.show(
+            'error',
+            `Your account is banned until ${until.toLocaleString()}.`,
+            'Login blocked'
+          );
+        } else if (deleteAfter) {
+          setErrorMessage('Account deletion is pending. Try again after the 24h grace window or contact support.');
+          notificationService.show(
+            'error',
+            'Account deletion is pending. Try again after the 24h grace window or contact support.',
+            'Login blocked'
+          );
+        } else {
+          setErrorMessage(response.error || 'Login failed');
+          notificationService.show('error', response.error || 'Login failed', 'Error');
+        }
       }
     } catch (error: any) {
       console.error('Login error:', error);
+      setErrorMessage('Network error or server issue');
       notificationService.show('error', 'Network error or server issue', 'Error');
     } finally {
       setIsLoading(false);
@@ -81,21 +126,19 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <LinearGradient
-      colors={['#03040A', '#071026']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
+    <View style={styles.container}>
+      <AppBackground />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.logoContainer}>
-          <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+        <View style={styles.hero}>
+          <Text style={styles.overline}>Welcome back</Text>
+          <Text style={styles.heroTitle}>Talk freely.</Text>
+          <Text style={styles.heroSubtitle}>Stay close. Own your data.</Text>
         </View>
 
-        <GlassCard width={360} style={styles.card}>
+        <GlassCard width="100%" style={styles.card} variant="subtle" padding={spacing.lg}>
           <View style={styles.cardContent}>
-            <Text style={styles.title}>LOGIN</Text>
-            <LinearGradient colors={['#2C82FF', '#0EA5FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.underline} />
+            <Text style={styles.title}>Sign in to Syncre</Text>
+            <Text style={styles.subtitle}>Secure messaging that mirrors our web glow.</Text>
 
             <TransparentField
               placeholder="Email"
@@ -103,7 +146,7 @@ export const LoginScreen: React.FC = () => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              prefixIcon={<Ionicons name="mail" size={18} color="#fff7" />}
+              prefixIcon={<Ionicons name="mail" size={18} color={palette.textSubtle} />}
               style={styles.field}
             />
 
@@ -112,59 +155,141 @@ export const LoginScreen: React.FC = () => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={obscurePassword}
-              prefixIcon={<Ionicons name="lock-closed" size={18} color="#fff7" />}
-              suffixIcon={<Ionicons name={obscurePassword ? 'eye' : 'eye-off'} size={18} color="#fff7" />}
+              prefixIcon={<Ionicons name="lock-closed" size={18} color={palette.textSubtle} />}
+              suffixIcon={<Ionicons name={obscurePassword ? 'eye' : 'eye-off'} size={18} color={palette.textSubtle} />}
               onSuffixPress={() => setObscurePassword(!obscurePassword)}
               style={styles.field}
             />
 
             <View style={styles.row}>
-              <View style={styles.rememberRow}>
-                <Switch value={remember} onValueChange={setRemember} trackColor={{ false: '#767577', true: '#2C82FF' }} thumbColor="#fff" ios_backgroundColor="#3e3e3e" />
-                <Text style={styles.rememberText}>Remember me</Text>
-              </View>
-              <TouchableOpacity>
-                <Text style={styles.forgotText}>Forgot?</Text>
+              <TouchableOpacity onPress={() => router.push({ pathname: '/reset', params: { email } } as any)}>
+                <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} onPress={handleLogin} activeOpacity={0.8} disabled={isLoading}>
-              <LinearGradient colors={isLoading ? ['#999', '#777'] : ['#2C82FF', '#0EA5FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.loginGradient}>
-                {isLoading ? <ActivityIndicator color="white" size="small" /> : <Text style={styles.loginButtonText}>LOGIN</Text>}
+            <TouchableOpacity
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+              onPress={handleLogin}
+              activeOpacity={0.9}
+              disabled={isLoading}
+            >
+              <LinearGradient
+                colors={isLoading ? ['#64748B', '#475569'] : ['#2563EB', '#0EA5E9']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.loginGradient}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Login</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 
+            {errorMessage ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            ) : null}
+
             <TouchableOpacity onPress={() => router.push('/register' as any)} style={styles.registerLink}>
-              <Text style={styles.registerText}>Don't have an account? <Text style={styles.registerTextHighlight}>Register</Text></Text>
+              <Text style={styles.registerText}>
+                Don&apos;t have an account? <Text style={styles.registerTextHighlight}>Register</Text>
+              </Text>
             </TouchableOpacity>
           </View>
         </GlassCard>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 };
 
 export default LoginScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 48 },
-  logoContainer: { marginBottom: 32, alignItems: 'center' },
-  logo: { width: 120, height: 120 },
-  card: { alignSelf: 'center' },
-  cardContent: { alignItems: 'center' },
-  title: { color: 'white', fontSize: 16, fontWeight: 'bold', letterSpacing: 2, marginTop: 10, marginBottom: 10 },
-  underline: { width: 60, height: 2, borderRadius: 1, marginBottom: 30 },
-  field: { marginBottom: 15 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 20 },
-  rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rememberText: { color: '#fff9', fontSize: 14 },
-  forgotText: { color: '#2C82FF', fontSize: 14, textDecorationLine: 'underline', textDecorationColor: '#fff7' },
-  loginButton: { width: '100%', marginBottom: 20 },
-  loginButtonDisabled: { opacity: 0.7 },
-  loginGradient: { paddingVertical: 14, borderRadius: 24, alignItems: 'center', shadowColor: '#2C82FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 5 },
-  loginButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  registerLink: { alignItems: 'center', paddingVertical: 8, marginTop: 4 },
-  registerText: { color: 'rgba(255, 255, 255, 0.7)', fontSize: 14 },
-  registerTextHighlight: { color: '#2C82FF', fontWeight: 'bold' },
+  container: { flex: 1, backgroundColor: palette.background },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xxl,
+    gap: spacing.lg,
+  },
+  hero: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  logo: { width: 96, height: 96, marginBottom: spacing.sm },
+  overline: {
+    color: palette.textSubtle,
+    ...font('displayMedium'),
+    letterSpacing: 4,
+    textTransform: 'uppercase',
+    fontSize: 12,
+  },
+  heroTitle: {
+    color: palette.text,
+    fontSize: 34,
+    ...font('display'),
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    color: palette.textMuted,
+    fontSize: 15,
+    ...font('regular'),
+  },
+  card: { width: '100%', maxWidth: 420 },
+  cardContent: { width: '100%' },
+  title: {
+    color: palette.text,
+    fontSize: 22,
+    ...font('semibold'),
+    letterSpacing: -0.2,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  subtitle: {
+    color: palette.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  field: { marginBottom: spacing.md },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: spacing.lg,
+  },
+  forgotText: { color: palette.accentSecondary, fontSize: 14, textDecorationLine: 'underline' },
+  loginButton: { width: '100%', marginBottom: spacing.md },
+  loginButtonDisabled: { opacity: 0.75 },
+  loginGradient: {
+    paddingVertical: spacing.md,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    shadowColor: '#0EA5E9',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  loginButtonText: { color: '#fff', fontSize: 16, ...font('semibold') },
+  registerLink: { alignItems: 'center', paddingVertical: spacing.xs, marginTop: spacing.xs },
+  registerText: { color: palette.textMuted, fontSize: 14 },
+  registerTextHighlight: { color: palette.accentSecondary, ...font('semibold') },
+  errorBox: {
+    width: '100%',
+    backgroundColor: '#ef44441a',
+    borderColor: '#ef4444',
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  errorText: { color: '#fecdd3', fontSize: 14, textAlign: 'center' },
 });

@@ -75,4 +75,43 @@ export class StorageService {
   static async removeAuthToken(): Promise<void> {
     return this.removeItem('auth_token');
   }
+
+  // Content filter helpers
+  static async setContentFilter(mode: 'standard' | 'none'): Promise<void> {
+    return this.setItem('content_filter', mode);
+  }
+
+  static async getContentFilter(): Promise<'standard' | 'none'> {
+    const value = await this.getItem('content_filter');
+    if (value === 'none') return 'none';
+    return 'standard'; // default
+  }
+
+  // Privacy settings helpers
+  static async setReadReceipts(enabled: boolean): Promise<void> {
+    return this.setItem('read_receipts', enabled ? 'true' : 'false');
+  }
+
+  static async getReadReceipts(): Promise<boolean> {
+    const value = await this.getItem('read_receipts');
+    return value !== 'false'; // default true
+  }
+
+  static async setLastSeen(enabled: boolean): Promise<void> {
+    return this.setItem('last_seen', enabled ? 'true' : 'false');
+  }
+
+  static async getLastSeen(): Promise<boolean> {
+    const value = await this.getItem('last_seen');
+    return value !== 'false'; // default true
+  }
+
+  static async setTypingIndicator(enabled: boolean): Promise<void> {
+    return this.setItem('typing_indicator', enabled ? 'true' : 'false');
+  }
+
+  static async getTypingIndicator(): Promise<boolean> {
+    const value = await this.getItem('typing_indicator');
+    return value !== 'false'; // default true
+  }
 }

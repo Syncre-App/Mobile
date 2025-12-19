@@ -1,35 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
+import { font, layout, palette, radii, spacing } from '../theme/designSystem';
 import { TransparentField } from './TransparentField';
 import { UserAvatar } from './UserAvatar';
+import BadgeIcon from './BadgeIcon';
 
 interface User {
   id: string;
   username: string;
   profile_picture?: string | null;
+  friendship_status?: string;
   [key: string]: any;
 }
 
 interface FriendSearchWidgetProps {
   onFriendUpdated: () => void;
+  showHeader?: boolean;
 }
 
 export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
   onFriendUpdated,
+  showHeader = true,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -59,8 +55,7 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
       
       if (response.success && response.data) {
         let users: User[];
-        
-        // Handle both array and object response
+
         if (Array.isArray(response.data)) {
           users = response.data;
         } else if (response.data.users && Array.isArray(response.data.users)) {
@@ -68,22 +63,17 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
         } else {
           users = [];
         }
-        
-        const filtered = users.filter((candidate: any) => {
-          const availability = candidate?.friendship_status || candidate?.status;
-          const normalized = availability ? String(availability).toLowerCase() : 'available';
-          return normalized === 'available';
-        });
-        
-        console.log('🔍 Found', users.length, 'users');
-        console.log('🔍 Filtered to', filtered.length, 'available users');
-        UserCacheService.addUsers(
-          filtered.map((candidate: any) => ({
-            ...candidate,
-            id: candidate.id?.toString?.() ?? String(candidate.id),
-          }))
-        );
-        setSearchResults(filtered);
+
+        const normalized = users.map((candidate: any) => ({
+          ...candidate,
+          id: candidate.id?.toString?.() ?? String(candidate.id),
+          friendship_status: candidate.friendship_status || candidate.status || 'available',
+          badges: Array.isArray(candidate.badges) ? candidate.badges : [],
+        }));
+
+        console.log('🔍 Found', normalized.length, 'users');
+        UserCacheService.addUsers(normalized as any[]);
+        setSearchResults(normalized);
       } else {
         console.log('❌ Search failed:', response.error);
         setSearchResults([]);
@@ -136,15 +126,25 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
         }
 
         onFriendUpdated();
-        
-        // Clear search
-        setSearchQuery('');
-        setSearchResults([]);
+        setSearchResults((prev) =>
+          prev.map((entry) =>
+            entry.id === user.id
+              ? {
+                  ...entry,
+                  friendship_status: status === 'accepted' ? 'friend' : 'pending_outgoing',
+                }
+              : entry
+          )
+        );
       } else {
         console.log('❌ Failed to add friend:', response.error);
         if (response.statusCode === 409) {
           NotificationService.show('info', response.error || 'Friend request already pending or you are already connected');
-          setSearchResults((prev) => prev.filter((item) => item.id !== user.id));
+          setSearchResults((prev) =>
+            prev.map((entry) =>
+              entry.id === user.id ? { ...entry, friendship_status: 'pending_outgoing' } : entry
+            )
+          );
         } else {
           NotificationService.show('error', response.error || 'Failed to send friend request');
         }
@@ -152,6 +152,49 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
     } catch (error: any) {      
       console.log('❌ Error adding friend:', error);
       NotificationService.show('error', 'Failed to send friend request');
+    }
+  };
+
+  const handleCancelRequest = async (user: User) => {
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        console.log('❌ No auth token for canceling friend request');
+        return;
+      }
+      const response = await ApiService.post('/user/remove', { friendId: user.id }, token);
+      if (response.success) {
+        NotificationService.show('info', 'Friend request withdrawn');
+        setSearchResults((prev) =>
+          prev.map((entry) =>
+            entry.id === user.id ? { ...entry, friendship_status: 'available' } : entry
+          )
+        );
+        onFriendUpdated();
+      } else {
+        NotificationService.show('error', response.error || 'Unable to cancel request');
+      }
+    } catch (error: any) {
+      console.log('❌ Error canceling request:', error);
+      NotificationService.show('error', 'Unable to cancel request');
+    }
+  };
+
+  const resolveStatus = (user: User) => {
+    const status = user.friendship_status || user.status || 'available';
+    return String(status).toLowerCase();
+  };
+
+  const renderStatusText = (status: string) => {
+    switch (status) {
+      case 'friend':
+        return 'You are already friends';
+      case 'pending_outgoing':
+        return 'Request sent — tap to cancel';
+      case 'pending_incoming':
+        return 'They sent you a request';
+      default:
+        return 'Tap to send a friend request';
     }
   };
 
@@ -172,33 +215,77 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
     );
   };
 
-  const renderSearchResult = ({ item }: { item: User }) => (
-    <TouchableOpacity style={styles.searchResultItem} onPress={() => confirmAddFriend(item)}>
-      <UserAvatar
-        uri={item.profile_picture}
-        name={item.username || item.email}
-        size={44}
-        style={styles.avatarContainer}
-      />
-      <View style={styles.searchResultInfo}>
-        <Text style={styles.searchResultUsername}>{item.username}</Text>
-        <Text style={styles.searchResultMeta}>Tap to send a friend request</Text>
-      </View>
-      <Ionicons name="person-add" size={20} color="#2C82FF" />
-    </TouchableOpacity>
-  );
+  const renderSearchResult = ({ item }: { item: User }) => {
+    const status = resolveStatus(item);
+    const actionable = status === 'available' || status === 'pending_outgoing';
+    const onPress =
+      status === 'available'
+        ? () => confirmAddFriend(item)
+        : status === 'pending_outgoing'
+          ? () => handleCancelRequest(item)
+          : undefined;
+    const icon = (() => {
+      if (status === 'friend') return <Ionicons name="checkmark-circle" size={20} color="#22c55e" />;
+      if (status === 'pending_outgoing') return <Ionicons name="time-outline" size={20} color="#f59e0b" />;
+      if (status === 'pending_incoming') return <Ionicons name="mail-unread-outline" size={20} color="#22d3ee" />;
+      return <Ionicons name="person-add" size={20} color="#2C82FF" />;
+    })();
+
+    const content = (
+      <>
+        <UserAvatar
+          uri={item.profile_picture}
+          name={item.username || item.email}
+          size={44}
+          style={styles.avatarContainer}
+        />
+        <View style={styles.searchResultInfo}>
+          <View style={styles.searchResultTitleRow}>
+            <Text style={styles.searchResultUsername}>{item.username}</Text>
+            {Array.isArray(item.badges) && item.badges.length > 0 ? (
+              <View style={styles.badgeContainer}>
+                {item.badges.slice(0, 3).map((badge: string, idx: number) => (
+                  <View key={`${item.id}-badge-${badge}-${idx}`} style={styles.badgeWrapper}>
+                    <BadgeIcon type={badge as any} size={20} />
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.searchResultMeta}>{renderStatusText(status)}</Text>
+        </View>
+        {icon}
+      </>
+    );
+
+    if (actionable) {
+      return (
+        <TouchableOpacity style={styles.searchResultItem} onPress={onPress} disabled={!onPress}>
+          {content}
+        </TouchableOpacity>
+      );
+    }
+
+    return <View style={[styles.searchResultItem, styles.searchResultItemDisabled]}>{content}</View>;
+  };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, !showHeader && styles.containerCompact]}>
+      {showHeader ? (
+        <>
+          <Text style={styles.label}>Connect</Text>
+          <Text style={styles.title}>Add a friend</Text>
+        </>
+      ) : null}
       <TransparentField
         placeholder="Search users by username or email"
         value={searchQuery}
         onChangeText={handleSearchChange}
         prefixIcon={
           isSearching ? (
-            <ActivityIndicator size="small" color="rgba(255, 255, 255, 0.7)" />
+            <ActivityIndicator size="small" color={palette.textSubtle} />
           ) : (
-            <Ionicons name="search" size={18} color="rgba(255, 255, 255, 0.7)" />
+            <Ionicons name="search" size={18} color={palette.textSubtle} />
           )
         }
         style={styles.searchInput}
@@ -226,49 +313,90 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 0,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
+  },
+  containerCompact: {
+    marginBottom: spacing.md,
   },
   searchInput: {
-    marginBottom: 12,
-    paddingHorizontal: 16,
+    marginBottom: spacing.sm,
+    alignSelf: 'stretch',
   },
   searchResults: {
-    maxHeight: 200,
-    paddingHorizontal: 16,
+    maxHeight: 220,
+    marginTop: spacing.xs,
   },
   searchResultItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginBottom: 8,
-    gap: 12,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    marginBottom: spacing.xs,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  searchResultItemDisabled: {
+    opacity: 0.7,
   },
   avatarContainer: {
-    marginRight: 4,
+    marginRight: spacing.xs,
   },
   searchResultInfo: {
     flex: 1,
   },
+  searchResultTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   searchResultUsername: {
-    color: 'white',
+    color: palette.text,
     fontSize: 16,
-    fontWeight: '600',
+    ...font('semibold'),
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  badgeWrapper: {
+    shadowColor: '#ffffff',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 1,
   },
   searchResultMeta: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: palette.textMuted,
     fontSize: 13,
     marginTop: 2,
   },
   noResults: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: spacing.md,
   },
   noResultsText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 14,
+  },
+  label: {
+    color: palette.textSubtle,
+    ...font('displayMedium'),
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 4,
+    marginBottom: spacing.xxs,
+  },
+  title: {
+    color: palette.text,
+    fontSize: 20,
+    ...font('semibold'),
+    marginBottom: spacing.sm,
   },
 });

@@ -1,13 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { font, palette, radii, spacing } from '../theme/designSystem';
 import { GlassCard } from './GlassCard';
 import { UserAvatar } from './UserAvatar';
 
@@ -16,6 +11,8 @@ interface FriendSummary {
   username: string;
   email?: string;
   profile_picture?: string | null;
+  status?: string | null;
+  last_seen?: string | null;
 }
 
 interface FriendRequestsWidgetProps {
@@ -39,6 +36,24 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
   const renderIncomingRequest = (request: FriendSummary) => {
     const isProcessing = processingId === request.id;
 
+    const status = request.status ? request.status.toLowerCase() : '';
+    const lastSeen = request.last_seen;
+    const presenceLabel = (() => {
+      if (status === 'online') return 'Online';
+      if (status === 'idle') return 'Idle';
+      if (!lastSeen) return '';
+      const parsed = Date.parse(lastSeen);
+      if (Number.isNaN(parsed)) return '';
+      const diffMs = Date.now() - parsed;
+      const minutes = Math.floor(diffMs / 60000);
+      if (minutes < 3) return 'Idle';
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      return `${days}d ago`;
+    })();
+
     return (
       <View key={request.id} style={styles.requestRow}>
         <UserAvatar
@@ -51,6 +66,9 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
           <Text style={styles.requestName}>{request.username}</Text>
           {request.email ? (
             <Text style={styles.requestEmail}>{request.email}</Text>
+          ) : null}
+          {presenceLabel ? (
+            <Text style={styles.requestPresence}>{presenceLabel}</Text>
           ) : null}
         </View>
         <View style={styles.requestActions}>
@@ -94,8 +112,16 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
   );
 
   return (
-    <GlassCard width="100%" style={styles.card}>
-      <Text style={styles.title}>Friend Requests</Text>
+    <GlassCard width="100%" style={styles.card} variant="subtle" padding={spacing.lg}>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.label}>Social</Text>
+          <Text style={styles.title}>Friend requests</Text>
+        </View>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{incoming.length + outgoing.length}</Text>
+        </View>
+      </View>
 
       {incoming.length > 0 && (
         <View style={styles.section}>
@@ -116,81 +142,85 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   title: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
+    color: palette.text,
+    fontSize: 20,
+    ...font('semibold'),
+    letterSpacing: -0.2,
   },
   section: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
+    color: palette.textSubtle,
+    fontSize: 12,
+    ...font('displayMedium'),
+    marginBottom: spacing.sm,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 3,
   },
   requestRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-    gap: 12,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    gap: spacing.md,
   },
   pendingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   requestAvatar: {
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   requestInfo: {
     flex: 1,
   },
   requestName: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 16,
-    fontWeight: '600',
+    ...font('semibold'),
   },
   requestEmail: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 13,
     marginTop: 2,
   },
+  requestPresence: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    marginTop: 2,
+  },
   pendingText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: palette.textMuted,
     fontSize: 13,
     marginTop: 2,
   },
   requestActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.xs,
   },
   actionButton: {
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    minWidth: 84,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    minWidth: 88,
     alignItems: 'center',
     justifyContent: 'center',
   },
   acceptButton: {
-    backgroundColor: '#2C82FF',
+    backgroundColor: palette.accent,
   },
   rejectButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
@@ -198,11 +228,38 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   actionButtonText: {
-    color: '#ffffff',
+    color: palette.text,
     fontSize: 14,
-    fontWeight: '600',
+    ...font('semibold'),
   },
   rejectButtonText: {
-    color: '#ff6b6b',
+    color: palette.error,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  label: {
+    color: palette.textSubtle,
+    ...font('displayMedium'),
+    fontSize: 12,
+    letterSpacing: 4,
+    textTransform: 'uppercase',
+    marginBottom: spacing.xxs,
+  },
+  badge: {
+    minWidth: 36,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 1.5,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: palette.accentSecondary,
+    ...font('display'),
+    fontSize: 14,
   },
 });

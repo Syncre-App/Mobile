@@ -1,5 +1,4 @@
 import { Alert, Platform, ToastAndroid } from 'react-native';
-// small uid helper to avoid adding a dependency
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 
 export enum NotificationType {
@@ -9,7 +8,6 @@ export enum NotificationType {
   INFO = 'info',
 }
 
-// Lightweight NotificationService: will call native fallback or rely on an external provider
 export class NotificationService {
   private static instance: NotificationService;
   private pushHandler: ((n: { id: string; type: string; title?: string; message: string }) => void) | null = null;

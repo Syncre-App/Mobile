@@ -1,6 +1,16 @@
 import { UserCacheService } from './UserCacheService';
+import { TimezoneService } from './TimezoneService';
 
-const BASE_URL = 'https://api.syncre.xyz/v1';
+const resolveBaseUrl = () => {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (envUrl) {
+    const normalized = envUrl.endsWith('/v1') ? envUrl : `${envUrl.replace(/\/+$/, '')}/v1`;
+    return normalized;
+  }
+  return 'https://api.syncre.xyz/v1';
+};
+
+const BASE_URL = resolveBaseUrl();
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -12,15 +22,20 @@ export interface ApiResponse<T = any> {
 export class ApiService {
   public static readonly baseUrl = BASE_URL;
 
+  private static buildHeaders(token?: string): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    TimezoneService.applyHeader(headers);
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
   static async post<T = any>(endpoint: string, data: any, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = this.buildHeaders(token);
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'POST',
@@ -40,7 +55,7 @@ export class ApiService {
 
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData?.message || responseData?.error || responseData?.text || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
@@ -55,13 +70,7 @@ export class ApiService {
 
   static async get<T = any>(endpoint: string, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = this.buildHeaders(token);
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'GET',
@@ -72,7 +81,6 @@ export class ApiService {
       try {
         responseData = await response.json();
       } catch (e) {
-        // Non-JSON response — capture text for debugging
         const text = await response.text();
         console.warn('ApiService.get: Non-JSON response:', text);
         responseData = { text };
@@ -107,7 +115,7 @@ export class ApiService {
 
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData?.message || responseData?.error || responseData?.text || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
@@ -122,6 +130,59 @@ export class ApiService {
 
   static async getUserById(userId: string, token: string): Promise<ApiResponse<any>> {
     const cachedUser = UserCacheService.getUser(userId);
+    const shouldRevalidate = UserCacheService.isStale(userId);
+    const missingCriticalFields =
+      !cachedUser ||
+      cachedUser.last_seen === undefined ||
+      cachedUser.badges === undefined ||
+      cachedUser.status === undefined;
+
+    if (cachedUser) {
+      // If we have cache but it's missing important fields, do a blocking refresh.
+      if (!missingCriticalFields && shouldRevalidate) {
+        // Return cached immediately; refresh in background if stale to keep names/avatars current
+        this.get(`/user/${userId}`, token)
+          .then((response) => {
+            if (response.success && response.data) {
+              UserCacheService.addUser(response.data);
+            }
+          })
+          .catch((err) => console.warn('[ApiService] Background user refresh failed:', err));
+        return {
+          success: true,
+          data: cachedUser,
+          statusCode: 200,
+        };
+      }
+
+      if (!missingCriticalFields) {
+        return {
+          success: true,
+          data: cachedUser,
+          statusCode: 200,
+        };
+      }
+    }
+
+    const response = await this.get(`/user/${userId}`, token);
+    if (!response.success && response.statusCode === 404) {
+      const placeholder = {
+        id: userId,
+        username: 'Unknown user',
+        email: '',
+        profile_picture: null,
+        status: null,
+        last_seen: null,
+        missing: true,
+      };
+      UserCacheService.addUser(placeholder as any);
+    }
+    if (response.success && response.data) {
+      UserCacheService.addUser(response.data);
+      return response;
+    }
+
+    // If network fetch failed but we had a cached user, return it to avoid breaking UI.
     if (cachedUser) {
       return {
         success: true,
@@ -130,22 +191,17 @@ export class ApiService {
       };
     }
 
-    const response = await this.get(`/user/${userId}`, token);
-    if (response.success && response.data) {
-      UserCacheService.addUser(response.data);
-    }
     return response;
+  }
+
+  static async getDailyWrap(date?: string, token?: string): Promise<ApiResponse<any>> {
+    const suffix = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this.get(`/user/wrap/daily${suffix}`, token);
   }
 
   static async put<T = any>(endpoint: string, data: any, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = this.buildHeaders(token);
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'PUT',
@@ -157,7 +213,7 @@ export class ApiService {
       
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData.message || responseData.error || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
@@ -172,13 +228,7 @@ export class ApiService {
 
   static async delete<T = any>(endpoint: string, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = this.buildHeaders(token);
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'DELETE',
@@ -189,7 +239,7 @@ export class ApiService {
       
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData.message || responseData.error || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
@@ -204,15 +254,16 @@ export class ApiService {
 
   static async upload<T = any>(endpoint: string, formData: FormData, token?: string): Promise<ApiResponse<T>> {
     try {
-      const headers: HeadersInit = {};
+      const headerRecord: Record<string, string> = {};
+      TimezoneService.applyHeader(headerRecord);
 
       if (token) {
-        headers.Authorization = `Bearer ${token}`;
+        headerRecord.Authorization = `Bearer ${token}`;
       }
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'POST',
-        headers,
+        headers: headerRecord as HeadersInit,
         body: formData,
       });
 
@@ -226,7 +277,7 @@ export class ApiService {
 
       return {
         success: response.ok,
-        data: response.ok ? responseData : undefined,
+        data: responseData,
         error: !response.ok ? (responseData?.message || responseData?.error || `Request failed with status ${response.status}`) : undefined,
         statusCode: response.status,
       };
@@ -237,5 +288,118 @@ export class ApiService {
         statusCode: 0,
       };
     }
+  }
+
+  // Streak methods
+  static async getStreakForChat(chatId: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/chat/${chatId}/streak`, token);
+  }
+
+  static async getStreaksForChats(chatIds: (string | number)[], token: string): Promise<ApiResponse> {
+    return this.post('/chat/streaks', { chatIds }, token);
+  }
+
+  // Scheduled message methods
+  static async scheduleMessage(
+    chatId: string | number,
+    data: {
+      content: string;
+      attachments?: number[];
+      replyTo?: number;
+      scheduledFor: string;
+      timezone?: string;
+    },
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/schedule`, data, token);
+  }
+
+  static async getScheduledMessages(token: string, status: string = 'pending'): Promise<ApiResponse> {
+    return this.get(`/chat/scheduled/list?status=${status}`, token);
+  }
+
+  static async getScheduledMessage(id: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/chat/scheduled/${id}`, token);
+  }
+
+  static async updateScheduledMessage(
+    id: string | number,
+    data: {
+      content?: string;
+      attachments?: number[];
+      scheduledFor?: string;
+      timezone?: string;
+    },
+    token: string
+  ): Promise<ApiResponse> {
+    return this.put(`/chat/scheduled/${id}`, data, token);
+  }
+
+  static async cancelScheduledMessage(id: string | number, token: string): Promise<ApiResponse> {
+    return this.delete(`/chat/scheduled/${id}`, token);
+  }
+
+  // Poll methods
+  static async createPoll(
+    chatId: string | number,
+    data: {
+      question: string;
+      options: string[];
+      multiSelect?: boolean;
+    },
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/poll`, data, token);
+  }
+
+  static async getPollByMessageId(messageId: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/chat/message/${messageId}/poll`, token);
+  }
+
+  static async votePoll(
+    chatId: string | number,
+    pollId: string | number,
+    optionIds: number[],
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/poll/${pollId}/vote`, { optionIds }, token);
+  }
+
+  static async removeVotePoll(
+    chatId: string | number,
+    pollId: string | number,
+    optionId: number,
+    token: string
+  ): Promise<ApiResponse> {
+    return this.delete(`/chat/${chatId}/poll/${pollId}/vote?optionId=${optionId}`, token);
+  }
+
+  static async closePoll(
+    chatId: string | number,
+    pollId: string | number,
+    token: string
+  ): Promise<ApiResponse> {
+    return this.post(`/chat/${chatId}/poll/${pollId}/close`, {}, token);
+  }
+
+  // Spotify methods
+  static async getSpotifyStatus(token: string): Promise<ApiResponse> {
+    return this.get('/spotify/status', token);
+  }
+
+  static async getSpotifyAuthUrl(token: string): Promise<ApiResponse> {
+    return this.get('/spotify/auth', token);
+  }
+
+  static async disconnectSpotify(token: string): Promise<ApiResponse> {
+    return this.post('/spotify/disconnect', {}, token);
+  }
+
+  static async getSpotifyNowPlaying(token: string): Promise<ApiResponse> {
+    return this.get('/spotify/now-playing', token);
+  }
+
+  static async getUserActivity(userId: string | number, token: string): Promise<ApiResponse> {
+    return this.get(`/spotify/activity/${userId}`, token);
   }
 }
