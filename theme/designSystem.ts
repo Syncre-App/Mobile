@@ -52,23 +52,24 @@ const iosPalette = {
   error: '#FF453A',
 };
 
+// Material Design 3 color palette for Android
 const androidPalette = {
-  background: '#000000',
-  backgroundMuted: '#0A0A0A',
-  surface: 'rgba(255, 255, 255, 0.06)',
-  surfaceStrong: 'rgba(255, 255, 255, 0.12)',
-  surfaceSoft: 'rgba(255, 255, 255, 0.04)',
-  border: 'rgba(255, 255, 255, 0.12)',
-  borderStrong: 'rgba(255, 255, 255, 0.18)',
-  text: '#FFFFFF',
-  textMuted: 'rgba(255, 255, 255, 0.65)',
-  textSubtle: 'rgba(255, 255, 255, 0.4)',
-  accent: '#1C1C1E',
-  accentSecondary: '#FFFFFF',
-  accentTertiary: '#D6D6D6',
-  success: '#FFFFFF',
-  warning: '#D6D6D6',
-  error: '#F2F2F2',
+  background: '#141218',           // MD3 surface
+  backgroundMuted: '#1D1B20',      // MD3 surfaceContainerLow
+  surface: '#211F26',              // MD3 surfaceContainer
+  surfaceStrong: '#2B2930',        // MD3 surfaceContainerHigh
+  surfaceSoft: '#0F0D13',          // MD3 surfaceContainerLowest
+  border: '#49454F',               // MD3 outlineVariant
+  borderStrong: '#938F99',         // MD3 outline
+  text: '#E6E1E5',                 // MD3 onSurface
+  textMuted: '#CAC4D0',            // MD3 onSurfaceVariant
+  textSubtle: '#938F99',           // MD3 outline (used for subtle text)
+  accent: '#D0BCFF',               // MD3 primary
+  accentSecondary: '#CCC2DC',      // MD3 secondary
+  accentTertiary: '#EFB8C8',       // MD3 tertiary
+  success: '#4CAF50',              // Material green
+  warning: '#FF9800',              // Material amber
+  error: '#F2B8B5',                // MD3 error
 };
 
 export const palette = isIOS ? iosPalette : androidPalette;
@@ -81,12 +82,13 @@ const iosGradients = {
   avatarRing: ['#FFFFFF', '#D7DBE4', '#B0B7C3'],
 };
 
+// Material Design 3 gradients for Android (more subtle)
 const androidGradients = {
-  backgroundBase: ['#000000', '#050505', '#000000'],
-  buttonPrimary: ['#1C1C1E', '#2C2C2E'],
-  buttonMuted: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)'],
-  cardStroke: ['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.06)'],
-  avatarRing: ['#FFFFFF', '#DADADA', '#BFBFBF'],
+  backgroundBase: ['#141218', '#1D1B20', '#141218'],
+  buttonPrimary: ['#4F378B', '#381E72'],       // MD3 primaryContainer to onPrimary
+  buttonMuted: ['#2B2930', '#211F26'],         // MD3 surface variations
+  cardStroke: ['rgba(202, 196, 208, 0.15)', 'rgba(202, 196, 208, 0.05)'], // MD3 onSurfaceVariant
+  avatarRing: ['#E6E1E5', '#CAC4D0', '#938F99'], // MD3 surface to outline
 };
 
 export const gradients = isIOS ? iosGradients : androidGradients;
@@ -129,20 +131,21 @@ const iosShadows = {
   },
 };
 
+// Material Design 3 shadows for Android (more subtle, lower elevation)
 const androidShadows = {
   card: {
     shadowColor: '#000000',
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 18,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   floating: {
     shadowColor: '#000000',
-    shadowOpacity: 0.4,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 20 },
-    elevation: 12,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
 };
 

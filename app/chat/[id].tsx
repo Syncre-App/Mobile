@@ -38,6 +38,7 @@ import { EphemeralOptions, type EphemeralDuration } from '../../components/Ephem
 import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
 import { CreatePollSheet } from '../../components/CreatePollSheet';
 import { PollMessage, type PollData } from '../../components/PollMessage';
+import { NativeContextMenu, type ContextMenuAction } from '../../components/NativeContextMenu';
 import { font, palette, radii, spacing } from '../../theme/designSystem';
 import leo from 'leo-profanity';
 
@@ -681,6 +682,8 @@ interface MessageBubbleProps {
   onBubblePress?: () => void;
   onBubbleDoubleTap?: (event: GestureResponderEvent) => void;
   onBubbleLongPress?: (event: GestureResponderEvent) => void;
+  /** Context menu actions for native iOS context menu */
+  contextMenuActions?: ContextMenuAction[];
   onAttachmentPress?: (attachment: MessageAttachment, attachments?: MessageAttachment[]) => void;
   onLinkPress?: (url: string) => void;
   onDownloadAttachment?: (attachment: MessageAttachment) => void;
@@ -708,6 +711,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onBubblePress,
   onBubbleDoubleTap,
   onBubbleLongPress,
+  contextMenuActions,
   onAttachmentPress,
   onLinkPress,
   onDownloadAttachment,
@@ -1120,18 +1124,23 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         >
           <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
         </Animated.View>
-        <Pressable
-          onPress={handleBubblePress}
-          onLongPress={(event) => onBubbleLongPress?.(event)}
-          style={[
-            styles.messageContent,
-            isMine ? styles.messageContentMine : styles.messageContentTheirs,
-            message.replyTo && styles.messageContentWithReply,
-            isMediaOnlyMessage && styles.messageContentMediaOnly,
-            isFileOnlyMessage && styles.messageContentFileOnly,
-          ]}
-          delayLongPress={120}
+        <NativeContextMenu
+          title={message.content ? undefined : 'Message'}
+          actions={contextMenuActions || []}
+          disabled={!contextMenuActions || contextMenuActions.length === 0 || message.isPlaceholder}
         >
+          <Pressable
+            onPress={handleBubblePress}
+            onLongPress={Platform.OS === 'android' ? (event) => onBubbleLongPress?.(event) : undefined}
+            style={[
+              styles.messageContent,
+              isMine ? styles.messageContentMine : styles.messageContentTheirs,
+              message.replyTo && styles.messageContentWithReply,
+              isMediaOnlyMessage && styles.messageContentMediaOnly,
+              isFileOnlyMessage && styles.messageContentFileOnly,
+            ]}
+            delayLongPress={120}
+          >
           {showSenderMetadata && !isMine ? (
             <View style={styles.senderMetaRow}>
               <UserAvatar
@@ -1428,7 +1437,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               </View>
             </Pressable>
           )}
-        </Pressable>
+          </Pressable>
+        </NativeContextMenu>
       </Animated.View>
     </>
   );
@@ -1618,13 +1628,18 @@ const ChatScreen: React.FC = () => {
     [togglePreviewChrome]
   );
   const closeAttachmentSheet = useCallback((onFinished?: () => void) => {
+    console.log('[DEBUG] closeAttachmentSheet called, onFinished:', typeof onFinished);
     Animated.timing(attachmentSheetAnim, {
       toValue: 0,
       duration: 160,
       useNativeDriver: true,
-    }).start(() => {
+    }).start((result) => {
+      console.log('[DEBUG] Animation finished, result:', result, 'calling onFinished:', typeof onFinished);
       setAttachmentSheetVisible(false);
-      onFinished?.();
+      if (onFinished) {
+        console.log('[DEBUG] Executing onFinished callback');
+        onFinished();
+      }
     });
   }, [attachmentSheetAnim]);
   const resolveActionIcon = useCallback((label: string): any => {
@@ -4211,6 +4226,80 @@ const ChatScreen: React.FC = () => {
     }
   }, []);
 
+  // Build native context menu actions for a message (iOS native UIMenu)
+  const buildContextMenuActions = useCallback(
+    (message: Message): ContextMenuAction[] => {
+      if (message.isPlaceholder || message.isDeleted) {
+        return [];
+      }
+
+      const canEdit = message.senderId === currentUserId && !message.isDeleted;
+      const canDelete = message.senderId === currentUserId && !message.isDeleted;
+      const primaryAttachment = (message.attachments || [])[0];
+
+      const actions: ContextMenuAction[] = [
+        {
+          title: 'Reply',
+          systemIcon: 'arrowshape.turn.up.left',
+          onPress: () => setReplyContext(buildReplyPayloadFromMessage(message)),
+        },
+      ];
+
+      if (message.content) {
+        actions.push({
+          title: 'Copy',
+          systemIcon: 'doc.on.doc',
+          onPress: () => handleCopyMessage(message),
+        });
+      }
+
+      if (primaryAttachment) {
+        actions.push({
+          title: 'Share',
+          systemIcon: 'square.and.arrow.up',
+          onPress: () => handleShareAttachment(primaryAttachment),
+        });
+      }
+
+      if (canEdit) {
+        actions.push({
+          title: 'Edit',
+          systemIcon: 'pencil',
+          onPress: () => startEditMessage(message),
+        });
+      }
+
+      if (canDelete) {
+        actions.push({
+          title: 'Delete',
+          systemIcon: 'trash',
+          destructive: true,
+          onPress: () => confirmDeleteMessage(message),
+        });
+      }
+
+      if (message.senderId !== currentUserId && !message.isDeleted) {
+        actions.push({
+          title: 'Report',
+          systemIcon: 'flag',
+          destructive: true,
+          onPress: () => handleReportMessage(message),
+        });
+      }
+
+      return actions;
+    },
+    [
+      buildReplyPayloadFromMessage,
+      confirmDeleteMessage,
+      currentUserId,
+      handleCopyMessage,
+      handleReportMessage,
+      handleShareAttachment,
+      startEditMessage,
+    ]
+  );
+
   const openMessageActions = useCallback(
     (message: Message, anchorX?: number, anchorY?: number) => {
       const canEdit = message.senderId === currentUserId && !message.isDeleted;
@@ -5637,6 +5726,7 @@ const ChatScreen: React.FC = () => {
           }}
           onBubbleDoubleTap={(event) => handleBubbleDoubleTap(messageItem, event)}
           onBubbleLongPress={(event) => handleBubbleLongPress(messageItem, event)}
+          contextMenuActions={buildContextMenuActions(messageItem)}
           onAttachmentPress={handleAttachmentTap}
           onDownloadAttachment={handleDownloadAttachment}
           onLinkPress={handleOpenLink}
@@ -5665,6 +5755,7 @@ const ChatScreen: React.FC = () => {
       handleToggleReaction,
       handleBubbleDoubleTap,
       handleBubbleLongPress,
+      buildContextMenuActions,
       contentFilterMode,
       typingUsers,
       formatTypingLabel,

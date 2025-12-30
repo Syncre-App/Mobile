@@ -19,6 +19,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Syncre uses your approximate location to keep message timestamps accurate.",
+        "UIDesignRequiresCompatibility": false,
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
