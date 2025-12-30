@@ -39,7 +39,7 @@ export function MessageInput({
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
   const inputRef = useRef<TextInput>(null);
-  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTextChange = (text: string) => {
     setMessage(text);

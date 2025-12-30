@@ -165,6 +165,28 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: Layout.spacing.xs,
   },
+  glassCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  blurCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonContent: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: Layout.fontSize.lg,
     fontWeight: Layout.fontWeight.semibold,
@@ -194,11 +216,27 @@ const styles = StyleSheet.create({
     fontWeight: Layout.fontWeight.medium,
     marginTop: Layout.spacing.md,
   },
+  buttonSection: {
+    marginBottom: Layout.spacing.xl,
+  },
   infoSection: {
     marginBottom: Layout.spacing.lg,
   },
+  infoCard: {
+    borderRadius: Layout.radius.lg,
+    paddingHorizontal: Layout.spacing.md,
+    overflow: 'hidden',
+  },
   infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: Layout.spacing.md,
+  },
+  infoIcon: {
+    marginRight: Layout.spacing.md,
+  },
+  infoContent: {
+    flex: 1,
   },
   infoLabel: {
     fontSize: Layout.fontSize.sm,
@@ -207,6 +245,10 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: Layout.fontSize.md,
     fontWeight: Layout.fontWeight.medium,
+  },
+  divider: {
+    height: 0.5,
+    marginLeft: 36,
   },
   note: {
     fontSize: Layout.fontSize.sm,

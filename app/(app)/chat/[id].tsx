@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ActionSheetIOS,
   Alert,
+  GestureResponderEvent,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +19,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { useChatStore } from '../../../stores/chatStore';
 import { useAuthStore } from '../../../stores/authStore';
 import { chatApi } from '../../../services/api';
-import { Avatar, LoadingSpinner } from '../../../components/ui';
+import { Avatar, LoadingSpinner, GlassContextMenu } from '../../../components/ui';
 import { MessageBubble, MessageInput, TypingIndicator, ReactionPicker } from '../../../components/chat';
 import { Layout } from '../../../constants/layout';
 import { Message, Chat, TypingUser } from '../../../types/chat';
@@ -45,6 +46,8 @@ export default function ChatScreen() {
   const [chat, setChat] = useState<Chat | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [replyTo, setReplyTo] = useState<{ id: number; name: string; preview: string } | null>(null);
   const [showTimestampForMessage, setShowTimestampForMessage] = useState<number | null>(null);
   
@@ -167,69 +170,10 @@ export default function ChatScreen() {
     );
   };
 
-  const handleMessageLongPress = (message: Message) => {
+  const handleMessageLongPress = (message: Message, event: GestureResponderEvent) => {
     setSelectedMessage(message);
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Reply', 'React', 'Copy', 'Delete'],
-          cancelButtonIndex: 0,
-          destructiveButtonIndex: 4,
-        },
-        buttonIndex => {
-          switch (buttonIndex) {
-            case 1: // Reply
-              setReplyTo({
-                id: message.id,
-                name: message.senderName,
-                preview: message.content || '',
-              });
-              break;
-            case 2: // React
-              setShowReactionPicker(true);
-              break;
-            case 3: // Copy
-              // TODO: Copy to clipboard
-              break;
-            case 4: // Delete
-              handleDeleteMessage(message);
-              break;
-          }
-        }
-      );
-    } else {
-      Alert.alert(
-        'Message Options',
-        undefined,
-        [
-          {
-            text: 'Reply',
-            onPress: () => setReplyTo({
-              id: message.id,
-              name: message.senderName,
-              preview: message.content || '',
-            }),
-          },
-          {
-            text: 'React',
-            onPress: () => setShowReactionPicker(true),
-          },
-          {
-            text: 'Copy',
-            onPress: () => {
-              // TODO: Copy to clipboard
-            },
-          },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => handleDeleteMessage(message),
-          },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
-    }
+    setContextMenuPos({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY });
+    setShowContextMenu(true);
   };
 
   const handleDoubleTap = (message: Message) => {
@@ -286,7 +230,7 @@ export default function ChatScreen() {
         showAvatar={showAvatar}
         showTimestamp={showTimestamp}
         onPress={() => handleMessagePress(item)}
-        onLongPress={() => handleMessageLongPress(item)}
+        onLongPress={(e) => handleMessageLongPress(item, e)}
         onDoubleTap={() => handleDoubleTap(item)}
         onReactionPress={reaction => {
           setSelectedMessage(item);
@@ -376,6 +320,49 @@ export default function ChatScreen() {
           setSelectedMessage(null);
         }}
         onSelect={handleReaction}
+      />
+
+      <GlassContextMenu
+        visible={showContextMenu}
+        onClose={() => setShowContextMenu(false)}
+        anchorPosition={contextMenuPos}
+        items={[
+          {
+            label: 'Reply',
+            icon: 'arrow-undo-outline',
+            onPress: () => {
+              if (selectedMessage) {
+                setReplyTo({
+                  id: selectedMessage.id,
+                  name: selectedMessage.senderName,
+                  preview: selectedMessage.content || '',
+                });
+              }
+            },
+          },
+          {
+            label: 'React',
+            icon: 'happy-outline',
+            onPress: () => setShowReactionPicker(true),
+          },
+          {
+            label: 'Copy',
+            icon: 'copy-outline',
+            onPress: () => {
+              // TODO: Copy to clipboard
+            },
+          },
+          {
+            label: 'Delete',
+            icon: 'trash-outline',
+            destructive: true,
+            onPress: () => {
+              if (selectedMessage) {
+                handleDeleteMessage(selectedMessage);
+              }
+            },
+          },
+        ]}
       />
     </SafeAreaView>
   );

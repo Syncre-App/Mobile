@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Pressable,
+  GestureResponderEvent,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +22,7 @@ interface MessageBubbleProps {
   showAvatar?: boolean;
   showTimestamp?: boolean;
   onPress?: () => void;
-  onLongPress?: () => void;
+  onLongPress?: (event: GestureResponderEvent) => void;
   onDoubleTap?: () => void;
   onReactionPress?: (reaction: string) => void;
 }
@@ -58,9 +59,9 @@ export const MessageBubble = memo(function MessageBubble({
     }
   };
 
-  const handleLongPress = () => {
+  const handleLongPress = (event: GestureResponderEvent) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    onLongPress?.();
+    onLongPress?.(event);
   };
 
   const bubbleStyle = isOwnMessage
