@@ -12,7 +12,6 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
@@ -356,10 +355,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-  },
-  headerGlass: {
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.md,
   },

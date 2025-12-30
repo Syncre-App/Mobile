@@ -51,6 +51,12 @@ export interface UserSearchResult {
   id: string;
   username: string;
   profile_picture: string | null;
-  isFriend: boolean;
-  isPending: boolean;
+  status: string | null;
+  last_seen: string | null;
+  created_at: string;
+  badges: string[];
+  friendship_status: 'friend' | 'pending_outgoing' | 'pending_incoming' | 'available';
+  // Computed properties for convenience
+  isFriend?: boolean;
+  isPending?: boolean;
 }

@@ -6,12 +6,10 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useTheme } from '../../../hooks/useTheme';
 import { useChatStore } from '../../../stores/chatStore';
 import { useAuthStore } from '../../../stores/authStore';
@@ -123,10 +121,8 @@ export default function ChatsScreen() {
     );
   };
 
-  const renderHeader = () => {
-    const useGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
-
-    const headerContent = (
+  const renderHeader = () => (
+    <View style={[styles.header, { backgroundColor: colors.background }]}>
       <View style={styles.headerContent}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Chats</Text>
         <TouchableOpacity
@@ -136,22 +132,8 @@ export default function ChatsScreen() {
           <Ionicons name="create-outline" size={22} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
-    );
-
-    if (useGlass) {
-      return (
-        <GlassView style={styles.headerGlass} glassEffectStyle="regular">
-          {headerContent}
-        </GlassView>
-      );
-    }
-
-    return (
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        {headerContent}
-      </View>
-    );
-  };
+    </View>
+  );
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -204,11 +186,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-    borderBottomWidth: 0.5,
-  },
-  headerGlass: {
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.md,
   },

@@ -446,6 +446,9 @@ export default function ChatScreen() {
     const prevMessage = chatMessages[index + 1];
     const showAvatar = !prevMessage || prevMessage.senderId !== item.senderId;
     const showTimestamp = showTimestampForMessage === item.id;
+    
+    // Get display content - use decrypted for E2EE, otherwise use message.content
+    const displayContent = getMessageContent(item);
 
     return (
       <MessageBubble
@@ -453,6 +456,7 @@ export default function ChatScreen() {
         isOwnMessage={isOwnMessage}
         showAvatar={showAvatar}
         showTimestamp={showTimestamp}
+        displayContent={displayContent}
         onPress={() => handleMessagePress(item)}
         onLongPress={(e) => handleMessageLongPress(item, e)}
         onDoubleTap={() => handleDoubleTap(item)}

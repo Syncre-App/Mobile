@@ -21,6 +21,7 @@ interface MessageBubbleProps {
   isOwnMessage: boolean;
   showAvatar?: boolean;
   showTimestamp?: boolean;
+  displayContent?: string | null; // For decrypted E2EE messages
   onPress?: () => void;
   onLongPress?: (event: GestureResponderEvent) => void;
   onDoubleTap?: () => void;
@@ -32,6 +33,7 @@ export const MessageBubble = memo(function MessageBubble({
   isOwnMessage,
   showAvatar = true,
   showTimestamp = false,
+  displayContent,
   onPress,
   onLongPress,
   onDoubleTap,
@@ -205,9 +207,9 @@ export const MessageBubble = memo(function MessageBubble({
           {renderReply()}
           {renderAttachments()}
           
-          {message.content && (
+          {(displayContent || message.content) && (
             <Text style={[styles.messageText, textStyle]}>
-              {message.content}
+              {displayContent || message.content}
             </Text>
           )}
 

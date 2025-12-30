@@ -7,13 +7,11 @@ import {
   TouchableOpacity,
   RefreshControl,
   TextInput,
-  Platform,
   SectionList,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
 import { useFriendStore } from '../../../stores/friendStore';
@@ -96,46 +94,28 @@ export default function FriendsScreen() {
     }
   };
 
-  const renderHeader = () => {
-    const useGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
-
-    const headerContent = (
-      <>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Friends</Text>
-        <View style={[styles.searchContainer, { backgroundColor: colors.inputBackground }]}>
-          <Ionicons name="search" size={18} color={colors.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search users..."
-            placeholderTextColor={colors.inputPlaceholder}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </>
-    );
-
-    if (useGlass) {
-      return (
-        <GlassView style={styles.headerGlass} glassEffectStyle="regular">
-          {headerContent}
-        </GlassView>
-      );
-    }
-
-    return (
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        {headerContent}
+  const renderHeader = () => (
+    <View style={[styles.header, { backgroundColor: colors.background }]}>
+      <Text style={[styles.headerTitle, { color: colors.text }]}>Friends</Text>
+      <View style={[styles.searchContainer, { backgroundColor: colors.inputBackground }]}>
+        <Ionicons name="search" size={18} color={colors.textSecondary} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.text }]}
+          placeholder="Search users..."
+          placeholderTextColor={colors.inputPlaceholder}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
-    );
-  };
+    </View>
+  );
 
   const renderSearchResult = ({ item }: { item: UserSearchResult }) => (
     <View style={[styles.friendItem, { backgroundColor: colors.background }]}>
@@ -344,11 +324,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingTop: Layout.spacing.md,
-    paddingBottom: Layout.spacing.md,
-  },
-  headerGlass: {
     paddingHorizontal: Layout.spacing.lg,
     paddingTop: Layout.spacing.md,
     paddingBottom: Layout.spacing.md,

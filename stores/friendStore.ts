@@ -94,9 +94,17 @@ export const useFriendStore = create<FriendState>((set, get) => ({
     try {
       set({ isSearching: true });
       const results = await userApi.searchUsers(query);
-      set({ searchResults: results, isSearching: false });
+      // Map friendship_status to isFriend/isPending for UI convenience
+      const mappedResults = results.map(user => ({
+        ...user,
+        isFriend: user.friendship_status === 'friend',
+        isPending: user.friendship_status === 'pending_outgoing' || user.friendship_status === 'pending_incoming',
+      }));
+      set({ searchResults: mappedResults, isSearching: false });
     } catch (error: any) {
+      console.error('Search error:', error);
       set({
+        searchResults: [],
         isSearching: false,
         error: error.message || 'Search failed',
       });
