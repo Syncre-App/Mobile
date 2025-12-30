@@ -15,14 +15,7 @@ const checkLiquidGlass = (): boolean => {
   if (_liquidGlassAvailable === null) {
     try {
       _liquidGlassAvailable = isLiquidGlassAvailable();
-      // Debug log - remove in production
-      if (__DEV__) {
-        console.log('[GlassCard] Liquid Glass available:', _liquidGlassAvailable);
-      }
-    } catch (e) {
-      if (__DEV__) {
-        console.log('[GlassCard] Liquid Glass check failed:', e);
-      }
+    } catch {
       _liquidGlassAvailable = false;
     }
   }
