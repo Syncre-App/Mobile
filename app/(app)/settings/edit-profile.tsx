@@ -6,24 +6,30 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
 import { useAuthStore } from '../../../stores/authStore';
 import { userApi } from '../../../services/api';
-import { Avatar, Button, Input } from '../../../components/ui';
+import { Avatar, GlassButton } from '../../../components/ui';
 import { Layout } from '../../../constants/layout';
 
 export default function EditProfileScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { user, refreshUser } = useAuthStore();
 
   const [profilePicture, setProfilePicture] = useState(user?.profile_picture || null);
   const [isUploading, setIsUploading] = useState(false);
+
+  const useGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
+  const isIOS = Platform.OS === 'ios';
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -53,12 +59,44 @@ export default function EditProfileScreen() {
     }
   };
 
+  const renderCloseButton = () => {
+    const buttonContent = (
+      <View style={styles.closeButtonContent}>
+        <Ionicons name="close" size={24} color={colors.text} />
+      </View>
+    );
+
+    if (useGlass) {
+      return (
+        <TouchableOpacity onPress={() => router.back()}>
+          <GlassView style={styles.glassCloseButton} glassEffectStyle="regular">
+            {buttonContent}
+          </GlassView>
+        </TouchableOpacity>
+      );
+    }
+
+    if (isIOS) {
+      return (
+        <TouchableOpacity onPress={() => router.back()}>
+          <BlurView style={styles.blurCloseButton} tint={isDark ? 'dark' : 'light'} intensity={60}>
+            {buttonContent}
+          </BlurView>
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <TouchableOpacity onPress={() => router.back()} style={[styles.closeButton, { backgroundColor: colors.surface }]}>
+        {buttonContent}
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-          <Ionicons name="close" size={28} color={colors.text} />
-        </TouchableOpacity>
+        {renderCloseButton()}
         <Text style={[styles.headerTitle, { color: colors.text }]}>Edit Profile</Text>
         <View style={styles.placeholder} />
       </View>
@@ -71,21 +109,36 @@ export default function EditProfileScreen() {
               <Ionicons name="camera" size={16} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handlePickImage} disabled={isUploading}>
-            <Text style={[styles.changePhotoText, { color: colors.accent }]}>
-              {isUploading ? 'Uploading...' : 'Change Profile Photo'}
-            </Text>
-          </TouchableOpacity>
+        </View>
+
+        <View style={styles.buttonSection}>
+          <GlassButton
+            title={isUploading ? 'Uploading...' : 'Change Profile Photo'}
+            icon="camera-outline"
+            onPress={handlePickImage}
+            loading={isUploading}
+            disabled={isUploading}
+            fullWidth
+          />
         </View>
 
         <View style={styles.infoSection}>
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Username</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>@{user?.username}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.email}</Text>
+          <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.infoRow}>
+              <Ionicons name="at" size={20} color={colors.textSecondary} style={styles.infoIcon} />
+              <View style={styles.infoContent}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Username</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{user?.username}</Text>
+              </View>
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <View style={styles.infoRow}>
+              <Ionicons name="mail-outline" size={20} color={colors.textSecondary} style={styles.infoIcon} />
+              <View style={styles.infoContent}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{user?.email}</Text>
+              </View>
+            </View>
           </View>
         </View>
 
