@@ -19,6 +19,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Syncre uses your approximate location to keep message timestamps accurate.",
+        "UIDesignRequiresCompatibility": false,
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
@@ -53,6 +54,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-glass-effect",
       [
         "expo-splash-screen",
         {

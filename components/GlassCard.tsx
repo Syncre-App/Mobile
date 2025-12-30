@@ -15,7 +15,14 @@ const checkLiquidGlass = (): boolean => {
   if (_liquidGlassAvailable === null) {
     try {
       _liquidGlassAvailable = isLiquidGlassAvailable();
-    } catch {
+      // Debug log - remove in production
+      if (__DEV__) {
+        console.log('[GlassCard] Liquid Glass available:', _liquidGlassAvailable);
+      }
+    } catch (e) {
+      if (__DEV__) {
+        console.log('[GlassCard] Liquid Glass check failed:', e);
+      }
       _liquidGlassAvailable = false;
     }
   }
@@ -71,15 +78,14 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   // iOS 26+: Native Liquid Glass
   // ═══════════════════════════════════════════════════════════════
   if (checkLiquidGlass()) {
-    const glassStyle = isHero ? 'regular' : 'clear';
+    const glassStyle = isSubtle ? 'clear' : 'regular';
     const tintColor = isHero ? palette.accent : undefined;
     
     return (
       <GlassView
         style={[
           styles.liquidGlassContainer,
-          isHero && styles.heroShadow,
-          isSubtle && styles.subtleShadow,
+          isHero && styles.liquidGlassHero,
           { width },
           style,
         ]}
@@ -162,6 +168,14 @@ const styles = StyleSheet.create({
   liquidGlassContainer: {
     borderRadius: radii.xl,
     overflow: 'hidden',
+    // No background color - GlassView provides the glass effect
+  },
+  liquidGlassHero: {
+    // Hero variant gets subtle shadow for depth
+    shadowColor: '#0A84FF',
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
   },
   liquidGlassContent: {
     flex: 1,
