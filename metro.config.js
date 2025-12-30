@@ -15,4 +15,11 @@ config.resolver = {
   sourceExts: [...resolver.sourceExts, 'svg'],
 };
 
+// Completely disable Watchman - use Node's fs.watch instead
+// This fixes "Operation not permitted" errors on macOS
+config.watcher = {
+  ...config.watcher,
+  watchman: false,
+};
+
 module.exports = config;

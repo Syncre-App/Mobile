@@ -5,7 +5,6 @@ import {
   Dimensions,
   Modal,
   Pressable,
-  Platform,
   StyleSheet,
   Text,
   View,
@@ -13,7 +12,7 @@ import {
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { NativeBlur } from './NativeBlur';
+import { NativeBlur, BlurPresets } from './NativeBlur';
 import { UserAvatar } from './UserAvatar';
 import { BadgeRow } from './BadgeIcon';
 import { font, palette, radii, spacing } from '../theme/designSystem';
@@ -155,7 +154,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       statusBarTranslucent
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <NativeBlur intensity={80} tint={Platform.OS === 'ios' ? 'default' : 'dark'} style={styles.blurOverlay}>
+        <NativeBlur {...BlurPresets.modal} style={styles.blurOverlay}>
           <Pressable style={styles.cardContainer} onPress={(e) => e.stopPropagation()}>
             <LinearGradient
               colors={['rgba(30, 41, 59, 0.95)', 'rgba(15, 23, 42, 0.98)']}
