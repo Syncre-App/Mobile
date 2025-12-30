@@ -276,6 +276,8 @@ PODS:
     - ExpoModulesCore
   - ExpoFont (14.0.9):
     - ExpoModulesCore
+  - ExpoGlassEffect (0.1.8):
+    - ExpoModulesCore
   - ExpoHaptics (15.0.7):
     - ExpoModulesCore
   - ExpoHead (6.0.15):
@@ -2165,6 +2167,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - react-native-context-menu-view (1.21.0):
+    - React
   - react-native-safe-area-context (5.6.2):
     - React-Core
   - React-NativeModulesApple (0.81.5):
@@ -2765,9 +2769,9 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - SDWebImage (5.21.3):
-    - SDWebImage/Core (= 5.21.3)
-  - SDWebImage/Core (5.21.3)
+  - SDWebImage (5.21.4):
+    - SDWebImage/Core (= 5.21.4)
+  - SDWebImage/Core (5.21.4)
   - SDWebImageAVIFCoder (0.11.1):
     - libavif/core (>= 0.11.0)
     - SDWebImage (~> 5.10)
@@ -2805,8 +2809,9 @@ DEPENDENCIES:
   - "ExpoDocumentPicker (from `../node_modules/.pnpm/expo-document-picker@14.0.7_expo@54.0.25/node_modules/expo-document-picker/ios`)"
   - "ExpoFileSystem (from `../node_modules/.pnpm/expo-file-system@19.0.19_expo@54.0.25_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0_/node_modules/expo-file-system/ios`)"
   - "ExpoFont (from `../node_modules/.pnpm/expo-font@14.0.9_expo@54.0.25_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0__react@19.1.0/node_modules/expo-font/ios`)"
+  - "ExpoGlassEffect (from `../node_modules/.pnpm/expo-glass-effect@0.1.8_expo@54.0.25_react-native@0.81.5_@babel+core@7.28.5_@types+reac_54fc7792311eee655b379de724e27d52/node_modules/expo-glass-effect/ios`)"
   - "ExpoHaptics (from `../node_modules/.pnpm/expo-haptics@15.0.7_expo@54.0.25/node_modules/expo-haptics/ios`)"
-  - "ExpoHead (from `../node_modules/.pnpm/expo-router@6.0.15_@expo+metro-runtime@6.1.2_@testing-library+react-native@13.3.3_jest@_78e9212fc560c273bc8be85c8665162e/node_modules/expo-router/ios`)"
+  - "ExpoHead (from `../node_modules/.pnpm/expo-router@6.0.15_@expo+metro-runtime@6.1.2_@testing-library+react-native@13.3.3_jest@_c3a1d3b0ac02d7d4cd928f9aed4028a1/node_modules/expo-router/ios`)"
   - "ExpoImage (from `../node_modules/.pnpm/expo-image@3.0.10_expo@54.0.25_react-native-web@0.21.2_react-dom@19.2.0_react@19.1.0__r_3f10c5f9d7bf8933a69967ab8f87be79/node_modules/expo-image/ios`)"
   - "ExpoImagePicker (from `../node_modules/.pnpm/expo-image-picker@17.0.8_expo@54.0.25/node_modules/expo-image-picker/ios`)"
   - "ExpoInsights (from `../node_modules/.pnpm/expo-insights@0.10.7_expo@54.0.25/node_modules/expo-insights/ios`)"
@@ -2863,6 +2868,7 @@ DEPENDENCIES:
   - "React-Mapbuffer (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0/node_modules/react-native/ReactCommon`)"
   - "React-microtasksnativemodule (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0/node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)"
   - "react-native-blur (from `../node_modules/.pnpm/@react-native-community+blur@4.4.1_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0__react@19.1.0/node_modules/@react-native-community/blur`)"
+  - "react-native-context-menu-view (from `../node_modules/.pnpm/react-native-context-menu-view@1.21.0_react-native@0.81.5_@babel+core@7.28.5_@types+rea_a0e7803c276ca7c407db3fde70e45a70/node_modules/react-native-context-menu-view`)"
   - "react-native-safe-area-context (from `../node_modules/.pnpm/react-native-safe-area-context@5.6.2_react-native@0.81.5_@babel+core@7.28.5_@types+reac_5f82b74ffb2ef91c01fced46dc2ed1c4/node_modules/react-native-safe-area-context`)"
   - "React-NativeModulesApple (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)"
   - "React-oscompat (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0/node_modules/react-native/ReactCommon/oscompat`)"
@@ -2966,10 +2972,12 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/expo-file-system@19.0.19_expo@54.0.25_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0_/node_modules/expo-file-system/ios"
   ExpoFont:
     :path: "../node_modules/.pnpm/expo-font@14.0.9_expo@54.0.25_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0__react@19.1.0/node_modules/expo-font/ios"
+  ExpoGlassEffect:
+    :path: "../node_modules/.pnpm/expo-glass-effect@0.1.8_expo@54.0.25_react-native@0.81.5_@babel+core@7.28.5_@types+reac_54fc7792311eee655b379de724e27d52/node_modules/expo-glass-effect/ios"
   ExpoHaptics:
     :path: "../node_modules/.pnpm/expo-haptics@15.0.7_expo@54.0.25/node_modules/expo-haptics/ios"
   ExpoHead:
-    :path: "../node_modules/.pnpm/expo-router@6.0.15_@expo+metro-runtime@6.1.2_@testing-library+react-native@13.3.3_jest@_78e9212fc560c273bc8be85c8665162e/node_modules/expo-router/ios"
+    :path: "../node_modules/.pnpm/expo-router@6.0.15_@expo+metro-runtime@6.1.2_@testing-library+react-native@13.3.3_jest@_c3a1d3b0ac02d7d4cd928f9aed4028a1/node_modules/expo-router/ios"
   ExpoImage:
     :path: "../node_modules/.pnpm/expo-image@3.0.10_expo@54.0.25_react-native-web@0.21.2_react-dom@19.2.0_react@19.1.0__r_3f10c5f9d7bf8933a69967ab8f87be79/node_modules/expo-image/ios"
   ExpoImagePicker:
@@ -3081,6 +3089,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0/node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
   react-native-blur:
     :path: "../node_modules/.pnpm/@react-native-community+blur@4.4.1_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.2.7_react@19.1.0__react@19.1.0/node_modules/@react-native-community/blur"
+  react-native-context-menu-view:
+    :path: "../node_modules/.pnpm/react-native-context-menu-view@1.21.0_react-native@0.81.5_@babel+core@7.28.5_@types+rea_a0e7803c276ca7c407db3fde70e45a70/node_modules/react-native-context-menu-view"
   react-native-safe-area-context:
     :path: "../node_modules/.pnpm/react-native-safe-area-context@5.6.2_react-native@0.81.5_@babel+core@7.28.5_@types+reac_5f82b74ffb2ef91c01fced46dc2ed1c4/node_modules/react-native-safe-area-context"
   React-NativeModulesApple:
@@ -3186,6 +3196,7 @@ SPEC CHECKSUMS:
   ExpoDocumentPicker: 2200eefc2817f19315fa18f0147e0b80ece86926
   ExpoFileSystem: 77157a101e03150a4ea4f854b4dd44883c93ae0a
   ExpoFont: cf9d90ec1d3b97c4f513211905724c8171f82961
+  ExpoGlassEffect: 8ce45eca31f12e949e23a4ee13e2bfb59e9b0785
   ExpoHaptics: 807476b0c39e9d82b7270349d6487928ce32df84
   ExpoHead: 4c983c69758d46a8fe52b875729758dc458775cd
   ExpoImage: 9c3428921c536ab29e5c6721d001ad5c1f469566
@@ -3246,6 +3257,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: 94f4264de2cb156960cd82b338a403f4653f2fd9
   React-microtasksnativemodule: 6c4ee39a36958c39c97b074d28f360246a335e84
   react-native-blur: f3a7d1ca6aa959eb611168e1ce4ca5481359bcff
+  react-native-context-menu-view: da39a4612c1294d651907162529cfba8421e9b89
   react-native-safe-area-context: 6c8805194166a9d6b3e53ba69ca76756c9bfb052
   React-NativeModulesApple: ebf2ce72b35870036900d6498b33724386540a71
   React-oscompat: eb0626e8ba1a2c61673c991bf9dc21834898475d
@@ -3284,13 +3296,13 @@ SPEC CHECKSUMS:
   RNScreens: a7111235a0bbc4b3c59869919ccffd4313851c8a
   RNSVG: 7c0130308bacee76b280102b2d8c66c277d95ba7
   RNVectorIcons: 9084b0cf37b3c5690b730c5627a21d750c9f517e
-  SDWebImage: 16309af6d214ba3f77a7c6f6fdda888cb313a50a
+  SDWebImage: d0184764be51240d49c761c37f53dd017e1ccaaf
   SDWebImageAVIFCoder: afe194a084e851f70228e4be35ef651df0fc5c57
   SDWebImageSVGCoder: 15a300a97ec1c8ac958f009c02220ac0402e936c
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 728df40394d49f3f471688747cf558158b3a3bd1
 
-PODFILE CHECKSUM: 4347c247ff438afc51a9f156707240e85a49c19f
+PODFILE CHECKSUM: 7d354c2ae3c9ba8fda276ba7d7fbddad7a570c83
 
 COCOAPODS: 1.16.2

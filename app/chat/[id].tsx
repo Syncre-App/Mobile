@@ -1628,13 +1628,18 @@ const ChatScreen: React.FC = () => {
     [togglePreviewChrome]
   );
   const closeAttachmentSheet = useCallback((onFinished?: () => void) => {
+    console.log('[DEBUG] closeAttachmentSheet called, onFinished:', typeof onFinished);
     Animated.timing(attachmentSheetAnim, {
       toValue: 0,
       duration: 160,
       useNativeDriver: true,
-    }).start(() => {
+    }).start((result) => {
+      console.log('[DEBUG] Animation finished, result:', result, 'calling onFinished:', typeof onFinished);
       setAttachmentSheetVisible(false);
-      onFinished?.();
+      if (onFinished) {
+        console.log('[DEBUG] Executing onFinished callback');
+        onFinished();
+      }
     });
   }, [attachmentSheetAnim]);
   const resolveActionIcon = useCallback((label: string): any => {

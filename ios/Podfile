@@ -56,17 +56,5 @@ target 'syncre' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
-    # Ensure the overall Pods project also uses the newer standard.
-    installer.pods_project.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
-      config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++20'
-    end
-    installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
-        # React Native 0.81 uses C++20 (concepts, std::identity, std::bit_width); force C++20 for pods.
-        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++20'
-      end
-    end
   end
 end
