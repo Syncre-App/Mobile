@@ -16,6 +16,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
+import { ThemeMode } from '../../../stores/themeStore';
 import { useAuthStore } from '../../../stores/authStore';
 import { useChatStore } from '../../../stores/chatStore';
 import { useFriendStore } from '../../../stores/friendStore';
@@ -87,7 +88,7 @@ function SettingSection({ title, children }: { title: string; children: React.Re
 }
 
 export default function SettingsScreen() {
-  const { colors } = useTheme();
+  const { colors, mode, setMode } = useTheme();
   const { user, logout } = useAuthStore();
   const chatStore = useChatStore();
   const friendStore = useFriendStore();
@@ -102,6 +103,29 @@ export default function SettingsScreen() {
   const loadSettings = async () => {
     const biometric = await secureStorage.isBiometricEnabled();
     setBiometricEnabled(biometric);
+  };
+
+  const getThemeModeLabel = (themeMode: ThemeMode): string => {
+    switch (themeMode) {
+      case 'light': return 'Light';
+      case 'dark': return 'Dark';
+      case 'system': return 'System';
+    }
+  };
+
+  const getThemeModeIcon = (themeMode: ThemeMode): keyof typeof Ionicons.glyphMap => {
+    switch (themeMode) {
+      case 'light': return 'sunny';
+      case 'dark': return 'moon';
+      case 'system': return 'phone-portrait-outline';
+    }
+  };
+
+  const handleThemeChange = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Cycle through: dark -> light -> system -> dark
+    const nextMode: ThemeMode = mode === 'dark' ? 'light' : mode === 'light' ? 'system' : 'dark';
+    setMode(nextMode);
   };
 
   const handleBiometricToggle = async (value: boolean) => {
@@ -210,6 +234,25 @@ export default function SettingsScreen() {
             </View>
           </View>
         </TouchableOpacity>
+
+        {/* Appearance Section */}
+        <SettingSection title="Appearance">
+          <SettingItem
+            icon={getThemeModeIcon(mode)}
+            title="Theme"
+            subtitle={`Current: ${getThemeModeLabel(mode)}`}
+            onPress={handleThemeChange}
+            rightElement={
+              <View style={[styles.themeBadge, { backgroundColor: colors.surface }]}>
+                <Ionicons name={getThemeModeIcon(mode)} size={16} color={colors.accent} />
+                <Text style={[styles.themeBadgeText, { color: colors.text }]}>
+                  {getThemeModeLabel(mode)}
+                </Text>
+              </View>
+            }
+            showChevron={false}
+          />
+        </SettingSection>
 
         {/* Account Section */}
         <SettingSection title="Account">
@@ -417,5 +460,17 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: Layout.fontSize.xs,
+  },
+  themeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Layout.spacing.sm,
+    paddingVertical: Layout.spacing.xs,
+    borderRadius: Layout.radius.sm,
+    gap: 4,
+  },
+  themeBadgeText: {
+    fontSize: Layout.fontSize.sm,
+    fontWeight: Layout.fontWeight.medium,
   },
 });

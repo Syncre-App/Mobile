@@ -1,18 +1,23 @@
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useTheme } from '../../../hooks/useTheme';
 import { useChatStore } from '../../../stores/chatStore';
 import { useFriendStore } from '../../../stores/friendStore';
 import { Layout } from '../../../constants/layout';
 
 export default function TabLayout() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { unreadSummary } = useChatStore();
   const { pending } = useFriendStore();
 
   const totalUnread = unreadSummary?.total || 0;
   const pendingRequests = pending.incoming.length;
+
+  const useGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
+  const isIOS = Platform.OS === 'ios';
 
   return (
     <Tabs
@@ -21,12 +26,34 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.tabActive,
         tabBarInactiveTintColor: colors.tabInactive,
         tabBarStyle: {
-          backgroundColor: colors.tabBar,
-          borderTopColor: colors.tabBarBorder,
-          borderTopWidth: 0.5,
+          position: 'absolute',
+          backgroundColor: useGlass || isIOS ? 'transparent' : colors.tabBar,
+          borderTopColor: useGlass ? 'transparent' : colors.tabBarBorder,
+          borderTopWidth: useGlass ? 0 : 0.5,
           height: Layout.heights.tabBar,
           paddingBottom: Platform.OS === 'ios' ? 28 : 8,
           paddingTop: 8,
+          elevation: 0,
+        },
+        tabBarBackground: () => {
+          if (useGlass) {
+            return (
+              <GlassView 
+                style={StyleSheet.absoluteFill} 
+                glassEffectStyle="regular"
+              />
+            );
+          }
+          if (isIOS) {
+            return (
+              <BlurView
+                style={StyleSheet.absoluteFill}
+                tint={isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+                intensity={100}
+              />
+            );
+          }
+          return <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.tabBar }]} />;
         },
         tabBarLabelStyle: {
           fontSize: 10,
