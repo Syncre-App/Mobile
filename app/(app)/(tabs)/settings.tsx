@@ -177,23 +177,9 @@ export default function SettingsScreen() {
   };
 
   const renderHeader = () => {
-    const useGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
-
-    const headerContent = (
-      <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
-    );
-
-    if (useGlass) {
-      return (
-        <GlassView style={styles.headerGlass} glassEffectStyle="regular">
-          {headerContent}
-        </GlassView>
-      );
-    }
-
     return (
       <View style={[styles.header, { backgroundColor: colors.background }]}>
-        {headerContent}
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
       </View>
     );
   };

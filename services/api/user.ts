@@ -19,10 +19,11 @@ export const userApi = {
 
   /**
    * Search for users
+   * Backend returns array directly (not wrapped in { users: [...] })
    */
   searchUsers: async (query: string): Promise<UserSearchResult[]> => {
-    const response = await apiClient.get<{ users: UserSearchResult[] }>(`/user/search?q=${encodeURIComponent(query)}`);
-    return response.users || [];
+    const response = await apiClient.get<UserSearchResult[]>(`/user/search?q=${encodeURIComponent(query)}`);
+    return response || [];
   },
 
   /**

@@ -514,7 +514,7 @@ export default function ChatScreen() {
         <FlatList
           ref={flatListRef}
           data={chatMessages}
-          keyExtractor={item => item.localId || item.id.toString()}
+          keyExtractor={(item, index) => `msg_${item.id}_${item.localId || ''}_${index}`}
           renderItem={renderMessage}
           inverted
           contentContainerStyle={styles.messageList}
