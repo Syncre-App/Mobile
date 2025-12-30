@@ -16,6 +16,7 @@ export interface AuthUser extends User {
   banned_time: string | null;
   delete_requested_at: string | null;
   delete_scheduled_for: string | null;
+  activeDeviceId?: string; // Current device ID for E2EE and WebSocket
 }
 
 export interface Friend {

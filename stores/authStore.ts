@@ -1,8 +1,32 @@
 import { create } from 'zustand';
+import * as Crypto from 'expo-crypto';
 import { AuthUser } from '../types/user';
 import { apiClient, authApi } from '../services/api';
 import { secureStorage } from '../services/storage/secure';
 import { LoginRequest, RegisterRequest } from '../types/api';
+
+/**
+ * Generate a unique device ID using expo-crypto
+ */
+const generateDeviceId = async (): Promise<string> => {
+  const randomBytes = await Crypto.getRandomBytesAsync(16);
+  const hexString = Array.from(randomBytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `device_${hexString}`;
+};
+
+/**
+ * Get or create a device ID
+ */
+const getOrCreateDeviceId = async (): Promise<string> => {
+  let deviceId = await secureStorage.getDeviceId();
+  if (!deviceId) {
+    deviceId = await generateDeviceId();
+    await secureStorage.setDeviceId(deviceId);
+  }
+  return deviceId;
+};
 
 interface AuthState {
   // State
@@ -44,15 +68,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const token = await secureStorage.getAuthToken();
       const userData = await secureStorage.getUserData<AuthUser>();
       const biometricEnabled = await secureStorage.isBiometricEnabled();
+      const deviceId = await getOrCreateDeviceId();
 
       if (token && userData) {
         apiClient.setAuthToken(token);
+
+        // Add device ID to user data
+        const userWithDeviceId = { ...userData, activeDeviceId: deviceId };
 
         // Check if biometric unlock is needed
         if (biometricEnabled) {
           set({
             token,
-            user: userData,
+            user: userWithDeviceId,
             isAuthenticated: false, // Not fully authenticated until unlocked
             needsUnlock: true,
             isInitialized: true,
@@ -62,10 +90,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           // Verify token is still valid
           try {
             const freshUser = await authApi.getCurrentUser();
-            await secureStorage.setUserData(freshUser);
+            const freshUserWithDeviceId = { ...freshUser, activeDeviceId: deviceId };
+            await secureStorage.setUserData(freshUserWithDeviceId);
             set({
               token,
-              user: freshUser,
+              user: freshUserWithDeviceId,
               isAuthenticated: true,
               needsUnlock: false,
               isInitialized: true,
@@ -114,11 +143,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Get full user data
       apiClient.setAuthToken(response.token);
       const fullUser = await authApi.getCurrentUser();
-      await secureStorage.setUserData(fullUser);
+      
+      // Get or create device ID
+      const deviceId = await getOrCreateDeviceId();
+      const fullUserWithDeviceId = { ...fullUser, activeDeviceId: deviceId };
+      await secureStorage.setUserData(fullUserWithDeviceId);
 
       set({
         token: response.token,
-        user: fullUser,
+        user: fullUserWithDeviceId,
         isAuthenticated: true,
         isLoading: false,
         needsUnlock: false,
@@ -224,11 +257,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     
     try {
       const user = await authApi.getCurrentUser();
-      await secureStorage.setUserData(user);
+      const deviceId = await getOrCreateDeviceId();
+      const userWithDeviceId = { ...user, activeDeviceId: deviceId };
+      await secureStorage.setUserData(userWithDeviceId);
       
       set({
         token,
-        user,
+        user: userWithDeviceId,
         isAuthenticated: true,
         needsUnlock: false,
       });

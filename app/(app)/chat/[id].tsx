@@ -19,6 +19,8 @@ import { useTheme } from '../../../hooks/useTheme';
 import { useChatStore } from '../../../stores/chatStore';
 import { useAuthStore } from '../../../stores/authStore';
 import { chatApi } from '../../../services/api';
+import { wsClient } from '../../../services/websocket/client';
+import { WSMessage, WSNewMessage, WSTypingEvent, WSMessageDeletedEvent, WSChatMessage } from '../../../services/websocket/types';
 import { Avatar, LoadingSpinner, GlassContextMenu } from '../../../components/ui';
 import { MessageBubble, MessageInput, TypingIndicator, ReactionPicker } from '../../../components/chat';
 import { Layout } from '../../../constants/layout';
@@ -41,6 +43,8 @@ export default function ChatScreen() {
     markChatAsRead,
     setActiveChat,
     isLoadingMessages,
+    addTypingUser,
+    removeTypingUser,
   } = useChatStore();
 
   const [chat, setChat] = useState<Chat | null>(null);
@@ -54,6 +58,104 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const chatMessages = messages[chatId] || [];
   const chatTypingUsers = typingUsers.filter(t => t.chatId === chatId);
+
+  // WebSocket setup
+  useEffect(() => {
+    if (!user?.id || !user?.activeDeviceId) return; 
+
+    const senderId = parseInt(user.id);
+    const senderDeviceId = user.activeDeviceId; 
+
+    wsClient.joinChat(chatId, senderDeviceId);
+
+    const handleNewMessage = (wsMessage: WSMessage) => {
+      if (wsMessage.type === 'new_message' || wsMessage.type === 'message_envelope') {
+        const wsMsg = wsMessage as WSNewMessage;
+        if (wsMsg.chatId === chatId) {
+          // Convert WSNewMessage to Message format
+          const newMessage: Message = {
+            id: wsMsg.messageId,
+            chatId: wsMsg.chatId,
+            senderId: wsMsg.senderId,
+            senderDeviceId: null,
+            senderName: wsMsg.senderUsername,
+            senderAvatar: wsMsg.senderAvatar || null,
+            senderBadges: wsMsg.senderBadges || [],
+            isEncrypted: wsMsg.message_type === 'e2ee',
+            messageType: wsMsg.message_type as Message['messageType'],
+            content: wsMsg.content || null,
+            envelopes: wsMsg.envelopes,
+            createdAt: wsMsg.createdAt || wsMsg.created_at,
+            createdAtLocal: wsMsg.createdAt || wsMsg.created_at,
+            deliveredAt: null,
+            deliveredAtLocal: null,
+            seenAt: null,
+            seenAtLocal: null,
+            editedAt: wsMsg.editedAt || null,
+            editedAtLocal: wsMsg.editedAt || null,
+            editCount: 0,
+            deletedAt: wsMsg.deletedAt || null,
+            deletedAtLocal: wsMsg.deletedAt || null,
+            isDeleted: !!wsMsg.deletedAt,
+            deletedBy: null,
+            deletedByName: null,
+            reply: wsMsg.reply || null,
+            attachments: wsMsg.attachments || [],
+            seenBy: [],
+            reactions: [],
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            pending: false,
+          };
+          addMessage(newMessage);
+          // Scroll to bottom only if it's not our own message
+          if (wsMsg.senderId !== senderId) {
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+          }
+        }
+      }
+    };
+
+    const handleMessageDelete = (wsMessage: WSMessage) => {
+      const deleteMsg = wsMessage as WSMessageDeletedEvent;
+      if (deleteMsg.chatId === chatId) {
+        updateMessage(chatId, deleteMsg.messageId, { 
+          isDeleted: true, 
+          deletedAt: deleteMsg.deletedAt,
+          deletedBy: deleteMsg.deletedBy.toString(),
+          deletedByName: deleteMsg.deletedByName,
+        });
+      }
+    };
+
+    const handleTypingEvent = (wsMessage: WSMessage) => {
+      if (wsMessage.type === 'typing') {
+        const typingMsg = wsMessage as WSTypingEvent;
+        if (typingMsg.chatId === chatId && typingMsg.userId !== senderId) {
+          addTypingUser({ chatId, userId: typingMsg.userId, username: typingMsg.username, timestamp: Date.now() });
+        }
+      } else if (wsMessage.type === 'stop-typing') {
+        const typingMsg = wsMessage as WSTypingEvent;
+        if (typingMsg.chatId === chatId && typingMsg.userId !== senderId) {
+          removeTypingUser(chatId, typingMsg.userId);
+        }
+      }
+    };
+
+    const unsubscribeNewMessage = wsClient.on('new_message', handleNewMessage);
+    const unsubscribeMessageEnvelope = wsClient.on('message_envelope', handleNewMessage);
+    const unsubscribeMessageDeleted = wsClient.on('message_deleted', handleMessageDelete);
+    const unsubscribeTyping = wsClient.on('typing', handleTypingEvent);
+    const unsubscribeStopTyping = wsClient.on('stop-typing', handleTypingEvent);
+
+    return () => {
+      wsClient.leaveChat(chatId);
+      unsubscribeNewMessage();
+      unsubscribeMessageEnvelope();
+      unsubscribeMessageDeleted();
+      unsubscribeTyping();
+      unsubscribeStopTyping();
+    };
+  }, [chatId, user?.id, user?.activeDeviceId, addMessage, updateMessage, addTypingUser, removeTypingUser]);
 
   useEffect(() => {
     // Find chat info
@@ -77,7 +179,7 @@ export default function ChatScreen() {
     return () => {
       setActiveChat(null);
     };
-  }, [chatId]);
+  }, [chatId, chats, fetchMessages, markChatAsRead, setActiveChat]);
 
   const getOtherParticipant = () => {
     if (!chat || chat.isGroup) return null;
@@ -104,16 +206,20 @@ export default function ChatScreen() {
 
   const handleSendMessage = async (content: string, attachments?: string[]) => {
     if (!content.trim() && (!attachments || attachments.length === 0)) return;
+    if (!user?.id || !user?.activeDeviceId) {
+      Alert.alert('Error', 'User not authenticated.');
+      return;
+    }
 
     // Create optimistic message
     const localId = `local_${Date.now()}`;
     const optimisticMessage: Message = {
-      id: Date.now(), // Temporary ID
+      id: Date.now(), // Temporary ID, will be replaced by server ID
       chatId,
-      senderId: parseInt(user?.id || '0'),
-      senderDeviceId: null,
-      senderName: user?.username || '',
-      senderAvatar: user?.profile_picture || null,
+      senderId: parseInt(user.id),
+      senderDeviceId: user.activeDeviceId,
+      senderName: user.username || '',
+      senderAvatar: user.profile_picture || null,
       senderBadges: [],
       isEncrypted: false,
       messageType: 'text',
@@ -152,15 +258,25 @@ export default function ChatScreen() {
     // Scroll to bottom
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
 
-    // TODO: Send via WebSocket
-    // For now, simulate success after delay
-    setTimeout(() => {
-      updateMessage(chatId, optimisticMessage.id, { pending: false });
-    }, 500);
+    // Send via WebSocket
+    wsClient.sendMessage({
+      type: 'chat_message',
+      chatId,
+      localId,
+      content,
+      senderDeviceId: user.activeDeviceId,
+      replyTo: replyTo ? {
+        messageId: replyTo.id.toString(),
+        preview: replyTo.preview,
+        senderLabel: replyTo.name,
+      } : undefined,
+      // attachments: attachments ? attachments.map(uri => ({ uri, type: 'image' })) : undefined, // TODO: Handle attachments properly
+    } as WSChatMessage);
   };
 
   const handleTyping = (isTyping: boolean) => {
-    // TODO: Send typing indicator via WebSocket
+    if (!user?.activeDeviceId) return;
+    wsClient.sendTyping(chatId, isTyping);
   };
 
   const handleMessagePress = (message: Message) => {
