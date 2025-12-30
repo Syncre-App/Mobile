@@ -105,6 +105,8 @@ export interface DeviceKey {
   pubIdentityKey: string;
   keyVersion: number;
   revoked: boolean;
+  lastSeen?: string;
+  createdAt?: string;
 }
 
 export interface RegisterDeviceKeyRequest {

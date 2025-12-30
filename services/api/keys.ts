@@ -70,4 +70,12 @@ export const keysApi = {
   addEnvelopes: async (messageId: number, envelopes: any[]): Promise<{ message: string }> => {
     return apiClient.post('/keys/envelopes', { messageId, envelopes });
   },
+
+  /**
+   * Get current user's own devices
+   */
+  getMyDevices: async (userId: string): Promise<DeviceKey[]> => {
+    const response = await apiClient.get<{ devices: DeviceKey[] }>(`/keys/${userId}`);
+    return response.devices || [];
+  },
 };

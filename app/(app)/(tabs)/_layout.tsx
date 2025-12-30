@@ -14,7 +14,7 @@ export default function TabLayout() {
   return (
     <NativeTabs
       minimizeBehavior="onScrollDown"
-      disableTransparentOnScrollEdge
+      backgroundColor={null}
     >
       <NativeTabs.Trigger name="index">
         <Icon

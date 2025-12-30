@@ -36,6 +36,13 @@ export const APP_CONFIG = {
   BIOMETRIC_ENABLED_KEY: 'biometric_enabled',
   ENCRYPTED_PASSWORD_KEY: 'encrypted_password',
   DEVICE_ID_KEY: 'device_id',
+  PIN_CODE_KEY: 'pin_code',
+  PIN_HASH_KEY: 'pin_hash',
+  E2EE_KEY_ENCRYPTED_KEY: 'e2ee_key_encrypted',
+  
+  // PIN configuration
+  PIN_MIN_LENGTH: 4,
+  PIN_MAX_LENGTH: 6,
   
   // Typing indicator
   TYPING_DEBOUNCE_MS: 500,

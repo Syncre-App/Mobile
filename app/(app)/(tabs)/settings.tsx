@@ -10,8 +10,8 @@ import {
   Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Host, Switch as SwiftUISwitch } from '@expo/ui/swift-ui';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
@@ -175,21 +175,8 @@ export default function SettingsScreen() {
     );
   };
 
-  const renderHeader = () => {
-    return (
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
-      </View>
-    );
-  };
-
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={['top']}
-    >
-      {renderHeader()}
-
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -346,21 +333,13 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-  },
-  headerTitle: {
-    fontSize: Layout.fontSize.largeTitle,
-    fontWeight: Layout.fontWeight.bold,
   },
   scrollContent: {
     paddingBottom: Layout.spacing.xxl,

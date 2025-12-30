@@ -6,10 +6,13 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Alert,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Host, ContextMenu, Button } from '@expo/ui/swift-ui';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
 import { useChatStore } from '../../../stores/chatStore';
 import { useAuthStore } from '../../../stores/authStore';
@@ -57,6 +60,36 @@ export default function ChatsScreen() {
     return other?.profile_picture;
   };
 
+  const handleMuteChat = (chatId: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // TODO: Implement mute chat
+    Alert.alert('Muted', 'Chat has been muted');
+  };
+
+  const handlePinChat = (chatId: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // TODO: Implement pin chat
+    Alert.alert('Pinned', 'Chat has been pinned');
+  };
+
+  const handleDeleteChat = (chatId: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Alert.alert(
+      'Delete Chat',
+      'Are you sure you want to delete this chat? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            // TODO: Implement delete chat
+          },
+        },
+      ]
+    );
+  };
+
   const renderChatItem = ({ item }: { item: Chat }) => {
     const displayName = getChatDisplayName(item);
     const avatarUrl = getChatAvatar(item);
@@ -65,7 +98,7 @@ export default function ChatsScreen() {
       ? formatDistanceToNow(new Date(item.updated_at), { addSuffix: false })
       : '';
 
-    return (
+    const chatContent = (
       <TouchableOpacity
         style={[styles.chatItem, { backgroundColor: colors.background }]}
         onPress={() => router.push(`/(app)/chat/${item.id}`)}
@@ -119,21 +152,42 @@ export default function ChatsScreen() {
         </View>
       </TouchableOpacity>
     );
-  };
 
-  const renderHeader = () => (
-    <View style={[styles.header, { backgroundColor: colors.background }]}>
-      <View style={styles.headerContent}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Chats</Text>
-        <TouchableOpacity
-          style={[styles.newChatButton, { backgroundColor: colors.accent }]}
-          onPress={() => router.push('/(app)/new-chat')}
-        >
-          <Ionicons name="create-outline" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    // Use SwiftUI ContextMenu on iOS for native long-press menu
+    if (Platform.OS === 'ios') {
+      return (
+        <Host matchContents>
+          <ContextMenu>
+            <ContextMenu.Items>
+              <Button
+                systemImage="bell.slash"
+                onPress={() => handleMuteChat(item.id)}
+              >
+                Mute
+              </Button>
+              <Button
+                systemImage="pin"
+                onPress={() => handlePinChat(item.id)}
+              >
+                Pin
+              </Button>
+              <Button
+                systemImage="trash"
+                onPress={() => handleDeleteChat(item.id)}
+              >
+                Delete
+              </Button>
+            </ContextMenu.Items>
+            <ContextMenu.Trigger>
+              {chatContent}
+            </ContextMenu.Trigger>
+          </ContextMenu>
+        </Host>
+      );
+    }
+
+    return chatContent;
+  };
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -152,12 +206,7 @@ export default function ChatsScreen() {
   );
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={['top']}
-    >
-      {renderHeader()}
-
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {isLoading && chats.length === 0 ? (
         <LoadingSpinner fullScreen message="Loading chats..." />
       ) : (
@@ -177,33 +226,13 @@ export default function ChatsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: Layout.fontSize.largeTitle,
-    fontWeight: Layout.fontWeight.bold,
-  },
-  newChatButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   list: {
     paddingTop: Layout.spacing.sm,

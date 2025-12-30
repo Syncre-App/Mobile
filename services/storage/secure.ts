@@ -144,6 +144,56 @@ export const secureStorage = {
   },
 
   /**
+   * Save PIN hash (hashed PIN for verification)
+   */
+  async setPinHash(hash: string): Promise<void> {
+    await this.set(APP_CONFIG.PIN_HASH_KEY, hash);
+  },
+
+  /**
+   * Get PIN hash
+   */
+  async getPinHash(): Promise<string | null> {
+    return this.get(APP_CONFIG.PIN_HASH_KEY);
+  },
+
+  /**
+   * Check if PIN is set up
+   */
+  async hasPinSetup(): Promise<boolean> {
+    const hash = await this.getPinHash();
+    return hash !== null && hash.length > 0;
+  },
+
+  /**
+   * Delete PIN hash
+   */
+  async deletePinHash(): Promise<void> {
+    await this.delete(APP_CONFIG.PIN_HASH_KEY);
+  },
+
+  /**
+   * Save E2EE key encrypted with PIN
+   */
+  async setEncryptedE2EEKey(encryptedKey: string): Promise<void> {
+    await this.set(APP_CONFIG.E2EE_KEY_ENCRYPTED_KEY, encryptedKey);
+  },
+
+  /**
+   * Get E2EE key encrypted with PIN
+   */
+  async getEncryptedE2EEKey(): Promise<string | null> {
+    return this.get(APP_CONFIG.E2EE_KEY_ENCRYPTED_KEY);
+  },
+
+  /**
+   * Delete encrypted E2EE key
+   */
+  async deleteEncryptedE2EEKey(): Promise<void> {
+    await this.delete(APP_CONFIG.E2EE_KEY_ENCRYPTED_KEY);
+  },
+
+  /**
    * Clear all auth data (for logout)
    */
   async clearAuthData(): Promise<void> {
@@ -152,6 +202,8 @@ export const secureStorage = {
       this.deleteUserData(),
       this.deleteEncryptedPassword(),
       this.delete(APP_CONFIG.BIOMETRIC_ENABLED_KEY),
+      this.deletePinHash(),
+      this.deleteEncryptedE2EEKey(),
     ]);
   },
 };

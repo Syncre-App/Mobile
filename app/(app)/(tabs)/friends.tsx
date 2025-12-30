@@ -8,10 +8,12 @@ import {
   RefreshControl,
   TextInput,
   SectionList,
+  Platform,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Host, ContextMenu, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
 import { useFriendStore } from '../../../stores/friendStore';
@@ -94,9 +96,8 @@ export default function FriendsScreen() {
     }
   };
 
-  const renderHeader = () => (
-    <View style={[styles.header, { backgroundColor: colors.background }]}>
-      <Text style={[styles.headerTitle, { color: colors.text }]}>Friends</Text>
+  const renderSearchBar = () => (
+    <View style={[styles.searchWrapper, { backgroundColor: colors.background }]}>
       <View style={[styles.searchContainer, { backgroundColor: colors.inputBackground }]}>
         <Ionicons name="search" size={18} color={colors.textSecondary} />
         <TextInput
@@ -169,29 +170,105 @@ export default function FriendsScreen() {
     </View>
   );
 
-  const renderFriend = ({ item }: { item: Friend }) => (
-    <TouchableOpacity
-      style={[styles.friendItem, { backgroundColor: colors.background }]}
-      onPress={() => router.push(`/(app)/profile/${item.id}`)}
-    >
-      <View style={styles.friendInfo}>
-        <Avatar
-          source={item.profile_picture}
-          name={item.username}
-          size="md"
-          showOnlineStatus
-          isOnline={item.status === 'online'}
-        />
-        <View style={styles.friendDetails}>
-          <Text style={[styles.friendName, { color: colors.text }]}>@{item.username}</Text>
-          <Text style={[styles.friendStatus, { color: colors.textSecondary }]}>
-            {item.status === 'online' ? 'Online' : 'Offline'}
-          </Text>
+  const handleRemoveFriend = (friendId: string, username: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Alert.alert(
+      'Remove Friend',
+      `Are you sure you want to remove @${username} from your friends?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            // TODO: Implement remove friend
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBlockUser = (userId: string, username: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Alert.alert(
+      'Block User',
+      `Are you sure you want to block @${username}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            // TODO: Implement block user
+          },
+        },
+      ]
+    );
+  };
+
+  const renderFriend = ({ item }: { item: Friend }) => {
+    const friendContent = (
+      <TouchableOpacity
+        style={[styles.friendItem, { backgroundColor: colors.background }]}
+        onPress={() => router.push(`/(app)/profile/${item.id}`)}
+      >
+        <View style={styles.friendInfo}>
+          <Avatar
+            source={item.profile_picture}
+            name={item.username}
+            size="md"
+            showOnlineStatus
+            isOnline={item.status === 'online'}
+          />
+          <View style={styles.friendDetails}>
+            <Text style={[styles.friendName, { color: colors.text }]}>@{item.username}</Text>
+            <Text style={[styles.friendStatus, { color: colors.textSecondary }]}>
+              {item.status === 'online' ? 'Online' : 'Offline'}
+            </Text>
+          </View>
         </View>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-    </TouchableOpacity>
-  );
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
+    );
+
+    // Use SwiftUI ContextMenu on iOS for native long-press menu
+    if (Platform.OS === 'ios') {
+      return (
+        <Host matchContents>
+          <ContextMenu>
+            <ContextMenu.Items>
+              <SwiftUIButton
+                systemImage="message"
+                onPress={() => {
+                  // TODO: Start chat with friend
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                Message
+              </SwiftUIButton>
+              <SwiftUIButton
+                systemImage="person.crop.circle.badge.minus"
+                onPress={() => handleRemoveFriend(item.id, item.username)}
+              >
+                Remove Friend
+              </SwiftUIButton>
+              <SwiftUIButton
+                systemImage="nosign"
+                onPress={() => handleBlockUser(item.id, item.username)}
+              >
+                Block
+              </SwiftUIButton>
+            </ContextMenu.Items>
+            <ContextMenu.Trigger>
+              {friendContent}
+            </ContextMenu.Trigger>
+          </ContextMenu>
+        </Host>
+      );
+    }
+
+    return friendContent;
+  };
 
   const renderContent = () => {
     // Show search results
@@ -305,17 +382,14 @@ export default function FriendsScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={['top']}
-    >
-      {renderHeader()}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {renderSearchBar()}
       {isLoading && friends.length === 0 ? (
         <LoadingSpinner fullScreen message="Loading friends..." />
       ) : (
         renderContent()
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -323,15 +397,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  searchWrapper: {
     paddingHorizontal: Layout.spacing.lg,
-    paddingTop: Layout.spacing.md,
-    paddingBottom: Layout.spacing.md,
-  },
-  headerTitle: {
-    fontSize: Layout.fontSize.largeTitle,
-    fontWeight: Layout.fontWeight.bold,
-    marginBottom: Layout.spacing.md,
+    paddingVertical: Layout.spacing.sm,
   },
   searchContainer: {
     flexDirection: 'row',

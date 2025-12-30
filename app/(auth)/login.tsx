@@ -7,12 +7,12 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore } from '../../stores/authStore';
+import { secureStorage } from '../../services/storage/secure';
 import { Button, Input } from '../../components/ui';
 import { Layout } from '../../constants/layout';
 
@@ -52,7 +52,16 @@ export default function LoginScreen() {
     const result = await login({ email: email.trim().toLowerCase(), password });
 
     if (result.success) {
-      router.replace('/(app)/(tabs)');
+      // Check if PIN is already set up
+      const hasPin = await secureStorage.hasPinSetup();
+      
+      if (hasPin) {
+        // PIN exists, go to PIN unlock
+        router.replace('/(app)/pin-unlock');
+      } else {
+        // No PIN, need to set up
+        router.replace('/(auth)/pin-setup');
+      }
     } else if (result.verified === false) {
       // User not verified, redirect to verification
       router.push({
