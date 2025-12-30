@@ -167,3 +167,21 @@ export interface WSErrorMessage extends WSMessage {
 export interface WSPongMessage extends WSMessage {
   type: 'pong';
 }
+
+// Re-encryption request (when a new device is added)
+export interface WSRequestReencryptEvent extends WSMessage {
+  type: 'request_reencrypt';
+  targetUserId: number;
+  targetDeviceId: string | null;
+  chatId: number;
+  reason: 'new_device' | 'device_rotated';
+  timestamp: string;
+}
+
+// Envelopes appended notification
+export interface WSEnvelopesAppendedEvent extends WSMessage {
+  type: 'envelopes_appended';
+  messageId: number;
+  chatId: number;
+  timestamp: string;
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
 import { useChatStore } from '../../../stores/chatStore';
 import { useAuthStore } from '../../../stores/authStore';
+import { useE2EEStore } from '../../../stores/e2eeStore';
 import { chatApi } from '../../../services/api';
 import { wsClient } from '../../../services/websocket/client';
 import { WSMessage, WSNewMessage, WSTypingEvent, WSMessageDeletedEvent, WSChatMessage } from '../../../services/websocket/types';
@@ -46,6 +47,12 @@ export default function ChatScreen() {
     addTypingUser,
     removeTypingUser,
   } = useChatStore();
+  const {
+    isUnlocked: isE2EEUnlocked,
+    encryptMessage,
+    decryptMessage,
+    fetchRecipientDevices,
+  } = useE2EEStore();
 
   const [chat, setChat] = useState<Chat | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -54,10 +61,59 @@ export default function ChatScreen() {
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [replyTo, setReplyTo] = useState<{ id: number; name: string; preview: string } | null>(null);
   const [showTimestampForMessage, setShowTimestampForMessage] = useState<number | null>(null);
+  const [decryptedMessages, setDecryptedMessages] = useState<Record<number, string>>({});
   
   const flatListRef = useRef<FlatList>(null);
   const chatMessages = messages[chatId] || [];
   const chatTypingUsers = typingUsers.filter(t => t.chatId === chatId);
+
+  // Fetch recipient devices for E2EE when chat loads
+  useEffect(() => {
+    if (chat && isE2EEUnlocked) {
+      const participantIds = chat.participants.map(p => p.id);
+      fetchRecipientDevices(participantIds);
+    }
+  }, [chat, isE2EEUnlocked]);
+
+  // Decrypt encrypted messages
+  useEffect(() => {
+    const decryptMessages = async () => {
+      if (!isE2EEUnlocked || !user?.id || !user?.activeDeviceId) return;
+
+      const newDecrypted: Record<number, string> = { ...decryptedMessages };
+      
+      for (const message of chatMessages) {
+        if (message.isEncrypted && message.envelopes && !decryptedMessages[message.id]) {
+          try {
+            const plaintext = await decryptMessage(
+              message.envelopes,
+              user.id,
+              user.activeDeviceId
+            );
+            if (plaintext) {
+              newDecrypted[message.id] = plaintext;
+            }
+          } catch (error) {
+            console.error(`Failed to decrypt message ${message.id}:`, error);
+          }
+        }
+      }
+
+      if (Object.keys(newDecrypted).length !== Object.keys(decryptedMessages).length) {
+        setDecryptedMessages(newDecrypted);
+      }
+    };
+
+    decryptMessages();
+  }, [chatMessages, isE2EEUnlocked, user?.id, user?.activeDeviceId]);
+
+  // Get display content for a message (decrypted if E2EE)
+  const getMessageContent = useCallback((message: Message): string | null => {
+    if (message.isEncrypted) {
+      return decryptedMessages[message.id] || '[Encrypted message]';
+    }
+    return message.content;
+  }, [decryptedMessages]);
 
   // WebSocket setup
   useEffect(() => {
@@ -210,9 +266,15 @@ export default function ChatScreen() {
       Alert.alert('Error', 'User not authenticated.');
       return;
     }
+    if (!chat) {
+      Alert.alert('Error', 'Chat not loaded.');
+      return;
+    }
 
     // Create optimistic message
     const localId = `local_${Date.now()}`;
+    const isEncrypted = isE2EEUnlocked;
+    
     const optimisticMessage: Message = {
       id: Date.now(), // Temporary ID, will be replaced by server ID
       chatId,
@@ -221,9 +283,9 @@ export default function ChatScreen() {
       senderName: user.username || '',
       senderAvatar: user.profile_picture || null,
       senderBadges: [],
-      isEncrypted: false,
-      messageType: 'text',
-      content,
+      isEncrypted,
+      messageType: isEncrypted ? 'e2ee' : 'text',
+      content: isEncrypted ? null : content, // Content is null for E2EE messages
       createdAt: new Date().toISOString(),
       createdAtLocal: new Date().toISOString(),
       deliveredAt: null,
@@ -253,25 +315,71 @@ export default function ChatScreen() {
     };
 
     addMessage(optimisticMessage);
+    
+    // Store decrypted content locally for display
+    if (isEncrypted) {
+      setDecryptedMessages(prev => ({ ...prev, [optimisticMessage.id]: content }));
+    }
+    
     setReplyTo(null);
 
     // Scroll to bottom
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
 
-    // Send via WebSocket
-    wsClient.sendMessage({
-      type: 'chat_message',
-      chatId,
-      localId,
-      content,
-      senderDeviceId: user.activeDeviceId,
-      replyTo: replyTo ? {
-        messageId: replyTo.id.toString(),
-        preview: replyTo.preview,
-        senderLabel: replyTo.name,
-      } : undefined,
-      // attachments: attachments ? attachments.map(uri => ({ uri, type: 'image' })) : undefined, // TODO: Handle attachments properly
-    } as WSChatMessage);
+    // Encrypt and send via WebSocket
+    if (isEncrypted) {
+      const participantIds = chat.participants.map(p => p.id);
+      const envelopes = await encryptMessage(content, participantIds, user.activeDeviceId);
+      
+      if (envelopes && envelopes.length > 0) {
+        wsClient.sendMessage({
+          type: 'chat_message',
+          chatId,
+          localId,
+          message_type: 'e2ee',
+          senderDeviceId: user.activeDeviceId,
+          envelopes,
+          preview: content.slice(0, 50), // Short preview for notifications
+          replyMetadata: replyTo ? {
+            messageId: replyTo.id.toString(),
+            senderId: '',
+            preview: replyTo.preview,
+            senderLabel: replyTo.name,
+          } : undefined,
+        } as WSChatMessage);
+      } else {
+        // Fallback to unencrypted if encryption fails
+        console.warn('E2EE encryption failed, sending unencrypted');
+        wsClient.sendMessage({
+          type: 'chat_message',
+          chatId,
+          localId,
+          content,
+          senderDeviceId: user.activeDeviceId,
+          replyMetadata: replyTo ? {
+            messageId: replyTo.id.toString(),
+            senderId: '',
+            preview: replyTo.preview,
+            senderLabel: replyTo.name,
+          } : undefined,
+        } as WSChatMessage);
+      }
+    } else {
+      // Send unencrypted
+      wsClient.sendMessage({
+        type: 'chat_message',
+        chatId,
+        localId,
+        content,
+        senderDeviceId: user.activeDeviceId,
+        replyMetadata: replyTo ? {
+          messageId: replyTo.id.toString(),
+          senderId: '',
+          preview: replyTo.preview,
+          senderLabel: replyTo.name,
+        } : undefined,
+      } as WSChatMessage);
+    }
   };
 
   const handleTyping = (isTyping: boolean) => {
