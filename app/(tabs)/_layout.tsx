@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { NativeTabs, Icon, Label, Badge } from 'expo-router/unstable-native-tabs';
-import { DynamicColorIOS, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { ApiService } from '../../services/ApiService';
 import { StorageService } from '../../services/StorageService';
@@ -472,13 +472,23 @@ export default function TabLayout() {
   const unreadBadge = totalUnreadChats > 0 ? (totalUnreadChats > 99 ? '99+' : String(totalUnreadChats)) : undefined;
   const friendRequestsBadge = incomingRequests.length > 0 ? String(incomingRequests.length) : undefined;
 
+  const tabBarBackground = Platform.OS === 'ios'
+    ? 'rgba(11, 14, 20, 0.78)'
+    : palette.backgroundMuted;
+
   return (
     <ChatContext.Provider value={contextValue}>
       <NativeTabs
-        backgroundColor={palette.background}
-        blurEffect="systemMaterialDark"
-        tintColor="white"
-        disableTransparentOnScrollEdge={false}
+        backgroundColor={tabBarBackground}
+        blurEffect={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : undefined}
+        tintColor="#FFFFFF"
+        iconColor={{ default: 'rgba(255, 255, 255, 0.72)', selected: '#FFFFFF' }}
+        labelStyle={{
+          default: { color: 'rgba(255, 255, 255, 0.72)', fontSize: 11, fontWeight: '600' },
+          selected: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
+        }}
+        shadowColor="transparent"
+        disableTransparentOnScrollEdge
       >
         <NativeTabs.Trigger name="index">
           <Icon 
@@ -489,7 +499,7 @@ export default function TabLayout() {
           {unreadBadge && <Badge>{unreadBadge}</Badge>}
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="friends" role="search">
+        <NativeTabs.Trigger name="friends">
           <Icon 
             sf={{ default: 'person.2', selected: 'person.2.fill' }} 
             androidSrc={require('../../assets/logo.png')}

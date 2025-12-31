@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { font, palette, radii, spacing } from '../theme/designSystem';
+import { GlassySheet } from './GlassySheet';
 import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
@@ -268,12 +269,18 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   if (shouldUseSwiftUI && SwiftUIBottomSheet) {
     return (
       <SwiftUIBottomSheet
-        isPresented={visible}
-        onDismiss={onClose}
-        detents={['medium', 'large']}
-        preferGrabberVisible
+        isOpened={visible}
+        onIsOpenedChange={(isOpened: boolean) => {
+          if (!isOpened) {
+            onClose();
+          }
+        }}
+        presentationDetents={['medium', 'large']}
+        presentationDragIndicator="visible"
       >
-        <SheetContent useSwiftUIDatePicker={!!SwiftUIDatePicker} />
+        <GlassySheet>
+          <SheetContent useSwiftUIDatePicker={!!SwiftUIDatePicker} />
+        </GlassySheet>
       </SwiftUIBottomSheet>
     );
   }

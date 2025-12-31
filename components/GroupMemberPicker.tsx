@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { UserAvatar } from './UserAvatar';
 import { font, palette, radii, spacing } from '../theme/designSystem';
+import { GlassySheet } from './GlassySheet';
 import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
@@ -277,12 +278,18 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   if (shouldUseSwiftUI && SwiftUIBottomSheet) {
     return (
       <SwiftUIBottomSheet
-        isPresented={visible}
-        onDismiss={onClose}
-        detents={['medium', 'large']}
-        preferGrabberVisible
+        isOpened={visible}
+        onIsOpenedChange={(isOpened: boolean) => {
+          if (!isOpened) {
+            onClose();
+          }
+        }}
+        presentationDetents={['medium', 'large']}
+        presentationDragIndicator="visible"
       >
-        <SheetContent />
+        <GlassySheet>
+          <SheetContent />
+        </GlassySheet>
       </SwiftUIBottomSheet>
     );
   }

@@ -1,5 +1,4 @@
 import React, {
-  ComponentProps,
   useCallback,
   useEffect,
   useMemo,
@@ -124,8 +123,6 @@ type ChatListItem =
   | { kind: 'message'; id: string; message: Message }
   | { kind: 'date'; id: string; label: string }
   | { kind: 'typing'; id: string };
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const MESSAGE_PAYLOAD_VERSION = 1;
 const API_ROOT = ApiService.baseUrl.replace(/\/v1\/?$/i, '');
@@ -1127,7 +1124,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         <NativeContextMenu
           title={message.content ? undefined : 'Message'}
           actions={contextMenuActions || []}
-          disabled={!contextMenuActions || contextMenuActions.length === 0 || message.isPlaceholder}
+          activationMethod="longPress"
+          disabled={
+            Platform.OS === 'android' ||
+            !contextMenuActions ||
+            contextMenuActions.length === 0 ||
+            message.isPlaceholder
+          }
         >
           <Pressable
             onPress={handleBubblePress}
@@ -1539,8 +1542,6 @@ const ChatScreen: React.FC = () => {
     return safeTop + 64;
   }, [insets.top]);
   const previewBottomChromeHeight = useMemo(() => Math.max(insets.bottom, 10) + 126, [insets.bottom]);
-  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
-  const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
   const previewChromeTopPadding = useMemo(
     () => (previewChromeVisible ? previewTopChromeHeight : 0),
     [previewChromeVisible, previewTopChromeHeight]
@@ -1627,21 +1628,6 @@ const ChatScreen: React.FC = () => {
     },
     [togglePreviewChrome]
   );
-  const closeAttachmentSheet = useCallback((onFinished?: () => void) => {
-    console.log('[DEBUG] closeAttachmentSheet called, onFinished:', typeof onFinished);
-    Animated.timing(attachmentSheetAnim, {
-      toValue: 0,
-      duration: 160,
-      useNativeDriver: true,
-    }).start((result) => {
-      console.log('[DEBUG] Animation finished, result:', result, 'calling onFinished:', typeof onFinished);
-      setAttachmentSheetVisible(false);
-      if (onFinished) {
-        console.log('[DEBUG] Executing onFinished callback');
-        onFinished();
-      }
-    });
-  }, [attachmentSheetAnim]);
   const resolveActionIcon = useCallback((label: string): any => {
     const normalized = label.toLowerCase();
     if (normalized.includes('reply')) return 'return-down-back';
@@ -1708,7 +1694,6 @@ const ChatScreen: React.FC = () => {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const windowHeight = Dimensions.get('window').height;
   const ACTION_CARD_WIDTH = 280;
-  const ATTACHMENT_DROPDOWN_WIDTH = 260;
   const ACTION_CARD_HEIGHT = 240;
   const SCREEN_WIDTH = Dimensions.get('window').width;
   const reactionAnim = useRef(new Animated.Value(0)).current;
@@ -1887,18 +1872,6 @@ const ChatScreen: React.FC = () => {
       }).start();
     }
   }, [messageActionAnim, messageActionContext]);
-
-  useEffect(() => {
-    if (attachmentSheetVisible) {
-      attachmentSheetAnim.setValue(0);
-      Animated.spring(attachmentSheetAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 90,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [attachmentSheetAnim, attachmentSheetVisible]);
 
   const getReplyLabel = useCallback(
     (senderId: string) => {
@@ -3596,21 +3569,6 @@ const ChatScreen: React.FC = () => {
     }
   }, [attachmentPickerBusy, handleUploadBatch]);
 
-  const handleAttachmentTrigger = useCallback(() => {
-    if (!chatId) {
-      NotificationService.show('error', 'This conversation is not available');
-      return;
-    }
-    if (attachmentPickerBusy) {
-      NotificationService.show('info', 'Please wait for the current upload to complete');
-      return;
-    }
-    if (pendingAttachments.length >= MAX_PENDING_ATTACHMENTS) {
-      NotificationService.show('warning', `You can attach up to ${MAX_PENDING_ATTACHMENTS} items per message`);
-      return;
-    }
-    setAttachmentSheetVisible(true);
-  }, [attachmentPickerBusy, chatId, pendingAttachments.length]);
 
   const handleRemoveAttachment = useCallback(
     async (attachmentId: string) => {
@@ -4176,30 +4134,25 @@ const ChatScreen: React.FC = () => {
     );
   }, [chatId]);
 
-  const handleShowChatOptions = useCallback(() => {
+  const chatHeaderMenuActions = useMemo<ContextMenuAction[]>(() => {
     const targetId = otherUserIdRef.current;
-    if (!targetId) return;
+    if (!targetId) {
+      return [];
+    }
     const createGroupParams = encodeURIComponent(JSON.stringify([targetId.toString()]));
-
-    Alert.alert(
-      'Chat Options',
-      undefined,
-      [
-        {
-          text: 'Create group',
-          onPress: () => router.push(`/group/create?members=${createGroupParams}` as any),
-        },
-        {
-          text: 'Report User',
-          style: 'destructive',
-          onPress: handleReportUser,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+    return [
+      {
+        title: 'Create group',
+        systemIcon: 'person.3',
+        onPress: () => router.push(`/group/create?members=${createGroupParams}` as any),
+      },
+      {
+        title: 'Report user',
+        systemIcon: 'flag',
+        destructive: true,
+        onPress: handleReportUser,
+      },
+    ];
   }, [handleReportUser]);
 
   const handleCopyAttachmentLink = useCallback(async (attachment?: MessageAttachment | null) => {
@@ -5799,11 +5752,6 @@ const ChatScreen: React.FC = () => {
     return Math.max(insets.bottom, 12);
   }, [insets.bottom, isKeyboardVisible]);
 
-  const attachmentSheetBottom = useMemo(() => {
-    const keyboardOffset =
-      Platform.OS === 'android' ? keyboardHeight : Math.max(keyboardHeight - insets.bottom, 0);
-    return Math.max(insets.bottom + 16, 16) + keyboardOffset;
-  }, [insets.bottom, keyboardHeight]);
   const sendButtonDisabled =
     ((isComposerEmpty && !hasPendingAttachments) ||
       isSendingMessage ||
@@ -5813,7 +5761,6 @@ const ChatScreen: React.FC = () => {
 
   interface AttachmentOption {
     key: string;
-    icon: IoniconName;
     label: string;
     hint: string;
     onPress: () => void;
@@ -5823,41 +5770,90 @@ const ChatScreen: React.FC = () => {
     () => [
       {
         key: 'photos',
-        icon: 'images-outline',
         label: 'Photos & Videos',
         hint: 'Camera roll',
         onPress: handlePickPhoto,
       },
       {
         key: 'files',
-        icon: 'document-text-outline',
         label: 'Files',
         hint: 'Browse documents',
         onPress: handlePickDocument,
       },
       {
         key: 'paste',
-        icon: 'clipboard-outline',
         label: 'Paste image',
         hint: 'Add from clipboard',
         onPress: handlePasteImage,
       },
       {
         key: 'schedule',
-        icon: 'calendar-outline',
         label: 'Schedule message',
         hint: 'Send later',
         onPress: () => setShowScheduleSheet(true),
       },
       {
         key: 'poll',
-        icon: 'stats-chart-outline',
         label: 'Create poll',
         hint: 'Start a vote',
         onPress: () => setShowPollSheet(true),
       },
     ],
     [handlePasteImage, handlePickDocument, handlePickPhoto, setShowPollSheet, setShowScheduleSheet]
+  );
+  const attachmentMenuDisabled =
+    !chatId ||
+    attachmentPickerBusy ||
+    Boolean(editingMessage) ||
+    pendingAttachments.length >= MAX_PENDING_ATTACHMENTS;
+  const attachmentMenuActions = useMemo<ContextMenuAction[]>(
+    () =>
+      attachmentMenuOptions.map((option) => ({
+        title: option.label,
+        subtitle: option.hint,
+        systemIcon: (() => {
+          switch (option.key) {
+            case 'photos':
+              return 'photo.on.rectangle';
+            case 'files':
+              return 'doc.text';
+            case 'paste':
+              return 'clipboard';
+            case 'schedule':
+              return 'calendar';
+            case 'poll':
+              return 'chart.bar';
+            default:
+              return undefined;
+          }
+        })(),
+        onPress: () => {
+          if (!chatId) {
+            NotificationService.show('error', 'This conversation is not available');
+            return;
+          }
+          if (attachmentPickerBusy) {
+            NotificationService.show('info', 'Please wait for the current upload to complete');
+            return;
+          }
+          if (pendingAttachments.length >= MAX_PENDING_ATTACHMENTS) {
+            NotificationService.show('warning', `You can attach up to ${MAX_PENDING_ATTACHMENTS} items per message`);
+            return;
+          }
+          if (editingMessage) {
+            NotificationService.show('info', 'Finish editing before adding attachments');
+            return;
+          }
+          option.onPress();
+        },
+      })),
+    [
+      attachmentMenuOptions,
+      attachmentPickerBusy,
+      chatId,
+      editingMessage,
+      pendingAttachments.length,
+    ]
   );
 
   const isGroupChat = Boolean(chatDetails?.isGroup);
@@ -5963,14 +5959,20 @@ const ChatScreen: React.FC = () => {
             <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
           </Pressable>
         ) : !isGroupChat && otherUserIdRef.current ? (
-          <Pressable
-            onPress={handleShowChatOptions}
-            style={styles.headerActionButton}
-            accessibilityRole="button"
-            accessibilityLabel="Chat options"
+          <NativeContextMenu
+            title="Chat options"
+            actions={chatHeaderMenuActions}
+            activationMethod="singlePress"
+            disabled={chatHeaderMenuActions.length === 0}
           >
-            <Ionicons name="ellipsis-vertical" size={22} color="#FFFFFF" />
-          </Pressable>
+            <View
+              style={styles.headerActionButton}
+              accessibilityRole="button"
+              accessibilityLabel="Chat options"
+            >
+              <Ionicons name="ellipsis-vertical" size={22} color="#FFFFFF" />
+            </View>
+          </NativeContextMenu>
         ) : shouldShowAddButton ? (
           <Pressable
             onPress={() => handleOpenMemberPicker(addButtonMode)}
@@ -6230,22 +6232,27 @@ const ChatScreen: React.FC = () => {
           ) : null}
 
           <View style={[styles.inputContainer, { paddingBottom: composerBottomPadding }]}>
-            <Pressable
-              onPress={handleAttachmentTrigger}
-              style={[
-                styles.attachButton,
-                (attachmentPickerBusy || Boolean(editingMessage)) && styles.attachButtonDisabled,
-              ]}
-              disabled={attachmentPickerBusy || Boolean(editingMessage)}
-              accessibilityRole="button"
-              accessibilityLabel="Open quick actions"
+            <NativeContextMenu
+              title="Quick actions"
+              actions={attachmentMenuActions}
+              activationMethod="singlePress"
+              disabled={attachmentMenuDisabled || attachmentMenuActions.length === 0}
             >
-              {attachmentPickerBusy ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Ionicons name="add" size={20} color="#ffffff" />
-              )}
-            </Pressable>
+              <View
+                style={[
+                  styles.attachButton,
+                  attachmentMenuDisabled && styles.attachButtonDisabled,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Open quick actions"
+              >
+                {attachmentPickerBusy ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Ionicons name="add" size={20} color="#ffffff" />
+                )}
+              </View>
+            </NativeContextMenu>
             {!editingMessage && (
               <EphemeralOptions
                 selectedDuration={ephemeralDuration}
@@ -6631,58 +6638,6 @@ const ChatScreen: React.FC = () => {
                       >
                         {action.label}
                       </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            </GlassCard>
-          </Animated.View>
-        </Animated.View>
-      ) : null}
-      {attachmentSheetVisible ? (
-        <Animated.View
-          style={[styles.messageActionOverlay, { opacity: attachmentSheetAnim }]}
-          pointerEvents="box-none"
-        >
-          <Pressable
-            style={styles.messageActionBackdrop}
-            onPress={() => closeAttachmentSheet()}
-          />
-          <Animated.View
-            style={[
-              styles.attachmentDropdownWrapper,
-              { bottom: attachmentSheetBottom + 8 },
-              {
-                transform: [
-                  {
-                    translateY: attachmentSheetAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [18, 0],
-                    }),
-                  },
-                ],
-                opacity: attachmentSheetAnim,
-              },
-            ]}
-          >
-            <GlassCard width={ATTACHMENT_DROPDOWN_WIDTH} padding={0} variant="default">
-              <View style={styles.attachmentDropdownContent}>
-                <Text style={styles.attachmentDropdownTitle}>Quick actions</Text>
-                <View style={styles.attachmentDropdownList}>
-                  {attachmentMenuOptions.map((option) => (
-                    <Pressable
-                      key={option.key}
-                      style={({ pressed }) => [
-                        styles.attachmentDropdownOption,
-                        pressed && styles.attachmentDropdownOptionPressed,
-                      ]}
-                      onPress={() => closeAttachmentSheet(() => option.onPress())}
-                    >
-                      <Ionicons name={option.icon} size={20} color="#ffffff" />
-                      <View style={styles.attachmentDropdownLabelColumn}>
-                        <Text style={styles.attachmentDropdownLabel}>{option.label}</Text>
-                        <Text style={styles.attachmentDropdownHint}>{option.hint}</Text>
-                      </View>
                     </Pressable>
                   ))}
                 </View>
@@ -8033,50 +7988,6 @@ const styles = StyleSheet.create({
   quickReactionRow: {
     paddingVertical: 0,
     paddingHorizontal: 0,
-  },
-  attachmentDropdownWrapper: {
-    position: 'absolute',
-    left: spacing.lg,
-    zIndex: 40,
-  },
-  attachmentDropdownContent: {
-    padding: spacing.sm,
-    gap: spacing.xs,
-  },
-  attachmentDropdownTitle: {
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    fontWeight: '700',
-  },
-  attachmentDropdownList: {
-    gap: spacing.xs,
-  },
-  attachmentDropdownOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.lg,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
-  attachmentDropdownOptionPressed: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  attachmentDropdownLabelColumn: {
-    flex: 1,
-  },
-  attachmentDropdownLabel: {
-    color: palette.text,
-    fontSize: 15,
-    ...font('medium'),
-  },
-  attachmentDropdownHint: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
   },
   scrollToBottomButton: {
     position: 'absolute',

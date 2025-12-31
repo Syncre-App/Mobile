@@ -43,6 +43,7 @@ interface NativeContextMenuProps {
   actions: ContextMenuAction[];
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
+  activationMethod?: 'singlePress' | 'longPress';
   /** Preview component shown when context menu is active (iOS only) */
   preview?: React.ReactNode;
   /** Called when the menu is activated */
@@ -62,6 +63,7 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
   actions,
   style,
   disabled = false,
+  activationMethod = 'longPress',
   preview,
   onMenuWillShow,
   onMenuWillHide,
@@ -83,7 +85,7 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
     return (
       <View style={style}>
         <Host matchContents>
-          <ContextMenu>
+          <ContextMenu activationMethod={activationMethod}>
             <ContextMenu.Items>
               {actions.map((action, index) => (
                 <Button
@@ -117,6 +119,7 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
       destructive: action.destructive,
       disabled: action.disabled,
     }));
+    const dropdownMenuMode = activationMethod === 'singlePress';
 
     const handlePress = (event: { nativeEvent: { index: number; name: string } }) => {
       const actionIndex = event.nativeEvent.index;
@@ -132,7 +135,7 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
         actions={contextMenuActions}
         onPress={handlePress}
         previewBackgroundColor="transparent"
-        dropdownMenuMode={true}
+        dropdownMenuMode={dropdownMenuMode}
         style={style}
       >
         {children}

@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import {
   Alert,
   Linking,
-  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -20,36 +19,6 @@ import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { SpotifyConnection } from '../components/SpotifyConnection';
-import { canUseSwiftUI } from '../utils/swiftUi';
-
-// SwiftUI imports for iOS
-let SwiftUIHost: any = null;
-let SwiftUIForm: any = null;
-let SwiftUISection: any = null;
-let SwiftUISwitch: any = null;
-let SwiftUIButton: any = null;
-let SwiftUIHStack: any = null;
-let SwiftUIText: any = null;
-let SwiftUIImage: any = null;
-let SwiftUISpacer: any = null;
-
-// Try to import SwiftUI components (iOS only)
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIHost = swiftUI.Host;
-    SwiftUIForm = swiftUI.Form;
-    SwiftUISection = swiftUI.Section;
-    SwiftUISwitch = swiftUI.Switch;
-    SwiftUIButton = swiftUI.Button;
-    SwiftUIHStack = swiftUI.HStack;
-    SwiftUIText = swiftUI.Text;
-    SwiftUIImage = swiftUI.Image;
-    SwiftUISpacer = swiftUI.Spacer;
-  } catch (e) {
-    console.warn('SwiftUI components not available:', e);
-  }
-}
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
@@ -61,7 +30,6 @@ export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true);
   const appVersion = UpdateService.getCurrentVersion();
-  const shouldUseSwiftUI = canUseSwiftUI();
 
   const handleBack = () => {
     router.back();
@@ -111,130 +79,6 @@ export const SettingsScreen: React.FC = () => {
   const handleLanguagePress = () => {
     Alert.alert('Language', 'Multiple languages will be supported in future updates');
   };
-
-  // ═══════════════════════════════════════════════════════════════
-  // iOS: SwiftUI Form
-  // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIForm && SwiftUISection && SwiftUISwitch) {
-    return (
-      <SafeAreaView
-        style={[styles.container, { paddingTop: extraTopPadding }]}
-        edges={['top', 'left', 'right']}
-      >
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <AppBackground />
-
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          <View style={styles.headerCentered} pointerEvents="none">
-            <Text style={styles.headerTitle}>Settings</Text>
-          </View>
-          <View style={styles.headerPlaceholder} />
-        </View>
-
-        <SwiftUIHost style={styles.formHost}>
-          <SwiftUIForm>
-            {/* Notifications Section */}
-            <SwiftUISection header="Notifications">
-              <SwiftUIHStack spacing={8}>
-                <SwiftUIImage systemName="bell.fill" color="white" size={18} />
-                <SwiftUIText>Push Notifications</SwiftUIText>
-                <SwiftUISpacer />
-                <SwiftUISwitch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                />
-              </SwiftUIHStack>
-            </SwiftUISection>
-
-            {/* Appearance Section */}
-            <SwiftUISection header="Appearance">
-              <SwiftUIHStack spacing={8}>
-                <SwiftUIImage systemName="moon.fill" color="white" size={18} />
-                <SwiftUIText>Dark Mode</SwiftUIText>
-                <SwiftUISpacer />
-                <SwiftUISwitch
-                  value={darkModeEnabled}
-                  onValueChange={setDarkModeEnabled}
-                  disabled
-                />
-              </SwiftUIHStack>
-
-              <SwiftUIButton onPress={handleLanguagePress}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="globe" color="white" size={18} />
-                  <SwiftUIText color="primary">Language</SwiftUIText>
-                  <SwiftUISpacer />
-                  <SwiftUIText color="secondary">English</SwiftUIText>
-                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                </SwiftUIHStack>
-              </SwiftUIButton>
-            </SwiftUISection>
-
-            {/* Storage Section */}
-            <SwiftUISection header="Storage">
-              <SwiftUIButton onPress={handleClearCache}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="trash" color="white" size={18} />
-                  <SwiftUIText color="primary">Clear Cache</SwiftUIText>
-                  <SwiftUISpacer />
-                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                </SwiftUIHStack>
-              </SwiftUIButton>
-            </SwiftUISection>
-
-            {/* Safety Section */}
-            <SwiftUISection header="Safety & Reporting">
-              <SwiftUIButton onPress={handleBlockedUsers}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="hand.raised" color="white" size={18} />
-                  <SwiftUIText color="primary">Blocked Users</SwiftUIText>
-                  <SwiftUISpacer />
-                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                </SwiftUIHStack>
-              </SwiftUIButton>
-
-              <SwiftUIButton onPress={handleReportInfo}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="flag" color="white" size={18} />
-                  <SwiftUIText color="primary">Report Content</SwiftUIText>
-                  <SwiftUISpacer />
-                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                </SwiftUIHStack>
-              </SwiftUIButton>
-
-              <SwiftUIButton onPress={handleCommunityGuidelines}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="shield.checkered" color="white" size={18} />
-                  <SwiftUIText color="primary">Community Guidelines</SwiftUIText>
-                  <SwiftUISpacer />
-                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                </SwiftUIHStack>
-              </SwiftUIButton>
-            </SwiftUISection>
-
-            {/* About Section */}
-            <SwiftUISection header="About">
-              <SwiftUIHStack spacing={8}>
-                <SwiftUIText>App Version</SwiftUIText>
-                <SwiftUISpacer />
-                <SwiftUIText color="secondary">{appVersion}</SwiftUIText>
-              </SwiftUIHStack>
-            </SwiftUISection>
-          </SwiftUIForm>
-        </SwiftUIHost>
-
-        {/* Integrations Section (React Native) */}
-        <View style={styles.integrationsSection}>
-          <Text style={styles.sectionTitle}>Integrations</Text>
-          <SpotifyConnection />
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   // ═══════════════════════════════════════════════════════════════
   // Android / Fallback: React Native components
@@ -429,9 +273,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.lg,
     alignItems: 'stretch',
-  },
-  formHost: {
-    flex: 1,
   },
   integrationsSection: {
     paddingHorizontal: spacing.lg,

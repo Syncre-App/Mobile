@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -21,35 +20,8 @@ import { ApiService } from '../services/ApiService';
 import { CryptoService } from '../services/CryptoService';
 import { IdentityService } from '../services/IdentityService';
 import { AppBackground } from '../components/AppBackground';
-import { canUseSwiftUI } from '../utils/swiftUi';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 
-// SwiftUI imports for iOS
-let SwiftUIHost: any = null;
-let SwiftUIForm: any = null;
-let SwiftUISection: any = null;
-let SwiftUIButton: any = null;
-let SwiftUIHStack: any = null;
-let SwiftUIText: any = null;
-let SwiftUIImage: any = null;
-let SwiftUISpacer: any = null;
-
-// Try to import SwiftUI components (iOS only)
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIHost = swiftUI.Host;
-    SwiftUIForm = swiftUI.Form;
-    SwiftUISection = swiftUI.Section;
-    SwiftUIButton = swiftUI.Button;
-    SwiftUIHStack = swiftUI.HStack;
-    SwiftUIText = swiftUI.Text;
-    SwiftUIImage = swiftUI.Image;
-    SwiftUISpacer = swiftUI.Spacer;
-  } catch (e) {
-    console.warn('SwiftUI components not available:', e);
-  }
-}
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
@@ -58,7 +30,6 @@ export const PrivacyScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const minTopPadding = spacing.lg;
   const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
-  const shouldUseSwiftUI = canUseSwiftUI();
 
   const [contentFilter, setContentFilter] = useState<'standard' | 'none'>('standard');
   const [isRotatingKeys, setIsRotatingKeys] = useState(false);
@@ -353,125 +324,6 @@ export const PrivacyScreen: React.FC = () => {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: SwiftUI Form
-  // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIForm && SwiftUISection) {
-    return (
-      <SafeAreaView
-        style={[styles.container, { paddingTop: extraTopPadding }]}
-        edges={['top', 'left', 'right']}
-      >
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <AppBackground />
-
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          <View style={styles.headerCentered} pointerEvents="none">
-            <Text style={styles.headerTitle}>Privacy</Text>
-          </View>
-          <View style={styles.headerPlaceholder} />
-        </View>
-
-        <SwiftUIHost style={styles.formHost}>
-          <SwiftUIForm>
-            {/* Content Section */}
-            <SwiftUISection header="Content">
-              <SwiftUIButton onPress={handleContentFilterChange}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="shield.checkered" color="white" size={18} />
-                  <SwiftUIText color="primary">Content Filter</SwiftUIText>
-                  <SwiftUISpacer />
-                  <SwiftUIText color="secondary">
-                    {contentFilter === 'standard' ? 'Standard' : 'None'}
-                  </SwiftUIText>
-                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                </SwiftUIHStack>
-              </SwiftUIButton>
-            </SwiftUISection>
-
-            {/* Blocked Section */}
-            <SwiftUISection header="Blocked">
-              <SwiftUIButton onPress={handleBlockedUsers}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="hand.raised" color="white" size={18} />
-                  <SwiftUIText color="primary">Blocked Users</SwiftUIText>
-                  <SwiftUISpacer />
-                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                </SwiftUIHStack>
-              </SwiftUIButton>
-            </SwiftUISection>
-
-            {/* Account Section */}
-            <SwiftUISection header="Account">
-              <SwiftUIButton onPress={handleRotateKeys} disabled={isRotatingKeys || isBootstrapping}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="key" color="white" size={18} />
-                  <SwiftUIText color="primary">Rotate encryption keys</SwiftUIText>
-                  <SwiftUISpacer />
-                  {(isRotatingKeys || isBootstrapping) ? (
-                    <ActivityIndicator size="small" color={palette.accent} />
-                  ) : (
-                    <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                  )}
-                </SwiftUIHStack>
-              </SwiftUIButton>
-
-              <SwiftUIButton onPress={handleOpenTerms}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="doc.text" color="white" size={18} />
-                  <SwiftUIText color="primary">Terms of Service</SwiftUIText>
-                  <SwiftUISpacer />
-                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                </SwiftUIHStack>
-              </SwiftUIButton>
-
-              <SwiftUIButton onPress={handleDeleteAccount}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="trash" color="#ef4444" size={18} />
-                  <SwiftUIText color="destructive">Delete account</SwiftUIText>
-                  <SwiftUISpacer />
-                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                </SwiftUIHStack>
-              </SwiftUIButton>
-            </SwiftUISection>
-
-            {/* Developer Section */}
-            <SwiftUISection header="Developer">
-              <SwiftUIButton onPress={handleBotAccountPress} disabled={isLoadingBotStatus}>
-                <SwiftUIHStack spacing={8}>
-                  <SwiftUIImage systemName="cpu" color="white" size={18} />
-                  <SwiftUIText color="primary">Bot Account</SwiftUIText>
-                  <SwiftUISpacer />
-                  {isLoadingBotStatus ? (
-                    <ActivityIndicator size="small" color={palette.accent} />
-                  ) : botStatus === 'approved' ? (
-                    <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
-                  ) : botStatus === 'pending' ? (
-                    <Ionicons name="time" size={20} color="#f59e0b" />
-                  ) : (
-                    <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
-                  )}
-                </SwiftUIHStack>
-              </SwiftUIButton>
-            </SwiftUISection>
-          </SwiftUIForm>
-        </SwiftUIHost>
-
-        {/* Info Section */}
-        <View style={styles.infoContainer}>
-          <Ionicons name="information-circle-outline" size={18} color={palette.textMuted} />
-          <Text style={styles.infoText}>
-            Your privacy settings are stored locally on this device and synced securely with your account.
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
   // Android / Fallback: React Native components
   // ═══════════════════════════════════════════════════════════════
 
@@ -683,9 +535,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.lg,
     alignItems: 'stretch',
-  },
-  formHost: {
-    flex: 1,
   },
   section: {
     marginBottom: spacing.md,

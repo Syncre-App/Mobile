@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { font, palette, radii, spacing } from '../theme/designSystem';
+import { GlassySheet } from './GlassySheet';
 import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
@@ -108,12 +109,14 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
       {/* iOS: Native BottomSheet */}
       {shouldUseSwiftUI && SwiftUIBottomSheet ? (
         <SwiftUIBottomSheet
-          isPresented={isModalVisible}
-          onDismiss={() => setIsModalVisible(false)}
-          detents={['medium']}
-          preferGrabberVisible
+          isOpened={isModalVisible}
+          onIsOpenedChange={setIsModalVisible}
+          presentationDetents={['medium']}
+          presentationDragIndicator="visible"
         >
-          <SheetContent />
+          <GlassySheet variant="subtle">
+            <SheetContent />
+          </GlassySheet>
         </SwiftUIBottomSheet>
       ) : (
         /* Android / Fallback: Modal */

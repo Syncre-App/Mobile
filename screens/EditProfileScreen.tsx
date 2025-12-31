@@ -22,34 +22,6 @@ import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
 import { font, palette, spacing, radii } from '../theme/designSystem';
-import { canUseSwiftUI } from '../utils/swiftUi';
-
-// SwiftUI imports for iOS
-let SwiftUIHost: any = null;
-let SwiftUIForm: any = null;
-let SwiftUISection: any = null;
-let SwiftUIButton: any = null;
-let SwiftUIHStack: any = null;
-let SwiftUIText: any = null;
-let SwiftUIImage: any = null;
-let SwiftUISpacer: any = null;
-
-// Try to import SwiftUI components (iOS only)
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIHost = swiftUI.Host;
-    SwiftUIForm = swiftUI.Form;
-    SwiftUISection = swiftUI.Section;
-    SwiftUIButton = swiftUI.Button;
-    SwiftUIHStack = swiftUI.HStack;
-    SwiftUIText = swiftUI.Text;
-    SwiftUIImage = swiftUI.Image;
-    SwiftUISpacer = swiftUI.Spacer;
-  } catch (e) {
-    console.warn('SwiftUI components not available:', e);
-  }
-}
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 const MAX_PROFILE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -79,7 +51,6 @@ export const EditProfileScreen: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<{ uri: string; mimeType: string; fileName?: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const shouldUseSwiftUI = canUseSwiftUI();
 
   useEffect(() => {
     loadUserProfile();
@@ -246,97 +217,6 @@ export const EditProfileScreen: React.FC = () => {
   }
 
   const displayImage = selectedImage?.uri || profilePicture;
-
-  // ═══════════════════════════════════════════════════════════════
-  // iOS: SwiftUI Form with React Native avatar picker
-  // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIForm && SwiftUISection) {
-    return (
-      <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <AppBackground />
-
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-
-          <View style={styles.headerCentered} pointerEvents="none">
-            <Text style={styles.headerTitle}>Edit Profile</Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={handleUpload}
-            disabled={!selectedImage || uploading}
-            style={[styles.headerButton, (!selectedImage || uploading) && styles.headerButtonDisabled]}
-          >
-            {uploading ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Ionicons name="checkmark" size={24} color={selectedImage ? palette.accent : 'rgba(255,255,255,0.3)'} />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Profile Picture Section (React Native for image picker) */}
-        <View style={styles.avatarSection}>
-          <TouchableOpacity style={styles.avatarRow} onPress={handlePickImage} activeOpacity={0.8}>
-            <View style={styles.avatarContainer}>
-              {displayImage ? (
-                <Image source={{ uri: displayImage }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="person" size={40} color="rgba(255, 255, 255, 0.5)" />
-                </View>
-              )}
-              {selectedImage && (
-                <View style={styles.avatarBadge}>
-                  <Ionicons name="ellipse" size={12} color={palette.accent} />
-                </View>
-              )}
-            </View>
-            <View style={styles.avatarTexts}>
-              <Text style={styles.avatarTitle}>Change Photo</Text>
-              <Text style={styles.avatarSubtitle}>
-                {selectedImage ? 'New photo selected' : 'Tap to select a new photo'}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.3)" />
-          </TouchableOpacity>
-        </View>
-
-        {/* SwiftUI Form for Account Info */}
-        <SwiftUIHost style={styles.formHost}>
-          <SwiftUIForm>
-            <SwiftUISection header="Account Info">
-              <SwiftUIHStack spacing={8}>
-                <SwiftUIImage systemName="person" color="white" size={18} />
-                <SwiftUIText color="primary">Username</SwiftUIText>
-                <SwiftUISpacer />
-                <SwiftUIText color="secondary">{user?.username || '—'}</SwiftUIText>
-              </SwiftUIHStack>
-
-              <SwiftUIHStack spacing={8}>
-                <SwiftUIImage systemName="envelope" color="white" size={18} />
-                <SwiftUIText color="primary">Email</SwiftUIText>
-                <SwiftUISpacer />
-                <SwiftUIText color="secondary">{user?.email || '—'}</SwiftUIText>
-              </SwiftUIHStack>
-            </SwiftUISection>
-          </SwiftUIForm>
-        </SwiftUIHost>
-
-        {/* Hint */}
-        <View style={styles.hintContainer}>
-          <Ionicons name="information-circle-outline" size={16} color={palette.textMuted} />
-          <Text style={styles.hintText}>
-            Username and email cannot be changed here. Contact support if you need to update them.
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   // ═══════════════════════════════════════════════════════════════
   // Android / Fallback: React Native components
@@ -526,9 +406,6 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.lg,
-  },
-  formHost: {
-    flex: 1,
   },
   avatarSection: {
     marginHorizontal: spacing.lg,

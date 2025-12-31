@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { UserAvatar } from './UserAvatar';
 import { palette, radii, spacing, font } from '../theme/designSystem';
+import { GlassySheet } from './GlassySheet';
 import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS BottomSheet
@@ -88,9 +89,11 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
     onClose();
   };
 
+  const menuContentStyle = shouldUseSwiftUI ? styles.menuContentGlassy : styles.menuContent;
+
   // Shared content component
   const MenuContent = () => (
-    <View style={styles.menuContent}>
+    <View style={menuContentStyle}>
       {/* User Info Header */}
       <View style={styles.userHeader}>
         <UserAvatar
@@ -171,12 +174,18 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   if (shouldUseSwiftUI && SwiftUIBottomSheet) {
     return (
       <SwiftUIBottomSheet
-        isPresented={visible}
-        onDismiss={onClose}
-        detents={['medium']}
-        preferGrabberVisible
+        isOpened={visible}
+        onIsOpenedChange={(isOpened: boolean) => {
+          if (!isOpened) {
+            onClose();
+          }
+        }}
+        presentationDetents={['medium']}
+        presentationDragIndicator="visible"
       >
-        <MenuContent />
+        <GlassySheet variant="subtle">
+          <MenuContent />
+        </GlassySheet>
       </SwiftUIBottomSheet>
     );
   }
@@ -230,6 +239,9 @@ const styles = StyleSheet.create({
   },
   menuContent: {
     backgroundColor: 'rgba(15, 23, 42, 0.95)',
+  },
+  menuContentGlassy: {
+    backgroundColor: 'rgba(8, 12, 20, 0.4)',
   },
   userHeader: {
     flexDirection: 'row',

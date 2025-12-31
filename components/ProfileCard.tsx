@@ -18,6 +18,7 @@ import { BadgeRow } from './BadgeIcon';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+import { GlassySheet } from './GlassySheet';
 import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS BottomSheet
@@ -270,14 +271,20 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   if (shouldUseSwiftUI && SwiftUIBottomSheet) {
     return (
       <SwiftUIBottomSheet
-        isPresented={visible}
-        onDismiss={onClose}
-        detents={['medium']}
-        preferGrabberVisible
+        isOpened={visible}
+        onIsOpenedChange={(isOpened: boolean) => {
+          if (!isOpened) {
+            onClose();
+          }
+        }}
+        presentationDetents={['medium']}
+        presentationDragIndicator="visible"
       >
-        <View style={styles.sheetContent}>
-          <CardContent />
-        </View>
+        <GlassySheet variant="subtle">
+          <View style={styles.sheetContent}>
+            <CardContent />
+          </View>
+        </GlassySheet>
       </SwiftUIBottomSheet>
     );
   }
