@@ -7,6 +7,7 @@ import { StorageService } from '../../services/StorageService';
 import { UserCacheService } from '../../services/UserCacheService';
 import { WebSocketService, WebSocketMessage, UserStatus } from '../../services/WebSocketService';
 import { PushService } from '../../services/PushService';
+import { palette } from '../../theme/designSystem';
 
 // ═══════════════════════════════════════════════════════════════
 // Chat Context - Shared state across tabs
@@ -474,20 +475,10 @@ export default function TabLayout() {
   return (
     <ChatContext.Provider value={contextValue}>
       <NativeTabs
-        minimizeBehavior="onScrollDown"
-        disableTransparentOnScrollEdge
-        {...(Platform.OS === 'ios' && {
-          labelStyle: {
-            color: DynamicColorIOS({
-              dark: 'white',
-              light: 'black',
-            }),
-          },
-          tintColor: DynamicColorIOS({
-            dark: 'white',
-            light: 'black',
-          }),
-        })}
+        backgroundColor={palette.background}
+        blurEffect="systemMaterialDark"
+        tintColor="white"
+        disableTransparentOnScrollEdge={false}
       >
         <NativeTabs.Trigger name="index">
           <Icon 

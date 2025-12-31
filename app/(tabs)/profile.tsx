@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import {
+  Alert,
   Platform,
   ScrollView,
   StatusBar,
@@ -11,12 +12,13 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-
 import { useChatContext } from './_layout';
 import { AppBackground } from '../../components/AppBackground';
 import { UserAvatar } from '../../components/UserAvatar';
 import { BadgeRow } from '../../components/BadgeIcon';
 import { StorageService } from '../../services/StorageService';
+import { CryptoService } from '../../services/CryptoService';
+import { PinService } from '../../services/PinService';
 import { WebSocketService } from '../../services/WebSocketService';
 import { font, palette, radii, spacing } from '../../theme/designSystem';
 
@@ -41,14 +43,31 @@ export default function ProfileTab() {
     router.push('/settings/privacy');
   }, [router]);
 
-  const handleLogout = useCallback(async () => {
-    try {
-      WebSocketService.getInstance().disconnect();
-      await StorageService.clear();
-      router.replace('/');
-    } catch (error) {
-      console.error('Failed to logout:', error);
-    }
+  const handleLogout = useCallback(() => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              WebSocketService.getInstance().disconnect();
+              await Promise.all([
+                CryptoService.resetIdentity(),
+                PinService.clearPin(),
+                StorageService.clear(),
+              ]);
+              router.replace('/');
+            } catch (error) {
+              console.error('Failed to logout:', error);
+            }
+          },
+        },
+      ]
+    );
   }, [router]);
 
   // ─────────────────────────────────────────────────────────────
