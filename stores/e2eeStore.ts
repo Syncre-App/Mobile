@@ -26,6 +26,13 @@ import {
 } from '../services/crypto';
 import { secureStorage } from '../services/storage/secure';
 
+// Debug logging helper
+const log = (label: string, message: string, data?: any) => {
+  if (__DEV__) {
+    console.log(`[E2EEStore] ${label}:`, message, data || '');
+  }
+};
+
 interface E2EEState {
   // State
   isInitialized: boolean;
@@ -63,27 +70,33 @@ export const useE2EEStore = create<E2EEState>((set, get) => ({
   // Initialize E2EE state
   initialize: async () => {
     try {
+      log('initialize', 'Starting E2EE initialization...');
       set({ isLoading: true, error: null });
 
       // Check for local key
       const hasLocal = await hasIdentityKey();
+      log('initialize', `Local key exists: ${hasLocal}`);
       
       // Check for cached unlocked key
       const cachedKey = await getCachedPrivateKey();
       const isUnlocked = cachedKey !== null;
+      log('initialize', `Cached key exists (unlocked): ${isUnlocked}`);
 
       // Check for server key
       let hasServer = false;
       try {
         const serverKey = await keysApi.getIdentityKey();
         hasServer = !!serverKey?.publicKey;
+        log('initialize', `Server key exists: ${hasServer}`, serverKey ? { publicKey: serverKey.publicKey.substring(0, 20) + '...' } : null);
       } catch (error: any) {
         // 404 means no key on server, which is fine
         if (error.status !== 404) {
           console.error('Failed to fetch server identity key:', error);
         }
+        log('initialize', 'No server key found or error fetching');
       }
 
+      log('initialize', 'E2EE initialization complete', { hasLocal, hasServer, isUnlocked });
       set({
         isInitialized: true,
         hasLocalKey: hasLocal,
@@ -93,6 +106,7 @@ export const useE2EEStore = create<E2EEState>((set, get) => ({
       });
     } catch (error: any) {
       console.error('E2EE initialization error:', error);
+      log('initialize', 'E2EE initialization failed', { error: error.message });
       set({
         isInitialized: true,
         isLoading: false,
@@ -104,15 +118,21 @@ export const useE2EEStore = create<E2EEState>((set, get) => ({
   // Setup new identity key (first time or key rotation)
   setupIdentityKey: async (password: string) => {
     try {
+      log('setupIdentityKey', 'Starting identity key setup...');
       set({ isLoading: true, error: null });
 
-      // Generate new key pair
-      const keyPair = generateIdentityKeyPair();
+      // Generate new key pair (async for reliable PRNG)
+      log('setupIdentityKey', 'Generating new key pair...');
+      const keyPair = await generateIdentityKeyPair();
+      log('setupIdentityKey', 'Key pair generated', { publicKeyLength: keyPair.publicKey.length });
 
       // Store locally (encrypted with password)
+      log('setupIdentityKey', 'Storing key locally...');
       const stored = await storeIdentityKey(keyPair, password);
+      log('setupIdentityKey', 'Key stored locally');
 
       // Register with server
+      log('setupIdentityKey', 'Registering key with server...');
       await keysApi.registerIdentityKey({
         publicKey: stored.publicKey,
         encryptedPrivateKey: stored.encryptedPrivateKey,
@@ -121,10 +141,13 @@ export const useE2EEStore = create<E2EEState>((set, get) => ({
         iterations: stored.iterations,
         version: stored.version,
       });
+      log('setupIdentityKey', 'Key registered with server');
 
       // Cache unlocked key for session
+      log('setupIdentityKey', 'Caching unlocked key for session...');
       await cacheUnlockedPrivateKey(keyPair.privateKey);
 
+      log('setupIdentityKey', 'Identity key setup complete!');
       set({
         hasLocalKey: true,
         hasServerKey: true,
@@ -135,6 +158,7 @@ export const useE2EEStore = create<E2EEState>((set, get) => ({
       return { success: true };
     } catch (error: any) {
       console.error('Failed to setup identity key:', error);
+      log('setupIdentityKey', 'Setup failed', { error: error.message });
       set({
         isLoading: false,
         error: error.message || 'Failed to setup encryption',

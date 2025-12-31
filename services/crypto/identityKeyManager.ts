@@ -6,7 +6,7 @@
 
 import { secureStorage } from '../storage/secure';
 import {
-  generateKeyPair,
+  generateKeyPairAsync,
   encryptPrivateKey,
   decryptPrivateKey,
   encodeBase64,
@@ -15,6 +15,13 @@ import {
 
 const IDENTITY_KEY_STORAGE_KEY = 'e2ee_identity_key';
 const IDENTITY_PRIVATE_KEY_STORAGE_KEY = 'e2ee_identity_private_key';
+
+// Debug logging helper
+const log = (label: string, message: string, data?: any) => {
+  if (__DEV__) {
+    console.log(`[IdentityKeyManager] ${label}:`, message, data || '');
+  }
+};
 
 export interface IdentityKeyPair {
   publicKey: Uint8Array;
@@ -31,10 +38,14 @@ export interface StoredIdentityKey {
 }
 
 /**
- * Generate a new identity key pair
+ * Generate a new identity key pair (async - uses expo-crypto for reliable PRNG)
  */
-export const generateIdentityKeyPair = (): IdentityKeyPair => {
-  const keyPair = generateKeyPair();
+export const generateIdentityKeyPair = async (): Promise<IdentityKeyPair> => {
+  log('generateIdentityKeyPair', 'Generating new identity key pair...');
+  const keyPair = await generateKeyPairAsync();
+  log('generateIdentityKeyPair', 'Key pair generated successfully', {
+    publicKeyLength: keyPair.publicKey.length,
+  });
   return {
     publicKey: keyPair.publicKey,
     privateKey: keyPair.secretKey,
@@ -48,6 +59,7 @@ export const storeIdentityKey = async (
   keyPair: IdentityKeyPair,
   password: string
 ): Promise<StoredIdentityKey> => {
+  log('storeIdentityKey', 'Encrypting and storing identity key...');
   const encrypted = await encryptPrivateKey(keyPair.privateKey, password);
   
   const storedKey: StoredIdentityKey = {
@@ -60,6 +72,10 @@ export const storeIdentityKey = async (
   };
 
   await secureStorage.set(IDENTITY_KEY_STORAGE_KEY, JSON.stringify(storedKey));
+  log('storeIdentityKey', 'Identity key stored successfully', {
+    publicKey: storedKey.publicKey.substring(0, 20) + '...',
+    version: storedKey.version,
+  });
   
   return storedKey;
 };
@@ -68,12 +84,22 @@ export const storeIdentityKey = async (
  * Get stored identity key metadata (without decrypting private key)
  */
 export const getStoredIdentityKey = async (): Promise<StoredIdentityKey | null> => {
+  log('getStoredIdentityKey', 'Fetching stored identity key...');
   const stored = await secureStorage.get(IDENTITY_KEY_STORAGE_KEY);
-  if (!stored) return null;
+  if (!stored) {
+    log('getStoredIdentityKey', 'No stored identity key found');
+    return null;
+  }
   
   try {
-    return JSON.parse(stored) as StoredIdentityKey;
-  } catch {
+    const parsed = JSON.parse(stored) as StoredIdentityKey;
+    log('getStoredIdentityKey', 'Found stored identity key', {
+      publicKey: parsed.publicKey.substring(0, 20) + '...',
+      version: parsed.version,
+    });
+    return parsed;
+  } catch (error) {
+    log('getStoredIdentityKey', 'Failed to parse stored identity key', error);
     return null;
   }
 };
@@ -117,19 +143,28 @@ export const unlockIdentityKey = async (
  * This is stored in SecureStore and should be cleared on logout
  */
 export const cacheUnlockedPrivateKey = async (privateKey: Uint8Array): Promise<void> => {
+  log('cacheUnlockedPrivateKey', 'Caching unlocked private key for session...');
   await secureStorage.set(IDENTITY_PRIVATE_KEY_STORAGE_KEY, encodeBase64(privateKey));
+  log('cacheUnlockedPrivateKey', 'Private key cached successfully');
 };
 
 /**
  * Get cached unlocked private key
  */
 export const getCachedPrivateKey = async (): Promise<Uint8Array | null> => {
+  log('getCachedPrivateKey', 'Checking for cached private key...');
   const cached = await secureStorage.get(IDENTITY_PRIVATE_KEY_STORAGE_KEY);
-  if (!cached) return null;
+  if (!cached) {
+    log('getCachedPrivateKey', 'No cached private key found');
+    return null;
+  }
   
   try {
-    return decodeBase64(cached);
-  } catch {
+    const decoded = decodeBase64(cached);
+    log('getCachedPrivateKey', 'Found cached private key', { keyLength: decoded.length });
+    return decoded;
+  } catch (error) {
+    log('getCachedPrivateKey', 'Failed to decode cached private key', error);
     return null;
   }
 };

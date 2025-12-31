@@ -7,7 +7,9 @@
 export {
   randomBytes,
   generateKeyPair,
+  generateKeyPairAsync,
   generateSigningKeyPair,
+  generateSigningKeyPairAsync,
   deriveSharedSecret,
   deriveKeyFromPassword,
   encrypt,

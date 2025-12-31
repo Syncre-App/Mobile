@@ -1,8 +1,10 @@
 import { NativeTabs, Icon, Label, Badge } from 'expo-router/unstable-native-tabs';
 import { useChatStore } from '../../../stores/chatStore';
 import { useFriendStore } from '../../../stores/friendStore';
+import { useTheme } from '../../../hooks/useTheme';
 
 export default function TabLayout() {
+  const { colors, isDark } = useTheme();
   const { unreadSummary } = useChatStore();
   const { pending } = useFriendStore();
 
@@ -10,7 +12,20 @@ export default function TabLayout() {
   const pendingRequests = pending.incoming.length;
 
   return (
-    <NativeTabs>
+    <NativeTabs
+      backgroundColor={colors.background}
+      blurEffect={isDark ? 'systemMaterialDark' : 'systemMaterialLight'}
+      disableTransparentOnScrollEdge={true}
+      tintColor={colors.accent}
+      labelStyle={{
+        default: { color: colors.textSecondary },
+        selected: { color: colors.accent },
+      }}
+      iconColor={{
+        default: colors.textSecondary,
+        selected: colors.accent,
+      }}
+    >
       <NativeTabs.Trigger name="index">
         <Icon
           sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }}

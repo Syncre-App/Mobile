@@ -9,11 +9,12 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Host, Switch as SwiftUISwitch } from '@expo/ui/swift-ui';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../hooks/useTheme';
 import { ThemeMode } from '../../../stores/themeStore';
 import { useAuthStore } from '../../../stores/authStore';
@@ -176,7 +177,17 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          headerTitle: 'Settings',
+          headerLargeTitle: true,
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.text,
+          headerShadowVisible: false,
+        }}
+      />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -333,7 +344,7 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

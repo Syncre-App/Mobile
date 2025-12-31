@@ -10,9 +10,10 @@ import {
   Platform,
   ActionSheetIOS,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../hooks/useTheme';
 import { useChatStore } from '../../../stores/chatStore';
 import { useAuthStore } from '../../../stores/authStore';
@@ -209,7 +210,25 @@ export default function ChatsScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          headerTitle: 'Chats',
+          headerLargeTitle: true,
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.text,
+          headerShadowVisible: false,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push('/(app)/new-chat')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="create-outline" size={24} color={colors.accent} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
       {isLoading && chats.length === 0 ? (
         <LoadingSpinner fullScreen message="Loading chats..." />
       ) : (
@@ -229,7 +248,7 @@ export default function ChatsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

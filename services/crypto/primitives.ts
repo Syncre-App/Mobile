@@ -17,22 +17,7 @@ const SALT_LENGTH = 16;
 const PBKDF2_ITERATIONS = 150000;
 
 /**
- * Generate random bytes synchronously using the polyfill
- */
-export const randomBytesSync = (length: number): Uint8Array => {
-  const bytes = new Uint8Array(length);
-  // Use the polyfilled crypto.getRandomValues
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
-  } else {
-    // Fallback to expo-crypto (but this is async, so we throw)
-    throw new Error('crypto.getRandomValues not available - ensure react-native-get-random-values is imported first');
-  }
-  return bytes;
-};
-
-/**
- * Generate random bytes async
+ * Generate random bytes async (reliable, uses expo-crypto)
  */
 export const randomBytes = async (length: number): Promise<Uint8Array> => {
   const bytes = await Crypto.getRandomBytesAsync(length);
@@ -40,23 +25,53 @@ export const randomBytes = async (length: number): Promise<Uint8Array> => {
 };
 
 /**
- * Generate a new X25519 key pair for key exchange
- * Uses expo-crypto for random bytes generation
+ * Generate a new X25519 key pair for key exchange (ASYNC)
+ * Uses expo-crypto for reliable random bytes generation
  */
-export const generateKeyPair = (): { publicKey: Uint8Array; secretKey: Uint8Array } => {
-  // Generate 32 random bytes for the secret key using polyfilled crypto
-  const secretKey = randomBytesSync(32);
+export const generateKeyPairAsync = async (): Promise<{ publicKey: Uint8Array; secretKey: Uint8Array }> => {
+  // Generate 32 random bytes for the secret key using expo-crypto
+  const secretKey = await randomBytes(32);
   return nacl.box.keyPair.fromSecretKey(secretKey);
 };
 
 /**
- * Generate a new signing key pair (Ed25519)
- * Uses expo-crypto for random bytes generation
+ * Generate a new X25519 key pair for key exchange (SYNC - fallback)
+ * @deprecated Use generateKeyPairAsync instead
+ */
+export const generateKeyPair = (): { publicKey: Uint8Array; secretKey: Uint8Array } => {
+  // Try polyfilled crypto.getRandomValues first
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const secretKey = new Uint8Array(32);
+    crypto.getRandomValues(secretKey);
+    return nacl.box.keyPair.fromSecretKey(secretKey);
+  }
+  // Fallback to nacl's built-in (may fail with no PRNG error)
+  return nacl.box.keyPair();
+};
+
+/**
+ * Generate a new signing key pair (Ed25519) (ASYNC)
+ * Uses expo-crypto for reliable random bytes generation
+ */
+export const generateSigningKeyPairAsync = async (): Promise<{ publicKey: Uint8Array; secretKey: Uint8Array }> => {
+  // Ed25519 needs 32 bytes seed
+  const seed = await randomBytes(32);
+  return nacl.sign.keyPair.fromSeed(seed);
+};
+
+/**
+ * Generate a new signing key pair (Ed25519) (SYNC - fallback)
+ * @deprecated Use generateSigningKeyPairAsync instead
  */
 export const generateSigningKeyPair = (): { publicKey: Uint8Array; secretKey: Uint8Array } => {
-  // Ed25519 needs 32 bytes seed
-  const seed = randomBytesSync(32);
-  return nacl.sign.keyPair.fromSeed(seed);
+  // Try polyfilled crypto.getRandomValues first
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const seed = new Uint8Array(32);
+    crypto.getRandomValues(seed);
+    return nacl.sign.keyPair.fromSeed(seed);
+  }
+  // Fallback to nacl's built-in
+  return nacl.sign.keyPair();
 };
 
 /**

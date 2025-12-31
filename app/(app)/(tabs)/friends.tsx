@@ -12,9 +12,10 @@ import {
   Alert,
   ActionSheetIOS,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../hooks/useTheme';
 import { useFriendStore } from '../../../stores/friendStore';
 import { userApi } from '../../../services/api';
@@ -399,14 +400,24 @@ export default function FriendsScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          headerTitle: 'Friends',
+          headerLargeTitle: true,
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.text,
+          headerShadowVisible: false,
+        }}
+      />
       {renderSearchBar()}
       {isLoading && friends.length === 0 ? (
         <LoadingSpinner fullScreen message="Loading friends..." />
       ) : (
         renderContent()
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
