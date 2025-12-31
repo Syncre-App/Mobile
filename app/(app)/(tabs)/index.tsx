@@ -8,10 +8,10 @@ import {
   RefreshControl,
   Alert,
   Platform,
+  ActionSheetIOS,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Host, ContextMenu, Button } from '@expo/ui/swift-ui';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
 import { useChatStore } from '../../../stores/chatStore';
@@ -90,6 +90,42 @@ export default function ChatsScreen() {
     );
   };
 
+  const showChatActions = (item: Chat) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const displayName = getChatDisplayName(item);
+    
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Mute', 'Pin', 'Delete'],
+          cancelButtonIndex: 0,
+          destructiveButtonIndex: 3,
+          title: displayName,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            handleMuteChat(item.id);
+          } else if (buttonIndex === 2) {
+            handlePinChat(item.id);
+          } else if (buttonIndex === 3) {
+            handleDeleteChat(item.id);
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        displayName,
+        '',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Mute', onPress: () => handleMuteChat(item.id) },
+          { text: 'Pin', onPress: () => handlePinChat(item.id) },
+          { text: 'Delete', style: 'destructive', onPress: () => handleDeleteChat(item.id) },
+        ]
+      );
+    }
+  };
+
   const renderChatItem = ({ item }: { item: Chat }) => {
     const displayName = getChatDisplayName(item);
     const avatarUrl = getChatAvatar(item);
@@ -98,10 +134,12 @@ export default function ChatsScreen() {
       ? formatDistanceToNow(new Date(item.updated_at), { addSuffix: false })
       : '';
 
-    const chatContent = (
+    return (
       <TouchableOpacity
         style={[styles.chatItem, { backgroundColor: colors.background }]}
         onPress={() => router.push(`/(app)/chat/${item.id}`)}
+        onLongPress={() => showChatActions(item)}
+        delayLongPress={300}
         activeOpacity={0.7}
       >
         <Avatar
@@ -152,41 +190,6 @@ export default function ChatsScreen() {
         </View>
       </TouchableOpacity>
     );
-
-    // Use SwiftUI ContextMenu on iOS for native long-press menu
-    if (Platform.OS === 'ios') {
-      return (
-        <Host matchContents>
-          <ContextMenu>
-            <ContextMenu.Items>
-              <Button
-                systemImage="bell.slash"
-                onPress={() => handleMuteChat(item.id)}
-              >
-                Mute
-              </Button>
-              <Button
-                systemImage="pin"
-                onPress={() => handlePinChat(item.id)}
-              >
-                Pin
-              </Button>
-              <Button
-                systemImage="trash"
-                onPress={() => handleDeleteChat(item.id)}
-              >
-                Delete
-              </Button>
-            </ContextMenu.Items>
-            <ContextMenu.Trigger>
-              {chatContent}
-            </ContextMenu.Trigger>
-          </ContextMenu>
-        </Host>
-      );
-    }
-
-    return chatContent;
   };
 
   const renderEmpty = () => (

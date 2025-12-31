@@ -10,10 +10,10 @@ import {
   SectionList,
   Platform,
   Alert,
+  ActionSheetIOS,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Host, ContextMenu, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
 import { useFriendStore } from '../../../stores/friendStore';
@@ -223,11 +223,49 @@ export default function FriendsScreen() {
     );
   };
 
+  const showFriendActions = (item: Friend) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Message', 'Remove Friend', 'Block'],
+          cancelButtonIndex: 0,
+          destructiveButtonIndex: 3,
+          title: `@${item.username}`,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            // TODO: Start chat with friend
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          } else if (buttonIndex === 2) {
+            handleRemoveFriend(item.id, item.username);
+          } else if (buttonIndex === 3) {
+            handleBlockUser(item.id, item.username);
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        `@${item.username}`,
+        '',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Message', onPress: () => {} },
+          { text: 'Remove Friend', onPress: () => handleRemoveFriend(item.id, item.username) },
+          { text: 'Block', style: 'destructive', onPress: () => handleBlockUser(item.id, item.username) },
+        ]
+      );
+    }
+  };
+
   const renderFriend = ({ item }: { item: Friend }) => {
-    const friendContent = (
+    return (
       <TouchableOpacity
         style={[styles.friendItem, { backgroundColor: colors.background }]}
         onPress={() => router.push(`/(app)/profile/${item.id}`)}
+        onLongPress={() => showFriendActions(item)}
+        delayLongPress={300}
       >
         <View style={styles.friendInfo}>
           <Avatar
@@ -247,44 +285,6 @@ export default function FriendsScreen() {
         <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
       </TouchableOpacity>
     );
-
-    // Use SwiftUI ContextMenu on iOS for native long-press menu
-    if (Platform.OS === 'ios') {
-      return (
-        <Host matchContents>
-          <ContextMenu>
-            <ContextMenu.Items>
-              <SwiftUIButton
-                systemImage="message"
-                onPress={() => {
-                  // TODO: Start chat with friend
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-              >
-                Message
-              </SwiftUIButton>
-              <SwiftUIButton
-                systemImage="person.crop.circle.badge.minus"
-                onPress={() => handleRemoveFriend(item.id, item.username)}
-              >
-                Remove Friend
-              </SwiftUIButton>
-              <SwiftUIButton
-                systemImage="nosign"
-                onPress={() => handleBlockUser(item.id, item.username)}
-              >
-                Block
-              </SwiftUIButton>
-            </ContextMenu.Items>
-            <ContextMenu.Trigger>
-              {friendContent}
-            </ContextMenu.Trigger>
-          </ContextMenu>
-        </Host>
-      );
-    }
-
-    return friendContent;
   };
 
   const renderContent = () => {

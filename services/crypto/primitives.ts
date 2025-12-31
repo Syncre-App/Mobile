@@ -17,7 +17,22 @@ const SALT_LENGTH = 16;
 const PBKDF2_ITERATIONS = 150000;
 
 /**
- * Generate random bytes
+ * Generate random bytes synchronously using the polyfill
+ */
+export const randomBytesSync = (length: number): Uint8Array => {
+  const bytes = new Uint8Array(length);
+  // Use the polyfilled crypto.getRandomValues
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    // Fallback to expo-crypto (but this is async, so we throw)
+    throw new Error('crypto.getRandomValues not available - ensure react-native-get-random-values is imported first');
+  }
+  return bytes;
+};
+
+/**
+ * Generate random bytes async
  */
 export const randomBytes = async (length: number): Promise<Uint8Array> => {
   const bytes = await Crypto.getRandomBytesAsync(length);
@@ -26,16 +41,22 @@ export const randomBytes = async (length: number): Promise<Uint8Array> => {
 
 /**
  * Generate a new X25519 key pair for key exchange
+ * Uses expo-crypto for random bytes generation
  */
 export const generateKeyPair = (): { publicKey: Uint8Array; secretKey: Uint8Array } => {
-  return nacl.box.keyPair();
+  // Generate 32 random bytes for the secret key using polyfilled crypto
+  const secretKey = randomBytesSync(32);
+  return nacl.box.keyPair.fromSecretKey(secretKey);
 };
 
 /**
  * Generate a new signing key pair (Ed25519)
+ * Uses expo-crypto for random bytes generation
  */
 export const generateSigningKeyPair = (): { publicKey: Uint8Array; secretKey: Uint8Array } => {
-  return nacl.sign.keyPair();
+  // Ed25519 needs 32 bytes seed
+  const seed = randomBytesSync(32);
+  return nacl.sign.keyPair.fromSeed(seed);
 };
 
 /**

@@ -69,28 +69,39 @@ export default function LoginScreen() {
           hasIdentityKey = e.status !== 404;
         }
 
+        let e2eeReady = false;
+
         if (hasIdentityKey) {
-          // Unlock E2EE with password
+          // Try to unlock E2EE with password
           const unlockResult = await unlockWithPassword(password);
-          if (!unlockResult.success) {
-            console.error('Failed to unlock E2EE:', unlockResult.error);
-            // Continue anyway, might need re-setup
+          if (unlockResult.success) {
+            e2eeReady = true;
+          } else {
+            // Password doesn't match stored key - create new identity key
+            // This happens when user changes password or key is corrupted
+            console.log('Creating new identity key (old key incompatible)');
+            const setupResult = await setupIdentityKey(password);
+            if (setupResult.success) {
+              e2eeReady = true;
+            }
           }
         } else {
-          // Create new identity key with password
+          // No identity key exists - create new one with password
           const setupResult = await setupIdentityKey(password);
-          if (!setupResult.success) {
-            throw new Error(setupResult.error || 'Failed to setup encryption');
+          if (setupResult.success) {
+            e2eeReady = true;
           }
         }
 
-        // Register device
-        const deviceId = await secureStorage.getDeviceId();
-        if (deviceId) {
-          try {
-            await registerDevice(deviceId);
-          } catch (e) {
-            console.log('Device registration:', e);
+        // Register device if E2EE is ready
+        if (e2eeReady) {
+          const deviceId = await secureStorage.getDeviceId();
+          if (deviceId) {
+            try {
+              await registerDevice(deviceId);
+            } catch (e) {
+              console.log('Device registration:', e);
+            }
           }
         }
 
