@@ -58,6 +58,17 @@ export const encryptMessageForRecipients = async (
 
   for (const recipient of recipients) {
     try {
+      // Validate recipient public key
+      if (!recipient.publicKey || typeof recipient.publicKey !== 'string') {
+        console.error(`Invalid public key for recipient ${recipient.userId}:${recipient.deviceId}:`, recipient.publicKey);
+        continue;
+      }
+
+      // Debug log the public key
+      if (__DEV__) {
+        console.log(`[MessageEncryption] Encrypting for ${recipient.userId}:${recipient.deviceId}, publicKey: ${recipient.publicKey.substring(0, 20)}...`);
+      }
+
       // Derive shared secret with recipient's public key
       const recipientPublicKey = decodeBase64(recipient.publicKey);
       const sharedSecret = deriveSharedSecret(keyPair.privateKey, recipientPublicKey);

@@ -47,7 +47,7 @@ export const handleReencryptRequest = async (event: WSRequestReencryptEvent): Pr
     const recipientDevice: RecipientDevice = {
       userId: targetUserId.toString(),
       deviceId: newDevice.deviceId,
-      publicKey: newDevice.pubIdentityKey,
+      publicKey: newDevice.identityKey, // Backend returns 'identityKey' for the public key
       keyVersion: newDevice.keyVersion,
     };
 

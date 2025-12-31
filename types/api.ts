@@ -102,9 +102,9 @@ export interface RegisterIdentityKeyRequest {
 
 export interface DeviceKey {
   deviceId: string;
-  pubIdentityKey: string;
+  identityKey: string; // Public identity key (base64)
   keyVersion: number;
-  revoked: boolean;
+  revoked?: boolean;
   lastSeen?: string;
   createdAt?: string;
 }

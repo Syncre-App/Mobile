@@ -10,7 +10,7 @@ export const API_CONFIG = {
   
   // Timeouts
   REQUEST_TIMEOUT: 30000, // 30 seconds
-  WS_AUTH_TIMEOUT: 5000,  // 5 seconds to authenticate
+  WS_AUTH_TIMEOUT: 10000,  // 10 seconds to authenticate (increased for slow networks)
   WS_RECONNECT_DELAY: 3000, // 3 seconds
   WS_MAX_RECONNECT_ATTEMPTS: 5,
   

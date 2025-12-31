@@ -255,19 +255,29 @@ export const useE2EEStore = create<E2EEState>((set, get) => ({
   // Fetch recipient devices for encryption
   fetchRecipientDevices: async (userIds: string[]) => {
     try {
+      log('fetchRecipientDevices', `Fetching devices for users: ${userIds.join(', ')}`);
       const devices: Record<string, RecipientDevice[]> = { ...get().recipientDevices };
 
       for (const userId of userIds) {
         try {
           const userDevices = await keysApi.getUserDevices(userId);
+          log('fetchRecipientDevices', `Got ${userDevices.length} devices for user ${userId}`);
+          
+          // Debug: log raw response to see what we're getting
+          if (__DEV__ && userDevices.length > 0) {
+            console.log(`[E2EEStore] Raw device data for user ${userId}:`, JSON.stringify(userDevices[0], null, 2));
+          }
+          
           devices[userId] = userDevices
             .filter(d => !d.revoked)
             .map(d => ({
               userId,
               deviceId: d.deviceId,
-              publicKey: d.pubIdentityKey,
+              publicKey: d.identityKey, // Backend returns 'identityKey' for the public key
               keyVersion: d.keyVersion,
             }));
+            
+          log('fetchRecipientDevices', `Mapped ${devices[userId].length} active devices for user ${userId}`);
         } catch (error) {
           console.error(`Failed to fetch devices for user ${userId}:`, error);
         }

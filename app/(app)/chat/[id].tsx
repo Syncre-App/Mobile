@@ -75,37 +75,57 @@ export default function ChatScreen() {
     }
   }, [chat, isE2EEUnlocked]);
 
-  // Decrypt encrypted messages
+  // Decrypt encrypted messages - debounced and optimized to avoid excessive key fetches
+  const decryptionQueueRef = useRef<Set<number>>(new Set());
+  const isDecryptingRef = useRef(false);
+  
   useEffect(() => {
     const decryptMessages = async () => {
       if (!isE2EEUnlocked || !user?.id || !user?.activeDeviceId) return;
-
-      const newDecrypted: Record<number, string> = { ...decryptedMessages };
+      if (isDecryptingRef.current) return; // Prevent concurrent runs
       
-      for (const message of chatMessages) {
-        if (message.isEncrypted && message.envelopes && !decryptedMessages[message.id]) {
-          try {
-            const plaintext = await decryptMessage(
-              message.envelopes,
-              user.id,
-              user.activeDeviceId
-            );
-            if (plaintext) {
-              newDecrypted[message.id] = plaintext;
-            }
-          } catch (error) {
-            console.error(`Failed to decrypt message ${message.id}:`, error);
+      // Find messages that need decryption
+      const messagesToDecrypt = chatMessages.filter(
+        msg => msg.isEncrypted && 
+               msg.envelopes && 
+               !decryptedMessages[msg.id] && 
+               !decryptionQueueRef.current.has(msg.id)
+      );
+      
+      if (messagesToDecrypt.length === 0) return;
+      
+      isDecryptingRef.current = true;
+      const newDecrypted: Record<number, string> = {};
+      
+      // Mark messages as being processed
+      messagesToDecrypt.forEach(msg => decryptionQueueRef.current.add(msg.id));
+      
+      for (const message of messagesToDecrypt) {
+        try {
+          const plaintext = await decryptMessage(
+            message.envelopes!,
+            user.id,
+            user.activeDeviceId
+          );
+          if (plaintext) {
+            newDecrypted[message.id] = plaintext;
           }
+        } catch (error) {
+          console.error(`Failed to decrypt message ${message.id}:`, error);
         }
+        // Remove from queue after processing
+        decryptionQueueRef.current.delete(message.id);
       }
-
-      if (Object.keys(newDecrypted).length !== Object.keys(decryptedMessages).length) {
-        setDecryptedMessages(newDecrypted);
+      
+      isDecryptingRef.current = false;
+      
+      if (Object.keys(newDecrypted).length > 0) {
+        setDecryptedMessages(prev => ({ ...prev, ...newDecrypted }));
       }
     };
 
     decryptMessages();
-  }, [chatMessages, isE2EEUnlocked, user?.id, user?.activeDeviceId]);
+  }, [chatMessages.length, isE2EEUnlocked, user?.id, user?.activeDeviceId, decryptMessage]);
 
   // Get display content for a message (decrypted if E2EE)
   const getMessageContent = useCallback((message: Message): string | null => {
