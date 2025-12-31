@@ -17,6 +17,7 @@ import { Host, ContextMenu, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../hooks/useTheme';
 import { useFriendStore } from '../../../stores/friendStore';
+import { userApi } from '../../../services/api';
 import { Avatar, LoadingSpinner, Button } from '../../../components/ui';
 import { Layout } from '../../../constants/layout';
 import { Friend, FriendRequest, UserSearchResult } from '../../../types/user';
@@ -41,6 +42,7 @@ export default function FriendsScreen() {
     searchUsers,
     clearSearchResults,
     addFriend,
+    removeFriend,
     acceptRequest,
     rejectRequest,
     isLoading,
@@ -181,7 +183,13 @@ export default function FriendsScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
-            // TODO: Implement remove friend
+            const result = await removeFriend(friendId);
+            if (result.success) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } else {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert('Error', result.error || 'Failed to remove friend');
+            }
           },
         },
       ]
@@ -199,7 +207,16 @@ export default function FriendsScreen() {
           text: 'Block',
           style: 'destructive',
           onPress: async () => {
-            // TODO: Implement block user
+            try {
+              await userApi.blockUser(userId);
+              // Also remove from friends list
+              await removeFriend(userId);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert('Blocked', `@${username} has been blocked`);
+            } catch (error: any) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert('Error', error.message || 'Failed to block user');
+            }
           },
         },
       ]

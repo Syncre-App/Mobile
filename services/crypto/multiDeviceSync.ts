@@ -6,14 +6,14 @@
 import { keysApi, chatApi } from '../api';
 import { wsClient } from '../websocket/client';
 import { WSMessage, WSRequestReencryptEvent } from '../websocket/types';
+import { getIdentityKeyPair } from './identityKeyManager';
+import { encodeBase64 } from './primitives';
 import {
-  getIdentityKeyPair,
-  encodeBase64,
   RecipientDevice,
   reencryptMessageForDevice,
   decryptMessageForDevice,
   MessageEnvelope,
-} from './index';
+} from './messageEncryption';
 import { Message } from '../../types/chat';
 
 /**

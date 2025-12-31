@@ -2,31 +2,37 @@ import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '../stores/authStore';
 import { useE2EEStore } from '../stores/e2eeStore';
-import { secureStorage } from '../services/storage/secure';
+import { keysApi } from '../services/api';
 import { LoadingSpinner } from '../components/ui';
 
 export default function Index() {
   const { isAuthenticated, isLoading, isInitialized, token } = useAuthStore();
   const { isUnlocked } = useE2EEStore();
-  const [checkingPin, setCheckingPin] = useState(true);
-  const [hasPin, setHasPin] = useState(false);
+  const [checkingIdentity, setCheckingIdentity] = useState(true);
+  const [hasIdentityKey, setHasIdentityKey] = useState(false);
 
   useEffect(() => {
-    const checkPin = async () => {
+    const checkIdentityKey = async () => {
       if (isAuthenticated && token) {
-        const pinExists = await secureStorage.hasPinSetup();
-        setHasPin(pinExists);
+        try {
+          // Check if user has identity key on server
+          await keysApi.getIdentityKey();
+          setHasIdentityKey(true);
+        } catch (error: any) {
+          // 404 means no identity key exists
+          setHasIdentityKey(error.status !== 404);
+        }
       }
-      setCheckingPin(false);
+      setCheckingIdentity(false);
     };
     
     if (isInitialized) {
-      checkPin();
+      checkIdentityKey();
     }
   }, [isInitialized, isAuthenticated, token]);
 
   // Still loading
-  if (!isInitialized || isLoading || checkingPin) {
+  if (!isInitialized || isLoading || checkingIdentity) {
     return <LoadingSpinner fullScreen message="Loading..." />;
   }
 
@@ -37,11 +43,11 @@ export default function Index() {
 
   // Authenticated but E2EE not unlocked
   if (!isUnlocked) {
-    if (hasPin) {
-      // Has PIN, need to unlock
+    if (hasIdentityKey) {
+      // Has identity key on server, need to unlock with PIN
       return <Redirect href="/(app)/pin-unlock" />;
     } else {
-      // No PIN, need to set up
+      // No identity key, need to set up PIN and create new key
       return <Redirect href="/(auth)/pin-setup" />;
     }
   }

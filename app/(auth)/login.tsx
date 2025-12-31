@@ -12,7 +12,7 @@ import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore } from '../../stores/authStore';
-import { secureStorage } from '../../services/storage/secure';
+import { keysApi } from '../../services/api';
 import { Button, Input } from '../../components/ui';
 import { Layout } from '../../constants/layout';
 
@@ -52,15 +52,19 @@ export default function LoginScreen() {
     const result = await login({ email: email.trim().toLowerCase(), password });
 
     if (result.success) {
-      // Check if PIN is already set up
-      const hasPin = await secureStorage.hasPinSetup();
-      
-      if (hasPin) {
-        // PIN exists, go to PIN unlock
+      // Check if user has identity key on server
+      try {
+        await keysApi.getIdentityKey();
+        // Has identity key on server - go to PIN unlock
         router.replace('/(app)/pin-unlock');
-      } else {
-        // No PIN, need to set up
-        router.replace('/(auth)/pin-setup');
+      } catch (error: any) {
+        // 404 means no identity key - need to set up PIN and create new key
+        if (error.status === 404) {
+          router.replace('/(auth)/pin-setup');
+        } else {
+          // Other error - still try PIN unlock (might work with local key)
+          router.replace('/(app)/pin-unlock');
+        }
       }
     } else if (result.verified === false) {
       // User not verified, redirect to verification

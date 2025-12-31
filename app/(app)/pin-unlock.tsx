@@ -5,17 +5,21 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  Platform,
+  Pressable,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
+import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore } from '../../stores/authStore';
 import { useE2EEStore } from '../../stores/e2eeStore';
 import { secureStorage } from '../../services/storage/secure';
 import { Layout } from '../../constants/layout';
+import { APP_CONFIG } from '../../constants/config';
 
 export default function PinUnlockScreen() {
   const { colors } = useTheme();
@@ -26,22 +30,12 @@ export default function PinUnlockScreen() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attempts, setAttempts] = useState(0);
-  const [pinLength, setPinLength] = useState(6); // Default, will be detected
 
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    // Focus input on mount
     setTimeout(() => inputRef.current?.focus(), 100);
-    
-    // Detect PIN length from stored hash (we don't know the exact length, use max)
-    detectPinLength();
   }, []);
-
-  const detectPinLength = async () => {
-    // We'll use 6 as default max length
-    setPinLength(6);
-  };
 
   const hashPin = async (pinCode: string): Promise<string> => {
     const hash = await Crypto.digestStringAsync(
@@ -52,29 +46,28 @@ export default function PinUnlockScreen() {
   };
 
   const handlePinChange = async (value: string) => {
-    const digits = value.replace(/\D/g, '');
+    const digits = value.replace(/\D/g, '').slice(0, APP_CONFIG.PIN_MAX_LENGTH);
     setPin(digits);
     setError('');
-
-    // Try to verify at 4, 5, and 6 digits
-    if (digits.length >= 4 && digits.length <= 6) {
-      await verifyPin(digits);
-    }
   };
 
-  const verifyPin = async (pinToVerify: string) => {
+  const verifyPin = async () => {
+    if (pin.length < APP_CONFIG.PIN_MIN_LENGTH) {
+      setError(`PIN must be at least ${APP_CONFIG.PIN_MIN_LENGTH} digits`);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const storedHash = await secureStorage.getPinHash();
-      const inputHash = await hashPin(pinToVerify);
+      const inputHash = await hashPin(pin);
 
       if (inputHash === storedHash) {
-        // PIN correct!
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         // Unlock E2EE with PIN
-        const result = await unlockWithPassword(pinToVerify);
+        const result = await unlockWithPassword(pin);
         if (!result.success) {
           throw new Error(result.error || 'Failed to unlock encryption');
         }
@@ -85,36 +78,31 @@ export default function PinUnlockScreen() {
           try {
             await registerDevice(deviceId);
           } catch (e) {
-            // Device might already be registered, ignore
             console.log('Device registration:', e);
           }
         }
 
-        // Navigate to main app
         router.replace('/(app)/(tabs)');
-      } else if (pinToVerify.length === pinLength) {
-        // Wrong PIN at max length
+      } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        setAttempts(prev => prev + 1);
-        setError('Incorrect PIN');
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
         setPin('');
 
-        // Lock out after too many attempts
-        if (attempts >= 4) {
+        if (newAttempts >= 5) {
           setError('Too many attempts. Please log in again.');
           setTimeout(async () => {
             await logout();
             router.replace('/(auth)/login');
           }, 2000);
+        } else {
+          setError(`Incorrect PIN. ${5 - newAttempts} attempts remaining.`);
         }
       }
     } catch (err: any) {
       console.error('PIN verification error:', err);
-      // Don't show error if still typing
-      if (pinToVerify.length === pinLength) {
-        setError(err.message || 'Failed to unlock');
-        setPin('');
-      }
+      setError(err.message || 'Failed to unlock');
+      setPin('');
     } finally {
       setIsLoading(false);
     }
@@ -126,9 +114,11 @@ export default function PinUnlockScreen() {
     router.replace('/(auth)/login');
   };
 
+  const canUnlock = pin.length >= APP_CONFIG.PIN_MIN_LENGTH;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
+      <Pressable style={styles.content} onPress={() => inputRef.current?.focus()}>
         {/* Header */}
         <View style={styles.header}>
           <View style={[styles.iconContainer, { backgroundColor: colors.accent + '15' }]}>
@@ -143,7 +133,7 @@ export default function PinUnlockScreen() {
         {/* PIN Dots */}
         <View style={styles.pinContainer}>
           <View style={styles.pinDots}>
-            {Array.from({ length: pinLength }).map((_, index) => (
+            {Array.from({ length: APP_CONFIG.PIN_MAX_LENGTH }).map((_, index) => (
               <View
                 key={index}
                 style={[
@@ -164,10 +154,11 @@ export default function PinUnlockScreen() {
             value={pin}
             onChangeText={handlePinChange}
             keyboardType="number-pad"
-            maxLength={pinLength}
+            maxLength={APP_CONFIG.PIN_MAX_LENGTH}
             autoFocus
             secureTextEntry
-            editable={!isLoading}
+            editable={!isLoading && attempts < 5}
+            caretHidden
           />
         </View>
 
@@ -182,22 +173,43 @@ export default function PinUnlockScreen() {
             Unlocking...
           </Text>
         )}
+      </Pressable>
 
-        {/* Attempts remaining */}
-        {attempts > 0 && attempts < 5 && (
-          <Text style={[styles.attemptsText, { color: colors.warning }]}>
-            {5 - attempts} attempts remaining
-          </Text>
-        )}
-      </View>
+      {/* Unlock button */}
+      {canUnlock && !isLoading && (
+        <View style={styles.footer}>
+          {Platform.OS === 'ios' ? (
+            <Host style={styles.nativeButtonHost}>
+              <SwiftUIButton onPress={verifyPin}>
+                Unlock
+              </SwiftUIButton>
+            </Host>
+          ) : (
+            <TouchableOpacity
+              style={[styles.unlockButton, { backgroundColor: colors.accent }]}
+              onPress={verifyPin}
+            >
+              <Text style={styles.unlockButtonText}>Unlock</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Logout button */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={[styles.logoutText, { color: colors.error }]}>
-            Log Out
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.logoutContainer}>
+        {Platform.OS === 'ios' ? (
+          <Host>
+            <SwiftUIButton onPress={handleLogout}>
+              Log Out
+            </SwiftUIButton>
+          </Host>
+        ) : (
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={[styles.logoutText, { color: colors.error }]}>
+              Log Out
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -264,12 +276,24 @@ const styles = StyleSheet.create({
     fontSize: Layout.fontSize.sm,
     marginBottom: Layout.spacing.md,
   },
-  attemptsText: {
-    textAlign: 'center',
-    fontSize: Layout.fontSize.sm,
-    marginTop: Layout.spacing.sm,
-  },
   footer: {
+    padding: Layout.spacing.lg,
+  },
+  nativeButtonHost: {
+    height: 50,
+  },
+  unlockButton: {
+    height: 50,
+    borderRadius: Layout.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unlockButtonText: {
+    color: '#FFFFFF',
+    fontSize: Layout.fontSize.md,
+    fontWeight: Layout.fontWeight.semibold,
+  },
+  logoutContainer: {
     padding: Layout.spacing.lg,
     paddingBottom: Layout.spacing.xl,
     alignItems: 'center',
