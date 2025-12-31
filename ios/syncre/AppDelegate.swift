@@ -1,3 +1,4 @@
+import UIKit
 import Expo
 import React
 import ReactAppDependencyProvider
@@ -23,6 +24,8 @@ public class AppDelegate: ExpoAppDelegate {
 
 #if os(iOS) || os(tvOS)
     window = UIWindow(frame: UIScreen.main.bounds)
+    window?.backgroundColor = UIColor(red: 11.0 / 255.0, green: 14.0 / 255.0, blue: 20.0 / 255.0, alpha: 1.0)
+    window?.overrideUserInterfaceStyle = .dark
     factory.startReactNative(
       withModuleName: "main",
       in: window,

@@ -473,7 +473,7 @@ export default function TabLayout() {
   const friendRequestsBadge = incomingRequests.length > 0 ? String(incomingRequests.length) : undefined;
 
   const tabBarBackground = Platform.OS === 'ios'
-    ? 'rgba(11, 14, 20, 0.78)'
+    ? 'rgba(11, 14, 20, 0.9)'
     : palette.backgroundMuted;
 
   return (
@@ -487,6 +487,7 @@ export default function TabLayout() {
           default: { color: 'rgba(255, 255, 255, 0.72)', fontSize: 11, fontWeight: '600' },
           selected: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
         }}
+        minimizeBehavior="never"
         shadowColor="transparent"
         disableTransparentOnScrollEdge
       >
