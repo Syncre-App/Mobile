@@ -490,19 +490,28 @@ export default function TabLayout() {
         })}
       >
         <NativeTabs.Trigger name="index">
-          <Icon sfSymbol={{ default: 'message', selected: 'message.fill' }} />
+          <Icon 
+            sf={{ default: 'message', selected: 'message.fill' }} 
+            androidSrc={require('../../assets/logo.png')}
+          />
           <Label>Chats</Label>
           {unreadBadge && <Badge>{unreadBadge}</Badge>}
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="friends" role="search">
-          <Icon sfSymbol={{ default: 'person.2', selected: 'person.2.fill' }} />
+          <Icon 
+            sf={{ default: 'person.2', selected: 'person.2.fill' }} 
+            androidSrc={require('../../assets/logo.png')}
+          />
           <Label>Friends</Label>
           {friendRequestsBadge && <Badge>{friendRequestsBadge}</Badge>}
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="profile">
-          <Icon sfSymbol={{ default: 'person.circle', selected: 'person.circle.fill' }} />
+          <Icon 
+            sf={{ default: 'person.circle', selected: 'person.circle.fill' }} 
+            androidSrc={require('../../assets/logo.png')}
+          />
           <Label>Profile</Label>
         </NativeTabs.Trigger>
       </NativeTabs>
