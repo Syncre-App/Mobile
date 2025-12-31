@@ -12,13 +12,18 @@ import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore } from '../../stores/authStore';
+import { useE2EEStore } from '../../stores/e2eeStore';
 import { keysApi } from '../../services/api';
+import { secureStorage } from '../../services/storage/secure';
 import { Button, Input } from '../../components/ui';
 import { Layout } from '../../constants/layout';
 
 export default function LoginScreen() {
   const { colors } = useTheme();
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, isLoading: authLoading, error, clearError } = useAuthStore();
+  const { setupIdentityKey, unlockWithPassword, registerDevice } = useE2EEStore();
+  const [isSettingUp, setIsSettingUp] = useState(false);
+  const isLoading = authLoading || isSettingUp;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,19 +57,58 @@ export default function LoginScreen() {
     const result = await login({ email: email.trim().toLowerCase(), password });
 
     if (result.success) {
-      // Check if user has identity key on server
+      setIsSettingUp(true);
+      
       try {
-        await keysApi.getIdentityKey();
-        // Has identity key on server - go to PIN unlock
-        router.replace('/(app)/pin-unlock');
-      } catch (error: any) {
-        // 404 means no identity key - need to set up PIN and create new key
-        if (error.status === 404) {
-          router.replace('/(auth)/pin-setup');
-        } else {
-          // Other error - still try PIN unlock (might work with local key)
-          router.replace('/(app)/pin-unlock');
+        // Check if user has identity key on server
+        let hasIdentityKey = false;
+        try {
+          await keysApi.getIdentityKey();
+          hasIdentityKey = true;
+        } catch (e: any) {
+          hasIdentityKey = e.status !== 404;
         }
+
+        if (hasIdentityKey) {
+          // Unlock E2EE with password
+          const unlockResult = await unlockWithPassword(password);
+          if (!unlockResult.success) {
+            console.error('Failed to unlock E2EE:', unlockResult.error);
+            // Continue anyway, might need re-setup
+          }
+        } else {
+          // Create new identity key with password
+          const setupResult = await setupIdentityKey(password);
+          if (!setupResult.success) {
+            throw new Error(setupResult.error || 'Failed to setup encryption');
+          }
+        }
+
+        // Register device
+        const deviceId = await secureStorage.getDeviceId();
+        if (deviceId) {
+          try {
+            await registerDevice(deviceId);
+          } catch (e) {
+            console.log('Device registration:', e);
+          }
+        }
+
+        // Check if PIN is set up
+        const hasPin = await secureStorage.hasPinSetup();
+        if (hasPin) {
+          // PIN exists, E2EE already unlocked, go to main app
+          router.replace('/(app)/(tabs)');
+        } else {
+          // No PIN, need to set up (E2EE already done)
+          router.replace('/(auth)/pin-setup');
+        }
+      } catch (err: any) {
+        console.error('E2EE setup error:', err);
+        // Still go to app, might work
+        router.replace('/(app)/(tabs)');
+      } finally {
+        setIsSettingUp(false);
       }
     } else if (result.verified === false) {
       // User not verified, redirect to verification

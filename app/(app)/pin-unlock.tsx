@@ -16,15 +16,19 @@ import * as Crypto from 'expo-crypto';
 import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore } from '../../stores/authStore';
-import { useE2EEStore } from '../../stores/e2eeStore';
 import { secureStorage } from '../../services/storage/secure';
 import { Layout } from '../../constants/layout';
 import { APP_CONFIG } from '../../constants/config';
 
+/**
+ * PIN Unlock Screen
+ * 
+ * This screen is shown when the app starts and PIN is set up.
+ * This is only a local lock screen - E2EE is handled during login with password.
+ */
 export default function PinUnlockScreen() {
   const { colors } = useTheme();
-  const { user, logout } = useAuthStore();
-  const { unlockWithPassword, registerDevice } = useE2EEStore();
+  const { logout } = useAuthStore();
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -38,14 +42,15 @@ export default function PinUnlockScreen() {
   }, []);
 
   const hashPin = async (pinCode: string): Promise<string> => {
+    // Use the same fixed salt as PIN setup
     const hash = await Crypto.digestStringAsync(
       Crypto.CryptoDigestAlgorithm.SHA256,
-      pinCode + (user?.id || 'salt')
+      pinCode + 'syncre_pin_salt'
     );
     return hash;
   };
 
-  const handlePinChange = async (value: string) => {
+  const handlePinChange = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, APP_CONFIG.PIN_MAX_LENGTH);
     setPin(digits);
     setError('');
@@ -65,23 +70,6 @@ export default function PinUnlockScreen() {
 
       if (inputHash === storedHash) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-        // Unlock E2EE with PIN
-        const result = await unlockWithPassword(pin);
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to unlock encryption');
-        }
-
-        // Register device if needed
-        const deviceId = await secureStorage.getDeviceId();
-        if (deviceId) {
-          try {
-            await registerDevice(deviceId);
-          } catch (e) {
-            console.log('Device registration:', e);
-          }
-        }
-
         router.replace('/(app)/(tabs)');
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -101,7 +89,7 @@ export default function PinUnlockScreen() {
       }
     } catch (err: any) {
       console.error('PIN verification error:', err);
-      setError(err.message || 'Failed to unlock');
+      setError(err.message || 'Failed to verify PIN');
       setPin('');
     } finally {
       setIsLoading(false);
@@ -126,7 +114,7 @@ export default function PinUnlockScreen() {
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Enter PIN</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Enter your PIN to unlock your messages
+            Enter your PIN to unlock
           </Text>
         </View>
 
@@ -170,7 +158,7 @@ export default function PinUnlockScreen() {
         {/* Loading */}
         {isLoading && (
           <Text style={[styles.loading, { color: colors.textSecondary }]}>
-            Unlocking...
+            Verifying...
           </Text>
         )}
       </Pressable>
@@ -197,19 +185,11 @@ export default function PinUnlockScreen() {
 
       {/* Logout button */}
       <View style={styles.logoutContainer}>
-        {Platform.OS === 'ios' ? (
-          <Host>
-            <SwiftUIButton onPress={handleLogout}>
-              Log Out
-            </SwiftUIButton>
-          </Host>
-        ) : (
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={[styles.logoutText, { color: colors.error }]}>
-              Log Out
-            </Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={[styles.logoutText, { color: colors.error }]}>
+            Log Out
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

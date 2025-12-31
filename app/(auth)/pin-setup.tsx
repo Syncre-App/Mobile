@@ -16,16 +16,19 @@ import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { useTheme } from '../../hooks/useTheme';
-import { useAuthStore } from '../../stores/authStore';
-import { useE2EEStore } from '../../stores/e2eeStore';
 import { secureStorage } from '../../services/storage/secure';
 import { Layout } from '../../constants/layout';
 import { APP_CONFIG } from '../../constants/config';
 
+/**
+ * PIN Setup Screen
+ * 
+ * This screen is shown after login when no PIN exists.
+ * The E2EE identity key is already set up with the password during login.
+ * This PIN is only for local quick unlock (lock screen).
+ */
 export default function PinSetupScreen() {
   const { colors } = useTheme();
-  const { user } = useAuthStore();
-  const { setupIdentityKey, registerDevice } = useE2EEStore();
 
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [pin, setPin] = useState('');
@@ -36,14 +39,14 @@ export default function PinSetupScreen() {
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    // Focus input on mount and step change
     setTimeout(() => inputRef.current?.focus(), 100);
   }, [step]);
 
   const hashPin = async (pinCode: string): Promise<string> => {
+    // Use a fixed salt for PIN - this is just for local lock screen
     const hash = await Crypto.digestStringAsync(
       Crypto.CryptoDigestAlgorithm.SHA256,
-      pinCode + (user?.id || 'salt')
+      pinCode + 'syncre_pin_salt'
     );
     return hash;
   };
@@ -60,7 +63,7 @@ export default function PinSetupScreen() {
       
       // Auto-verify when confirm PIN matches created PIN length
       if (digits.length === pin.length) {
-        verifyAndSetup(digits);
+        verifyAndSave(digits);
       }
     }
   };
@@ -71,7 +74,7 @@ export default function PinSetupScreen() {
     setConfirmPin('');
   };
 
-  const verifyAndSetup = async (confirmedPin: string) => {
+  const verifyAndSave = async (confirmedPin: string) => {
     if (confirmedPin !== pin) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setError('PINs do not match. Try again.');
@@ -83,23 +86,13 @@ export default function PinSetupScreen() {
     setError('');
 
     try {
-      // Hash and store PIN
+      // Hash and store PIN locally
       const pinHash = await hashPin(pin);
       await secureStorage.setPinHash(pinHash);
 
-      // Setup E2EE with PIN as the password
-      const e2eeResult = await setupIdentityKey(pin);
-      if (!e2eeResult.success) {
-        throw new Error(e2eeResult.error || 'Failed to setup encryption');
-      }
-
-      // Register device
-      const deviceId = await secureStorage.getDeviceId();
-      if (deviceId) {
-        await registerDevice(deviceId);
-      }
-
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // Navigate to main app
       router.replace('/(app)/(tabs)');
     } catch (err: any) {
       console.error('PIN setup error:', err);
@@ -119,6 +112,11 @@ export default function PinSetupScreen() {
       setConfirmPin('');
       setError('');
     }
+  };
+
+  const handleSkip = () => {
+    // Allow skipping PIN setup
+    router.replace('/(app)/(tabs)');
   };
 
   const currentPin = step === 'create' ? pin : confirmPin;
@@ -147,7 +145,7 @@ export default function PinSetupScreen() {
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {step === 'create'
-                ? `Enter a ${APP_CONFIG.PIN_MIN_LENGTH}-${APP_CONFIG.PIN_MAX_LENGTH} digit PIN to secure your messages`
+                ? `Enter a ${APP_CONFIG.PIN_MIN_LENGTH}-${APP_CONFIG.PIN_MAX_LENGTH} digit PIN for quick unlock`
                 : 'Enter your PIN again to confirm'}
             </Text>
           </View>
@@ -198,31 +196,31 @@ export default function PinSetupScreen() {
           {/* Loading */}
           {isLoading && (
             <Text style={[styles.loading, { color: colors.textSecondary }]}>
-              Setting up encryption...
+              Setting up PIN...
             </Text>
           )}
 
-          {/* Instructions */}
+          {/* Info */}
           <View style={styles.instructions}>
             <View style={styles.instructionRow}>
-              <Ionicons name="shield-checkmark" size={20} color={colors.success} />
+              <Ionicons name="flash" size={20} color={colors.accent} />
               <Text style={[styles.instructionText, { color: colors.textSecondary }]}>
-                Your PIN encrypts your messages
+                PIN is for quick unlock only
               </Text>
             </View>
             <View style={styles.instructionRow}>
-              <Ionicons name="warning" size={20} color={colors.warning} />
+              <Ionicons name="shield-checkmark" size={20} color={colors.success} />
               <Text style={[styles.instructionText, { color: colors.textSecondary }]}>
-                If you forget your PIN, you'll lose access to old messages
+                Your messages are encrypted with your password
               </Text>
             </View>
           </View>
         </Pressable>
 
-        {/* Continue button - Native SwiftUI on iOS */}
-        {canContinue && (
-          <View style={styles.footer}>
-            {Platform.OS === 'ios' ? (
+        {/* Buttons */}
+        <View style={styles.footer}>
+          {canContinue && (
+            Platform.OS === 'ios' ? (
               <Host style={styles.nativeButtonHost}>
                 <SwiftUIButton onPress={handleContinue}>
                   Continue
@@ -235,9 +233,17 @@ export default function PinSetupScreen() {
               >
                 <Text style={styles.continueButtonText}>Continue</Text>
               </TouchableOpacity>
-            )}
-          </View>
-        )}
+            )
+          )}
+          
+          {step === 'create' && (
+            <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+              <Text style={[styles.skipButtonText, { color: colors.textSecondary }]}>
+                Skip for now
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -336,6 +342,7 @@ const styles = StyleSheet.create({
   footer: {
     padding: Layout.spacing.lg,
     paddingBottom: Layout.spacing.xl,
+    gap: Layout.spacing.md,
   },
   nativeButtonHost: {
     height: 50,
@@ -350,5 +357,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: Layout.fontSize.md,
     fontWeight: Layout.fontWeight.semibold,
+  },
+  skipButton: {
+    alignItems: 'center',
+    padding: Layout.spacing.sm,
+  },
+  skipButtonText: {
+    fontSize: Layout.fontSize.md,
   },
 });
