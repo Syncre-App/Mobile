@@ -7,7 +7,7 @@
     "icon": "./assets/logo.png",
     "scheme": "syncre",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "jsEngine": "hermes",
     "notification": {
       "icon": "./assets/logo.png",

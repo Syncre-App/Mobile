@@ -490,19 +490,19 @@ export default function TabLayout() {
         })}
       >
         <NativeTabs.Trigger name="index">
-          <Icon sf={{ default: 'message', selected: 'message.fill' }} drawable="ic_chat" />
+          <Icon sfSymbol={{ default: 'message', selected: 'message.fill' }} />
           <Label>Chats</Label>
           {unreadBadge && <Badge>{unreadBadge}</Badge>}
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="friends" role="search">
-          <Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} drawable="ic_friends" />
+          <Icon sfSymbol={{ default: 'person.2', selected: 'person.2.fill' }} />
           <Label>Friends</Label>
           {friendRequestsBadge && <Badge>{friendRequestsBadge}</Badge>}
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="profile">
-          <Icon sf={{ default: 'person.circle', selected: 'person.circle.fill' }} drawable="ic_profile" />
+          <Icon sfSymbol={{ default: 'person.circle', selected: 'person.circle.fill' }} />
           <Label>Profile</Label>
         </NativeTabs.Trigger>
       </NativeTabs>

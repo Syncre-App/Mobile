@@ -1,35 +1,41 @@
 import React from 'react';
 import { Platform, StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
-import { BlurView as ExpoBlurView } from 'expo-blur';
 import { BlurView as NativeBlurView } from '@react-native-community/blur';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { md3Colors, md3Elevation } from '../theme/md3Theme';
+import { md3Elevation } from '../theme/md3Theme';
 
 const isIOS = Platform.OS === 'ios';
 const isAndroid = Platform.OS === 'android';
 
-// Cache the liquid glass availability check
-let _liquidGlassAvailable: boolean | null = null;
-const checkLiquidGlass = (): boolean => {
-  if (_liquidGlassAvailable === null) {
-    try {
-      _liquidGlassAvailable = isLiquidGlassAvailable();
-    } catch {
-      _liquidGlassAvailable = false;
-    }
+// SwiftUI components for iOS
+let SwiftUIHost: any = null;
+let SwiftUIRoundedRectangle: any = null;
+let glassEffect: any = null;
+let GlassEffectContainer: any = null;
+
+if (isIOS) {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIHost = swiftUI.Host;
+    SwiftUIRoundedRectangle = swiftUI.RoundedRectangle;
+    GlassEffectContainer = swiftUI.GlassEffectContainer;
+    const modifiers = require('@expo/ui/swift-ui/modifiers');
+    glassEffect = modifiers.glassEffect;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
   }
-  return _liquidGlassAvailable;
-};
+}
 
 interface NativeBlurProps {
   intensity?: number;
   tint?: 'light' | 'dark' | 'default';
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
-  /** For iOS 26+ GlassView: 'regular' or 'clear' */
-  glassStyle?: 'regular' | 'clear';
-  /** For iOS 26+ GlassView: whether the glass should be interactive */
+  /** Glass variant for iOS: 'regular', 'clear', or 'identity' */
+  glassVariant?: 'regular' | 'clear' | 'identity';
+  /** Whether the glass should be interactive (iOS) */
   isInteractive?: boolean;
+  /** Corner radius for the blur container */
+  cornerRadius?: number;
   /** MD3 elevation level for Android (0-5) */
   elevation?: 0 | 1 | 2 | 3 | 4 | 5;
 }
@@ -41,8 +47,9 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
   tint = defaultTint,
   style,
   children,
-  glassStyle = 'regular',
+  glassVariant = 'regular',
   isInteractive = false,
+  cornerRadius = 20,
   elevation = 2,
 }) => {
   // Android: Material Design 3 Surface
@@ -55,6 +62,7 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
           {
             backgroundColor: elevationStyle.backgroundColor,
             elevation: elevationStyle.elevation,
+            borderRadius: cornerRadius,
           },
           style,
         ]}
@@ -64,22 +72,34 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
     );
   }
 
-  // iOS 26+: Native Liquid Glass
-  if (checkLiquidGlass()) {
+  // iOS: Try SwiftUI GlassEffect first, fallback to native blur
+  if (SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
     return (
-      <GlassView
-        style={[styles.container, style]}
-        glassEffectStyle={glassStyle}
-        isInteractive={isInteractive}
-      >
+      <View style={[styles.container, { borderRadius: cornerRadius }, style]}>
+        <GlassEffectContainer spacing={0}>
+          <SwiftUIHost style={StyleSheet.absoluteFillObject}>
+            <SwiftUIRoundedRectangle
+              cornerRadius={cornerRadius}
+              modifiers={[
+                glassEffect({
+                  glass: {
+                    variant: glassVariant,
+                    interactive: isInteractive,
+                  },
+                  shape: 'rectangle',
+                }),
+              ]}
+            />
+          </SwiftUIHost>
+        </GlassEffectContainer>
         <View style={styles.content}>
           {children}
         </View>
-      </GlassView>
+      </View>
     );
   }
 
-  // iOS < 26: Traditional blur effect
+  // iOS Fallback: Traditional blur effect with @react-native-community/blur
   const blurType = tint === 'light'
     ? 'ultraThinMaterialLight'
     : tint === 'dark'
@@ -93,7 +113,7 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
       : 'rgba(28, 28, 30, 0.75)';
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { borderRadius: cornerRadius }, style]}>
       <NativeBlurView
         style={StyleSheet.absoluteFillObject}
         blurType={blurType}
@@ -111,31 +131,31 @@ export const BlurPresets = {
   card: { 
     intensity: isIOS ? 28 : 40, 
     tint: defaultTint,
-    glassStyle: 'regular' as const,
+    glassVariant: 'regular' as const,
     elevation: 2 as const,
   },
   modal: { 
     intensity: isIOS ? 42 : 60, 
     tint: defaultTint,
-    glassStyle: 'regular' as const,
+    glassVariant: 'regular' as const,
     elevation: 4 as const,
   },
   overlay: { 
     intensity: isIOS ? 58 : 80, 
     tint: defaultTint,
-    glassStyle: 'clear' as const,
+    glassVariant: 'clear' as const,
     elevation: 5 as const,
   },
   navigation: { 
     intensity: isIOS ? 32 : 50, 
     tint: defaultTint,
-    glassStyle: 'regular' as const,
+    glassVariant: 'regular' as const,
     elevation: 3 as const,
   },
   toast: { 
     intensity: isIOS ? 36 : 55, 
     tint: defaultTint,
-    glassStyle: 'clear' as const,
+    glassVariant: 'clear' as const,
     elevation: 3 as const,
   },
 } as const;
