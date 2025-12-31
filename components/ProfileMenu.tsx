@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { UserAvatar } from './UserAvatar';
 import { palette, radii, spacing, font } from '../theme/designSystem';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS BottomSheet
 let SwiftUIBottomSheet: any = null;
@@ -39,6 +40,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   isOnline,
 }) => {
   const router = useRouter();
+  const shouldUseSwiftUI = canUseSwiftUI();
   // Ref to ignore immediate overlay presses right after the modal opens
   const openedAtRef = React.useRef<number | null>(null);
 
@@ -166,7 +168,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (Platform.OS === 'ios' && SwiftUIBottomSheet) {
+  if (shouldUseSwiftUI && SwiftUIBottomSheet) {
     return (
       <SwiftUIBottomSheet
         isPresented={visible}

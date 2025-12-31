@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform, View, StyleProp, ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
 let Host: any = null;
@@ -65,6 +66,7 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
   onMenuWillShow,
   onMenuWillHide,
 }) => {
+  const shouldUseSwiftUI = canUseSwiftUI();
   if (disabled) {
     return <View style={style}>{children}</View>;
   }
@@ -72,7 +74,7 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: SwiftUI ContextMenu
   // ═══════════════════════════════════════════════════════════════
-  if (Platform.OS === 'ios' && Host && ContextMenu && Button) {
+  if (shouldUseSwiftUI && Host && ContextMenu && Button) {
     const handleActionPress = (action: ContextMenuAction) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       action.onPress();

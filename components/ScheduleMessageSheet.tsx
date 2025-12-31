@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { font, palette, radii, spacing } from '../theme/designSystem';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
 let SwiftUIBottomSheet: any = null;
@@ -67,6 +68,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   onSchedule,
   messagePreview,
 }) => {
+  const shouldUseSwiftUI = canUseSwiftUI();
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const date = new Date();
     date.setMinutes(date.getMinutes() + 30);
@@ -263,7 +265,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native BottomSheet with SwiftUI DatePicker
   // ═══════════════════════════════════════════════════════════════
-  if (Platform.OS === 'ios' && SwiftUIBottomSheet) {
+  if (shouldUseSwiftUI && SwiftUIBottomSheet) {
     return (
       <SwiftUIBottomSheet
         isPresented={visible}

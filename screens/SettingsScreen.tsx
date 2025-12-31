@@ -20,6 +20,7 @@ import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { SpotifyConnection } from '../components/SpotifyConnection';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
 let SwiftUIHost: any = null;
@@ -60,6 +61,7 @@ export const SettingsScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true);
   const appVersion = UpdateService.getCurrentVersion();
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   const handleBack = () => {
     router.back();
@@ -113,7 +115,7 @@ export const SettingsScreen: React.FC = () => {
   // ═══════════════════════════════════════════════════════════════
   // iOS: SwiftUI Form
   // ═══════════════════════════════════════════════════════════════
-  if (Platform.OS === 'ios' && SwiftUIHost && SwiftUIForm && SwiftUISection && SwiftUISwitch) {
+  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIForm && SwiftUISection && SwiftUISwitch) {
     return (
       <SafeAreaView
         style={[styles.container, { paddingTop: extraTopPadding }]}

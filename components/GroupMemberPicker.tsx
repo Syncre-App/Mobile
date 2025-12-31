@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { UserAvatar } from './UserAvatar';
 import { font, palette, radii, spacing } from '../theme/designSystem';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
 let SwiftUIBottomSheet: any = null;
@@ -68,6 +69,7 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
 }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   const lockedSet = useMemo(() => new Set(lockedIds.map((id) => id.toString())), [lockedIds]);
   const excludedSet = useMemo(
@@ -272,7 +274,7 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (Platform.OS === 'ios' && SwiftUIBottomSheet) {
+  if (shouldUseSwiftUI && SwiftUIBottomSheet) {
     return (
       <SwiftUIBottomSheet
         isPresented={visible}

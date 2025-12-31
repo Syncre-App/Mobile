@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { font, palette, radii, spacing } from '../theme/designSystem';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
 let SwiftUIBottomSheet: any = null;
@@ -47,6 +48,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
   const [multiSelect, setMultiSelect] = useState(false);
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   const resetForm = useCallback(() => {
     setQuestion('');
@@ -205,7 +207,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (Platform.OS === 'ios' && SwiftUIBottomSheet) {
+  if (shouldUseSwiftUI && SwiftUIBottomSheet) {
     return (
       <SwiftUIBottomSheet
         isPresented={visible}

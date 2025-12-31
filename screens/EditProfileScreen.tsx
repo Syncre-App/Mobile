@@ -22,6 +22,7 @@ import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
 import { font, palette, spacing, radii } from '../theme/designSystem';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
 let SwiftUIHost: any = null;
@@ -78,6 +79,7 @@ export const EditProfileScreen: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<{ uri: string; mimeType: string; fileName?: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   useEffect(() => {
     loadUserProfile();
@@ -248,7 +250,7 @@ export const EditProfileScreen: React.FC = () => {
   // ═══════════════════════════════════════════════════════════════
   // iOS: SwiftUI Form with React Native avatar picker
   // ═══════════════════════════════════════════════════════════════
-  if (Platform.OS === 'ios' && SwiftUIHost && SwiftUIForm && SwiftUISection) {
+  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIForm && SwiftUISection) {
     return (
       <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />

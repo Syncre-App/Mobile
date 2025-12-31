@@ -21,6 +21,7 @@ import { ApiService } from '../services/ApiService';
 import { CryptoService } from '../services/CryptoService';
 import { IdentityService } from '../services/IdentityService';
 import { AppBackground } from '../components/AppBackground';
+import { canUseSwiftUI } from '../utils/swiftUi';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 
 // SwiftUI imports for iOS
@@ -57,6 +58,7 @@ export const PrivacyScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const minTopPadding = spacing.lg;
   const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   const [contentFilter, setContentFilter] = useState<'standard' | 'none'>('standard');
   const [isRotatingKeys, setIsRotatingKeys] = useState(false);
@@ -353,7 +355,7 @@ export const PrivacyScreen: React.FC = () => {
   // ═══════════════════════════════════════════════════════════════
   // iOS: SwiftUI Form
   // ═══════════════════════════════════════════════════════════════
-  if (Platform.OS === 'ios' && SwiftUIHost && SwiftUIForm && SwiftUISection) {
+  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIForm && SwiftUISection) {
     return (
       <SafeAreaView
         style={[styles.container, { paddingTop: extraTopPadding }]}

@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { NativeBlur } from './NativeBlur';
 import { gradients, palette, radii, shadows, tokens } from '../theme/designSystem';
 import { md3Colors, getMd3CardStyle, type CardVariant } from '../theme/md3Theme';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 const isIOS = Platform.OS === 'ios';
 const isAndroid = Platform.OS === 'android';
@@ -51,6 +52,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 }) => {
   const isHero = variant === 'hero';
   const isSubtle = variant === 'subtle';
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   // ═══════════════════════════════════════════════════════════════
   // ANDROID: Material Design 3 Card
@@ -77,7 +79,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Try SwiftUI GlassEffect first
   // ═══════════════════════════════════════════════════════════════
-  if (SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
+  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
     const glassVariant = isSubtle ? 'clear' : 'regular';
     const tintColor = isHero ? palette.accent : undefined;
     

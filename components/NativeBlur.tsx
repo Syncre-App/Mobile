@@ -2,6 +2,7 @@ import React from 'react';
 import { Platform, StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import { BlurView as NativeBlurView } from '@react-native-community/blur';
 import { md3Elevation } from '../theme/md3Theme';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 const isIOS = Platform.OS === 'ios';
 const isAndroid = Platform.OS === 'android';
@@ -52,6 +53,7 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
   cornerRadius = 20,
   elevation = 2,
 }) => {
+  const shouldUseSwiftUI = canUseSwiftUI();
   // Android: Material Design 3 Surface
   if (isAndroid) {
     const elevationStyle = md3Elevation[`level${elevation}`];
@@ -73,7 +75,7 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
   }
 
   // iOS: Try SwiftUI GlassEffect first, fallback to native blur
-  if (SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
+  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
     return (
       <View style={[styles.container, { borderRadius: cornerRadius }, style]}>
         <GlassEffectContainer spacing={0}>

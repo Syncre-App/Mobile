@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { font, palette, radii, spacing } from '../theme/designSystem';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
 let SwiftUIBottomSheet: any = null;
@@ -42,6 +43,7 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
   onSelectDuration,
 }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   const handleToggleModal = () => {
     setIsModalVisible(!isModalVisible);
@@ -104,7 +106,7 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
       </Pressable>
 
       {/* iOS: Native BottomSheet */}
-      {Platform.OS === 'ios' && SwiftUIBottomSheet ? (
+      {shouldUseSwiftUI && SwiftUIBottomSheet ? (
         <SwiftUIBottomSheet
           isPresented={isModalVisible}
           onDismiss={() => setIsModalVisible(false)}

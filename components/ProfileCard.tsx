@@ -18,6 +18,7 @@ import { BadgeRow } from './BadgeIcon';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS BottomSheet
 let SwiftUIBottomSheet: any = null;
@@ -79,6 +80,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 }) => {
   const [spotifyActivity, setSpotifyActivity] = useState<SpotifyActivity | null>(null);
   const [isLoadingSpotify, setIsLoadingSpotify] = useState(false);
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   const fetchSpotifyActivity = useCallback(async () => {
     if (!user?.id) return;
@@ -265,7 +267,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (Platform.OS === 'ios' && SwiftUIBottomSheet) {
+  if (shouldUseSwiftUI && SwiftUIBottomSheet) {
     return (
       <SwiftUIBottomSheet
         isPresented={visible}

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { font, gradients, palette, radii, spacing } from '../theme/designSystem';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI components for iOS
 let SwiftUIHost: any = null;
@@ -54,8 +55,9 @@ export const TransparentField: React.FC<TransparentFieldProps> = ({
   onSuffixPress,
   editable = true,
 }) => {
+  const shouldUseSwiftUI = canUseSwiftUI();
   // iOS: Try SwiftUI TextField/SecureField
-  if (Platform.OS === 'ios' && SwiftUIHost && (SwiftUITextField || SwiftUISecureField)) {
+  if (shouldUseSwiftUI && SwiftUIHost && (SwiftUITextField || SwiftUISecureField)) {
     const FieldComponent = secureTextEntry ? SwiftUISecureField : SwiftUITextField;
     
     if (FieldComponent) {
