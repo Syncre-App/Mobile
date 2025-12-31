@@ -7,4 +7,7 @@
    <FileRef
       location = "group:Syncre.xcodeproj">
    </FileRef>
+   <FileRef
+      location = "group:syncre.xcodeproj">
+   </FileRef>
 </Workspace>
