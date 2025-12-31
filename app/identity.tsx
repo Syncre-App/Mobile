@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GlassCard } from '../components/GlassCard';
+
 import { AppBackground } from '../components/AppBackground';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
@@ -177,7 +177,7 @@ export default function IdentityScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          <GlassCard width="100%" style={styles.card}>
+          <View style={styles.card}>
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.subtitle}>{subtitle}</Text>
 
@@ -236,7 +236,7 @@ export default function IdentityScreen() {
                 <Text style={styles.buttonText}>{mode === 'setup' ? 'Save PIN' : 'Unlock'}</Text>
               )}
             </TouchableOpacity>
-          </GlassCard>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -265,6 +265,11 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     alignSelf: 'center',
     gap: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 20,
   },
   title: {
     color: '#ffffff',

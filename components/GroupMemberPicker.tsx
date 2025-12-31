@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -11,8 +12,20 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { NativeBlur, BlurPresets } from './NativeBlur';
 import { UserAvatar } from './UserAvatar';
+import { font, palette, radii, spacing } from '../theme/designSystem';
+
+// SwiftUI imports for iOS
+let SwiftUIBottomSheet: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+  } catch (e) {
+    console.warn('SwiftUI BottomSheet not available:', e);
+  }
+}
 
 interface Friend {
   id: string;
@@ -178,86 +191,109 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
     );
   };
 
+  // Shared content component
+  const SheetContent = () => (
+    <View style={styles.sheetContent}>
+      <View style={styles.sheetHeader}>
+        <Text style={styles.sheetTitle}>{title}</Text>
+        <Pressable style={styles.closeButton} onPress={onClose} accessibilityRole="button">
+          <Ionicons name="close" size={18} color="#ffffff" />
+        </Pressable>
+      </View>
+
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search friends"
+        placeholderTextColor="rgba(255, 255, 255, 0.5)"
+        value={search}
+        onChangeText={setSearch}
+      />
+
+      {lockedParticipants.length ? (
+        <View style={styles.lockedSection}>
+          <Text style={styles.lockedLabel}>Already included</Text>
+          {lockedParticipants.map((participant) => (
+            <View key={participant.id} style={styles.lockedChip}>
+              <UserAvatar
+                uri={participant.profile_picture || undefined}
+                name={participant.username}
+                size={28}
+                style={styles.lockedAvatar}
+              />
+              <Text style={styles.lockedName}>{participant.username}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+      {isLoading ? (
+        <View style={styles.loadingState}>
+          <ActivityIndicator color="#FFFFFF" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredFriends}
+          keyExtractor={(item) => item.id?.toString?.() ?? String(item.id)}
+          renderItem={renderFriend}
+          contentContainerStyle={styles.friendList}
+          style={styles.friendListContainer}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No friends available for this action.</Text>
+          }
+        />
+      )}
+
+      <View style={styles.sheetFooter}>
+        <Text style={styles.counterText}>
+          {totalWithOwner}/{maxTotal} people
+        </Text>
+        <Pressable
+          style={[
+            styles.confirmButton,
+            (!minSatisfied || isSubmitting) && styles.confirmButtonDisabled,
+          ]}
+          disabled={!minSatisfied || isSubmitting}
+          onPress={handleConfirm}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#0B1630" />
+          ) : (
+            <Text style={styles.confirmButtonText}>
+              {mode === 'create' ? 'Continue' : 'Add'}
+            </Text>
+          )}
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: Native BottomSheet
+  // ═══════════════════════════════════════════════════════════════
+  if (Platform.OS === 'ios' && SwiftUIBottomSheet) {
+    return (
+      <SwiftUIBottomSheet
+        isPresented={visible}
+        onDismiss={onClose}
+        detents={['medium', 'large']}
+        preferGrabberVisible
+      >
+        <SheetContent />
+      </SwiftUIBottomSheet>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Android / Fallback: Modal
+  // ═══════════════════════════════════════════════════════════════
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
         <View style={styles.sheetContainer}>
-          <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
-          <View style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{title}</Text>
-              <Pressable style={styles.closeButton} onPress={onClose} accessibilityRole="button">
-                <Ionicons name="close" size={18} color="#ffffff" />
-              </Pressable>
-            </View>
-
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search friends"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-              value={search}
-              onChangeText={setSearch}
-            />
-
-            {lockedParticipants.length ? (
-              <View style={styles.lockedSection}>
-                <Text style={styles.lockedLabel}>Already included</Text>
-                {lockedParticipants.map((participant) => (
-                  <View key={participant.id} style={styles.lockedChip}>
-                    <UserAvatar
-                      uri={participant.profile_picture || undefined}
-                      name={participant.username}
-                      size={28}
-                      style={styles.lockedAvatar}
-                    />
-                    <Text style={styles.lockedName}>{participant.username}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-            {isLoading ? (
-              <View style={styles.loadingState}>
-                <ActivityIndicator color="#FFFFFF" />
-              </View>
-            ) : (
-              <FlatList
-                data={filteredFriends}
-                keyExtractor={(item) => item.id?.toString?.() ?? String(item.id)}
-                renderItem={renderFriend}
-                contentContainerStyle={styles.friendList}
-                style={styles.friendListContainer}
-                ListEmptyComponent={
-                  <Text style={styles.emptyText}>No friends available for this action.</Text>
-                }
-              />
-            )}
-
-            <View style={styles.sheetFooter}>
-              <Text style={styles.counterText}>
-                {totalWithOwner}/{maxTotal} people
-              </Text>
-              <Pressable
-                style={[
-                  styles.confirmButton,
-                  (!minSatisfied || isSubmitting) && styles.confirmButtonDisabled,
-                ]}
-                disabled={!minSatisfied || isSubmitting}
-                onPress={handleConfirm}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#0B1630" />
-                ) : (
-                  <Text style={styles.confirmButtonText}>
-                    {mode === 'create' ? 'Continue' : 'Add'}
-                  </Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
+          <SheetContent />
         </View>
       </View>
     </Modal>
@@ -273,11 +309,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   sheetContainer: {
-    borderRadius: 24,
+    borderRadius: radii.xl,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
     maxHeight: '80%',
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
   },
   sheetContent: {
     paddingHorizontal: 20,
@@ -293,7 +330,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#ffffff',
     fontSize: 20,
-    fontWeight: '600',
+    ...font('semibold'),
   },
   closeButton: {
     width: 32,
@@ -305,7 +342,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
+    borderRadius: radii.lg,
     paddingHorizontal: 16,
     paddingVertical: 10,
     color: '#ffffff',
@@ -333,7 +370,7 @@ const styles = StyleSheet.create({
   lockedName: {
     color: '#ffffff',
     fontSize: 14,
-    fontWeight: '600',
+    ...font('semibold'),
   },
   friendListContainer: {
     maxHeight: 300,
@@ -357,7 +394,7 @@ const styles = StyleSheet.create({
   friendName: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '500',
+    ...font('medium'),
   },
   friendStatus: {
     color: 'rgba(255, 255, 255, 0.6)',
@@ -397,7 +434,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: radii.full,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
@@ -406,7 +443,7 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: '#0B1630',
-    fontWeight: '600',
+    ...font('semibold'),
     fontSize: 15,
   },
   errorText: {

@@ -15,7 +15,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppBackground } from '../components/AppBackground';
 import { notificationService } from '../services/NotificationService';
-import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { font, palette, radii, spacing } from '../theme/designSystem';
@@ -56,7 +55,7 @@ export const RegisterScreen: React.FC = () => {
 
     setErrorMessage(null);
     setLoading(true);
-    console.log('📝 Starting registration for:', e, '(username:', u, ')');
+    console.log('Starting registration for:', e, '(username:', u, ')');
 
     try {
       const response = await ApiService.post('/auth/register', {
@@ -66,21 +65,21 @@ export const RegisterScreen: React.FC = () => {
         acceptedTerms: true,
       });
 
-      console.log('📝 Register response:', response);
+      console.log('Register response:', response);
 
       if (response.success) {
         const verified = response.data?.verified ?? false;
-        console.log('📧 User verified status:', verified);
+        console.log('User verified status:', verified);
 
         if (!verified) {
-          console.log('📧 User needs verification, redirecting to verify screen');
+          console.log('User needs verification, redirecting to verify screen');
           notificationService.show('success', 'Please check your email for a verification code.', 'Registration successful');
           router.replace({
             pathname: '/verify' as any,
             params: { email: e },
           } as any);
         } else {
-          console.log('✅ User already verified, registration complete');
+          console.log('User already verified, registration complete');
           notificationService.show('success', 'Registration completed successfully!', 'Registration successful');
           router.replace({
             pathname: '/verify' as any,
@@ -88,13 +87,13 @@ export const RegisterScreen: React.FC = () => {
           } as any);
         }
       } else {
-        console.log('❌ Registration failed:', response.error);
+        console.log('Registration failed:', response.error);
         const errorMessage = response.error || 'Registration error occurred';
         setErrorMessage(errorMessage);
         notificationService.show('error', errorMessage || 'Registration failed', 'Error');
       }
     } catch (error: any) {
-      console.log('❌ Registration exception:', error);
+      console.log('Registration exception:', error);
       const msg = error.toString();
       if (msg.includes('Connection refused') || msg.includes('Network Error')) {
         const message = `Connection error: server not reachable (${ApiService.baseUrl})`;
@@ -136,7 +135,7 @@ export const RegisterScreen: React.FC = () => {
           <Text style={styles.subtitle}>Encryption-first chat across mobile.</Text>
         </View>
 
-        <GlassCard style={styles.formCard} variant="subtle" padding={spacing.lg}>
+        <View style={styles.formCard}>
           <View style={styles.formContainer}>
             <TransparentField
               placeholder="Username"
@@ -217,11 +216,12 @@ export const RegisterScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        </GlassCard>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -236,22 +236,6 @@ const styles = StyleSheet.create({
   hero: {
     alignItems: 'center',
     gap: spacing.sm,
-  },
-  logoGradient: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#2C82FF',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 18,
-    elevation: 18,
-    marginBottom: spacing.sm,
   },
   overline: {
     color: palette.textSubtle,
@@ -276,6 +260,11 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     alignSelf: 'center',
+    padding: spacing.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   formContainer: {
     paddingBottom: spacing.xs,

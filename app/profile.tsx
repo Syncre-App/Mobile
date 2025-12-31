@@ -11,7 +11,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassCard } from '../components/GlassCard';
+
 import { AppBackground } from '../components/AppBackground';
 import { UpdateService } from '../services/UpdateService';
 import { font, palette, spacing, radii } from '../theme/designSystem';
@@ -123,7 +123,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.contentColumn}>
         {/* Account Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Account</Text>
           </View>
@@ -154,10 +154,10 @@ export default function ProfileScreen() {
               router.push('/settings/privacy' as any);
             }
           )}
-        </GlassCard>
+        </View>
 
         {/* About Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>About</Text>
           </View>
@@ -182,17 +182,17 @@ export default function ProfileScreen() {
               Alert.alert('Help & Support', 'Support will be available in future updates');
             }
           )}
-        </GlassCard>
+        </View>
 
         {/* Logout Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
+        <View style={styles.section}>
           {renderSettingItem(
             'log-out',
             'Logout',
             'Sign out of your account',
             handleLogout
           )}
-        </GlassCard>
+        </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -258,6 +258,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     alignSelf: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   sectionHeader: {
     paddingHorizontal: spacing.lg,

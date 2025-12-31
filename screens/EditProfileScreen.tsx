@@ -17,12 +17,38 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackground } from '../components/AppBackground';
-import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
 import { font, palette, spacing, radii } from '../theme/designSystem';
+
+// SwiftUI imports for iOS
+let SwiftUIHost: any = null;
+let SwiftUIForm: any = null;
+let SwiftUISection: any = null;
+let SwiftUIButton: any = null;
+let SwiftUIHStack: any = null;
+let SwiftUIText: any = null;
+let SwiftUIImage: any = null;
+let SwiftUISpacer: any = null;
+
+// Try to import SwiftUI components (iOS only)
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIHost = swiftUI.Host;
+    SwiftUIForm = swiftUI.Form;
+    SwiftUISection = swiftUI.Section;
+    SwiftUIButton = swiftUI.Button;
+    SwiftUIHStack = swiftUI.HStack;
+    SwiftUIText = swiftUI.Text;
+    SwiftUIImage = swiftUI.Image;
+    SwiftUISpacer = swiftUI.Spacer;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
+  }
+}
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 const MAX_PROFILE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -205,6 +231,115 @@ export const EditProfileScreen: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
+        <AppBackground />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={palette.accent} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const displayImage = selectedImage?.uri || profilePicture;
+
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: SwiftUI Form with React Native avatar picker
+  // ═══════════════════════════════════════════════════════════════
+  if (Platform.OS === 'ios' && SwiftUIHost && SwiftUIForm && SwiftUISection) {
+    return (
+      <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <AppBackground />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+
+          <View style={styles.headerCentered} pointerEvents="none">
+            <Text style={styles.headerTitle}>Edit Profile</Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={handleUpload}
+            disabled={!selectedImage || uploading}
+            style={[styles.headerButton, (!selectedImage || uploading) && styles.headerButtonDisabled]}
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Ionicons name="checkmark" size={24} color={selectedImage ? palette.accent : 'rgba(255,255,255,0.3)'} />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Profile Picture Section (React Native for image picker) */}
+        <View style={styles.avatarSection}>
+          <TouchableOpacity style={styles.avatarRow} onPress={handlePickImage} activeOpacity={0.8}>
+            <View style={styles.avatarContainer}>
+              {displayImage ? (
+                <Image source={{ uri: displayImage }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="person" size={40} color="rgba(255, 255, 255, 0.5)" />
+                </View>
+              )}
+              {selectedImage && (
+                <View style={styles.avatarBadge}>
+                  <Ionicons name="ellipse" size={12} color={palette.accent} />
+                </View>
+              )}
+            </View>
+            <View style={styles.avatarTexts}>
+              <Text style={styles.avatarTitle}>Change Photo</Text>
+              <Text style={styles.avatarSubtitle}>
+                {selectedImage ? 'New photo selected' : 'Tap to select a new photo'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.3)" />
+          </TouchableOpacity>
+        </View>
+
+        {/* SwiftUI Form for Account Info */}
+        <SwiftUIHost style={styles.formHost}>
+          <SwiftUIForm>
+            <SwiftUISection header="Account Info">
+              <SwiftUIHStack spacing={8}>
+                <SwiftUIImage systemName="person" color="white" size={18} />
+                <SwiftUIText color="primary">Username</SwiftUIText>
+                <SwiftUISpacer />
+                <SwiftUIText color="secondary">{user?.username || '—'}</SwiftUIText>
+              </SwiftUIHStack>
+
+              <SwiftUIHStack spacing={8}>
+                <SwiftUIImage systemName="envelope" color="white" size={18} />
+                <SwiftUIText color="primary">Email</SwiftUIText>
+                <SwiftUISpacer />
+                <SwiftUIText color="secondary">{user?.email || '—'}</SwiftUIText>
+              </SwiftUIHStack>
+            </SwiftUISection>
+          </SwiftUIForm>
+        </SwiftUIHost>
+
+        {/* Hint */}
+        <View style={styles.hintContainer}>
+          <Ionicons name="information-circle-outline" size={16} color={palette.textMuted} />
+          <Text style={styles.hintText}>
+            Username and email cannot be changed here. Contact support if you need to update them.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Android / Fallback: React Native components
+  // ═══════════════════════════════════════════════════════════════
+
   const renderSettingItem = (
     icon: string,
     title: string,
@@ -232,20 +367,6 @@ export const EditProfileScreen: React.FC = () => {
       ) : null}
     </TouchableOpacity>
   );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
-        <AppBackground />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={palette.accent} />
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const displayImage = selectedImage?.uri || profilePicture;
 
   return (
     <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
@@ -281,12 +402,12 @@ export const EditProfileScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Picture Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Profile Picture</Text>
           </View>
 
-          <TouchableOpacity style={styles.avatarRow} onPress={handlePickImage} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.avatarRowSection} onPress={handlePickImage} activeOpacity={0.8}>
             <View style={styles.avatarContainer}>
               {displayImage ? (
                 <Image source={{ uri: displayImage }} style={styles.avatar} />
@@ -309,10 +430,10 @@ export const EditProfileScreen: React.FC = () => {
             </View>
             <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.3)" />
           </TouchableOpacity>
-        </GlassCard>
+        </View>
 
         {/* Account Info Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Account Info</Text>
           </View>
@@ -333,7 +454,7 @@ export const EditProfileScreen: React.FC = () => {
             undefined,
             undefined
           )}
-        </GlassCard>
+        </View>
 
         {/* Hint */}
         <View style={styles.hintContainer}>
@@ -404,8 +525,24 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.lg,
   },
+  formHost: {
+    flex: 1,
+  },
+  avatarSection: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    overflow: 'hidden',
+  },
   section: {
     marginBottom: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
     width: '100%',
     maxWidth: 440,
@@ -422,6 +559,12 @@ const styles = StyleSheet.create({
     ...font('semibold'),
   },
   avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  avatarRowSection: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,

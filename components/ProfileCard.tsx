@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,12 +13,23 @@ import {
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { NativeBlur, BlurPresets } from './NativeBlur';
 import { UserAvatar } from './UserAvatar';
 import { BadgeRow } from './BadgeIcon';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+
+// SwiftUI imports for iOS BottomSheet
+let SwiftUIBottomSheet: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+  } catch (e) {
+    console.warn('SwiftUI BottomSheet not available:', e);
+  }
+}
 
 interface SpotifyActivity {
   isPlaying: boolean;
@@ -145,6 +157,132 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 
   if (!user) return null;
 
+  // Shared content component
+  const CardContent = () => (
+    <>
+      {/* Profile Header */}
+      <View style={styles.profileHeader}>
+        <UserAvatar
+          uri={user.profile_picture}
+          name={user.username}
+          size={100}
+          presence={presence}
+          presencePlacement="overlay"
+        />
+
+        <View style={styles.nameContainer}>
+          <Text style={styles.username}>{user.username}</Text>
+          {user.badges && user.badges.length > 0 && (
+            <BadgeRow badges={user.badges} size={24} spacing={6} style={styles.badges} />
+          )}
+        </View>
+
+        {/* Status */}
+        <View style={styles.statusContainer}>
+          <View style={[styles.statusDot, { backgroundColor: getPresenceColor() }]} />
+          <Text style={[styles.statusText, { color: getPresenceColor() }]}>
+            {getPresenceText()}
+          </Text>
+        </View>
+      </View>
+
+      {/* Spotify Activity */}
+      {isLoadingSpotify ? (
+        <View style={styles.spotifyContainer}>
+          <ActivityIndicator size="small" color="#1DB954" />
+        </View>
+      ) : spotifyActivity?.track ? (
+        <View style={styles.spotifyContainer}>
+          <View style={styles.spotifyHeader}>
+            <Ionicons
+              name={spotifyActivity.isPlaying ? 'play-circle' : 'pause-circle'}
+              size={16}
+              color="#1DB954"
+            />
+            <Text style={styles.spotifyLabel}>
+              {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
+            </Text>
+          </View>
+          <View style={styles.spotifyContent}>
+            {spotifyActivity.track.albumArt && (
+              <Image
+                source={{ uri: spotifyActivity.track.albumArt }}
+                style={styles.albumArt}
+                contentFit="cover"
+              />
+            )}
+            <View style={styles.trackInfo}>
+              <Text style={styles.trackName} numberOfLines={1}>
+                {spotifyActivity.track.name}
+              </Text>
+              <Text style={styles.trackArtist} numberOfLines={1}>
+                {spotifyActivity.track.artist}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Action Buttons */}
+      <View style={styles.actionsContainer}>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => handleAction(() => onRemoveFriend(user.id))}
+        >
+          <Ionicons name="person-remove-outline" size={20} color={palette.error} />
+          <Text style={[styles.actionText, { color: palette.error }]}>
+            Remove friend
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => handleAction(() => onBlockUser(user.id))}
+        >
+          <Ionicons
+            name={isBlocked ? 'lock-open-outline' : 'ban-outline'}
+            size={20}
+            color={palette.warning}
+          />
+          <Text style={[styles.actionText, { color: palette.warning }]}>
+            {isBlocked ? 'Unblock' : 'Block'}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => handleAction(() => onReportUser(user.id))}
+        >
+          <Ionicons name="flag-outline" size={20} color={palette.textMuted} />
+          <Text style={[styles.actionText, { color: palette.textMuted }]}>
+            Report
+          </Text>
+        </Pressable>
+      </View>
+    </>
+  );
+
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: Native BottomSheet
+  // ═══════════════════════════════════════════════════════════════
+  if (Platform.OS === 'ios' && SwiftUIBottomSheet) {
+    return (
+      <SwiftUIBottomSheet
+        isPresented={visible}
+        onDismiss={onClose}
+        detents={['medium']}
+        preferGrabberVisible
+      >
+        <View style={styles.sheetContent}>
+          <CardContent />
+        </View>
+      </SwiftUIBottomSheet>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Android / Fallback: Modal with blur overlay
+  // ═══════════════════════════════════════════════════════════════
   return (
     <Modal
       visible={visible}
@@ -154,7 +292,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       statusBarTranslucent
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <NativeBlur {...BlurPresets.modal} style={styles.blurOverlay}>
+        <View style={styles.blurOverlay}>
           <Pressable style={styles.cardContainer} onPress={(e) => e.stopPropagation()}>
             <LinearGradient
               colors={['rgba(30, 41, 59, 0.95)', 'rgba(15, 23, 42, 0.98)']}
@@ -167,108 +305,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 <Ionicons name="close" size={24} color={palette.textMuted} />
               </Pressable>
 
-              {/* Profile Header */}
-              <View style={styles.profileHeader}>
-                <UserAvatar
-                  uri={user.profile_picture}
-                  name={user.username}
-                  size={100}
-                  presence={presence}
-                  presencePlacement="overlay"
-                />
-
-                <View style={styles.nameContainer}>
-                  <Text style={styles.username}>{user.username}</Text>
-                  {user.badges && user.badges.length > 0 && (
-                    <BadgeRow badges={user.badges} size={24} spacing={6} style={styles.badges} />
-                  )}
-                </View>
-
-                {/* Status */}
-                <View style={styles.statusContainer}>
-                  <View style={[styles.statusDot, { backgroundColor: getPresenceColor() }]} />
-                  <Text style={[styles.statusText, { color: getPresenceColor() }]}>
-                    {getPresenceText()}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Spotify Activity */}
-              {isLoadingSpotify ? (
-                <View style={styles.spotifyContainer}>
-                  <ActivityIndicator size="small" color="#1DB954" />
-                </View>
-              ) : spotifyActivity?.track ? (
-                <View style={styles.spotifyContainer}>
-                  <View style={styles.spotifyHeader}>
-                    <Ionicons
-                      name={spotifyActivity.isPlaying ? 'play-circle' : 'pause-circle'}
-                      size={16}
-                      color="#1DB954"
-                    />
-                    <Text style={styles.spotifyLabel}>
-                      {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
-                    </Text>
-                  </View>
-                  <View style={styles.spotifyContent}>
-                    {spotifyActivity.track.albumArt && (
-                      <Image
-                        source={{ uri: spotifyActivity.track.albumArt }}
-                        style={styles.albumArt}
-                        contentFit="cover"
-                      />
-                    )}
-                    <View style={styles.trackInfo}>
-                      <Text style={styles.trackName} numberOfLines={1}>
-                        {spotifyActivity.track.name}
-                      </Text>
-                      <Text style={styles.trackArtist} numberOfLines={1}>
-                        {spotifyActivity.track.artist}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ) : null}
-
-              {/* Action Buttons */}
-              <View style={styles.actionsContainer}>
-                <Pressable
-                  style={styles.actionButton}
-                  onPress={() => handleAction(() => onRemoveFriend(user.id))}
-                >
-                  <Ionicons name="person-remove-outline" size={20} color={palette.error} />
-                  <Text style={[styles.actionText, { color: palette.error }]}>
-                    Remove friend
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={styles.actionButton}
-                  onPress={() => handleAction(() => onBlockUser(user.id))}
-                >
-                  <Ionicons
-                    name={isBlocked ? 'lock-open-outline' : 'ban-outline'}
-                    size={20}
-                    color={palette.warning}
-                  />
-                  <Text style={[styles.actionText, { color: palette.warning }]}>
-                    {isBlocked ? 'Unblock' : 'Block'}
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={styles.actionButton}
-                  onPress={() => handleAction(() => onReportUser(user.id))}
-                >
-                  <Ionicons name="flag-outline" size={20} color={palette.textMuted} />
-                  <Text style={[styles.actionText, { color: palette.textMuted }]}>
-                    Report
-                  </Text>
-                </Pressable>
-              </View>
+              <CardContent />
             </LinearGradient>
           </Pressable>
-        </NativeBlur>
+        </View>
       </Pressable>
     </Modal>
   );
@@ -286,6 +326,7 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   cardContainer: {
     width: SCREEN_WIDTH - spacing.xl * 2,
@@ -301,6 +342,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 40,
     elevation: 24,
+  },
+  sheetContent: {
+    padding: spacing.xl,
+    paddingTop: spacing.md,
   },
   closeButton: {
     position: 'absolute',

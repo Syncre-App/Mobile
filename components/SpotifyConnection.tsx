@@ -17,7 +17,6 @@ import { font, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
-import { GlassCard } from './GlassCard';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -162,11 +161,11 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
 
   if (isLoading) {
     return (
-      <GlassCard width="100%" variant="default" padding={spacing.md}>
+      <View style={styles.cardContainer}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={palette.accent} />
         </View>
-      </GlassCard>
+      </View>
     );
   }
 
@@ -200,7 +199,7 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
   }
 
   return (
-    <GlassCard width="100%" variant="default" padding={0}>
+    <View style={styles.cardContainer}>
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -271,11 +270,18 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
           </View>
         )}
       </View>
-    </GlassCard>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  cardContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    overflow: 'hidden',
+  },
   container: {},
   loadingContainer: {
     padding: spacing.lg,

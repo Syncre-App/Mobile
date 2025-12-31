@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppBackground } from '../components/AppBackground';
-import { GlassCard } from '../components/GlassCard';
+
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { CryptoService } from '../services/CryptoService';
@@ -149,7 +149,7 @@ export const PasswordResetScreen: React.FC = () => {
           </Text>
         </View>
 
-        <GlassCard style={styles.card} variant="subtle" padding={spacing.lg}>
+        <View style={styles.card}>
           <View style={styles.stack}>
             <TransparentField
               placeholder="Email"
@@ -242,7 +242,7 @@ export const PasswordResetScreen: React.FC = () => {
               <Text style={styles.expiry}>Link expires at {formattedExpiry}</Text>
             ) : null}
           </View>
-        </GlassCard>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -287,6 +287,11 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: spacing.lg,
   },
   stack: {
     gap: spacing.sm,

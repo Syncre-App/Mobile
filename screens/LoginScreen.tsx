@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -12,7 +11,6 @@ import {
     View,
 } from 'react-native';
 import { AppBackground } from '../components/AppBackground';
-import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
@@ -135,7 +133,7 @@ export const LoginScreen: React.FC = () => {
           <Text style={styles.heroSubtitle}>Stay close. Own your data.</Text>
         </View>
 
-        <GlassCard width="100%" style={styles.card} variant="subtle" padding={spacing.lg}>
+        <View style={styles.card}>
           <View style={styles.cardContent}>
             <Text style={styles.title}>Sign in to Syncre</Text>
             <Text style={styles.subtitle}>Secure messaging that mirrors our web glow.</Text>
@@ -199,7 +197,7 @@ export const LoginScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        </GlassCard>
+        </View>
       </ScrollView>
     </View>
   );
@@ -221,7 +219,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  logo: { width: 96, height: 96, marginBottom: spacing.sm },
   overline: {
     color: palette.textSubtle,
     ...font('displayMedium'),
@@ -240,7 +237,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     ...font('regular'),
   },
-  card: { width: '100%', maxWidth: 420 },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    padding: spacing.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
   cardContent: { width: '100%' },
   title: {
     color: palette.text,

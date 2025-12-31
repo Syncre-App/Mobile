@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppBackground } from '../components/AppBackground';
-import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
@@ -69,12 +68,6 @@ export const VerifyScreen: React.FC = () => {
     }
   };
 
-  const handlePaste = (text: string) => {
-    const normalized = text.replace(/\D/g, '').slice(0, CODE_LENGTH);
-    const next = Array.from({ length: CODE_LENGTH }, (_, idx) => normalized[idx] ?? '');
-    setCodeDigits(next);
-  };
-
   const handleVerify = async () => {
     const code = codeDigits.join('').trim();
     if (code.length !== CODE_LENGTH) {
@@ -83,7 +76,7 @@ export const VerifyScreen: React.FC = () => {
     }
 
     setLoading(true);
-    console.log('✅ Starting verification for:', email, 'with code:', code);
+    console.log('Starting verification for:', email, 'with code:', code);
 
     try {
       const response = await ApiService.post('/auth/verify', {
@@ -91,10 +84,10 @@ export const VerifyScreen: React.FC = () => {
         code,
       });
 
-      console.log('✅ Verify response:', response);
+      console.log('Verify response:', response);
 
       if (response.success && response.data) {
-        console.log('✅ Verification successful');
+        console.log('Verification successful');
         
         const { token, user } = response.data as any;
         
@@ -111,19 +104,19 @@ export const VerifyScreen: React.FC = () => {
           console.warn('Verify: server returned no user object');
         }
         
-  notificationService.show('success', 'Account verification successful!', 'Success');
+        notificationService.show('success', 'Account verification successful!', 'Success');
         router.replace('/home' as any);
       } else {
-        console.log('❌ Verification failed:', response.error);
-  notificationService.show('error', response.error || 'Verification failed', 'Error');
+        console.log('Verification failed:', response.error);
+        notificationService.show('error', response.error || 'Verification failed', 'Error');
       }
     } catch (error: any) {
-      console.log('❌ Verification exception:', error);
+      console.log('Verification exception:', error);
       const msg = error.toString();
       if (msg.includes('Connection refused') || msg.includes('Network Error')) {
-  notificationService.show('error', `Connection error: server not reachable (${ApiService.baseUrl})`, 'Error');
+        notificationService.show('error', `Connection error: server not reachable (${ApiService.baseUrl})`, 'Error');
       } else {
-  notificationService.show('error', `Error: ${error.message || error}`, 'Error');
+        notificationService.show('error', `Error: ${error.message || error}`, 'Error');
       }
     } finally {
       setLoading(false);
@@ -146,7 +139,7 @@ export const VerifyScreen: React.FC = () => {
           <Text style={styles.description}>We sent a code to {email}</Text>
         </View>
 
-        <GlassCard style={styles.card} variant="subtle" padding={spacing.lg}>
+        <View style={styles.card}>
           <View style={styles.content}>
             <View style={styles.codeRow}>
               {Array.from({ length: CODE_LENGTH }).map((_, idx) => (
@@ -169,8 +162,6 @@ export const VerifyScreen: React.FC = () => {
                   autoCapitalize="none"
                   autoCorrect={false}
                   onSubmitEditing={handleVerify}
-                  onFocus={() => {
-                  }}
                 />
               ))}
             </View>
@@ -194,11 +185,12 @@ export const VerifyScreen: React.FC = () => {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </GlassCard>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -238,6 +230,11 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     alignSelf: 'center',
+    padding: spacing.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   content: {
     gap: spacing.md,
@@ -262,19 +259,6 @@ const styles = StyleSheet.create({
   codeInputFilled: {
     borderColor: palette.accent,
     backgroundColor: 'rgba(37, 99, 235, 0.08)',
-  },
-  pasteChip: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.3)',
-  },
-  pasteText: {
-    color: palette.textMuted,
-    fontSize: 13,
-    ...font('medium'),
   },
   verifyButton: {
     width: '100%',

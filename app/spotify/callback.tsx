@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppBackground } from '../../components/AppBackground';
-import { GlassCard } from '../../components/GlassCard';
+
 import { font, palette, radii, spacing } from '../../theme/designSystem';
 
 const AUTO_RETURN_MS = 1400;
@@ -54,7 +54,7 @@ const SpotifyCallbackScreen: React.FC = () => {
       <AppBackground />
 
       <View style={styles.content}>
-        <GlassCard width={340} variant="hero" padding={spacing.lg}>
+        <View style={styles.card}>
           <View style={styles.cardContent}>
             <View style={[styles.iconWrap, isSuccess ? styles.iconSuccess : styles.iconError]}>
               <Ionicons
@@ -76,7 +76,7 @@ const SpotifyCallbackScreen: React.FC = () => {
               </Pressable>
             )}
           </View>
-        </GlassCard>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -92,6 +92,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+  },
+  card: {
+    width: 340,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    padding: spacing.lg,
   },
   cardContent: {
     alignItems: 'center',

@@ -59,7 +59,7 @@ export default function RootLayout() {
         }
 
         setMaintenance(false);
-        return { path: '/home', allowChatNavigation: true };
+        return { path: '/(tabs)', allowChatNavigation: true };
       }
 
       setMaintenance(false);
@@ -189,6 +189,7 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="index" />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="home" />
           <Stack.Screen name="register" />
           <Stack.Screen name="verify" />
@@ -207,6 +208,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings/blocked-users" options={{ title: 'Blocked Users' }} />
           <Stack.Screen name="spotify/callback" />
           <Stack.Screen name="share/index" />
+          <Stack.Screen name="wrap/[date]" />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

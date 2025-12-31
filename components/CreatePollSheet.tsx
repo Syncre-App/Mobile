@@ -13,7 +13,18 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassCard } from './GlassCard';
+
+// SwiftUI imports for iOS
+let SwiftUIBottomSheet: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+  } catch (e) {
+    console.warn('SwiftUI BottomSheet not available:', e);
+  }
+}
 
 const MAX_OPTIONS = 10;
 const MAX_OPTION_LENGTH = 50;
@@ -94,6 +105,122 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   const isValid = question.trim().length > 0 &&
     options.filter((opt) => opt.trim().length > 0).length >= MIN_OPTIONS;
 
+  // Shared content component
+  const SheetContent = () => (
+    <View style={styles.content}>
+      <View style={styles.header}>
+        <Ionicons name="stats-chart" size={24} color={palette.accent} />
+        <Text style={styles.title}>Create poll</Text>
+        <Pressable onPress={handleClose} style={styles.closeButton}>
+          <Ionicons name="close" size={22} color={palette.textMuted} />
+        </Pressable>
+      </View>
+
+      <ScrollView
+        style={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.label}>Question</Text>
+        <TextInput
+          style={styles.questionInput}
+          value={question}
+          onChangeText={(text) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
+          placeholder="What's the question?"
+          placeholderTextColor="rgba(255, 255, 255, 0.4)"
+          multiline
+          maxLength={MAX_QUESTION_LENGTH}
+        />
+        <Text style={styles.charCount}>
+          {question.length}/{MAX_QUESTION_LENGTH}
+        </Text>
+
+        <Text style={styles.label}>Options</Text>
+        {options.map((option, index) => (
+          <View key={index} style={styles.optionRow}>
+            <View style={styles.optionNumber}>
+              <Text style={styles.optionNumberText}>{index + 1}</Text>
+            </View>
+            <TextInput
+              style={styles.optionInput}
+              value={option}
+              onChangeText={(text) => handleOptionChange(index, text)}
+              placeholder={`${index + 1}. option`}
+              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              maxLength={MAX_OPTION_LENGTH}
+            />
+            {options.length > MIN_OPTIONS && (
+              <Pressable
+                onPress={() => handleRemoveOption(index)}
+                style={styles.removeOptionButton}
+              >
+                <Ionicons name="close-circle" size={22} color="#EF4444" />
+              </Pressable>
+            )}
+          </View>
+        ))}
+
+        {options.length < MAX_OPTIONS && (
+          <Pressable style={styles.addOptionButton} onPress={handleAddOption}>
+            <Ionicons name="add-circle-outline" size={20} color={palette.accent} />
+            <Text style={styles.addOptionText}>Add option</Text>
+          </Pressable>
+        )}
+
+        <Pressable
+          style={styles.multiSelectRow}
+          onPress={() => {
+            setMultiSelect(!multiSelect);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }}
+        >
+          <View style={[styles.checkbox, multiSelect && styles.checkboxChecked]}>
+            {multiSelect && <Ionicons name="checkmark" size={14} color="#ffffff" />}
+          </View>
+          <Text style={styles.multiSelectText}>Allow multiple answers</Text>
+        </Pressable>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Pressable style={styles.cancelButton} onPress={handleClose}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.createButton,
+            (!isValid || isCreating) && styles.createButtonDisabled,
+          ]}
+          onPress={handleCreate}
+          disabled={!isValid || isCreating}
+        >
+          <Ionicons name="stats-chart" size={18} color="#ffffff" />
+          <Text style={styles.createButtonText}>
+            {isCreating ? 'Creating...' : 'Create'}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: Native BottomSheet
+  // ═══════════════════════════════════════════════════════════════
+  if (Platform.OS === 'ios' && SwiftUIBottomSheet) {
+    return (
+      <SwiftUIBottomSheet
+        isPresented={visible}
+        onDismiss={handleClose}
+        detents={['medium', 'large']}
+        preferGrabberVisible
+      >
+        <SheetContent />
+      </SwiftUIBottomSheet>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Android / Fallback: Modal
+  // ═══════════════════════════════════════════════════════════════
   return (
     <Modal
       visible={visible}
@@ -106,101 +233,9 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
         style={styles.modalOverlay}
       >
         <Pressable style={styles.backdrop} onPress={handleClose} />
-        <GlassCard width="90%" variant="default" padding={0}>
-          <View style={styles.content}>
-            <View style={styles.header}>
-              <Ionicons name="stats-chart" size={24} color={palette.accent} />
-              <Text style={styles.title}>Create poll</Text>
-              <Pressable onPress={handleClose} style={styles.closeButton}>
-                <Ionicons name="close" size={22} color={palette.textMuted} />
-              </Pressable>
-            </View>
-
-            <ScrollView
-              style={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={styles.label}>Question</Text>
-              <TextInput
-                style={styles.questionInput}
-                value={question}
-                onChangeText={(text) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
-                placeholder="What's the question?"
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                multiline
-                maxLength={MAX_QUESTION_LENGTH}
-              />
-              <Text style={styles.charCount}>
-                {question.length}/{MAX_QUESTION_LENGTH}
-              </Text>
-
-              <Text style={styles.label}>Options</Text>
-              {options.map((option, index) => (
-                <View key={index} style={styles.optionRow}>
-                  <View style={styles.optionNumber}>
-                    <Text style={styles.optionNumberText}>{index + 1}</Text>
-                  </View>
-                  <TextInput
-                    style={styles.optionInput}
-                    value={option}
-                    onChangeText={(text) => handleOptionChange(index, text)}
-                    placeholder={`${index + 1}. option`}
-                    placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                    maxLength={MAX_OPTION_LENGTH}
-                  />
-                  {options.length > MIN_OPTIONS && (
-                    <Pressable
-                      onPress={() => handleRemoveOption(index)}
-                      style={styles.removeOptionButton}
-                    >
-                      <Ionicons name="close-circle" size={22} color="#EF4444" />
-                    </Pressable>
-                  )}
-                </View>
-              ))}
-
-              {options.length < MAX_OPTIONS && (
-                <Pressable style={styles.addOptionButton} onPress={handleAddOption}>
-                  <Ionicons name="add-circle-outline" size={20} color={palette.accent} />
-                  <Text style={styles.addOptionText}>Add option</Text>
-                </Pressable>
-              )}
-
-              <Pressable
-                style={styles.multiSelectRow}
-                onPress={() => {
-                  setMultiSelect(!multiSelect);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-              >
-                <View style={[styles.checkbox, multiSelect && styles.checkboxChecked]}>
-                  {multiSelect && <Ionicons name="checkmark" size={14} color="#ffffff" />}
-                </View>
-                <Text style={styles.multiSelectText}>Allow multiple answers</Text>
-              </Pressable>
-            </ScrollView>
-
-            <View style={styles.footer}>
-              <Pressable style={styles.cancelButton} onPress={handleClose}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.createButton,
-                  (!isValid || isCreating) && styles.createButtonDisabled,
-                ]}
-                onPress={handleCreate}
-                disabled={!isValid || isCreating}
-              >
-                <Ionicons name="stats-chart" size={18} color="#ffffff" />
-                <Text style={styles.createButtonText}>
-                  {isCreating ? 'Creating...' : 'Create'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </GlassCard>
+        <View style={styles.cardContainer}>
+          <SheetContent />
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -216,6 +251,15 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  cardContainer: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
   },
   content: {
     maxHeight: 500,

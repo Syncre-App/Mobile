@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { AppBackground } from '../../components/AppBackground';
-import { GlassCard } from '../../components/GlassCard';
+
 import { UserAvatar } from '../../components/UserAvatar';
 import { font, layout, palette, radii, spacing } from '../../theme/designSystem';
 import { ApiService } from '../../services/ApiService';
@@ -119,7 +119,7 @@ export default function DailyWrapScreen() {
       const base64 = dataUrl.replace('data:image/png;base64,', '');
       const cacheDir =
         (FileSystem as any).cacheDirectory ||
-        FileSystem.documentDirectory ||
+        (FileSystem as any).documentDirectory ||
         '';
       const fileUri = `${cacheDir}wrap-${wrap.statDate || 'today'}.png`;
       const encoding: any =
@@ -201,7 +201,7 @@ export default function DailyWrapScreen() {
           </View>
         ) : wrap ? (
           <>
-            <GlassCard width="100%" style={styles.card}>
+            <View style={styles.card}>
               <View style={styles.statRow}>
                 <View style={styles.statBlock}>
                   <Text style={styles.statLabel}>Total messages</Text>
@@ -226,7 +226,7 @@ export default function DailyWrapScreen() {
                 <Text style={styles.sectionTitle}>Hourly activity</Text>
                 {renderHourChart()}
               </View>
-            </GlassCard>
+            </View>
 
             <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
               <Text style={styles.shareButtonText}>Share wrap card</Text>
@@ -350,6 +350,11 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.maxContentWidth,
     gap: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: spacing.md,
   },
   statRow: {
     flexDirection: 'row',

@@ -10,7 +10,20 @@ import {
   View,
 } from 'react-native';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassCard } from './GlassCard';
+
+// SwiftUI imports for iOS
+let SwiftUIBottomSheet: any = null;
+let SwiftUIDatePicker: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIDatePicker = swiftUI.DatePicker;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
+  }
+}
 
 interface ScheduleMessageSheetProps {
   visible: boolean;
@@ -85,6 +98,10 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
     }
   };
 
+  const handleSwiftUIDateChange = (date: Date) => {
+    setSelectedDate(date);
+  };
+
   const handleConfirm = () => {
     if (selectedDate <= new Date()) {
       return;
@@ -95,20 +112,12 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
 
   const openDatePicker = () => {
     setPickerMode('date');
-    if (Platform.OS === 'android') {
-      setShowDatePicker(true);
-    } else {
-      setShowDatePicker(true);
-    }
+    setShowDatePicker(true);
   };
 
   const openTimePicker = () => {
     setPickerMode('time');
-    if (Platform.OS === 'android') {
-      setShowTimePicker(true);
-    } else {
-      setShowTimePicker(true);
-    }
+    setShowTimePicker(true);
   };
 
   const quickScheduleOptions = [
@@ -133,6 +142,143 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
 
   const isValidDate = selectedDate > new Date();
 
+  // Shared content component
+  const SheetContent = ({ useSwiftUIDatePicker = false }: { useSwiftUIDatePicker?: boolean }) => (
+    <View style={styles.content}>
+      <View style={styles.header}>
+        <Ionicons name="calendar-outline" size={24} color={palette.text} />
+        <Text style={styles.title}>Schedule message</Text>
+        <Pressable onPress={onClose} style={styles.closeButton}>
+          <Ionicons name="close" size={20} color={palette.textMuted} />
+        </Pressable>
+      </View>
+
+      {messagePreview ? (
+        <View style={styles.previewContainer}>
+          <Text style={styles.previewLabel}>Message:</Text>
+          <Text style={styles.previewText} numberOfLines={2}>
+            {messagePreview}
+          </Text>
+        </View>
+      ) : null}
+
+      <Text style={styles.sectionLabel}>Quick picks</Text>
+      <View style={styles.quickOptions}>
+        {quickScheduleOptions.map((option) => (
+          <Pressable
+            key={option.label}
+            style={styles.quickOption}
+            onPress={() => handleQuickSchedule(option)}
+          >
+            <Text style={styles.quickOptionText}>{option.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={styles.sectionLabel}>Custom time</Text>
+      
+      {useSwiftUIDatePicker && SwiftUIDatePicker ? (
+        <View style={styles.swiftUIPickerContainer}>
+          <SwiftUIDatePicker
+            date={selectedDate}
+            onDateChange={handleSwiftUIDateChange}
+            minimumDate={new Date()}
+            mode="dateAndTime"
+          />
+        </View>
+      ) : (
+        <>
+          <View style={styles.dateTimeRow}>
+            <Pressable style={styles.dateTimeButton} onPress={openDatePicker}>
+              <Ionicons name="calendar" size={18} color={palette.accent} />
+              <Text style={styles.dateTimeText}>{formatDate(selectedDate)}</Text>
+            </Pressable>
+            <Pressable style={styles.dateTimeButton} onPress={openTimePicker}>
+              <Ionicons name="time" size={18} color={palette.accent} />
+              <Text style={styles.dateTimeText}>{formatTime(selectedDate)}</Text>
+            </Pressable>
+          </View>
+
+          {(showDatePicker || showTimePicker) && Platform.OS === 'ios' && (
+            <View style={styles.pickerContainer}>
+              <DateTimePicker
+                value={selectedDate}
+                mode={pickerMode}
+                display="spinner"
+                onChange={handleDateChange}
+                minimumDate={new Date()}
+                locale="en-US"
+                textColor={palette.text}
+              />
+            </View>
+          )}
+
+          {showDatePicker && Platform.OS === 'android' && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display="default"
+              onChange={handleDateChange}
+              minimumDate={new Date()}
+            />
+          )}
+
+          {showTimePicker && Platform.OS === 'android' && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="time"
+              display="default"
+              onChange={handleDateChange}
+              is24Hour
+            />
+          )}
+        </>
+      )}
+
+      <View style={styles.footer}>
+        <Pressable style={styles.cancelButton} onPress={onClose}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.scheduleButton,
+            !isValidDate && styles.scheduleButtonDisabled,
+          ]}
+          onPress={handleConfirm}
+          disabled={!isValidDate}
+        >
+          <Ionicons name="send" size={16} color="#ffffff" />
+          <Text style={styles.scheduleButtonText}>Schedule</Text>
+        </Pressable>
+      </View>
+
+      {!isValidDate && (
+        <Text style={styles.errorText}>
+          Time must be in the future
+        </Text>
+      )}
+    </View>
+  );
+
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: Native BottomSheet with SwiftUI DatePicker
+  // ═══════════════════════════════════════════════════════════════
+  if (Platform.OS === 'ios' && SwiftUIBottomSheet) {
+    return (
+      <SwiftUIBottomSheet
+        isPresented={visible}
+        onDismiss={onClose}
+        detents={['medium', 'large']}
+        preferGrabberVisible
+      >
+        <SheetContent useSwiftUIDatePicker={!!SwiftUIDatePicker} />
+      </SwiftUIBottomSheet>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Android / Fallback: Modal
+  // ═══════════════════════════════════════════════════════════════
   return (
     <Modal
       visible={visible}
@@ -142,108 +288,9 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
     >
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()}>
-          <GlassCard width={320} variant="default" padding={0}>
-            <View style={styles.content}>
-              <View style={styles.header}>
-                <Ionicons name="calendar-outline" size={24} color={palette.text} />
-                <Text style={styles.title}>Schedule message</Text>
-                <Pressable onPress={onClose} style={styles.closeButton}>
-                  <Ionicons name="close" size={20} color={palette.textMuted} />
-                </Pressable>
-              </View>
-
-              {messagePreview ? (
-                <View style={styles.previewContainer}>
-                  <Text style={styles.previewLabel}>Message:</Text>
-                  <Text style={styles.previewText} numberOfLines={2}>
-                    {messagePreview}
-                  </Text>
-                </View>
-              ) : null}
-
-              <Text style={styles.sectionLabel}>Quick picks</Text>
-              <View style={styles.quickOptions}>
-                {quickScheduleOptions.map((option) => (
-                  <Pressable
-                    key={option.label}
-                    style={styles.quickOption}
-                    onPress={() => handleQuickSchedule(option)}
-                  >
-                    <Text style={styles.quickOptionText}>{option.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={styles.sectionLabel}>Custom time</Text>
-              <View style={styles.dateTimeRow}>
-                <Pressable style={styles.dateTimeButton} onPress={openDatePicker}>
-                  <Ionicons name="calendar" size={18} color={palette.accent} />
-                  <Text style={styles.dateTimeText}>{formatDate(selectedDate)}</Text>
-                </Pressable>
-                <Pressable style={styles.dateTimeButton} onPress={openTimePicker}>
-                  <Ionicons name="time" size={18} color={palette.accent} />
-                  <Text style={styles.dateTimeText}>{formatTime(selectedDate)}</Text>
-                </Pressable>
-              </View>
-
-              {(showDatePicker || showTimePicker) && Platform.OS === 'ios' && (
-                <View style={styles.pickerContainer}>
-                  <DateTimePicker
-                    value={selectedDate}
-                    mode={pickerMode}
-                    display="spinner"
-                    onChange={handleDateChange}
-                    minimumDate={new Date()}
-                    locale="en-US"
-                    textColor={palette.text}
-                  />
-                </View>
-              )}
-
-              {showDatePicker && Platform.OS === 'android' && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display="default"
-                  onChange={handleDateChange}
-                  minimumDate={new Date()}
-                />
-              )}
-
-              {showTimePicker && Platform.OS === 'android' && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="time"
-                  display="default"
-                  onChange={handleDateChange}
-                  is24Hour
-                />
-              )}
-
-              <View style={styles.footer}>
-                <Pressable style={styles.cancelButton} onPress={onClose}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.scheduleButton,
-                    !isValidDate && styles.scheduleButtonDisabled,
-                  ]}
-                  onPress={handleConfirm}
-                  disabled={!isValidDate}
-                >
-                  <Ionicons name="send" size={16} color="#ffffff" />
-                  <Text style={styles.scheduleButtonText}>Schedule</Text>
-                </Pressable>
-              </View>
-
-              {!isValidDate && (
-                <Text style={styles.errorText}>
-                  Time must be in the future
-                </Text>
-              )}
-            </View>
-          </GlassCard>
+          <View style={styles.cardContainer}>
+            <SheetContent />
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -257,6 +304,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
+  },
+  cardContainer: {
+    width: 320,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
   },
   content: {
     padding: spacing.md,
@@ -338,6 +393,10 @@ const styles = StyleSheet.create({
   },
   pickerContainer: {
     marginBottom: spacing.md,
+  },
+  swiftUIPickerContainer: {
+    marginBottom: spacing.md,
+    alignItems: 'center',
   },
   footer: {
     flexDirection: 'row',

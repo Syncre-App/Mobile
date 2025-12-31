@@ -2,13 +2,25 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassCard } from './GlassCard';
+
+// SwiftUI imports for iOS
+let SwiftUIBottomSheet: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+  } catch (e) {
+    console.warn('SwiftUI BottomSheet not available:', e);
+  }
+}
 
 export type EphemeralDuration = '5m' | '1h' | '24h' | '7d' | null;
 
@@ -42,6 +54,40 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
 
   const isActive = selectedDuration !== null;
 
+  // Shared content component
+  const SheetContent = () => (
+    <View style={styles.modalContent}>
+      <View style={styles.modalHeader}>
+        <Ionicons name="timer-outline" size={24} color={palette.text} />
+        <Text style={styles.modalTitle}>Disappearing Message</Text>
+      </View>
+      <Text style={styles.modalDescription}>
+        Choose how long before this message disappears
+      </Text>
+
+      <View style={styles.optionsList}>
+        {DURATION_OPTIONS.map((option) => (
+          <Pressable
+            key={option.value ?? 'off'}
+            style={[
+              styles.optionItem,
+              selectedDuration === option.value && styles.optionItemSelected,
+            ]}
+            onPress={() => handleSelectOption(option.value)}
+          >
+            <View style={styles.optionContent}>
+              <Text style={styles.optionLabel}>{option.label}</Text>
+              <Text style={styles.optionDescription}>{option.description}</Text>
+            </View>
+            {selectedDuration === option.value && (
+              <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
+            )}
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
   return (
     <>
       <Pressable
@@ -57,49 +103,33 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
         />
       </Pressable>
 
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setIsModalVisible(false)}>
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <GlassCard width={280} variant="default" padding={0}>
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Ionicons name="timer-outline" size={24} color={palette.text} />
-                  <Text style={styles.modalTitle}>Disappearing Message</Text>
-                </View>
-                <Text style={styles.modalDescription}>
-                  Choose how long before this message disappears
-                </Text>
-
-                <View style={styles.optionsList}>
-                  {DURATION_OPTIONS.map((option) => (
-                    <Pressable
-                      key={option.value ?? 'off'}
-                      style={[
-                        styles.optionItem,
-                        selectedDuration === option.value && styles.optionItemSelected,
-                      ]}
-                      onPress={() => handleSelectOption(option.value)}
-                    >
-                      <View style={styles.optionContent}>
-                        <Text style={styles.optionLabel}>{option.label}</Text>
-                        <Text style={styles.optionDescription}>{option.description}</Text>
-                      </View>
-                      {selectedDuration === option.value && (
-                        <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
-                      )}
-                    </Pressable>
-                  ))}
-                </View>
+      {/* iOS: Native BottomSheet */}
+      {Platform.OS === 'ios' && SwiftUIBottomSheet ? (
+        <SwiftUIBottomSheet
+          isPresented={isModalVisible}
+          onDismiss={() => setIsModalVisible(false)}
+          detents={['medium']}
+          preferGrabberVisible
+        >
+          <SheetContent />
+        </SwiftUIBottomSheet>
+      ) : (
+        /* Android / Fallback: Modal */
+        <Modal
+          visible={isModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setIsModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setIsModalVisible(false)}>
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <View style={styles.cardContainer}>
+                <SheetContent />
               </View>
-            </GlassCard>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      )}
     </>
   );
 };
@@ -118,6 +148,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
+  },
+  cardContainer: {
+    width: 280,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
   },
   modalContent: {
     padding: spacing.md,

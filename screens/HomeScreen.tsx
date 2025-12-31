@@ -19,7 +19,7 @@ import { AppBackground } from '../components/AppBackground';
 import { ChatListWidget } from '../components/ChatListWidget';
 import { FriendRequestsWidget } from '../components/FriendRequestsWidget';
 import { FriendSearchWidget } from '../components/FriendSearchWidget';
-import { GlassCard } from '../components/GlassCard';
+
 import { UserAvatar } from '../components/UserAvatar';
 import { font, layout, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
@@ -54,7 +54,7 @@ export const HomeScreen: React.FC = () => {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requestProcessingId, setRequestProcessingId] = useState<string | null>(null);
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
-  const unreadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const unreadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatsLoadingRef = useRef(false);
   const unreadLoadingRef = useRef(false);
   const validationStartedRef = useRef(false);
@@ -1066,7 +1066,7 @@ export const HomeScreen: React.FC = () => {
 
           {isNotificationsVisible && (
             <View style={styles.notificationsOverlay}>
-              <GlassCard width="100%" style={styles.notificationsCard}>
+              <View style={[styles.notificationsCard, styles.glassCardReplacement]}>
                 <View style={styles.notificationsHeader}>
                   <Text style={styles.notificationsTitle}>Notifications</Text>
                   <TouchableOpacity
@@ -1156,7 +1156,7 @@ export const HomeScreen: React.FC = () => {
                     );
                   })
                 )}
-              </GlassCard>
+              </View>
             </View>
           )}
           <View style={styles.mainColumn}>
@@ -1443,5 +1443,12 @@ const styles = StyleSheet.create({
     color: palette.error,
     fontSize: 14,
     ...font('semibold'),
+  },
+  glassCardReplacement: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: spacing.md,
   },
 });

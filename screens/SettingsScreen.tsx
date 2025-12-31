@@ -4,22 +4,51 @@ import React, { useState } from 'react';
 import {
   Alert,
   Linking,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
+  Switch as RNSwitch,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassCard } from '../components/GlassCard';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UpdateService } from '../services/UpdateService';
 import { AppBackground } from '../components/AppBackground';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { SpotifyConnection } from '../components/SpotifyConnection';
+
+// SwiftUI imports for iOS
+let SwiftUIHost: any = null;
+let SwiftUIForm: any = null;
+let SwiftUISection: any = null;
+let SwiftUISwitch: any = null;
+let SwiftUIButton: any = null;
+let SwiftUIHStack: any = null;
+let SwiftUIText: any = null;
+let SwiftUIImage: any = null;
+let SwiftUISpacer: any = null;
+
+// Try to import SwiftUI components (iOS only)
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIHost = swiftUI.Host;
+    SwiftUIForm = swiftUI.Form;
+    SwiftUISection = swiftUI.Section;
+    SwiftUISwitch = swiftUI.Switch;
+    SwiftUIButton = swiftUI.Button;
+    SwiftUIHStack = swiftUI.HStack;
+    SwiftUIText = swiftUI.Text;
+    SwiftUIImage = swiftUI.Image;
+    SwiftUISpacer = swiftUI.Spacer;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
+  }
+}
 
 const HEADER_BUTTON_DIMENSION = spacing.sm * 2 + 24;
 
@@ -29,8 +58,7 @@ export const SettingsScreen: React.FC = () => {
   const minTopPadding = spacing.lg;
   const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
+  const [darkModeEnabled, setDarkModeEnabled] = useState(true);
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
@@ -42,15 +70,11 @@ export const SettingsScreen: React.FC = () => {
       'Clear Cache',
       'This will clear all cached data. Are you sure?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Clear',
           onPress: async () => {
             try {
-              // Clear cache but keep auth token
               const token = await StorageService.getAuthToken();
               await StorageService.clear();
               if (token) {
@@ -66,6 +90,153 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  const handleBlockedUsers = () => {
+    router.push('/settings/blocked-users');
+  };
+
+  const handleReportInfo = () => {
+    Alert.alert(
+      'How to Report Content',
+      'To report objectionable content or users:\n\n- Long-press on any message in a chat\n- Select "Report" from the menu\n- Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
+      [{ text: 'Got it', style: 'default' }]
+    );
+  };
+
+  const handleCommunityGuidelines = () => {
+    Linking.openURL('https://syncre.app/terms');
+  };
+
+  const handleLanguagePress = () => {
+    Alert.alert('Language', 'Multiple languages will be supported in future updates');
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: SwiftUI Form
+  // ═══════════════════════════════════════════════════════════════
+  if (Platform.OS === 'ios' && SwiftUIHost && SwiftUIForm && SwiftUISection && SwiftUISwitch) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { paddingTop: extraTopPadding }]}
+        edges={['top', 'left', 'right']}
+      >
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <AppBackground />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          <View style={styles.headerCentered} pointerEvents="none">
+            <Text style={styles.headerTitle}>Settings</Text>
+          </View>
+          <View style={styles.headerPlaceholder} />
+        </View>
+
+        <SwiftUIHost style={styles.formHost}>
+          <SwiftUIForm>
+            {/* Notifications Section */}
+            <SwiftUISection header="Notifications">
+              <SwiftUIHStack spacing={8}>
+                <SwiftUIImage systemName="bell.fill" color="white" size={18} />
+                <SwiftUIText>Push Notifications</SwiftUIText>
+                <SwiftUISpacer />
+                <SwiftUISwitch
+                  value={notificationsEnabled}
+                  onValueChange={setNotificationsEnabled}
+                />
+              </SwiftUIHStack>
+            </SwiftUISection>
+
+            {/* Appearance Section */}
+            <SwiftUISection header="Appearance">
+              <SwiftUIHStack spacing={8}>
+                <SwiftUIImage systemName="moon.fill" color="white" size={18} />
+                <SwiftUIText>Dark Mode</SwiftUIText>
+                <SwiftUISpacer />
+                <SwiftUISwitch
+                  value={darkModeEnabled}
+                  onValueChange={setDarkModeEnabled}
+                  disabled
+                />
+              </SwiftUIHStack>
+
+              <SwiftUIButton onPress={handleLanguagePress}>
+                <SwiftUIHStack spacing={8}>
+                  <SwiftUIImage systemName="globe" color="white" size={18} />
+                  <SwiftUIText color="primary">Language</SwiftUIText>
+                  <SwiftUISpacer />
+                  <SwiftUIText color="secondary">English</SwiftUIText>
+                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
+                </SwiftUIHStack>
+              </SwiftUIButton>
+            </SwiftUISection>
+
+            {/* Storage Section */}
+            <SwiftUISection header="Storage">
+              <SwiftUIButton onPress={handleClearCache}>
+                <SwiftUIHStack spacing={8}>
+                  <SwiftUIImage systemName="trash" color="white" size={18} />
+                  <SwiftUIText color="primary">Clear Cache</SwiftUIText>
+                  <SwiftUISpacer />
+                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
+                </SwiftUIHStack>
+              </SwiftUIButton>
+            </SwiftUISection>
+
+            {/* Safety Section */}
+            <SwiftUISection header="Safety & Reporting">
+              <SwiftUIButton onPress={handleBlockedUsers}>
+                <SwiftUIHStack spacing={8}>
+                  <SwiftUIImage systemName="hand.raised" color="white" size={18} />
+                  <SwiftUIText color="primary">Blocked Users</SwiftUIText>
+                  <SwiftUISpacer />
+                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
+                </SwiftUIHStack>
+              </SwiftUIButton>
+
+              <SwiftUIButton onPress={handleReportInfo}>
+                <SwiftUIHStack spacing={8}>
+                  <SwiftUIImage systemName="flag" color="white" size={18} />
+                  <SwiftUIText color="primary">Report Content</SwiftUIText>
+                  <SwiftUISpacer />
+                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
+                </SwiftUIHStack>
+              </SwiftUIButton>
+
+              <SwiftUIButton onPress={handleCommunityGuidelines}>
+                <SwiftUIHStack spacing={8}>
+                  <SwiftUIImage systemName="shield.checkered" color="white" size={18} />
+                  <SwiftUIText color="primary">Community Guidelines</SwiftUIText>
+                  <SwiftUISpacer />
+                  <SwiftUIImage systemName="chevron.right" size={14} color="secondary" />
+                </SwiftUIHStack>
+              </SwiftUIButton>
+            </SwiftUISection>
+
+            {/* About Section */}
+            <SwiftUISection header="About">
+              <SwiftUIHStack spacing={8}>
+                <SwiftUIText>App Version</SwiftUIText>
+                <SwiftUISpacer />
+                <SwiftUIText color="secondary">{appVersion}</SwiftUIText>
+              </SwiftUIHStack>
+            </SwiftUISection>
+          </SwiftUIForm>
+        </SwiftUIHost>
+
+        {/* Integrations Section (React Native) */}
+        <View style={styles.integrationsSection}>
+          <Text style={styles.sectionTitle}>Integrations</Text>
+          <SpotifyConnection />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Android / Fallback: React Native components
+  // ═══════════════════════════════════════════════════════════════
 
   const renderSettingItem = (
     icon: string | null,
@@ -73,7 +244,7 @@ export const SettingsScreen: React.FC = () => {
     subtitle?: string,
     onPress?: () => void,
     rightComponent?: React.ReactNode,
-    hasTopBorder: boolean = true,
+    hasTopBorder: boolean = true
   ) => (
     <TouchableOpacity
       onPress={onPress}
@@ -89,19 +260,11 @@ export const SettingsScreen: React.FC = () => {
           {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
         </View>
       </View>
-      
-      {rightComponent && (
-        <View style={styles.settingRight}>
-          {rightComponent}
-        </View>
-      )}
-      
+
+      {rightComponent && <View style={styles.settingRight}>{rightComponent}</View>}
+
       {onPress && !rightComponent && (
-        <Ionicons
-          name="chevron-forward"
-          size={20}
-          color="rgba(255, 255, 255, 0.3)"
-        />
+        <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.3)" />
       )}
     </TouchableOpacity>
   );
@@ -112,7 +275,6 @@ export const SettingsScreen: React.FC = () => {
       edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
       <AppBackground />
 
       {/* Header */}
@@ -120,12 +282,9 @@ export const SettingsScreen: React.FC = () => {
         <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-
-        {/* Absolutely centered title so it aligns with centered cards */}
         <View style={styles.headerCentered} pointerEvents="none">
           <Text style={styles.headerTitle}>Settings</Text>
         </View>
-
         <View style={styles.headerPlaceholder} />
       </View>
 
@@ -135,17 +294,16 @@ export const SettingsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Notifications Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>Notifications</Text>
           </View>
-          
           {renderSettingItem(
             'notifications',
             'Push Notifications',
             'Receive notifications for new messages',
             undefined,
-            <Switch
+            <RNSwitch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
               trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
@@ -153,45 +311,35 @@ export const SettingsScreen: React.FC = () => {
             />,
             false
           )}
-        </GlassCard>
+        </View>
 
         {/* Appearance Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>Appearance</Text>
           </View>
-          
           {renderSettingItem(
             'moon',
             'Dark Mode',
             'Currently enabled by default',
             undefined,
-            <Switch
+            <RNSwitch
               value={darkModeEnabled}
               onValueChange={setDarkModeEnabled}
-              disabled={true} // Disabled for now
+              disabled={true}
               trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
               thumbColor="white"
             />,
             false
           )}
-          
-          {renderSettingItem(
-            'language',
-            'Language',
-            selectedLanguage,
-            () => {
-              Alert.alert('Language', 'Multiple languages will be supported in future updates');
-            }
-          )}
-        </GlassCard>
+          {renderSettingItem('language', 'Language', 'English', handleLanguagePress)}
+        </View>
 
         {/* Storage Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>Storage</Text>
           </View>
-          
           {renderSettingItem(
             'trash',
             'Clear Cache',
@@ -200,70 +348,33 @@ export const SettingsScreen: React.FC = () => {
             undefined,
             false
           )}
-        </GlassCard>
+        </View>
 
-        {/* Safety & Reporting Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
+        {/* Safety Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>Safety & Reporting</Text>
           </View>
-          
-          {renderSettingItem(
-            'ban',
-            'Blocked Users',
-            'Manage blocked users',
-            () => router.push('/settings/blocked-users'),
-            undefined,
-            false
-          )}
-
-          {renderSettingItem(
-            'flag',
-            'Report Content',
-            'Long-press any message to report',
-            () => {
-              Alert.alert(
-                'How to Report Content',
-                'To report objectionable content or users:\n\n- Long-press on any message in a chat\n- Select "Report" from the menu\n- Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
-                [{ text: 'Got it', style: 'default' }]
-              );
-            }
-          )}
-
-          {renderSettingItem(
-            'shield-checkmark',
-            'Community Guidelines',
-            'View our content policies',
-            () => Linking.openURL('https://syncre.app/terms')
-          )}
-        </GlassCard>
+          {renderSettingItem('ban', 'Blocked Users', 'Manage blocked users', handleBlockedUsers, undefined, false)}
+          {renderSettingItem('flag', 'Report Content', 'Long-press any message to report', handleReportInfo)}
+          {renderSettingItem('shield-checkmark', 'Community Guidelines', 'View our content policies', handleCommunityGuidelines)}
+        </View>
 
         {/* Integrations Section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>Integrations</Text>
           </View>
-          <View style={styles.integrationCardWrapper}>
-            <SpotifyConnection />
-          </View>
+          <SpotifyConnection />
         </View>
 
         {/* About Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>About</Text>
           </View>
-
-          {renderSettingItem(
-            null,
-            'App Version',
-            appVersion,
-            undefined,
-            undefined,
-            false
-          )}
-        </GlassCard>
-
+          {renderSettingItem(null, 'App Version', appVersion, undefined, undefined, false)}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -300,6 +411,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     ...font('display'),
   },
+  headerCentered: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   content: {
     flex: 1,
   },
@@ -308,18 +428,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'stretch',
   },
+  formHost: {
+    flex: 1,
+  },
+  integrationsSection: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
   section: {
     marginBottom: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
     width: '100%',
     maxWidth: 440,
     alignSelf: 'center',
   },
-  integrationCardWrapper: {
-    width: '100%',
-    marginTop: spacing.xs,
-  },
-  sectionHeader: {
+  sectionHeaderView: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.xs,
@@ -364,14 +491,5 @@ const styles = StyleSheet.create({
   },
   settingRight: {
     marginLeft: spacing.md,
-  },
-  headerCentered: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

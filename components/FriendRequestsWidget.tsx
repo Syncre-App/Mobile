@@ -3,7 +3,6 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassCard } from './GlassCard';
 import { UserAvatar } from './UserAvatar';
 
 interface FriendSummary {
@@ -112,7 +111,7 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
   );
 
   return (
-    <GlassCard width="100%" style={styles.card} variant="subtle" padding={spacing.lg}>
+    <View style={styles.card}>
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.label}>Social</Text>
@@ -136,13 +135,18 @@ export const FriendRequestsWidget: React.FC<FriendRequestsWidgetProps> = ({
           {outgoing.map(renderOutgoingRequest)}
         </View>
       )}
-    </GlassCard>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
     marginBottom: spacing.lg,
+    padding: spacing.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   title: {
     color: palette.text,

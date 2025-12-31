@@ -1,7 +1,31 @@
 import React from 'react';
 import { Platform, View, StyleProp, ViewStyle } from 'react-native';
-import ContextMenu from 'react-native-context-menu-view';
 import * as Haptics from 'expo-haptics';
+
+// SwiftUI imports for iOS
+let Host: any = null;
+let ContextMenu: any = null;
+let Button: any = null;
+
+// Try to import SwiftUI components (iOS only)
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    Host = swiftUI.Host;
+    ContextMenu = swiftUI.ContextMenu;
+    Button = swiftUI.Button;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
+  }
+}
+
+// Fallback for Android - use react-native-context-menu-view
+let LegacyContextMenu: any = null;
+try {
+  LegacyContextMenu = require('react-native-context-menu-view').default;
+} catch (e) {
+  console.warn('react-native-context-menu-view not available:', e);
+}
 
 export interface ContextMenuAction {
   title: string;
@@ -28,8 +52,8 @@ interface NativeContextMenuProps {
 
 /**
  * Native Context Menu component
- * Uses iOS UIMenu for native Liquid Glass context menus on iOS 26+
- * Falls back to standard context menu on older iOS and Android
+ * Uses SwiftUI ContextMenu for native Liquid Glass context menus on iOS 26+
+ * Falls back to react-native-context-menu-view on Android
  */
 export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
   children,
@@ -41,39 +65,83 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
   onMenuWillShow,
   onMenuWillHide,
 }) => {
-  // Convert our action format to react-native-context-menu-view format
-  const contextMenuActions = actions.map((action) => ({
-    title: action.title,
-    subtitle: action.subtitle,
-    systemIcon: action.systemIcon || getSystemIcon(action.title),
-    destructive: action.destructive,
-    disabled: action.disabled,
-  }));
-
-  const handlePress = (event: { nativeEvent: { index: number; name: string } }) => {
-    const actionIndex = event.nativeEvent.index;
-    if (actionIndex >= 0 && actionIndex < actions.length) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      actions[actionIndex].onPress();
-    }
-  };
-
   if (disabled) {
     return <View style={style}>{children}</View>;
   }
 
-  return (
-    <ContextMenu
-      title={title}
-      actions={contextMenuActions}
-      onPress={handlePress}
-      previewBackgroundColor="transparent"
-      dropdownMenuMode={Platform.OS === 'android'}
-      style={style}
-    >
-      {children}
-    </ContextMenu>
-  );
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: SwiftUI ContextMenu
+  // ═══════════════════════════════════════════════════════════════
+  if (Platform.OS === 'ios' && Host && ContextMenu && Button) {
+    const handleActionPress = (action: ContextMenuAction) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      action.onPress();
+    };
+
+    return (
+      <View style={style}>
+        <Host matchContents>
+          <ContextMenu>
+            <ContextMenu.Items>
+              {actions.map((action, index) => (
+                <Button
+                  key={`${action.title}-${index}`}
+                  systemImage={action.systemIcon || getSystemIcon(action.title)}
+                  onPress={() => handleActionPress(action)}
+                  disabled={action.disabled}
+                  role={action.destructive ? 'destructive' : undefined}
+                >
+                  {action.title}
+                </Button>
+              ))}
+            </ContextMenu.Items>
+            <ContextMenu.Trigger>
+              {children}
+            </ContextMenu.Trigger>
+          </ContextMenu>
+        </Host>
+      </View>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Android: Legacy react-native-context-menu-view
+  // ═══════════════════════════════════════════════════════════════
+  if (LegacyContextMenu) {
+    const contextMenuActions = actions.map((action) => ({
+      title: action.title,
+      subtitle: action.subtitle,
+      systemIcon: action.systemIcon || getSystemIcon(action.title),
+      destructive: action.destructive,
+      disabled: action.disabled,
+    }));
+
+    const handlePress = (event: { nativeEvent: { index: number; name: string } }) => {
+      const actionIndex = event.nativeEvent.index;
+      if (actionIndex >= 0 && actionIndex < actions.length) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        actions[actionIndex].onPress();
+      }
+    };
+
+    return (
+      <LegacyContextMenu
+        title={title}
+        actions={contextMenuActions}
+        onPress={handlePress}
+        previewBackgroundColor="transparent"
+        dropdownMenuMode={true}
+        style={style}
+      >
+        {children}
+      </LegacyContextMenu>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Fallback: Just render children without context menu
+  // ═══════════════════════════════════════════════════════════════
+  return <View style={style}>{children}</View>;
 };
 
 /**

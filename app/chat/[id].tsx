@@ -5913,7 +5913,7 @@ const ChatScreen: React.FC = () => {
           <Ionicons name="ban-outline" size={64} color="rgba(255, 255, 255, 0.4)" />
           <Text style={styles.blockedUserTitle}>This user is blocked</Text>
           <Text style={styles.blockedUserSubtitle}>
-            You won't receive messages from this user while they're blocked.
+            You will not receive messages from this user while they are blocked.
           </Text>
           <Pressable
             style={[styles.unblockButton, isUnblocking && styles.unblockButtonDisabled]}
