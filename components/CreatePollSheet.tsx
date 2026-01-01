@@ -13,22 +13,6 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassySheet } from './GlassySheet';
-import { canUseSwiftUI } from '../utils/swiftUi';
-
-// SwiftUI imports for iOS
-let SwiftUIBottomSheet: any = null;
-let SwiftUIHost: any = null;
-
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIHost = swiftUI.Host;
-  } catch (e) {
-    console.warn('SwiftUI BottomSheet not available:', e);
-  }
-}
 
 const MAX_OPTIONS = 10;
 const MAX_OPTION_LENGTH = 50;
@@ -51,7 +35,6 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
   const [multiSelect, setMultiSelect] = useState(false);
-  const shouldUseSwiftUI = canUseSwiftUI();
 
   const resetForm = useCallback(() => {
     setQuestion('');
@@ -208,31 +191,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native BottomSheet
-  // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost) {
-    return (
-      <SwiftUIHost style={styles.swiftUIHost}>
-        <SwiftUIBottomSheet
-          isOpened={visible}
-          onIsOpenedChange={(isOpened: boolean) => {
-            if (!isOpened) {
-              handleClose();
-            }
-          }}
-          presentationDetents={['medium', 'large']}
-          presentationDragIndicator="visible"
-        >
-          <GlassySheet>
-            <SheetContent />
-          </GlassySheet>
-        </SwiftUIBottomSheet>
-      </SwiftUIHost>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Android / Fallback: Modal
+  // All platforms: Modal (SwiftUI BottomSheet cannot render RN children)
   // ═══════════════════════════════════════════════════════════════
   return (
     <Modal

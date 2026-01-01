@@ -1783,6 +1783,17 @@ const ChatScreen: React.FC = () => {
   const shouldUseSwiftUIEmojiPicker =
     Platform.OS === 'ios' && canUseSwiftUI() && SwiftUIHost && SwiftUIHStack && SwiftUIButton;
 
+  // Direct recipient for 1:1 chats (must be defined before handleReportUser and chatHeaderMenuActions)
+  const directRecipient = useMemo(() => {
+    if (chatDetails?.isGroup) {
+      return null;
+    }
+    const participants = chatDetails?.participants || [];
+    return (
+      participants.find((participant) => participant.id !== currentUserId) || null
+    );
+  }, [chatDetails?.isGroup, chatDetails?.participants, currentUserId]);
+
   const reactionPickerPosition = useMemo(() => {
     if (!reactionPicker) {
       return null;
@@ -5587,16 +5598,6 @@ const ChatScreen: React.FC = () => {
     }
   }, [decoratedData]);
 
-  const directRecipient = useMemo(() => {
-    if (chatDetails?.isGroup) {
-      return null;
-    }
-    const participants = chatDetails?.participants || [];
-    return (
-      participants.find((participant) => participant.id !== currentUserId) || null
-    );
-  }, [chatDetails?.isGroup, chatDetails?.participants, currentUserId]);
-
   const renderChatItem = useCallback(
     ({ item, index }: { item: ChatListItem; index: number }) => {
       if (item.kind === 'typing') {
@@ -6920,8 +6921,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 22,
   },
   messageContent: {
-    flexShrink: 1,
-    maxWidth: '90%',
+    flexShrink: 0,
   },
   messageContentFileOnly: {
     width: '100%',

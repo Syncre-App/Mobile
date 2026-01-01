@@ -10,24 +10,6 @@ import {
   View,
 } from 'react-native';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassySheet } from './GlassySheet';
-import { canUseSwiftUI } from '../utils/swiftUi';
-
-// SwiftUI imports for iOS
-let SwiftUIBottomSheet: any = null;
-let SwiftUIDatePicker: any = null;
-let SwiftUIHost: any = null;
-
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIDatePicker = swiftUI.DatePicker;
-    SwiftUIHost = swiftUI.Host;
-  } catch (e) {
-    console.warn('SwiftUI components not available:', e);
-  }
-}
 
 interface ScheduleMessageSheetProps {
   visible: boolean;
@@ -71,7 +53,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   onSchedule,
   messagePreview,
 }) => {
-  const shouldUseSwiftUI = canUseSwiftUI();
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const date = new Date();
     date.setMinutes(date.getMinutes() + 30);
@@ -101,10 +82,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
     if (date) {
       setSelectedDate(date);
     }
-  };
-
-  const handleSwiftUIDateChange = (date: Date) => {
-    setSelectedDate(date);
   };
 
   const handleConfirm = () => {
@@ -148,7 +125,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   const isValidDate = selectedDate > new Date();
 
   // Shared content component
-  const SheetContent = ({ useSwiftUIDatePicker = false }: { useSwiftUIDatePicker?: boolean }) => (
+  const SheetContent = () => (
     <View style={styles.content}>
       <View style={styles.header}>
         <Ionicons name="calendar-outline" size={24} color={palette.text} />
@@ -182,63 +159,49 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
 
       <Text style={styles.sectionLabel}>Custom time</Text>
       
-      {useSwiftUIDatePicker && SwiftUIDatePicker && SwiftUIHost ? (
-        <SwiftUIHost matchContents style={styles.swiftUIPickerContainer}>
-          <SwiftUIDatePicker
-            initialDate={selectedDate.toISOString()}
-            onDateSelected={handleSwiftUIDateChange}
-            displayedComponents="dateAndTime"
-            variant="automatic"
-            color={palette.accent}
+      <View style={styles.dateTimeRow}>
+        <Pressable style={styles.dateTimeButton} onPress={openDatePicker}>
+          <Ionicons name="calendar" size={18} color={palette.accent} />
+          <Text style={styles.dateTimeText}>{formatDate(selectedDate)}</Text>
+        </Pressable>
+        <Pressable style={styles.dateTimeButton} onPress={openTimePicker}>
+          <Ionicons name="time" size={18} color={palette.accent} />
+          <Text style={styles.dateTimeText}>{formatTime(selectedDate)}</Text>
+        </Pressable>
+      </View>
+
+      {(showDatePicker || showTimePicker) && Platform.OS === 'ios' && (
+        <View style={styles.pickerContainer}>
+          <DateTimePicker
+            value={selectedDate}
+            mode={pickerMode}
+            display="spinner"
+            onChange={handleDateChange}
+            minimumDate={new Date()}
+            locale="en-US"
+            textColor={palette.text}
           />
-        </SwiftUIHost>
-      ) : (
-        <>
-          <View style={styles.dateTimeRow}>
-            <Pressable style={styles.dateTimeButton} onPress={openDatePicker}>
-              <Ionicons name="calendar" size={18} color={palette.accent} />
-              <Text style={styles.dateTimeText}>{formatDate(selectedDate)}</Text>
-            </Pressable>
-            <Pressable style={styles.dateTimeButton} onPress={openTimePicker}>
-              <Ionicons name="time" size={18} color={palette.accent} />
-              <Text style={styles.dateTimeText}>{formatTime(selectedDate)}</Text>
-            </Pressable>
-          </View>
+        </View>
+      )}
 
-          {(showDatePicker || showTimePicker) && Platform.OS === 'ios' && (
-            <View style={styles.pickerContainer}>
-              <DateTimePicker
-                value={selectedDate}
-                mode={pickerMode}
-                display="spinner"
-                onChange={handleDateChange}
-                minimumDate={new Date()}
-                locale="en-US"
-                textColor={palette.text}
-              />
-            </View>
-          )}
+      {showDatePicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+        />
+      )}
 
-          {showDatePicker && Platform.OS === 'android' && (
-            <DateTimePicker
-              value={selectedDate}
-              mode="date"
-              display="default"
-              onChange={handleDateChange}
-              minimumDate={new Date()}
-            />
-          )}
-
-          {showTimePicker && Platform.OS === 'android' && (
-            <DateTimePicker
-              value={selectedDate}
-              mode="time"
-              display="default"
-              onChange={handleDateChange}
-              is24Hour
-            />
-          )}
-        </>
+      {showTimePicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="time"
+          display="default"
+          onChange={handleDateChange}
+          is24Hour
+        />
       )}
 
       <View style={styles.footer}>
@@ -267,31 +230,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native BottomSheet with SwiftUI DatePicker
-  // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost) {
-    return (
-      <SwiftUIHost style={styles.swiftUIHost}>
-        <SwiftUIBottomSheet
-          isOpened={visible}
-          onIsOpenedChange={(isOpened: boolean) => {
-            if (!isOpened) {
-              onClose();
-            }
-          }}
-          presentationDetents={['medium', 'large']}
-          presentationDragIndicator="visible"
-        >
-          <GlassySheet>
-            <SheetContent useSwiftUIDatePicker={!!SwiftUIDatePicker} />
-          </GlassySheet>
-        </SwiftUIBottomSheet>
-      </SwiftUIHost>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Android / Fallback: Modal
+  // All platforms: Modal (SwiftUI BottomSheet cannot render RN children)
   // ═══════════════════════════════════════════════════════════════
   return (
     <Modal

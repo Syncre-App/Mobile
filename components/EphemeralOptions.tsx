@@ -2,29 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassySheet } from './GlassySheet';
-import { canUseSwiftUI } from '../utils/swiftUi';
-
-// SwiftUI imports for iOS
-let SwiftUIBottomSheet: any = null;
-let SwiftUIHost: any = null;
-
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIHost = swiftUI.Host;
-  } catch (e) {
-    console.warn('SwiftUI BottomSheet not available:', e);
-  }
-}
 
 export type EphemeralDuration = '5m' | '1h' | '24h' | '7d' | null;
 
@@ -46,7 +29,6 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
   onSelectDuration,
 }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const shouldUseSwiftUI = canUseSwiftUI();
 
   const handleToggleModal = () => {
     setIsModalVisible(!isModalVisible);
@@ -108,37 +90,21 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
         />
       </Pressable>
 
-      {/* iOS: Native BottomSheet */}
-      {shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost ? (
-        <SwiftUIHost style={styles.swiftUIHost}>
-          <SwiftUIBottomSheet
-            isOpened={isModalVisible}
-            onIsOpenedChange={setIsModalVisible}
-            presentationDetents={['medium']}
-            presentationDragIndicator="visible"
-          >
-            <GlassySheet variant="subtle">
+      {/* All platforms: Modal (SwiftUI BottomSheet cannot render RN children) */}
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setIsModalVisible(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View style={styles.cardContainer}>
               <SheetContent />
-            </GlassySheet>
-          </SwiftUIBottomSheet>
-        </SwiftUIHost>
-      ) : (
-        /* Android / Fallback: Modal */
-        <Modal
-          visible={isModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setIsModalVisible(false)}
-        >
-          <Pressable style={styles.modalOverlay} onPress={() => setIsModalVisible(false)}>
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              <View style={styles.cardContainer}>
-                <SheetContent />
-              </View>
-            </Pressable>
+            </View>
           </Pressable>
-        </Modal>
-      )}
+        </Pressable>
+      </Modal>
     </>
   );
 };
