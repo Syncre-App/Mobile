@@ -4090,7 +4090,7 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   const handleReportUser = useCallback(async () => {
-    const targetId = otherUserIdRef.current;
+    const targetId = directRecipient?.id?.toString?.() ?? otherUserIdRef.current;
     if (!targetId) {
       NotificationService.show('error', 'Unable to identify user');
       return;
@@ -4132,10 +4132,10 @@ const ChatScreen: React.FC = () => {
         },
       ]
     );
-  }, [chatId]);
+  }, [chatId, directRecipient?.id]);
 
   const chatHeaderMenuActions = useMemo<ContextMenuAction[]>(() => {
-    const targetId = otherUserIdRef.current;
+    const targetId = directRecipient?.id?.toString?.() ?? otherUserIdRef.current;
     if (!targetId) {
       return [];
     }
@@ -4153,7 +4153,7 @@ const ChatScreen: React.FC = () => {
         onPress: handleReportUser,
       },
     ];
-  }, [handleReportUser]);
+  }, [directRecipient?.id, handleReportUser]);
 
   const handleCopyAttachmentLink = useCallback(async (attachment?: MessageAttachment | null) => {
     if (!attachment) {
@@ -5858,7 +5858,7 @@ const ChatScreen: React.FC = () => {
 
   const isGroupChat = Boolean(chatDetails?.isGroup);
   const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
-  const shouldShowAddButton = !isGroupChat && Boolean(otherUserIdRef.current);
+  const shouldShowAddButton = !isGroupChat && Boolean(directRecipient?.id || otherUserIdRef.current);
   const shouldShowSettingsButton = isGroupChat && isGroupOwner;
   const addButtonMode: 'create' | 'add' = 'create';
   const receiverPresenceLabel = useMemo(() => {
@@ -5958,7 +5958,7 @@ const ChatScreen: React.FC = () => {
           >
             <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
           </Pressable>
-        ) : !isGroupChat && otherUserIdRef.current ? (
+        ) : !isGroupChat && (directRecipient?.id || otherUserIdRef.current) ? (
           <NativeContextMenu
             title="Chat options"
             actions={chatHeaderMenuActions}

@@ -53,6 +53,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   const isHero = variant === 'hero';
   const isSubtle = variant === 'subtle';
   const shouldUseSwiftUI = canUseSwiftUI();
+  const canUseGlassEffect = shouldUseSwiftUI && Number(Platform.Version) >= 26;
 
   // ═══════════════════════════════════════════════════════════════
   // ANDROID: Material Design 3 Card
@@ -79,7 +80,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Try SwiftUI GlassEffect first
   // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
+  if (canUseGlassEffect && SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
     const glassVariant = isSubtle ? 'clear' : 'regular';
     const tintColor = isHero ? palette.accent : undefined;
     

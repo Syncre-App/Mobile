@@ -136,6 +136,7 @@ class ReencryptionServiceClass {
             recipientDeviceId: targetDeviceId,
             token,
             currentUserId,
+            forceRefresh: true,
           });
 
           await ApiService.post(

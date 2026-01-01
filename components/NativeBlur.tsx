@@ -54,6 +54,7 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
   elevation = 2,
 }) => {
   const shouldUseSwiftUI = canUseSwiftUI();
+  const canUseGlassEffect = shouldUseSwiftUI && Number(Platform.Version) >= 26;
   // Android: Material Design 3 Surface
   if (isAndroid) {
     const elevationStyle = md3Elevation[`level${elevation}`];
@@ -75,7 +76,7 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
   }
 
   // iOS: Try SwiftUI GlassEffect first, fallback to native blur
-  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
+  if (canUseGlassEffect && SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
     return (
       <View style={[styles.container, { borderRadius: cornerRadius }, style]}>
         <SwiftUIHost style={StyleSheet.absoluteFillObject}>

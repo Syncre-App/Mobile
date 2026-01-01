@@ -142,7 +142,8 @@ async function derivePassphraseKey(password: string, salt: Uint8Array, iteration
   return pbkdf2DeriveKey(SHA256, passwordBytes, salt, iterations, 32);
 }
 
-const recipientPublicKeyCache = new Map<string, { key: string; version: number }>();
+const RECIPIENT_KEY_TTL_MS = 10 * 60 * 1000;
+const recipientPublicKeyCache = new Map<string, { key: string; version: number; fetchedAt: number }>();
 
 async function encryptPrivateKey(secretKey: Uint8Array, passphraseKey: Uint8Array) {
   const cipher = new XChaCha20Poly1305(passphraseKey);
@@ -163,9 +164,13 @@ async function decryptPrivateKey(encryptedBase64: string, nonceBase64: string, p
   return decrypted;
 }
 
-async function getRecipientPublicKey(userId: string, token: string): Promise<string> {
+async function getRecipientPublicKey(
+  userId: string,
+  token: string,
+  forceRefresh: boolean = false
+): Promise<string> {
   const cached = recipientPublicKeyCache.get(userId);
-  if (cached) {
+  if (!forceRefresh && cached && Date.now() - cached.fetchedAt < RECIPIENT_KEY_TTL_MS) {
     return cached.key;
   }
 
@@ -174,6 +179,7 @@ async function getRecipientPublicKey(userId: string, token: string): Promise<str
     const entry = {
       key: identityResponse.data.publicKey,
       version: identityResponse.data.version || 1,
+      fetchedAt: Date.now(),
     };
     recipientPublicKeyCache.set(userId, entry);
     return entry.key;
@@ -193,7 +199,7 @@ async function getRecipientPublicKey(userId: string, token: string): Promise<str
     throw new Error('Missing recipient identity key');
   }
 
-  const entry = { key: fallbackKey, version: 1 };
+  const entry = { key: fallbackKey, version: 1, fetchedAt: Date.now() };
   recipientPublicKeyCache.set(userId, entry);
   return entry.key;
 }
@@ -586,11 +592,22 @@ export const CryptoService = {
     recipientDeviceId?: string | null;
     token: string;
     currentUserId: string;
+    forceRefresh?: boolean;
   }): Promise<EnvelopeEntry> {
-    const { chatId, message, recipientUserId, recipientDeviceId = null, token, currentUserId } = params;
+    const {
+      chatId,
+      message,
+      recipientUserId,
+      recipientDeviceId = null,
+      token,
+      currentUserId,
+      forceRefresh = false,
+    } = params;
     const { identity, privateKeyBytes } = await getSenderIdentity();
     const recipientKey =
-      recipientUserId === currentUserId ? identity.publicKey : await getRecipientPublicKey(recipientUserId, token);
+      recipientUserId === currentUserId
+        ? identity.publicKey
+        : await getRecipientPublicKey(recipientUserId, token, forceRefresh);
     return encryptForRecipient({
       chatId,
       message,

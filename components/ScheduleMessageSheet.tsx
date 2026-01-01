@@ -185,10 +185,11 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
       {useSwiftUIDatePicker && SwiftUIDatePicker && SwiftUIHost ? (
         <SwiftUIHost matchContents style={styles.swiftUIPickerContainer}>
           <SwiftUIDatePicker
-            date={selectedDate}
-            onDateChange={handleSwiftUIDateChange}
-            minimumDate={new Date()}
-            mode="dateAndTime"
+            initialDate={selectedDate.toISOString()}
+            onDateSelected={handleSwiftUIDateChange}
+            displayedComponents="dateAndTime"
+            variant="automatic"
+            color={palette.accent}
           />
         </SwiftUIHost>
       ) : (
