@@ -20,8 +20,13 @@ let SwiftUIText: any = null;
 let SwiftUIButton: any = null;
 let SwiftUIVStack: any = null;
 let SwiftUIHStack: any = null;
+let SwiftUIImage: any = null;
+let SwiftUISpacer: any = null;
 let SwiftUIDateTimePicker: any = null;
 let SwiftUIDivider: any = null;
+let swiftUIBackground: any = null;
+let swiftUICornerRadius: any = null;
+let swiftUIPadding: any = null;
 
 if (Platform.OS === 'ios') {
   try {
@@ -32,8 +37,14 @@ if (Platform.OS === 'ios') {
     SwiftUIButton = swiftUI.Button;
     SwiftUIVStack = swiftUI.VStack;
     SwiftUIHStack = swiftUI.HStack;
+    SwiftUIImage = swiftUI.Image;
+    SwiftUISpacer = swiftUI.Spacer;
     SwiftUIDateTimePicker = swiftUI.DateTimePicker;
     SwiftUIDivider = swiftUI.Divider;
+    const modifiers = require('@expo/ui/swift-ui/modifiers');
+    swiftUIBackground = modifiers.background;
+    swiftUICornerRadius = modifiers.cornerRadius;
+    swiftUIPadding = modifiers.padding;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -162,7 +173,25 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native SwiftUI BottomSheet with SwiftUI DatePicker
   // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet && SwiftUIText && SwiftUIButton && SwiftUIVStack && SwiftUIDateTimePicker) {
+  if (
+    shouldUseSwiftUI &&
+    SwiftUIHost &&
+    SwiftUIBottomSheet &&
+    SwiftUIText &&
+    SwiftUIButton &&
+    SwiftUIVStack &&
+    SwiftUIHStack &&
+    SwiftUIDateTimePicker
+  ) {
+    const iconModifiers =
+      swiftUIBackground && swiftUICornerRadius && swiftUIPadding
+        ? [
+            swiftUIPadding({ all: 8 }),
+            swiftUIBackground('rgba(10, 132, 255, 0.18)'),
+            swiftUICornerRadius(12),
+          ]
+        : undefined;
+
     return (
       <SwiftUIHost style={styles.swiftUIHost}>
         <SwiftUIBottomSheet
@@ -175,16 +204,46 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
           presentationDetents={['medium', 'large']}
           presentationDragIndicator="visible"
         >
-          <SwiftUIVStack spacing={16} padding={20}>
-            <SwiftUIText style="title2" fontWeight="bold">
-              Schedule Message
-            </SwiftUIText>
+          <SwiftUIVStack spacing={16} padding={20} alignment="leading">
+            <SwiftUIHStack spacing={12} alignment="center">
+              {SwiftUIImage && iconModifiers && (
+                <SwiftUIImage
+                  systemName="calendar.badge.plus"
+                  color={palette.accent}
+                  size={20}
+                  modifiers={iconModifiers}
+                />
+              )}
+              <SwiftUIVStack spacing={4} alignment="leading">
+                <SwiftUIText style="title2" fontWeight="bold">
+                  Schedule Message
+                </SwiftUIText>
+                <SwiftUIText style="subheadline" color={palette.textMuted}>
+                  Send it later without leaving the chat
+                </SwiftUIText>
+              </SwiftUIVStack>
+            </SwiftUIHStack>
 
             {messagePreview && (
-              <SwiftUIText style="caption" color={palette.textMuted} numberOfLines={2}>
-                {messagePreview}
-              </SwiftUIText>
+              <SwiftUIVStack spacing={4} alignment="leading">
+                <SwiftUIText style="caption" color={palette.textMuted}>
+                  Message preview
+                </SwiftUIText>
+                <SwiftUIText style="subheadline" numberOfLines={2}>
+                  {messagePreview}
+                </SwiftUIText>
+              </SwiftUIVStack>
             )}
+
+            <SwiftUIHStack spacing={8} alignment="center">
+              {SwiftUIImage && (
+                <SwiftUIImage systemName="clock" color={palette.textMuted} size={14} />
+              )}
+              <SwiftUIText style="subheadline" color={palette.textMuted}>
+                Scheduled for {formatDate(selectedDate)} at {formatTime(selectedDate)}
+              </SwiftUIText>
+              {SwiftUISpacer && <SwiftUISpacer />}
+            </SwiftUIHStack>
 
             {SwiftUIDivider && <SwiftUIDivider />}
 
@@ -271,8 +330,13 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
           <View style={styles.cardContainer}>
             <View style={styles.content}>
               <View style={styles.header}>
-                <Ionicons name="calendar-outline" size={24} color={palette.text} />
-                <Text style={styles.title}>Schedule message</Text>
+                <View style={styles.headerIcon}>
+                  <Ionicons name="calendar-outline" size={18} color={palette.accent} />
+                </View>
+                <View style={styles.headerText}>
+                  <Text style={styles.title}>Schedule message</Text>
+                  <Text style={styles.subtitle}>Send it later without leaving the chat</Text>
+                </View>
                 <Pressable onPress={onClose} style={styles.closeButton}>
                   <Ionicons name="close" size={20} color={palette.textMuted} />
                 </Pressable>
@@ -286,6 +350,13 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                   </Text>
                 </View>
               ) : null}
+
+              <View style={styles.summaryRow}>
+                <Ionicons name="time-outline" size={16} color={palette.textMuted} />
+                <Text style={styles.summaryText}>
+                  Scheduled for {formatDate(selectedDate)} at {formatTime(selectedDate)}
+                </Text>
+              </View>
 
               <Text style={styles.sectionLabel}>Quick picks</Text>
               <View style={styles.quickOptions}>
@@ -385,21 +456,23 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(3, 7, 18, 0.65)',
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
     padding: spacing.lg,
   },
   cardContainer: {
-    width: 320,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.98)',
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     overflow: 'hidden',
   },
   content: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   header: {
     flexDirection: 'row',
@@ -407,11 +480,26 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  title: {
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(10, 132, 255, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: {
     flex: 1,
+  },
+  title: {
     color: palette.text,
     fontSize: 18,
     ...font('semibold'),
+  },
+  subtitle: {
+    color: palette.textMuted,
+    fontSize: 12,
+    marginTop: 2,
   },
   closeButton: {
     padding: spacing.xs,
@@ -431,6 +519,19 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 14,
   },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  summaryText: {
+    color: palette.textMuted,
+    fontSize: 13,
+  },
   sectionLabel: {
     color: palette.textMuted,
     fontSize: 12,
@@ -445,10 +546,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   quickOption: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   quickOptionText: {
     color: palette.text,

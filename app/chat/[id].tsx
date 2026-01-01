@@ -50,6 +50,15 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 let SwiftUIHost: any = null;
 let SwiftUIHStack: any = null;
 let SwiftUIButton: any = null;
+let SwiftUIBottomSheet: any = null;
+let SwiftUIText: any = null;
+let SwiftUIVStack: any = null;
+let SwiftUIImage: any = null;
+let SwiftUISpacer: any = null;
+let SwiftUIDivider: any = null;
+let swiftUIBackground: any = null;
+let swiftUICornerRadius: any = null;
+let swiftUIPadding: any = null;
 
 if (Platform.OS === 'ios') {
   try {
@@ -57,6 +66,16 @@ if (Platform.OS === 'ios') {
     SwiftUIHost = swiftUI.Host;
     SwiftUIHStack = swiftUI.HStack;
     SwiftUIButton = swiftUI.Button;
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIText = swiftUI.Text;
+    SwiftUIVStack = swiftUI.VStack;
+    SwiftUIImage = swiftUI.Image;
+    SwiftUISpacer = swiftUI.Spacer;
+    SwiftUIDivider = swiftUI.Divider;
+    const modifiers = require('@expo/ui/swift-ui/modifiers');
+    swiftUIBackground = modifiers.background;
+    swiftUICornerRadius = modifiers.cornerRadius;
+    swiftUIPadding = modifiers.padding;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -609,6 +628,10 @@ const SWIPE_REPLY_RETURN_DURATION = 420;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
 const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+const REACTION_ROWS = [
+  DEFAULT_REACTIONS.slice(0, 3),
+  DEFAULT_REACTIONS.slice(3),
+];
 const huWords = [
   "bazdmeg", "bazmeg", "geci", "fasz", "kurva", "picsa", "szar", "szopd", "kibaszott",
   "buzi", "köcsög", "baszik", "kúr", "nemnormális", "balfasz", "fing", "ribanc",
@@ -1781,8 +1804,15 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   const currentUserId = user?.id ? String(user.id) : null;
-  const shouldUseSwiftUIEmojiPicker =
-    Platform.OS === 'ios' && canUseSwiftUI() && SwiftUIHost && SwiftUIHStack && SwiftUIButton;
+  const shouldUseSwiftUIReactionSheet =
+    Platform.OS === 'ios' &&
+    canUseSwiftUI() &&
+    SwiftUIHost &&
+    SwiftUIBottomSheet &&
+    SwiftUIText &&
+    SwiftUIButton &&
+    SwiftUIVStack &&
+    SwiftUIHStack;
 
   // Direct recipient for 1:1 chats (must be defined before handleReportUser and chatHeaderMenuActions)
   const directRecipient = useMemo(() => {
@@ -1835,6 +1865,24 @@ const ChatScreen: React.FC = () => {
     const reactions = Array.isArray(liveMessage?.reactions) ? liveMessage.reactions : [];
     return reactions.filter((entry) => entry.count > 0);
   }, [messages, reactionPicker]);
+  const reactionTarget = reactionPicker?.message ?? null;
+  const reactionPreview = useMemo(() => {
+    if (!reactionTarget) return '';
+    const trimmed = (reactionTarget.content || '').trim();
+    if (trimmed) return trimmed;
+    const attachments = Array.isArray(reactionTarget.attachments) ? reactionTarget.attachments : [];
+    if (attachments.length > 0) return 'Attachment';
+    if (reactionTarget.isDeleted) return 'Message deleted';
+    return 'Message';
+  }, [reactionTarget]);
+  const reactionIconModifiers =
+    swiftUIBackground && swiftUICornerRadius && swiftUIPadding
+      ? [
+          swiftUIPadding({ all: 8 }),
+          swiftUIBackground('rgba(10, 132, 255, 0.18)'),
+          swiftUICornerRadius(12),
+        ]
+      : undefined;
 
   useEffect(() => {
     if (reactionPicker) {
@@ -6018,7 +6066,85 @@ const ChatScreen: React.FC = () => {
         )}
       </View>
 
-      {reactionPicker && reactionPickerPosition ? (
+      {shouldUseSwiftUIReactionSheet && reactionTarget ? (
+        <SwiftUIHost style={styles.reactionSheetHost}>
+          <SwiftUIBottomSheet
+            isOpened={Boolean(reactionPicker)}
+            onIsOpenedChange={(isOpened: boolean) => {
+              if (!isOpened) {
+                closeReactionPicker();
+              }
+            }}
+            presentationDetents={['medium']}
+            presentationDragIndicator="visible"
+          >
+            <SwiftUIVStack spacing={16} padding={20} alignment="leading">
+              <SwiftUIHStack spacing={12} alignment="center">
+                {SwiftUIImage && reactionIconModifiers && (
+                  <SwiftUIImage
+                    systemName="hand.thumbsup"
+                    color={palette.accent}
+                    size={20}
+                    modifiers={reactionIconModifiers}
+                  />
+                )}
+                <SwiftUIVStack spacing={4} alignment="leading">
+                  <SwiftUIText style="title2" fontWeight="bold">
+                    React to message
+                  </SwiftUIText>
+                  <SwiftUIText style="subheadline" color={palette.textMuted}>
+                    Pick an emoji reaction
+                  </SwiftUIText>
+                </SwiftUIVStack>
+              </SwiftUIHStack>
+
+              {reactionPreview ? (
+                <SwiftUIVStack spacing={4} alignment="leading">
+                  <SwiftUIText style="caption" color={palette.textMuted}>
+                    Message
+                  </SwiftUIText>
+                  <SwiftUIText style="subheadline" numberOfLines={2}>
+                    {reactionPreview}
+                  </SwiftUIText>
+                </SwiftUIVStack>
+              ) : null}
+
+              {SwiftUIDivider && <SwiftUIDivider />}
+
+              <SwiftUIVStack spacing={12} alignment="leading">
+                {REACTION_ROWS.map((row, rowIndex) => (
+                  <SwiftUIHStack key={`reaction-row-${rowIndex}`} spacing={12} alignment="center">
+                    {row.map((reaction) => (
+                      <SwiftUIButton
+                        key={`reaction-${reaction}`}
+                        onPress={() => {
+                          handleToggleReaction(reactionTarget, reaction);
+                          setContextTargetId(reactionTarget.id);
+                          closeReactionPicker();
+                        }}
+                        controlSize="large"
+                        variant={currentUserReaction === reaction ? 'borderedProminent' : 'bordered'}
+                      >
+                        {reaction}
+                      </SwiftUIButton>
+                    ))}
+                    {SwiftUISpacer && <SwiftUISpacer />}
+                  </SwiftUIHStack>
+                ))}
+              </SwiftUIVStack>
+
+              {visibleReactions.length ? (
+                <SwiftUIText style="caption" color={palette.textMuted}>
+                  {visibleReactions
+                    .map((entry) => `${entry.reaction} ${entry.count}`)
+                    .join('   ')}
+                </SwiftUIText>
+              ) : null}
+            </SwiftUIVStack>
+          </SwiftUIBottomSheet>
+        </SwiftUIHost>
+      ) : null}
+      {!shouldUseSwiftUIReactionSheet && reactionPicker && reactionPickerPosition ? (
         <View style={styles.reactionPickerOverlay} pointerEvents="box-none">
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -6045,45 +6171,22 @@ const ChatScreen: React.FC = () => {
               },
             ]}
           >
-            {shouldUseSwiftUIEmojiPicker ? (
-              <SwiftUIHost matchContents>
-                <SwiftUIHStack spacing={8}>
-                  {DEFAULT_REACTIONS.map((reaction) => (
-                    <SwiftUIButton
-                      key={`reaction-${reaction}`}
-                      onPress={() => {
-                        handleToggleReaction(reactionPicker.message, reaction);
-                        setContextTargetId(reactionPicker.message.id);
-                        closeReactionPicker();
-                      }}
-                      controlSize="large"
-                      variant={currentUserReaction === reaction ? 'borderedProminent' : 'borderless'}
-                    >
-                      {reaction}
-                    </SwiftUIButton>
-                  ))}
-                </SwiftUIHStack>
-              </SwiftUIHost>
-            ) : (
-              <>
-                {DEFAULT_REACTIONS.map((reaction) => (
-                  <Pressable
-                    key={`reaction-${reaction}`}
-                    style={[
-                      styles.reactionEmojiButton,
-                      currentUserReaction === reaction && styles.reactionEmojiButtonActive,
-                    ]}
-                    onPress={() => {
-                      handleToggleReaction(reactionPicker.message, reaction);
-                      setContextTargetId(reactionPicker.message.id);
-                      closeReactionPicker();
-                    }}
-                  >
-                    <Text style={styles.reactionEmojiText}>{reaction}</Text>
-                  </Pressable>
-                ))}
-              </>
-            )}
+            {DEFAULT_REACTIONS.map((reaction) => (
+              <Pressable
+                key={`reaction-${reaction}`}
+                style={[
+                  styles.reactionEmojiButton,
+                  currentUserReaction === reaction && styles.reactionEmojiButtonActive,
+                ]}
+                onPress={() => {
+                  handleToggleReaction(reactionPicker.message, reaction);
+                  setContextTargetId(reactionPicker.message.id);
+                  closeReactionPicker();
+                }}
+              >
+                <Text style={styles.reactionEmojiText}>{reaction}</Text>
+              </Pressable>
+            ))}
             {visibleReactions.length ? (
               <View style={styles.reactionPickerLabel}>
                 <Text style={styles.reactionPickerLabelText} numberOfLines={1}>
@@ -7714,6 +7817,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginTop: 8,
+  },
+  reactionSheetHost: {
+    position: 'absolute',
+    width: '100%',
+    height: 0,
   },
   reactionPickerOverlay: {
     ...StyleSheet.absoluteFillObject,

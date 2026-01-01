@@ -266,11 +266,10 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     if (!otherUserId) return;
 
     const cachedUser = userDetails[otherUserId];
-    if (cachedUser) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setProfileCardUser(cachedUser);
-      setProfileCardVisible(true);
-    }
+    // Always show ProfileCard, even if user details are loading
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setProfileCardUser(cachedUser || { id: otherUserId, username: 'Loading...', email: '' });
+    setProfileCardVisible(true);
   };
 
   const handleProfileCardClose = () => {

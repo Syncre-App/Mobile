@@ -23,24 +23,12 @@ import { canUseSwiftUI } from '../utils/swiftUi';
 // SwiftUI imports for iOS
 let SwiftUIHost: any = null;
 let SwiftUIBottomSheet: any = null;
-let SwiftUIText: any = null;
-let SwiftUIButton: any = null;
-let SwiftUIVStack: any = null;
-let SwiftUIHStack: any = null;
-let SwiftUISpacer: any = null;
-let SwiftUIDivider: any = null;
 
 if (Platform.OS === 'ios') {
   try {
     const swiftUI = require('@expo/ui/swift-ui');
     SwiftUIHost = swiftUI.Host;
     SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIText = swiftUI.Text;
-    SwiftUIButton = swiftUI.Button;
-    SwiftUIVStack = swiftUI.VStack;
-    SwiftUIHStack = swiftUI.HStack;
-    SwiftUISpacer = swiftUI.Spacer;
-    SwiftUIDivider = swiftUI.Divider;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -174,77 +162,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   if (!user) return null;
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet with SwiftUI content
-  // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet && SwiftUIText && SwiftUIButton && SwiftUIVStack) {
-    return (
-      <SwiftUIHost style={styles.swiftUIHost}>
-        <SwiftUIBottomSheet
-          isOpened={visible}
-          onIsOpenedChange={(isOpened: boolean) => {
-            if (!isOpened) {
-              onClose();
-            }
-          }}
-          presentationDetents={['medium']}
-          presentationDragIndicator="visible"
-        >
-          <SwiftUIVStack spacing={16} padding={20}>
-            {/* Username */}
-            <SwiftUIText style="title" fontWeight="bold">
-              {user.username}
-            </SwiftUIText>
-
-            {/* Status */}
-            <SwiftUIText style="subheadline" color={getPresenceColor()}>
-              {getPresenceText()}
-            </SwiftUIText>
-
-            {/* Spotify Activity */}
-            {spotifyActivity?.track && (
-              <SwiftUIHStack spacing={8}>
-                <SwiftUIText style="caption" color="#1DB954">
-                  {spotifyActivity.isPlaying ? '♫ ' : '⏸ '}
-                  {spotifyActivity.track.name} - {spotifyActivity.track.artist}
-                </SwiftUIText>
-              </SwiftUIHStack>
-            )}
-
-            {SwiftUIDivider && <SwiftUIDivider />}
-
-            {/* Action Buttons */}
-            <SwiftUIButton
-              variant="bordered"
-              role="destructive"
-              systemImage="person.badge.minus"
-              onPress={() => handleAction(() => onRemoveFriend(user.id))}
-            >
-              Remove friend
-            </SwiftUIButton>
-
-            <SwiftUIButton
-              variant="bordered"
-              systemImage={isBlocked ? 'lock.open' : 'hand.raised'}
-              onPress={() => handleAction(() => onBlockUser(user.id))}
-            >
-              {isBlocked ? 'Unblock' : 'Block'}
-            </SwiftUIButton>
-
-            <SwiftUIButton
-              variant="bordered"
-              systemImage="flag"
-              onPress={() => handleAction(() => onReportUser(user.id))}
-            >
-              Report
-            </SwiftUIButton>
-          </SwiftUIVStack>
-        </SwiftUIBottomSheet>
-      </SwiftUIHost>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Fallback content component for Modal
+  // Shared content component
   // ═══════════════════════════════════════════════════════════════
   const CardContent = () => (
     <>
@@ -350,6 +268,44 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     </>
   );
 
+  const renderCard = (cardStyle?: any) => (
+    <LinearGradient
+      colors={['rgba(30, 41, 59, 0.95)', 'rgba(15, 23, 42, 0.98)']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={[styles.card, cardStyle]}
+    >
+      <Pressable style={styles.closeButton} onPress={onClose}>
+        <Ionicons name="close" size={24} color={palette.textMuted} />
+      </Pressable>
+      <CardContent />
+    </LinearGradient>
+  );
+
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: Native SwiftUI BottomSheet
+  // ═══════════════════════════════════════════════════════════════
+  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet) {
+    return (
+      <SwiftUIHost style={styles.swiftUIHost}>
+        <SwiftUIBottomSheet
+          isOpened={visible}
+          onIsOpenedChange={(isOpened: boolean) => {
+            if (!isOpened) {
+              onClose();
+            }
+          }}
+          presentationDetents={['medium', 'large']}
+          presentationDragIndicator="visible"
+        >
+          <View style={styles.sheetCardContainer}>
+            {renderCard(styles.sheetCard)}
+          </View>
+        </SwiftUIBottomSheet>
+      </SwiftUIHost>
+    );
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // Android / Fallback: Modal with blur overlay
   // ═══════════════════════════════════════════════════════════════
@@ -364,19 +320,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       <Pressable style={styles.overlay} onPress={onClose}>
         <View style={styles.blurOverlay}>
           <Pressable style={styles.cardContainer} onPress={(e) => e.stopPropagation()}>
-            <LinearGradient
-              colors={['rgba(30, 41, 59, 0.95)', 'rgba(15, 23, 42, 0.98)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={styles.card}
-            >
-              {/* Close Button */}
-              <Pressable style={styles.closeButton} onPress={onClose}>
-                <Ionicons name="close" size={24} color={palette.textMuted} />
-              </Pressable>
-
-              <CardContent />
-            </LinearGradient>
+            {renderCard()}
           </Pressable>
         </View>
       </Pressable>
@@ -401,16 +345,19 @@ const styles = StyleSheet.create({
   swiftUIHost: {
     position: 'absolute',
     width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    top: 0,
-    left: 0,
-    zIndex: 9999,
+    height: 0,
+  },
+  sheetCardContainer: {
+    width: '100%',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   cardContainer: {
     width: SCREEN_WIDTH - spacing.xl * 2,
     maxWidth: 380,
   },
   card: {
+    width: '100%',
     borderRadius: radii.xxl,
     padding: spacing.xl,
     borderWidth: 1,
@@ -420,6 +367,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 40,
     elevation: 24,
+  },
+  sheetCard: {
+    shadowOpacity: 0.3,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 16,
   },
   sheetContent: {
     padding: spacing.xl,

@@ -23,11 +23,16 @@ let SwiftUIText: any = null;
 let SwiftUIButton: any = null;
 let SwiftUIVStack: any = null;
 let SwiftUIHStack: any = null;
+let SwiftUIImage: any = null;
+let SwiftUISpacer: any = null;
 let SwiftUITextField: any = null;
 let SwiftUISwitch: any = null;
 let SwiftUIDivider: any = null;
 let SwiftUIForm: any = null;
 let SwiftUISection: any = null;
+let swiftUIBackground: any = null;
+let swiftUICornerRadius: any = null;
+let swiftUIPadding: any = null;
 
 if (Platform.OS === 'ios') {
   try {
@@ -38,11 +43,17 @@ if (Platform.OS === 'ios') {
     SwiftUIButton = swiftUI.Button;
     SwiftUIVStack = swiftUI.VStack;
     SwiftUIHStack = swiftUI.HStack;
+    SwiftUIImage = swiftUI.Image;
+    SwiftUISpacer = swiftUI.Spacer;
     SwiftUITextField = swiftUI.TextField;
     SwiftUISwitch = swiftUI.Switch;
     SwiftUIDivider = swiftUI.Divider;
     SwiftUIForm = swiftUI.Form;
     SwiftUISection = swiftUI.Section;
+    const modifiers = require('@expo/ui/swift-ui/modifiers');
+    swiftUIBackground = modifiers.background;
+    swiftUICornerRadius = modifiers.cornerRadius;
+    swiftUIPadding = modifiers.padding;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -137,7 +148,25 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native SwiftUI BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet && SwiftUIText && SwiftUIButton && SwiftUIVStack && SwiftUITextField) {
+  if (
+    shouldUseSwiftUI &&
+    SwiftUIHost &&
+    SwiftUIBottomSheet &&
+    SwiftUIText &&
+    SwiftUIButton &&
+    SwiftUIVStack &&
+    SwiftUIHStack &&
+    SwiftUITextField
+  ) {
+    const iconModifiers =
+      swiftUIBackground && swiftUICornerRadius && swiftUIPadding
+        ? [
+            swiftUIPadding({ all: 8 }),
+            swiftUIBackground('rgba(10, 132, 255, 0.18)'),
+            swiftUICornerRadius(12),
+          ]
+        : undefined;
+
     return (
       <SwiftUIHost style={styles.swiftUIHost}>
         <SwiftUIBottomSheet
@@ -147,22 +176,40 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
               handleClose();
             }
           }}
-          presentationDetents={['large']}
+          presentationDetents={['medium', 'large']}
           presentationDragIndicator="visible"
         >
           <SwiftUIVStack spacing={16} padding={20} alignment="leading">
-            {/* Title - centered */}
-            <SwiftUIHStack>
-              <SwiftUIText style="title2" fontWeight="bold">
-                Create Poll
-              </SwiftUIText>
+            <SwiftUIHStack spacing={12} alignment="center">
+              {SwiftUIImage && iconModifiers && (
+                <SwiftUIImage
+                  systemName="chart.bar"
+                  color={palette.accent}
+                  size={20}
+                  modifiers={iconModifiers}
+                />
+              )}
+              <SwiftUIVStack spacing={4} alignment="leading">
+                <SwiftUIText style="title2" fontWeight="bold">
+                  Create Poll
+                </SwiftUIText>
+                <SwiftUIText style="subheadline" color={palette.textMuted}>
+                  Ask a question and collect votes
+                </SwiftUIText>
+              </SwiftUIVStack>
             </SwiftUIHStack>
 
             {/* Question Section */}
             <SwiftUIVStack spacing={8} alignment="leading">
-              <SwiftUIText style="subheadline" color={palette.textMuted}>
-                Question
-              </SwiftUIText>
+              <SwiftUIHStack spacing={8} alignment="center">
+                <SwiftUIText style="subheadline" color={palette.textMuted}>
+                  Question
+                </SwiftUIText>
+                {SwiftUISpacer && <SwiftUISpacer />}
+                <SwiftUIText style="caption" color={palette.textMuted}>
+                  {question.length}/{MAX_QUESTION_LENGTH}
+                </SwiftUIText>
+              </SwiftUIHStack>
               <SwiftUITextField
                 ref={questionRef}
                 defaultValue={question}
@@ -176,9 +223,15 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
 
             {/* Options Section */}
             <SwiftUIVStack spacing={8} alignment="leading">
-              <SwiftUIText style="subheadline" color={palette.textMuted}>
-                Options
-              </SwiftUIText>
+              <SwiftUIHStack spacing={8} alignment="center">
+                <SwiftUIText style="subheadline" color={palette.textMuted}>
+                  Options
+                </SwiftUIText>
+                {SwiftUISpacer && <SwiftUISpacer />}
+                <SwiftUIText style="caption" color={palette.textMuted}>
+                  Min {MIN_OPTIONS}
+                </SwiftUIText>
+              </SwiftUIHStack>
               {options.map((option, index) => (
                 <SwiftUIHStack key={index} spacing={8}>
                   <SwiftUITextField
@@ -203,6 +256,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
               <SwiftUIButton
                 variant="bordered"
                 systemImage="plus.circle"
+                controlSize="regular"
                 onPress={handleAddOption}
               >
                 Add option
@@ -264,8 +318,13 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
         <View style={styles.cardContainer}>
           <View style={styles.content}>
             <View style={styles.header}>
-              <Ionicons name="stats-chart" size={24} color={palette.accent} />
-              <Text style={styles.title}>Create poll</Text>
+              <View style={styles.headerIcon}>
+                <Ionicons name="stats-chart" size={18} color={palette.accent} />
+              </View>
+              <View style={styles.headerText}>
+                <Text style={styles.title}>Create poll</Text>
+                <Text style={styles.subtitle}>Ask a question and collect votes</Text>
+              </View>
               <Pressable onPress={handleClose} style={styles.closeButton}>
                 <Ionicons name="close" size={22} color={palette.textMuted} />
               </Pressable>
@@ -369,25 +428,26 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.md,
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+    padding: spacing.lg,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(3, 7, 18, 0.65)',
   },
   cardContainer: {
-    width: '90%',
-    maxWidth: 400,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.98)',
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     overflow: 'hidden',
   },
   content: {
-    maxHeight: 500,
+    maxHeight: 560,
   },
   header: {
     flexDirection: 'row',
@@ -397,18 +457,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  title: {
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(10, 132, 255, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: {
     flex: 1,
+  },
+  title: {
     color: palette.text,
     fontSize: 18,
     ...font('semibold'),
+  },
+  subtitle: {
+    color: palette.textMuted,
+    fontSize: 12,
+    marginTop: 2,
   },
   closeButton: {
     padding: spacing.xs,
   },
   scrollContent: {
     padding: spacing.md,
-    maxHeight: 320,
+    maxHeight: 360,
   },
   label: {
     color: palette.textMuted,
