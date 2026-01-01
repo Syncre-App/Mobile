@@ -150,49 +150,54 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
           presentationDetents={['large']}
           presentationDragIndicator="visible"
         >
-          <SwiftUIVStack spacing={16} padding={20}>
+          <SwiftUIVStack spacing={16} padding={20} alignment="leading">
+            {/* Title - centered */}
             <SwiftUIHStack>
               <SwiftUIText style="title2" fontWeight="bold">
                 Create Poll
               </SwiftUIText>
             </SwiftUIHStack>
 
-            {/* Question */}
-            <SwiftUIText style="subheadline" color={palette.textMuted}>
-              Question
-            </SwiftUIText>
-            <SwiftUITextField
-              ref={questionRef}
-              defaultValue={question}
-              placeholder="What's the question?"
-              onChangeText={(text: string) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
-              multiline
-            />
+            {/* Question Section */}
+            <SwiftUIVStack spacing={8} alignment="leading">
+              <SwiftUIText style="subheadline" color={palette.textMuted}>
+                Question
+              </SwiftUIText>
+              <SwiftUITextField
+                ref={questionRef}
+                defaultValue={question}
+                placeholder="What's the question?"
+                onChangeText={(text: string) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
+                multiline
+              />
+            </SwiftUIVStack>
 
             {SwiftUIDivider && <SwiftUIDivider />}
 
-            {/* Options */}
-            <SwiftUIText style="subheadline" color={palette.textMuted}>
-              Options
-            </SwiftUIText>
-            {options.map((option, index) => (
-              <SwiftUIHStack key={index} spacing={8}>
-                <SwiftUITextField
-                  ref={(ref: any) => (optionRefs.current[index] = ref)}
-                  defaultValue={option}
-                  placeholder={`Option ${index + 1}`}
-                  onChangeText={(text: string) => handleOptionChange(index, text)}
-                />
-                {options.length > MIN_OPTIONS && (
-                  <SwiftUIButton
-                    variant="plain"
-                    role="destructive"
-                    systemImage="xmark.circle.fill"
-                    onPress={() => handleRemoveOption(index)}
+            {/* Options Section */}
+            <SwiftUIVStack spacing={8} alignment="leading">
+              <SwiftUIText style="subheadline" color={palette.textMuted}>
+                Options
+              </SwiftUIText>
+              {options.map((option, index) => (
+                <SwiftUIHStack key={index} spacing={8}>
+                  <SwiftUITextField
+                    ref={(ref: any) => (optionRefs.current[index] = ref)}
+                    defaultValue={option}
+                    placeholder={`Option ${index + 1}`}
+                    onChangeText={(text: string) => handleOptionChange(index, text)}
                   />
-                )}
-              </SwiftUIHStack>
-            ))}
+                  {options.length > MIN_OPTIONS && (
+                    <SwiftUIButton
+                      variant="plain"
+                      role="destructive"
+                      systemImage="xmark.circle.fill"
+                      onPress={() => handleRemoveOption(index)}
+                    />
+                  )}
+                </SwiftUIHStack>
+              ))}
+            </SwiftUIVStack>
 
             {options.length < MAX_OPTIONS && (
               <SwiftUIButton
@@ -218,7 +223,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
 
             {SwiftUIDivider && <SwiftUIDivider />}
 
-            {/* Actions */}
+            {/* Actions - centered */}
             <SwiftUIHStack spacing={12}>
               <SwiftUIButton
                 variant="bordered"

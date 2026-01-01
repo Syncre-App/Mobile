@@ -434,7 +434,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   );
 
   return (
-    <>
+    <View style={styles.container}>
       <FlatList
         data={chats}
         keyExtractor={(item) => String(item.id)}
@@ -463,11 +463,14 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         isBlocked={profileCardUser ? (blockedUserIds?.has(profileCardUser.id) ?? false) : false}
         presence={profileCardUser ? getPresenceForUser(profileCardUser.id) : 'offline'}
       />
-    </>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   listContainer: {
     flexGrow: 1,
     paddingHorizontal: spacing.sm,

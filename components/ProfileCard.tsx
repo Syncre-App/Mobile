@@ -401,7 +401,10 @@ const styles = StyleSheet.create({
   swiftUIHost: {
     position: 'absolute',
     width: SCREEN_WIDTH,
-    height: 0,
+    height: SCREEN_HEIGHT,
+    top: 0,
+    left: 0,
+    zIndex: 9999,
   },
   cardContainer: {
     width: SCREEN_WIDTH - spacing.xl * 2,
