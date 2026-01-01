@@ -23,12 +23,41 @@ import { canUseSwiftUI } from '../utils/swiftUi';
 // SwiftUI imports for iOS
 let SwiftUIHost: any = null;
 let SwiftUIBottomSheet: any = null;
+let SwiftUIVStack: any = null;
+let SwiftUIHStack: any = null;
+let SwiftUIText: any = null;
+let SwiftUIButton: any = null;
+let SwiftUIImage: any = null;
+let SwiftUISpacer: any = null;
+let SwiftUIZStack: any = null;
+let swiftUIBackground: any = null;
+let swiftUICornerRadius: any = null;
+let swiftUIBorder: any = null;
+let swiftUIPadding: any = null;
+let swiftUIShadow: any = null;
+let swiftUIFrame: any = null;
+let swiftUIClipShape: any = null;
 
 if (Platform.OS === 'ios') {
   try {
     const swiftUI = require('@expo/ui/swift-ui');
     SwiftUIHost = swiftUI.Host;
     SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIVStack = swiftUI.VStack;
+    SwiftUIHStack = swiftUI.HStack;
+    SwiftUIText = swiftUI.Text;
+    SwiftUIButton = swiftUI.Button;
+    SwiftUIImage = swiftUI.Image;
+    SwiftUISpacer = swiftUI.Spacer;
+    SwiftUIZStack = swiftUI.ZStack;
+    const modifiers = require('@expo/ui/swift-ui/modifiers');
+    swiftUIBackground = modifiers.background;
+    swiftUICornerRadius = modifiers.cornerRadius;
+    swiftUIBorder = modifiers.border;
+    swiftUIPadding = modifiers.padding;
+    swiftUIShadow = modifiers.shadow;
+    swiftUIFrame = modifiers.frame;
+    swiftUIClipShape = modifiers.clipShape;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -70,6 +99,14 @@ interface ProfileCardProps {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+const getInitials = (name: string): string => {
+  const trimmed = name.trim();
+  if (!trimmed) return '?';
+  const parts = trimmed.split(/\s+/);
+  const letters = parts.map((part) => part[0]).join('');
+  return letters.slice(0, 2).toUpperCase();
+};
+
 export const ProfileCard: React.FC<ProfileCardProps> = ({
   visible,
   user,
@@ -83,6 +120,24 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [spotifyActivity, setSpotifyActivity] = useState<SpotifyActivity | null>(null);
   const [isLoadingSpotify, setIsLoadingSpotify] = useState(false);
   const shouldUseSwiftUI = canUseSwiftUI();
+  const canRenderSwiftUI =
+    shouldUseSwiftUI &&
+    SwiftUIHost &&
+    SwiftUIBottomSheet &&
+    SwiftUIVStack &&
+    SwiftUIHStack &&
+    SwiftUIText &&
+    SwiftUIButton &&
+    SwiftUIImage &&
+    SwiftUISpacer &&
+    SwiftUIZStack &&
+    swiftUIBackground &&
+    swiftUICornerRadius &&
+    swiftUIBorder &&
+    swiftUIPadding &&
+    swiftUIShadow &&
+    swiftUIFrame &&
+    swiftUIClipShape;
 
   const fetchSpotifyActivity = useCallback(async () => {
     if (!user?.id) return;
@@ -160,6 +215,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   };
 
   if (!user) return null;
+  const displayName = user.username || user.email || 'User';
+  const initials = getInitials(displayName);
+  const badgeLabel = user.badges?.length ? user.badges.join(' / ') : '';
 
   // ═══════════════════════════════════════════════════════════════
   // Shared content component
@@ -285,9 +343,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native SwiftUI BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet) {
+  if (canRenderSwiftUI) {
     return (
-      <SwiftUIHost style={styles.swiftUIHost}>
+      <SwiftUIHost style={styles.swiftUIHost} useViewportSizeMeasurement>
         <SwiftUIBottomSheet
           isOpened={visible}
           onIsOpenedChange={(isOpened: boolean) => {
@@ -298,9 +356,180 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           presentationDetents={['medium', 'large']}
           presentationDragIndicator="visible"
         >
-          <View style={styles.sheetCardContainer}>
-            {renderCard(styles.sheetCard)}
-          </View>
+          <SwiftUIVStack
+            alignment="center"
+            spacing={12}
+            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
+          >
+            <SwiftUIVStack
+              alignment="center"
+              spacing={14}
+              modifiers={[
+                swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.lg }),
+                swiftUIBackground('rgba(15, 23, 42, 0.92)'),
+                swiftUICornerRadius(26),
+                swiftUIBorder({ color: 'rgba(255, 255, 255, 0.12)', width: 1 }),
+                swiftUIShadow({ radius: 22, y: 14, color: 'rgba(0, 0, 0, 0.4)' }),
+                swiftUIFrame({ maxWidth: 380 }),
+              ]}
+            >
+              <SwiftUIHStack
+                alignment="center"
+                spacing={8}
+                modifiers={[swiftUIFrame({ maxWidth: 340, alignment: 'trailing' })]}
+              >
+                <SwiftUISpacer />
+                <SwiftUIButton
+                  onPress={onClose}
+                  variant="borderless"
+                  modifiers={[
+                    swiftUIFrame({ width: 32, height: 32 }),
+                    swiftUIBackground('rgba(255, 255, 255, 0.08)'),
+                    swiftUICornerRadius(16),
+                  ]}
+                >
+                  <SwiftUIImage systemName="xmark" size={12} color={palette.textMuted} />
+                </SwiftUIButton>
+              </SwiftUIHStack>
+
+              <SwiftUIZStack modifiers={[swiftUIFrame({ width: 96, height: 96 })]}>
+                <SwiftUIVStack
+                  modifiers={[
+                    swiftUIFrame({ width: 96, height: 96 }),
+                    swiftUIBackground('rgba(59, 130, 246, 0.25)'),
+                    swiftUICornerRadius(48),
+                    swiftUIBorder({ color: 'rgba(255, 255, 255, 0.18)', width: 1 }),
+                    swiftUIClipShape('circle'),
+                  ]}
+                >
+                  <SwiftUIText size={34} weight="semibold" color="#ffffff">
+                    {initials}
+                  </SwiftUIText>
+                </SwiftUIVStack>
+              </SwiftUIZStack>
+
+              <SwiftUIText size={20} weight="bold" color={palette.text} lineLimit={1}>
+                {displayName}
+              </SwiftUIText>
+              {badgeLabel ? (
+                <SwiftUIText size={11} color={palette.textMuted} lineLimit={1}>
+                  {badgeLabel}
+                </SwiftUIText>
+              ) : null}
+              <SwiftUIHStack alignment="center" spacing={6}>
+                <SwiftUIVStack
+                  modifiers={[
+                    swiftUIFrame({ width: 8, height: 8 }),
+                    swiftUIBackground(getPresenceColor()),
+                    swiftUICornerRadius(4),
+                  ]}
+                />
+                <SwiftUIText size={12} color={getPresenceColor()}>
+                  {getPresenceText()}
+                </SwiftUIText>
+              </SwiftUIHStack>
+
+              {isLoadingSpotify ? (
+                <SwiftUIText size={12} color={palette.textMuted}>
+                  Loading Spotify activity...
+                </SwiftUIText>
+              ) : spotifyActivity?.track ? (
+                <SwiftUIVStack
+                  alignment="leading"
+                  spacing={6}
+                  modifiers={[
+                    swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                    swiftUIBackground('rgba(29, 185, 84, 0.1)'),
+                    swiftUICornerRadius(14),
+                    swiftUIBorder({ color: 'rgba(29, 185, 84, 0.2)', width: 1 }),
+                    swiftUIFrame({ maxWidth: 320, alignment: 'leading' }),
+                  ]}
+                >
+                  <SwiftUIHStack alignment="center" spacing={6}>
+                    <SwiftUIImage
+                      systemName={spotifyActivity.isPlaying ? 'play.circle.fill' : 'pause.circle'}
+                      size={14}
+                      color="#1DB954"
+                    />
+                    <SwiftUIText size={11} weight="semibold" color="#1DB954">
+                      {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
+                    </SwiftUIText>
+                  </SwiftUIHStack>
+                  <SwiftUIText size={13} weight="semibold" color={palette.text} lineLimit={1}>
+                    {spotifyActivity.track.name}
+                  </SwiftUIText>
+                  <SwiftUIText size={12} color={palette.textMuted} lineLimit={1}>
+                    {spotifyActivity.track.artist}
+                  </SwiftUIText>
+                </SwiftUIVStack>
+              ) : null}
+
+              <SwiftUIVStack
+                alignment="leading"
+                spacing={8}
+                modifiers={[swiftUIFrame({ maxWidth: 340, alignment: 'leading' })]}
+              >
+                <SwiftUIButton
+                  onPress={() => handleAction(() => onRemoveFriend(user.id))}
+                  variant="borderless"
+                  modifiers={[
+                    swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                    swiftUIBackground('rgba(255, 255, 255, 0.06)'),
+                    swiftUICornerRadius(14),
+                    swiftUIBorder({ color: 'rgba(255, 255, 255, 0.08)', width: 1 }),
+                  ]}
+                >
+                  <SwiftUIHStack alignment="center" spacing={10}>
+                    <SwiftUIImage systemName="person.fill.xmark" size={16} color={palette.error} />
+                    <SwiftUIText size={14} weight="medium" color={palette.error}>
+                      Remove friend
+                    </SwiftUIText>
+                    <SwiftUISpacer />
+                  </SwiftUIHStack>
+                </SwiftUIButton>
+                <SwiftUIButton
+                  onPress={() => handleAction(() => onBlockUser(user.id))}
+                  variant="borderless"
+                  modifiers={[
+                    swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                    swiftUIBackground('rgba(255, 255, 255, 0.06)'),
+                    swiftUICornerRadius(14),
+                    swiftUIBorder({ color: 'rgba(255, 255, 255, 0.08)', width: 1 }),
+                  ]}
+                >
+                  <SwiftUIHStack alignment="center" spacing={10}>
+                    <SwiftUIImage
+                      systemName={isBlocked ? 'hand.raised.slash' : 'hand.raised'}
+                      size={16}
+                      color={palette.warning}
+                    />
+                    <SwiftUIText size={14} weight="medium" color={palette.warning}>
+                      {isBlocked ? 'Unblock' : 'Block'}
+                    </SwiftUIText>
+                    <SwiftUISpacer />
+                  </SwiftUIHStack>
+                </SwiftUIButton>
+                <SwiftUIButton
+                  onPress={() => handleAction(() => onReportUser(user.id))}
+                  variant="borderless"
+                  modifiers={[
+                    swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                    swiftUIBackground('rgba(255, 255, 255, 0.06)'),
+                    swiftUICornerRadius(14),
+                    swiftUIBorder({ color: 'rgba(255, 255, 255, 0.08)', width: 1 }),
+                  ]}
+                >
+                  <SwiftUIHStack alignment="center" spacing={10}>
+                    <SwiftUIImage systemName="flag" size={16} color={palette.textMuted} />
+                    <SwiftUIText size={14} weight="medium" color={palette.textMuted}>
+                      Report
+                    </SwiftUIText>
+                    <SwiftUISpacer />
+                  </SwiftUIHStack>
+                </SwiftUIButton>
+              </SwiftUIVStack>
+            </SwiftUIVStack>
+          </SwiftUIVStack>
         </SwiftUIBottomSheet>
       </SwiftUIHost>
     );

@@ -15,35 +15,36 @@ import { canUseSwiftUI } from '../utils/swiftUi';
 // SwiftUI imports for iOS
 let SwiftUIHost: any = null;
 let SwiftUIBottomSheet: any = null;
-let SwiftUIText: any = null;
-let SwiftUIButton: any = null;
 let SwiftUIVStack: any = null;
 let SwiftUIHStack: any = null;
-let SwiftUISpacer: any = null;
+let SwiftUIText: any = null;
+let SwiftUIButton: any = null;
 let SwiftUIImage: any = null;
-let SwiftUIDivider: any = null;
-let SwiftUIPicker: any = null;
+let SwiftUISpacer: any = null;
 let swiftUIBackground: any = null;
 let swiftUICornerRadius: any = null;
+let swiftUIBorder: any = null;
 let swiftUIPadding: any = null;
-
+let swiftUIShadow: any = null;
+let swiftUIFrame: any = null;
 if (Platform.OS === 'ios') {
   try {
     const swiftUI = require('@expo/ui/swift-ui');
     SwiftUIHost = swiftUI.Host;
     SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIText = swiftUI.Text;
-    SwiftUIButton = swiftUI.Button;
     SwiftUIVStack = swiftUI.VStack;
     SwiftUIHStack = swiftUI.HStack;
-    SwiftUISpacer = swiftUI.Spacer;
+    SwiftUIText = swiftUI.Text;
+    SwiftUIButton = swiftUI.Button;
     SwiftUIImage = swiftUI.Image;
-    SwiftUIDivider = swiftUI.Divider;
-    SwiftUIPicker = swiftUI.Picker;
+    SwiftUISpacer = swiftUI.Spacer;
     const modifiers = require('@expo/ui/swift-ui/modifiers');
     swiftUIBackground = modifiers.background;
     swiftUICornerRadius = modifiers.cornerRadius;
+    swiftUIBorder = modifiers.border;
     swiftUIPadding = modifiers.padding;
+    swiftUIShadow = modifiers.shadow;
+    swiftUIFrame = modifiers.frame;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -75,6 +76,22 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
   onClose,
 }) => {
   const shouldUseSwiftUI = canUseSwiftUI();
+  const canRenderSwiftUI =
+    shouldUseSwiftUI &&
+    SwiftUIHost &&
+    SwiftUIBottomSheet &&
+    SwiftUIVStack &&
+    SwiftUIHStack &&
+    SwiftUIText &&
+    SwiftUIButton &&
+    SwiftUIImage &&
+    SwiftUISpacer &&
+    swiftUIBackground &&
+    swiftUICornerRadius &&
+    swiftUIBorder &&
+    swiftUIPadding &&
+    swiftUIShadow &&
+    swiftUIFrame;
 
   const handleClose = () => {
     if (onClose) {
@@ -87,29 +104,54 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
     handleClose();
   };
 
+  const SheetContent = () => (
+    <View style={styles.cardContainer}>
+      <View style={styles.modalContent}>
+        <View style={styles.modalHeader}>
+          <View style={styles.headerIcon}>
+            <Ionicons name="timer-outline" size={18} color={palette.accent} />
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.modalTitle}>Disappearing Message</Text>
+            <Text style={styles.modalSubtitle}>
+              Choose how long before messages disappear
+            </Text>
+          </View>
+          <Pressable onPress={handleClose} style={styles.closeButton}>
+            <Ionicons name="close" size={20} color={palette.textMuted} />
+          </Pressable>
+        </View>
+
+        <View style={styles.optionsList}>
+          {DURATION_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value ?? 'off'}
+              style={[
+                styles.optionItem,
+                selectedDuration === option.value && styles.optionItemSelected,
+              ]}
+              onPress={() => handleSelectOption(option.value)}
+            >
+              <View style={styles.optionContent}>
+                <Text style={styles.optionLabel}>{option.label}</Text>
+                <Text style={styles.optionDescription}>{option.description}</Text>
+              </View>
+              {selectedDuration === option.value && (
+                <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
+              )}
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native SwiftUI BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (
-    shouldUseSwiftUI &&
-    SwiftUIHost &&
-    SwiftUIBottomSheet &&
-    SwiftUIText &&
-    SwiftUIButton &&
-    SwiftUIVStack &&
-    SwiftUIHStack
-  ) {
-    const iconModifiers =
-      swiftUIBackground && swiftUICornerRadius && swiftUIPadding
-        ? [
-            swiftUIPadding({ all: 8 }),
-            swiftUIBackground('rgba(10, 132, 255, 0.18)'),
-            swiftUICornerRadius(12),
-          ]
-        : undefined;
-
+  if (canRenderSwiftUI) {
     return (
-      <SwiftUIHost style={styles.swiftUIHost}>
+      <SwiftUIHost style={styles.swiftUIHost} useViewportSizeMeasurement>
         <SwiftUIBottomSheet
           isOpened={visible}
           onIsOpenedChange={(isOpened: boolean) => {
@@ -120,59 +162,107 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
           presentationDetents={['medium']}
           presentationDragIndicator="visible"
         >
-          <SwiftUIVStack spacing={16} padding={20} alignment="leading">
-            <SwiftUIHStack spacing={12} alignment="center">
-              {SwiftUIImage && iconModifiers && (
-                <SwiftUIImage
-                  systemName="timer"
-                  color={palette.accent}
-                  size={20}
-                  modifiers={iconModifiers}
-                />
-              )}
-              <SwiftUIVStack spacing={4} alignment="leading">
-                <SwiftUIText style="title2" fontWeight="bold">
-                  Disappearing Message
-                </SwiftUIText>
-                <SwiftUIText style="subheadline" color={palette.textMuted}>
-                  Choose how long before messages disappear
-                </SwiftUIText>
+          <SwiftUIVStack
+            alignment="center"
+            spacing={12}
+            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
+          >
+            <SwiftUIVStack
+              alignment="leading"
+              spacing={12}
+              modifiers={[
+                swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.lg }),
+                swiftUIBackground('rgba(15, 23, 42, 0.9)'),
+                swiftUICornerRadius(22),
+                swiftUIBorder({ color: 'rgba(255, 255, 255, 0.12)', width: 1 }),
+                swiftUIShadow({ radius: 18, y: 10, color: 'rgba(0, 0, 0, 0.35)' }),
+                swiftUIFrame({ maxWidth: 420 }),
+              ]}
+            >
+              <SwiftUIHStack alignment="center" spacing={12}>
+                <SwiftUIVStack
+                  modifiers={[
+                    swiftUIFrame({ width: 36, height: 36 }),
+                    swiftUIBackground('rgba(10, 132, 255, 0.18)'),
+                    swiftUICornerRadius(18),
+                  ]}
+                >
+                  <SwiftUIImage systemName="timer" size={16} color={palette.accent} />
+                </SwiftUIVStack>
+                <SwiftUIVStack
+                  alignment="leading"
+                  spacing={2}
+                  modifiers={[swiftUIFrame({ maxWidth: 220, alignment: 'leading' })]}
+                >
+                  <SwiftUIText size={17} weight="semibold" color={palette.text}>
+                    Disappearing Message
+                  </SwiftUIText>
+                  <SwiftUIText size={12} color={palette.textMuted}>
+                    Choose how long before messages disappear
+                  </SwiftUIText>
+                </SwiftUIVStack>
+                <SwiftUISpacer />
+                <SwiftUIButton
+                  onPress={handleClose}
+                  variant="borderless"
+                  modifiers={[
+                    swiftUIFrame({ width: 30, height: 30 }),
+                    swiftUIBackground('rgba(255, 255, 255, 0.08)'),
+                    swiftUICornerRadius(15),
+                  ]}
+                >
+                  <SwiftUIImage systemName="xmark" size={12} color={palette.textMuted} />
+                </SwiftUIButton>
+              </SwiftUIHStack>
+
+              <SwiftUIVStack alignment="leading" spacing={10}>
+                {DURATION_OPTIONS.map((option) => {
+                  const isSelected = selectedDuration === option.value;
+                  return (
+                    <SwiftUIButton
+                      key={option.value ?? 'off'}
+                      onPress={() => handleSelectOption(option.value)}
+                      variant="borderless"
+                      modifiers={[
+                        swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                        swiftUIBackground(
+                          isSelected ? 'rgba(10, 132, 255, 0.2)' : 'rgba(255, 255, 255, 0.06)'
+                        ),
+                        swiftUICornerRadius(14),
+                        swiftUIBorder({
+                          color: isSelected
+                            ? 'rgba(10, 132, 255, 0.55)'
+                            : 'rgba(255, 255, 255, 0.12)',
+                          width: 1,
+                        }),
+                      ]}
+                    >
+                      <SwiftUIHStack alignment="center" spacing={12}>
+                        <SwiftUIVStack
+                          alignment="leading"
+                          spacing={2}
+                          modifiers={[swiftUIFrame({ maxWidth: 240, alignment: 'leading' })]}
+                        >
+                          <SwiftUIText size={15} weight="medium" color={palette.text}>
+                            {option.label}
+                          </SwiftUIText>
+                          <SwiftUIText size={12} color={palette.textMuted}>
+                            {option.description}
+                          </SwiftUIText>
+                        </SwiftUIVStack>
+                        <SwiftUISpacer />
+                        {isSelected ? (
+                          <SwiftUIImage
+                            systemName="checkmark.circle.fill"
+                            size={18}
+                            color={palette.accent}
+                          />
+                        ) : null}
+                      </SwiftUIHStack>
+                    </SwiftUIButton>
+                  );
+                })}
               </SwiftUIVStack>
-            </SwiftUIHStack>
-
-            {SwiftUIDivider && <SwiftUIDivider />}
-
-            <SwiftUIVStack spacing={10} alignment="leading">
-              {DURATION_OPTIONS.map((option) => {
-                const isSelected = selectedDuration === option.value;
-                return (
-                  <SwiftUIButton
-                    key={option.value ?? 'off'}
-                    variant={isSelected ? 'borderedProminent' : 'bordered'}
-                    controlSize="large"
-                    onPress={() => handleSelectOption(option.value)}
-                  >
-                    <SwiftUIHStack spacing={12} alignment="center">
-                      <SwiftUIVStack spacing={2} alignment="leading">
-                        <SwiftUIText style="headline" fontWeight={isSelected ? 'semibold' : 'regular'}>
-                          {option.label}
-                        </SwiftUIText>
-                        <SwiftUIText style="caption" color={palette.textMuted}>
-                          {option.description}
-                        </SwiftUIText>
-                      </SwiftUIVStack>
-                      {SwiftUISpacer && <SwiftUISpacer />}
-                      {SwiftUIImage && (
-                        <SwiftUIImage
-                          systemName={isSelected ? 'checkmark.circle.fill' : 'circle'}
-                          color={isSelected ? palette.accent : palette.textMuted}
-                          size={18}
-                        />
-                      )}
-                    </SwiftUIHStack>
-                  </SwiftUIButton>
-                );
-              })}
             </SwiftUIVStack>
           </SwiftUIVStack>
         </SwiftUIBottomSheet>
@@ -192,45 +282,7 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
     >
       <Pressable style={styles.modalOverlay} onPress={handleClose}>
         <Pressable onPress={(e) => e.stopPropagation()}>
-          <View style={styles.cardContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <View style={styles.headerIcon}>
-                  <Ionicons name="timer-outline" size={18} color={palette.accent} />
-                </View>
-                <View style={styles.headerText}>
-                  <Text style={styles.modalTitle}>Disappearing Message</Text>
-                  <Text style={styles.modalSubtitle}>
-                    Choose how long before messages disappear
-                  </Text>
-                </View>
-                <Pressable onPress={handleClose} style={styles.closeButton}>
-                  <Ionicons name="close" size={20} color={palette.textMuted} />
-                </Pressable>
-              </View>
-
-              <View style={styles.optionsList}>
-                {DURATION_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.value ?? 'off'}
-                    style={[
-                      styles.optionItem,
-                      selectedDuration === option.value && styles.optionItemSelected,
-                    ]}
-                    onPress={() => handleSelectOption(option.value)}
-                  >
-                    <View style={styles.optionContent}>
-                      <Text style={styles.optionLabel}>{option.label}</Text>
-                      <Text style={styles.optionDescription}>{option.description}</Text>
-                    </View>
-                    {selectedDuration === option.value && (
-                      <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          </View>
+          <SheetContent />
         </Pressable>
       </Pressable>
     </Modal>
@@ -243,6 +295,10 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: 0,
   },
+  sheetContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(3, 7, 18, 0.65)',
@@ -254,7 +310,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.98)',
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
     borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
