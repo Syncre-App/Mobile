@@ -14,11 +14,13 @@ import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
 let SwiftUIBottomSheet: any = null;
+let SwiftUIHost: any = null;
 
 if (Platform.OS === 'ios') {
   try {
     const swiftUI = require('@expo/ui/swift-ui');
     SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIHost = swiftUI.Host;
   } catch (e) {
     console.warn('SwiftUI BottomSheet not available:', e);
   }
@@ -107,17 +109,19 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
       </Pressable>
 
       {/* iOS: Native BottomSheet */}
-      {shouldUseSwiftUI && SwiftUIBottomSheet ? (
-        <SwiftUIBottomSheet
-          isOpened={isModalVisible}
-          onIsOpenedChange={setIsModalVisible}
-          presentationDetents={['medium']}
-          presentationDragIndicator="visible"
-        >
-          <GlassySheet variant="subtle">
-            <SheetContent />
-          </GlassySheet>
-        </SwiftUIBottomSheet>
+      {shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost ? (
+        <SwiftUIHost style={styles.swiftUIHost}>
+          <SwiftUIBottomSheet
+            isOpened={isModalVisible}
+            onIsOpenedChange={setIsModalVisible}
+            presentationDetents={['medium']}
+            presentationDragIndicator="visible"
+          >
+            <GlassySheet variant="subtle">
+              <SheetContent />
+            </GlassySheet>
+          </SwiftUIBottomSheet>
+        </SwiftUIHost>
       ) : (
         /* Android / Fallback: Modal */
         <Modal
@@ -153,6 +157,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
+  },
+  swiftUIHost: {
+    width: 0,
+    height: 0,
   },
   cardContainer: {
     width: 280,

@@ -93,8 +93,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({
           style,
         ]}
       >
-        <GlassEffectContainer spacing={0}>
-          <SwiftUIHost style={StyleSheet.absoluteFillObject}>
+        <SwiftUIHost style={StyleSheet.absoluteFillObject}>
+          <GlassEffectContainer spacing={0}>
             <SwiftUIRoundedRectangle
               cornerRadius={radii.xl}
               modifiers={[
@@ -108,8 +108,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({
                 }),
               ]}
             />
-          </SwiftUIHost>
-        </GlassEffectContainer>
+          </GlassEffectContainer>
+        </SwiftUIHost>
         <View style={[styles.swiftUIContent, { padding: paddingValue }]}>
           {children}
         </View>

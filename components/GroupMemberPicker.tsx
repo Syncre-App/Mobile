@@ -19,11 +19,13 @@ import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
 let SwiftUIBottomSheet: any = null;
+let SwiftUIHost: any = null;
 
 if (Platform.OS === 'ios') {
   try {
     const swiftUI = require('@expo/ui/swift-ui');
     SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIHost = swiftUI.Host;
   } catch (e) {
     console.warn('SwiftUI BottomSheet not available:', e);
   }
@@ -275,22 +277,24 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIBottomSheet) {
+  if (shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost) {
     return (
-      <SwiftUIBottomSheet
-        isOpened={visible}
-        onIsOpenedChange={(isOpened: boolean) => {
-          if (!isOpened) {
-            onClose();
-          }
-        }}
-        presentationDetents={['medium', 'large']}
-        presentationDragIndicator="visible"
-      >
-        <GlassySheet>
-          <SheetContent />
-        </GlassySheet>
-      </SwiftUIBottomSheet>
+      <SwiftUIHost style={styles.swiftUIHost}>
+        <SwiftUIBottomSheet
+          isOpened={visible}
+          onIsOpenedChange={(isOpened: boolean) => {
+            if (!isOpened) {
+              onClose();
+            }
+          }}
+          presentationDetents={['medium', 'large']}
+          presentationDragIndicator="visible"
+        >
+          <GlassySheet>
+            <SheetContent />
+          </GlassySheet>
+        </SwiftUIBottomSheet>
+      </SwiftUIHost>
     );
   }
 
@@ -316,6 +320,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingBottom: 24,
     paddingHorizontal: 16,
+  },
+  swiftUIHost: {
+    width: 0,
+    height: 0,
   },
   sheetContainer: {
     borderRadius: radii.xl,

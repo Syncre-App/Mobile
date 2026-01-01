@@ -17,11 +17,13 @@ import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS BottomSheet
 let SwiftUIBottomSheet: any = null;
+let SwiftUIHost: any = null;
 
 if (Platform.OS === 'ios') {
   try {
     const swiftUI = require('@expo/ui/swift-ui');
     SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIHost = swiftUI.Host;
   } catch (e) {
     console.warn('SwiftUI BottomSheet not available:', e);
   }
@@ -171,22 +173,24 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIBottomSheet) {
+  if (shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost) {
     return (
-      <SwiftUIBottomSheet
-        isOpened={visible}
-        onIsOpenedChange={(isOpened: boolean) => {
-          if (!isOpened) {
-            onClose();
-          }
-        }}
-        presentationDetents={['medium']}
-        presentationDragIndicator="visible"
-      >
-        <GlassySheet variant="subtle">
-          <MenuContent />
-        </GlassySheet>
-      </SwiftUIBottomSheet>
+      <SwiftUIHost style={styles.swiftUIHost}>
+        <SwiftUIBottomSheet
+          isOpened={visible}
+          onIsOpenedChange={(isOpened: boolean) => {
+            if (!isOpened) {
+              onClose();
+            }
+          }}
+          presentationDetents={['medium']}
+          presentationDragIndicator="visible"
+        >
+          <GlassySheet variant="subtle">
+            <MenuContent />
+          </GlassySheet>
+        </SwiftUIBottomSheet>
+      </SwiftUIHost>
     );
   }
 
@@ -242,6 +246,10 @@ const styles = StyleSheet.create({
   },
   menuContentGlassy: {
     backgroundColor: 'rgba(8, 12, 20, 0.4)',
+  },
+  swiftUIHost: {
+    width: 0,
+    height: 0,
   },
   userHeader: {
     flexDirection: 'row',

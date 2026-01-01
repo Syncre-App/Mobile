@@ -23,11 +23,13 @@ import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS BottomSheet
 let SwiftUIBottomSheet: any = null;
+let SwiftUIHost: any = null;
 
 if (Platform.OS === 'ios') {
   try {
     const swiftUI = require('@expo/ui/swift-ui');
     SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIHost = swiftUI.Host;
   } catch (e) {
     console.warn('SwiftUI BottomSheet not available:', e);
   }
@@ -268,24 +270,26 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: Native BottomSheet
   // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIBottomSheet) {
+  if (shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost) {
     return (
-      <SwiftUIBottomSheet
-        isOpened={visible}
-        onIsOpenedChange={(isOpened: boolean) => {
-          if (!isOpened) {
-            onClose();
-          }
-        }}
-        presentationDetents={['medium']}
-        presentationDragIndicator="visible"
-      >
-        <GlassySheet variant="subtle">
-          <View style={styles.sheetContent}>
-            <CardContent />
-          </View>
-        </GlassySheet>
-      </SwiftUIBottomSheet>
+      <SwiftUIHost style={styles.swiftUIHost}>
+        <SwiftUIBottomSheet
+          isOpened={visible}
+          onIsOpenedChange={(isOpened: boolean) => {
+            if (!isOpened) {
+              onClose();
+            }
+          }}
+          presentationDetents={['medium']}
+          presentationDragIndicator="visible"
+        >
+          <GlassySheet variant="subtle">
+            <View style={styles.sheetContent}>
+              <CardContent />
+            </View>
+          </GlassySheet>
+        </SwiftUIBottomSheet>
+      </SwiftUIHost>
     );
   }
 
@@ -336,6 +340,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  swiftUIHost: {
+    width: 0,
+    height: 0,
   },
   cardContainer: {
     width: SCREEN_WIDTH - spacing.xl * 2,

@@ -78,8 +78,8 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
   if (shouldUseSwiftUI && SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
     return (
       <View style={[styles.container, { borderRadius: cornerRadius }, style]}>
-        <GlassEffectContainer spacing={0}>
-          <SwiftUIHost style={StyleSheet.absoluteFillObject}>
+        <SwiftUIHost style={StyleSheet.absoluteFillObject}>
+          <GlassEffectContainer spacing={0}>
             <SwiftUIRoundedRectangle
               cornerRadius={cornerRadius}
               modifiers={[
@@ -92,8 +92,8 @@ export const NativeBlur: React.FC<NativeBlurProps> = ({
                 }),
               ]}
             />
-          </SwiftUIHost>
-        </GlassEffectContainer>
+          </GlassEffectContainer>
+        </SwiftUIHost>
         <View style={styles.content}>
           {children}
         </View>
