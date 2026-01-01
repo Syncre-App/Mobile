@@ -69,6 +69,10 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
   onMenuWillHide,
 }) => {
   const shouldUseSwiftUI = canUseSwiftUI();
+  const canRenderSwiftUI = shouldUseSwiftUI && Host && ContextMenu && Button;
+  const shouldUseLegacyMenu =
+    Boolean(LegacyContextMenu) &&
+    (activationMethod === 'singlePress' || !canRenderSwiftUI);
   if (disabled) {
     return <View style={style}>{children}</View>;
   }
@@ -76,7 +80,7 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // iOS: SwiftUI ContextMenu
   // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && Host && ContextMenu && Button) {
+  if (canRenderSwiftUI && !shouldUseLegacyMenu) {
     const handleActionPress = (action: ContextMenuAction) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       action.onPress();
@@ -111,7 +115,7 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
   // ═══════════════════════════════════════════════════════════════
   // Android: Legacy react-native-context-menu-view
   // ═══════════════════════════════════════════════════════════════
-  if (LegacyContextMenu) {
+  if (shouldUseLegacyMenu) {
     const contextMenuActions = actions.map((action) => ({
       title: action.title,
       subtitle: action.subtitle,

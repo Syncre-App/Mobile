@@ -38,11 +38,28 @@ import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
 import { CreatePollSheet } from '../../components/CreatePollSheet';
 import { PollMessage, type PollData } from '../../components/PollMessage';
 import { NativeContextMenu, type ContextMenuAction } from '../../components/NativeContextMenu';
+import { canUseSwiftUI } from '../../utils/swiftUi';
 import { font, palette, radii, spacing } from '../../theme/designSystem';
 import leo from 'leo-profanity';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// SwiftUI imports for iOS
+let SwiftUIHost: any = null;
+let SwiftUIHStack: any = null;
+let SwiftUIButton: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIHost = swiftUI.Host;
+    SwiftUIHStack = swiftUI.HStack;
+    SwiftUIButton = swiftUI.Button;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
+  }
 }
 
 type MessageStatus = 'sending' | 'sent' | 'delivered' | 'seen';
@@ -937,8 +954,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const hasContent = Boolean((message.content || '').trim().length) && !isDeletedMessage && !showExpiredBubble;
   const isMediaOnlyMessage =
     hasPreviewableMedia && !hasContent && !message.replyTo && !message.isPlaceholder && !isDeletedMessage && !showExpiredBubble;
+  const messageRowMaxWidth = Math.round(Dimensions.get('window').width * 0.82);
   const containerStyle = [
     styles.messageRow,
+    { maxWidth: messageRowMaxWidth },
     isMine ? styles.messageRowMine : styles.messageRowTheirs,
     !isFirstInGroup && styles.messageRowStacked,
     isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
@@ -1761,12 +1780,14 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   const currentUserId = user?.id ? String(user.id) : null;
+  const shouldUseSwiftUIEmojiPicker =
+    Platform.OS === 'ios' && canUseSwiftUI() && SwiftUIHost && SwiftUIHStack && SwiftUIButton;
 
   const reactionPickerPosition = useMemo(() => {
     if (!reactionPicker) {
       return null;
     }
-    const buttonCount = DEFAULT_REACTIONS.length + 1; // emojis + menu
+    const buttonCount = DEFAULT_REACTIONS.length;
     const width = buttonCount * 40 + 24;
     const pickerHeight = 68;
     const showAbove = reactionPicker.anchorY > windowHeight * 0.6;
@@ -6014,22 +6035,45 @@ const ChatScreen: React.FC = () => {
               },
             ]}
           >
-            {DEFAULT_REACTIONS.map((reaction) => (
-              <Pressable
-                key={`reaction-${reaction}`}
-                style={[
-                  styles.reactionEmojiButton,
-                  currentUserReaction === reaction && styles.reactionEmojiButtonActive,
-                ]}
-                onPress={() => {
-                  handleToggleReaction(reactionPicker.message, reaction);
-                  setContextTargetId(reactionPicker.message.id);
-                  closeReactionPicker();
-                }}
-              >
-                <Text style={styles.reactionEmojiText}>{reaction}</Text>
-              </Pressable>
-            ))}
+            {shouldUseSwiftUIEmojiPicker ? (
+              <SwiftUIHost matchContents>
+                <SwiftUIHStack spacing={8}>
+                  {DEFAULT_REACTIONS.map((reaction) => (
+                    <SwiftUIButton
+                      key={`reaction-${reaction}`}
+                      onPress={() => {
+                        handleToggleReaction(reactionPicker.message, reaction);
+                        setContextTargetId(reactionPicker.message.id);
+                        closeReactionPicker();
+                      }}
+                      controlSize="large"
+                      variant={currentUserReaction === reaction ? 'borderedProminent' : 'borderless'}
+                    >
+                      {reaction}
+                    </SwiftUIButton>
+                  ))}
+                </SwiftUIHStack>
+              </SwiftUIHost>
+            ) : (
+              <>
+                {DEFAULT_REACTIONS.map((reaction) => (
+                  <Pressable
+                    key={`reaction-${reaction}`}
+                    style={[
+                      styles.reactionEmojiButton,
+                      currentUserReaction === reaction && styles.reactionEmojiButtonActive,
+                    ]}
+                    onPress={() => {
+                      handleToggleReaction(reactionPicker.message, reaction);
+                      setContextTargetId(reactionPicker.message.id);
+                      closeReactionPicker();
+                    }}
+                  >
+                    <Text style={styles.reactionEmojiText}>{reaction}</Text>
+                  </Pressable>
+                ))}
+              </>
+            )}
             {visibleReactions.length ? (
               <View style={styles.reactionPickerLabel}>
                 <Text style={styles.reactionPickerLabelText} numberOfLines={1}>

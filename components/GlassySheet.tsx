@@ -23,7 +23,6 @@ export const GlassySheet: React.FC<GlassySheetProps> = ({
 const styles = StyleSheet.create({
   card: {
     alignSelf: 'stretch',
-    flex: 1,
   },
 });
 
