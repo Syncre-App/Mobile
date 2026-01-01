@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Modal,
   Pressable,
@@ -14,6 +14,10 @@ export type EphemeralDuration = '5m' | '1h' | '24h' | '7d' | null;
 interface EphemeralOptionsProps {
   selectedDuration: EphemeralDuration;
   onSelectDuration: (duration: EphemeralDuration) => void;
+  /** External visibility control - when provided, no trigger button is rendered */
+  visible?: boolean;
+  /** Called when sheet should close - required when visible is provided */
+  onClose?: () => void;
 }
 
 const DURATION_OPTIONS: { value: EphemeralDuration; label: string; description: string }[] = [
@@ -27,19 +31,23 @@ const DURATION_OPTIONS: { value: EphemeralDuration; label: string; description: 
 export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
   selectedDuration,
   onSelectDuration,
+  visible,
+  onClose,
 }) => {
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  // External control mode: visible and onClose are provided
+  const isExternallyControlled = visible !== undefined && onClose !== undefined;
+  const isModalVisible = isExternallyControlled ? visible : false;
 
-  const handleToggleModal = () => {
-    setIsModalVisible(!isModalVisible);
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    }
   };
 
   const handleSelectOption = (duration: EphemeralDuration) => {
     onSelectDuration(duration);
-    setIsModalVisible(false);
+    handleClose();
   };
-
-  const isActive = selectedDuration !== null;
 
   // Shared content component
   const SheetContent = () => (
@@ -47,6 +55,9 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
       <View style={styles.modalHeader}>
         <Ionicons name="timer-outline" size={24} color={palette.text} />
         <Text style={styles.modalTitle}>Disappearing Message</Text>
+        <Pressable onPress={handleClose} style={styles.closeButton}>
+          <Ionicons name="close" size={20} color={palette.textMuted} />
+        </Pressable>
       </View>
       <Text style={styles.modalDescription}>
         Choose how long before this message disappears
@@ -75,29 +86,16 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
     </View>
   );
 
-  return (
-    <>
-      <Pressable
-        onPress={handleToggleModal}
-        style={[styles.triggerButton, isActive && styles.triggerButtonActive]}
-        accessibilityLabel="Ephemeral message options"
-        accessibilityRole="button"
-      >
-        <Ionicons
-          name="timer-outline"
-          size={22}
-          color={isActive ? '#FB923C' : 'rgba(255, 255, 255, 0.6)'}
-        />
-      </Pressable>
-
-      {/* All platforms: Modal (SwiftUI BottomSheet cannot render RN children) */}
+  // If externally controlled, just render the modal
+  if (isExternallyControlled) {
+    return (
       <Modal
         visible={isModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setIsModalVisible(false)}
+        onRequestClose={handleClose}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setIsModalVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={handleClose}>
           <Pressable onPress={(e) => e.stopPropagation()}>
             <View style={styles.cardContainer}>
               <SheetContent />
@@ -105,8 +103,11 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
           </Pressable>
         </Pressable>
       </Modal>
-    </>
-  );
+    );
+  }
+
+  // Legacy mode: no trigger button rendered (component is now only used externally controlled)
+  return null;
 };
 
 const styles = StyleSheet.create({
@@ -144,6 +145,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.xs,
+  },
+  closeButton: {
+    padding: spacing.xs,
+    marginLeft: 'auto',
   },
   modalTitle: {
     color: palette.text,

@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -18,22 +17,6 @@ import { BadgeRow } from './BadgeIcon';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
-import { GlassySheet } from './GlassySheet';
-import { canUseSwiftUI } from '../utils/swiftUi';
-
-// SwiftUI imports for iOS BottomSheet
-let SwiftUIBottomSheet: any = null;
-let SwiftUIHost: any = null;
-
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIHost = swiftUI.Host;
-  } catch (e) {
-    console.warn('SwiftUI BottomSheet not available:', e);
-  }
-}
 
 interface SpotifyActivity {
   isPlaying: boolean;
@@ -83,7 +66,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 }) => {
   const [spotifyActivity, setSpotifyActivity] = useState<SpotifyActivity | null>(null);
   const [isLoadingSpotify, setIsLoadingSpotify] = useState(false);
-  const shouldUseSwiftUI = canUseSwiftUI();
 
   const fetchSpotifyActivity = useCallback(async () => {
     if (!user?.id) return;
@@ -268,33 +250,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native BottomSheet
-  // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost) {
-    return (
-      <SwiftUIHost style={styles.swiftUIHost}>
-        <SwiftUIBottomSheet
-          isOpened={visible}
-          onIsOpenedChange={(isOpened: boolean) => {
-            if (!isOpened) {
-              onClose();
-            }
-          }}
-          presentationDetents={['medium']}
-          presentationDragIndicator="visible"
-        >
-          <GlassySheet variant="subtle">
-            <View style={styles.sheetContent}>
-              <CardContent />
-            </View>
-          </GlassySheet>
-        </SwiftUIBottomSheet>
-      </SwiftUIHost>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Android / Fallback: Modal with blur overlay
+  // All platforms: Modal with blur overlay
   // ═══════════════════════════════════════════════════════════════
   return (
     <Modal

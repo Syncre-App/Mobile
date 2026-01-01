@@ -1681,6 +1681,7 @@ const ChatScreen: React.FC = () => {
   const [ephemeralDuration, setEphemeralDuration] = useState<EphemeralDuration>(null);
   const [showScheduleSheet, setShowScheduleSheet] = useState(false);
   const [showPollSheet, setShowPollSheet] = useState(false);
+  const [showEphemeralSheet, setShowEphemeralSheet] = useState(false);
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
   const [pollsData, setPollsData] = useState<Map<string, { poll: PollData; userVotes: number[] }>>(new Map());
   const [isThreadLoading, setIsThreadLoading] = useState(true);
@@ -5820,8 +5821,14 @@ const ChatScreen: React.FC = () => {
         hint: 'Start a vote',
         onPress: () => setShowPollSheet(true),
       },
+      {
+        key: 'ephemeral',
+        label: 'Disappearing message',
+        hint: ephemeralDuration ? `Currently: ${ephemeralDuration}` : 'Set timer',
+        onPress: () => setShowEphemeralSheet(true),
+      },
     ],
-    [handlePasteImage, handlePickDocument, handlePickPhoto, setShowPollSheet, setShowScheduleSheet]
+    [ephemeralDuration, handlePasteImage, handlePickDocument, handlePickPhoto, setShowPollSheet, setShowScheduleSheet]
   );
   const attachmentMenuDisabled =
     !chatId ||
@@ -5845,6 +5852,8 @@ const ChatScreen: React.FC = () => {
               return 'calendar';
             case 'poll':
               return 'chart.bar';
+            case 'ephemeral':
+              return 'timer';
             default:
               return undefined;
           }
@@ -6298,12 +6307,6 @@ const ChatScreen: React.FC = () => {
                 )}
               </View>
             </NativeContextMenu>
-            {!editingMessage && (
-              <EphemeralOptions
-                selectedDuration={ephemeralDuration}
-                onSelectDuration={setEphemeralDuration}
-              />
-            )}
             <View style={styles.composerColumn}>
               <Pressable onPress={() => composerRef.current?.focus()} onLongPress={handlePasteImage}>
                 <TextInput
@@ -6364,6 +6367,12 @@ const ChatScreen: React.FC = () => {
         onClose={() => setShowPollSheet(false)}
         onCreatePoll={handleCreatePoll}
         isCreating={isCreatingPoll}
+      />
+      <EphemeralOptions
+        visible={showEphemeralSheet}
+        onClose={() => setShowEphemeralSheet(false)}
+        selectedDuration={ephemeralDuration}
+        onSelectDuration={setEphemeralDuration}
       />
       <Modal
         visible={Boolean(threadRootId)}
