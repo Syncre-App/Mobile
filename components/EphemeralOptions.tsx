@@ -1,22 +1,49 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
+  Dimensions,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { font, palette, radii, spacing } from '../theme/designSystem';
+import { canUseSwiftUI } from '../utils/swiftUi';
+
+// SwiftUI imports for iOS
+let SwiftUIHost: any = null;
+let SwiftUIBottomSheet: any = null;
+let SwiftUIText: any = null;
+let SwiftUIButton: any = null;
+let SwiftUIVStack: any = null;
+let SwiftUIDivider: any = null;
+let SwiftUIPicker: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIHost = swiftUI.Host;
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIText = swiftUI.Text;
+    SwiftUIButton = swiftUI.Button;
+    SwiftUIVStack = swiftUI.VStack;
+    SwiftUIDivider = swiftUI.Divider;
+    SwiftUIPicker = swiftUI.Picker;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
+  }
+}
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export type EphemeralDuration = '5m' | '1h' | '24h' | '7d' | null;
 
 interface EphemeralOptionsProps {
   selectedDuration: EphemeralDuration;
   onSelectDuration: (duration: EphemeralDuration) => void;
-  /** External visibility control - when provided, no trigger button is rendered */
   visible?: boolean;
-  /** Called when sheet should close - required when visible is provided */
   onClose?: () => void;
 }
 
@@ -31,12 +58,10 @@ const DURATION_OPTIONS: { value: EphemeralDuration; label: string; description: 
 export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
   selectedDuration,
   onSelectDuration,
-  visible,
+  visible = false,
   onClose,
 }) => {
-  // External control mode: visible and onClose are provided
-  const isExternallyControlled = visible !== undefined && onClose !== undefined;
-  const isModalVisible = isExternallyControlled ? visible : false;
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   const handleClose = () => {
     if (onClose) {
@@ -49,74 +74,108 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
     handleClose();
   };
 
-  // Shared content component
-  const SheetContent = () => (
-    <View style={styles.modalContent}>
-      <View style={styles.modalHeader}>
-        <Ionicons name="timer-outline" size={24} color={palette.text} />
-        <Text style={styles.modalTitle}>Disappearing Message</Text>
-        <Pressable onPress={handleClose} style={styles.closeButton}>
-          <Ionicons name="close" size={20} color={palette.textMuted} />
-        </Pressable>
-      </View>
-      <Text style={styles.modalDescription}>
-        Choose how long before this message disappears
-      </Text>
+  const selectedIndex = DURATION_OPTIONS.findIndex((opt) => opt.value === selectedDuration);
 
-      <View style={styles.optionsList}>
-        {DURATION_OPTIONS.map((option) => (
-          <Pressable
-            key={option.value ?? 'off'}
-            style={[
-              styles.optionItem,
-              selectedDuration === option.value && styles.optionItemSelected,
-            ]}
-            onPress={() => handleSelectOption(option.value)}
-          >
-            <View style={styles.optionContent}>
-              <Text style={styles.optionLabel}>{option.label}</Text>
-              <Text style={styles.optionDescription}>{option.description}</Text>
-            </View>
-            {selectedDuration === option.value && (
-              <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
-            )}
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-
-  // If externally controlled, just render the modal
-  if (isExternallyControlled) {
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: Native SwiftUI BottomSheet
+  // ═══════════════════════════════════════════════════════════════
+  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet && SwiftUIText && SwiftUIButton && SwiftUIVStack) {
     return (
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={handleClose}
-      >
-        <Pressable style={styles.modalOverlay} onPress={handleClose}>
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <View style={styles.cardContainer}>
-              <SheetContent />
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <SwiftUIHost style={styles.swiftUIHost}>
+        <SwiftUIBottomSheet
+          isOpened={visible}
+          onIsOpenedChange={(isOpened: boolean) => {
+            if (!isOpened) {
+              handleClose();
+            }
+          }}
+          presentationDetents={['medium']}
+          presentationDragIndicator="visible"
+        >
+          <SwiftUIVStack spacing={12} padding={20}>
+            <SwiftUIText style="title2" fontWeight="bold">
+              Disappearing Message
+            </SwiftUIText>
+            <SwiftUIText style="subheadline" color={palette.textMuted}>
+              Choose how long before this message disappears
+            </SwiftUIText>
+
+            {SwiftUIDivider && <SwiftUIDivider />}
+
+            {DURATION_OPTIONS.map((option) => (
+              <SwiftUIButton
+                key={option.value ?? 'off'}
+                variant={selectedDuration === option.value ? 'borderedProminent' : 'bordered'}
+                systemImage={selectedDuration === option.value ? 'checkmark.circle.fill' : 'circle'}
+                onPress={() => handleSelectOption(option.value)}
+              >
+                {option.label}
+              </SwiftUIButton>
+            ))}
+          </SwiftUIVStack>
+        </SwiftUIBottomSheet>
+      </SwiftUIHost>
     );
   }
 
-  // Legacy mode: no trigger button rendered (component is now only used externally controlled)
-  return null;
+  // ═══════════════════════════════════════════════════════════════
+  // Android / Fallback: Modal
+  // ═══════════════════════════════════════════════════════════════
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={handleClose}
+    >
+      <Pressable style={styles.modalOverlay} onPress={handleClose}>
+        <Pressable onPress={(e) => e.stopPropagation()}>
+          <View style={styles.cardContainer}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Ionicons name="timer-outline" size={24} color={palette.text} />
+                <Text style={styles.modalTitle}>Disappearing Message</Text>
+                <Pressable onPress={handleClose} style={styles.closeButton}>
+                  <Ionicons name="close" size={20} color={palette.textMuted} />
+                </Pressable>
+              </View>
+              <Text style={styles.modalDescription}>
+                Choose how long before this message disappears
+              </Text>
+
+              <View style={styles.optionsList}>
+                {DURATION_OPTIONS.map((option) => (
+                  <Pressable
+                    key={option.value ?? 'off'}
+                    style={[
+                      styles.optionItem,
+                      selectedDuration === option.value && styles.optionItemSelected,
+                    ]}
+                    onPress={() => handleSelectOption(option.value)}
+                  >
+                    <View style={styles.optionContent}>
+                      <Text style={styles.optionLabel}>{option.label}</Text>
+                      <Text style={styles.optionDescription}>{option.description}</Text>
+                    </View>
+                    {selectedDuration === option.value && (
+                      <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 };
 
 const styles = StyleSheet.create({
-  triggerButton: {
-    padding: spacing.xs,
-    borderRadius: radii.md,
-  },
-  triggerButtonActive: {
-    backgroundColor: 'rgba(251, 146, 60, 0.15)',
+  swiftUIHost: {
+    position: 'absolute',
+    width: SCREEN_WIDTH,
+    height: 0,
   },
   modalOverlay: {
     flex: 1,
@@ -125,12 +184,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
   },
-  swiftUIHost: {
-    width: 0,
-    height: 0,
-  },
   cardContainer: {
-    width: 280,
+    width: 300,
     backgroundColor: 'rgba(15, 23, 42, 0.95)',
     borderRadius: radii.xl,
     borderWidth: 1,

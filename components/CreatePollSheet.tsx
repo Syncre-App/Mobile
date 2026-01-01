@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
+  Dimensions,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +14,41 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { font, palette, radii, spacing } from '../theme/designSystem';
+import { canUseSwiftUI } from '../utils/swiftUi';
+
+// SwiftUI imports for iOS
+let SwiftUIHost: any = null;
+let SwiftUIBottomSheet: any = null;
+let SwiftUIText: any = null;
+let SwiftUIButton: any = null;
+let SwiftUIVStack: any = null;
+let SwiftUIHStack: any = null;
+let SwiftUITextField: any = null;
+let SwiftUISwitch: any = null;
+let SwiftUIDivider: any = null;
+let SwiftUIForm: any = null;
+let SwiftUISection: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIHost = swiftUI.Host;
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIText = swiftUI.Text;
+    SwiftUIButton = swiftUI.Button;
+    SwiftUIVStack = swiftUI.VStack;
+    SwiftUIHStack = swiftUI.HStack;
+    SwiftUITextField = swiftUI.TextField;
+    SwiftUISwitch = swiftUI.Switch;
+    SwiftUIDivider = swiftUI.Divider;
+    SwiftUIForm = swiftUI.Form;
+    SwiftUISection = swiftUI.Section;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
+  }
+}
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const MAX_OPTIONS = 10;
 const MAX_OPTION_LENGTH = 50;
@@ -35,6 +71,11 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
   const [multiSelect, setMultiSelect] = useState(false);
+  const shouldUseSwiftUI = canUseSwiftUI();
+  
+  // Refs for SwiftUI TextFields
+  const questionRef = useRef<any>(null);
+  const optionRefs = useRef<any[]>([]);
 
   const resetForm = useCallback(() => {
     setQuestion('');
@@ -93,105 +134,115 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   const isValid = question.trim().length > 0 &&
     options.filter((opt) => opt.trim().length > 0).length >= MIN_OPTIONS;
 
-  // Shared content component
-  const SheetContent = () => (
-    <View style={styles.content}>
-      <View style={styles.header}>
-        <Ionicons name="stats-chart" size={24} color={palette.accent} />
-        <Text style={styles.title}>Create poll</Text>
-        <Pressable onPress={handleClose} style={styles.closeButton}>
-          <Ionicons name="close" size={22} color={palette.textMuted} />
-        </Pressable>
-      </View>
-
-      <ScrollView
-        style={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.label}>Question</Text>
-        <TextInput
-          style={styles.questionInput}
-          value={question}
-          onChangeText={(text) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
-          placeholder="What's the question?"
-          placeholderTextColor="rgba(255, 255, 255, 0.4)"
-          multiline
-          maxLength={MAX_QUESTION_LENGTH}
-        />
-        <Text style={styles.charCount}>
-          {question.length}/{MAX_QUESTION_LENGTH}
-        </Text>
-
-        <Text style={styles.label}>Options</Text>
-        {options.map((option, index) => (
-          <View key={index} style={styles.optionRow}>
-            <View style={styles.optionNumber}>
-              <Text style={styles.optionNumberText}>{index + 1}</Text>
-            </View>
-            <TextInput
-              style={styles.optionInput}
-              value={option}
-              onChangeText={(text) => handleOptionChange(index, text)}
-              placeholder={`${index + 1}. option`}
-              placeholderTextColor="rgba(255, 255, 255, 0.4)"
-              maxLength={MAX_OPTION_LENGTH}
-            />
-            {options.length > MIN_OPTIONS && (
-              <Pressable
-                onPress={() => handleRemoveOption(index)}
-                style={styles.removeOptionButton}
-              >
-                <Ionicons name="close-circle" size={22} color="#EF4444" />
-              </Pressable>
-            )}
-          </View>
-        ))}
-
-        {options.length < MAX_OPTIONS && (
-          <Pressable style={styles.addOptionButton} onPress={handleAddOption}>
-            <Ionicons name="add-circle-outline" size={20} color={palette.accent} />
-            <Text style={styles.addOptionText}>Add option</Text>
-          </Pressable>
-        )}
-
-        <Pressable
-          style={styles.multiSelectRow}
-          onPress={() => {
-            setMultiSelect(!multiSelect);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: Native SwiftUI BottomSheet
+  // ═══════════════════════════════════════════════════════════════
+  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet && SwiftUIText && SwiftUIButton && SwiftUIVStack && SwiftUITextField) {
+    return (
+      <SwiftUIHost style={styles.swiftUIHost}>
+        <SwiftUIBottomSheet
+          isOpened={visible}
+          onIsOpenedChange={(isOpened: boolean) => {
+            if (!isOpened) {
+              handleClose();
+            }
           }}
+          presentationDetents={['large']}
+          presentationDragIndicator="visible"
         >
-          <View style={[styles.checkbox, multiSelect && styles.checkboxChecked]}>
-            {multiSelect && <Ionicons name="checkmark" size={14} color="#ffffff" />}
-          </View>
-          <Text style={styles.multiSelectText}>Allow multiple answers</Text>
-        </Pressable>
-      </ScrollView>
+          <SwiftUIVStack spacing={16} padding={20}>
+            <SwiftUIHStack>
+              <SwiftUIText style="title2" fontWeight="bold">
+                Create Poll
+              </SwiftUIText>
+            </SwiftUIHStack>
 
-      <View style={styles.footer}>
-        <Pressable style={styles.cancelButton} onPress={handleClose}>
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.createButton,
-            (!isValid || isCreating) && styles.createButtonDisabled,
-          ]}
-          onPress={handleCreate}
-          disabled={!isValid || isCreating}
-        >
-          <Ionicons name="stats-chart" size={18} color="#ffffff" />
-          <Text style={styles.createButtonText}>
-            {isCreating ? 'Creating...' : 'Create'}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
+            {/* Question */}
+            <SwiftUIText style="subheadline" color={palette.textMuted}>
+              Question
+            </SwiftUIText>
+            <SwiftUITextField
+              ref={questionRef}
+              defaultValue={question}
+              placeholder="What's the question?"
+              onChangeText={(text: string) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
+              multiline
+            />
+
+            {SwiftUIDivider && <SwiftUIDivider />}
+
+            {/* Options */}
+            <SwiftUIText style="subheadline" color={palette.textMuted}>
+              Options
+            </SwiftUIText>
+            {options.map((option, index) => (
+              <SwiftUIHStack key={index} spacing={8}>
+                <SwiftUITextField
+                  ref={(ref: any) => (optionRefs.current[index] = ref)}
+                  defaultValue={option}
+                  placeholder={`Option ${index + 1}`}
+                  onChangeText={(text: string) => handleOptionChange(index, text)}
+                />
+                {options.length > MIN_OPTIONS && (
+                  <SwiftUIButton
+                    variant="plain"
+                    role="destructive"
+                    systemImage="xmark.circle.fill"
+                    onPress={() => handleRemoveOption(index)}
+                  />
+                )}
+              </SwiftUIHStack>
+            ))}
+
+            {options.length < MAX_OPTIONS && (
+              <SwiftUIButton
+                variant="bordered"
+                systemImage="plus.circle"
+                onPress={handleAddOption}
+              >
+                Add option
+              </SwiftUIButton>
+            )}
+
+            {SwiftUIDivider && <SwiftUIDivider />}
+
+            {/* Multi-select toggle */}
+            {SwiftUISwitch && (
+              <SwiftUISwitch
+                checked={multiSelect}
+                onValueChange={setMultiSelect}
+                label="Allow multiple answers"
+                variant="switch"
+              />
+            )}
+
+            {SwiftUIDivider && <SwiftUIDivider />}
+
+            {/* Actions */}
+            <SwiftUIHStack spacing={12}>
+              <SwiftUIButton
+                variant="bordered"
+                onPress={handleClose}
+              >
+                Cancel
+              </SwiftUIButton>
+              <SwiftUIButton
+                variant="borderedProminent"
+                systemImage="chart.bar"
+                disabled={!isValid || isCreating}
+                onPress={handleCreate}
+              >
+                {isCreating ? 'Creating...' : 'Create'}
+              </SwiftUIButton>
+            </SwiftUIHStack>
+          </SwiftUIVStack>
+        </SwiftUIBottomSheet>
+      </SwiftUIHost>
+    );
+  }
 
   // ═══════════════════════════════════════════════════════════════
-  // All platforms: Modal (SwiftUI BottomSheet cannot render RN children)
+  // Android / Fallback: Modal
   // ═══════════════════════════════════════════════════════════════
   return (
     <Modal
@@ -206,7 +257,99 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
       >
         <Pressable style={styles.backdrop} onPress={handleClose} />
         <View style={styles.cardContainer}>
-          <SheetContent />
+          <View style={styles.content}>
+            <View style={styles.header}>
+              <Ionicons name="stats-chart" size={24} color={palette.accent} />
+              <Text style={styles.title}>Create poll</Text>
+              <Pressable onPress={handleClose} style={styles.closeButton}>
+                <Ionicons name="close" size={22} color={palette.textMuted} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.label}>Question</Text>
+              <TextInput
+                style={styles.questionInput}
+                value={question}
+                onChangeText={(text) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
+                placeholder="What's the question?"
+                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                multiline
+                maxLength={MAX_QUESTION_LENGTH}
+              />
+              <Text style={styles.charCount}>
+                {question.length}/{MAX_QUESTION_LENGTH}
+              </Text>
+
+              <Text style={styles.label}>Options</Text>
+              {options.map((option, index) => (
+                <View key={index} style={styles.optionRow}>
+                  <View style={styles.optionNumber}>
+                    <Text style={styles.optionNumberText}>{index + 1}</Text>
+                  </View>
+                  <TextInput
+                    style={styles.optionInput}
+                    value={option}
+                    onChangeText={(text) => handleOptionChange(index, text)}
+                    placeholder={`${index + 1}. option`}
+                    placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                    maxLength={MAX_OPTION_LENGTH}
+                  />
+                  {options.length > MIN_OPTIONS && (
+                    <Pressable
+                      onPress={() => handleRemoveOption(index)}
+                      style={styles.removeOptionButton}
+                    >
+                      <Ionicons name="close-circle" size={22} color="#EF4444" />
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+
+              {options.length < MAX_OPTIONS && (
+                <Pressable style={styles.addOptionButton} onPress={handleAddOption}>
+                  <Ionicons name="add-circle-outline" size={20} color={palette.accent} />
+                  <Text style={styles.addOptionText}>Add option</Text>
+                </Pressable>
+              )}
+
+              <Pressable
+                style={styles.multiSelectRow}
+                onPress={() => {
+                  setMultiSelect(!multiSelect);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <View style={[styles.checkbox, multiSelect && styles.checkboxChecked]}>
+                  {multiSelect && <Ionicons name="checkmark" size={14} color="#ffffff" />}
+                </View>
+                <Text style={styles.multiSelectText}>Allow multiple answers</Text>
+              </Pressable>
+            </ScrollView>
+
+            <View style={styles.footer}>
+              <Pressable style={styles.cancelButton} onPress={handleClose}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.createButton,
+                  (!isValid || isCreating) && styles.createButtonDisabled,
+                ]}
+                onPress={handleCreate}
+                disabled={!isValid || isCreating}
+              >
+                <Ionicons name="stats-chart" size={18} color="#ffffff" />
+                <Text style={styles.createButtonText}>
+                  {isCreating ? 'Creating...' : 'Create'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -214,15 +357,16 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
 };
 
 const styles = StyleSheet.create({
+  swiftUIHost: {
+    position: 'absolute',
+    width: SCREEN_WIDTH,
+    height: 0,
+  },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.md,
-  },
-  swiftUIHost: {
-    width: 0,
-    height: 0,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

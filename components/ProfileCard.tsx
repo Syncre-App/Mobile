@@ -4,9 +4,10 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
-  Text,
+  Text as RNText,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -17,6 +18,33 @@ import { BadgeRow } from './BadgeIcon';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+import { canUseSwiftUI } from '../utils/swiftUi';
+
+// SwiftUI imports for iOS
+let SwiftUIHost: any = null;
+let SwiftUIBottomSheet: any = null;
+let SwiftUIText: any = null;
+let SwiftUIButton: any = null;
+let SwiftUIVStack: any = null;
+let SwiftUIHStack: any = null;
+let SwiftUISpacer: any = null;
+let SwiftUIDivider: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIHost = swiftUI.Host;
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+    SwiftUIText = swiftUI.Text;
+    SwiftUIButton = swiftUI.Button;
+    SwiftUIVStack = swiftUI.VStack;
+    SwiftUIHStack = swiftUI.HStack;
+    SwiftUISpacer = swiftUI.Spacer;
+    SwiftUIDivider = swiftUI.Divider;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
+  }
+}
 
 interface SpotifyActivity {
   isPlaying: boolean;
@@ -66,6 +94,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 }) => {
   const [spotifyActivity, setSpotifyActivity] = useState<SpotifyActivity | null>(null);
   const [isLoadingSpotify, setIsLoadingSpotify] = useState(false);
+  const shouldUseSwiftUI = canUseSwiftUI();
 
   const fetchSpotifyActivity = useCallback(async () => {
     if (!user?.id) return;
@@ -120,17 +149,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     return `${days} days ago`;
   };
 
-  const getPresenceColor = () => {
-    switch (presence) {
-      case 'online':
-        return '#22C55E';
-      case 'idle':
-        return '#FBBF24';
-      default:
-        return palette.textMuted;
-    }
-  };
-
   const getPresenceText = () => {
     switch (presence) {
       case 'online':
@@ -142,9 +160,92 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     }
   };
 
+  const getPresenceColor = () => {
+    switch (presence) {
+      case 'online':
+        return '#22C55E';
+      case 'idle':
+        return '#FBBF24';
+      default:
+        return palette.textMuted;
+    }
+  };
+
   if (!user) return null;
 
-  // Shared content component
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: Native SwiftUI BottomSheet with SwiftUI content
+  // ═══════════════════════════════════════════════════════════════
+  if (shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet && SwiftUIText && SwiftUIButton && SwiftUIVStack) {
+    return (
+      <SwiftUIHost style={styles.swiftUIHost}>
+        <SwiftUIBottomSheet
+          isOpened={visible}
+          onIsOpenedChange={(isOpened: boolean) => {
+            if (!isOpened) {
+              onClose();
+            }
+          }}
+          presentationDetents={['medium']}
+          presentationDragIndicator="visible"
+        >
+          <SwiftUIVStack spacing={16} padding={20}>
+            {/* Username */}
+            <SwiftUIText style="title" fontWeight="bold">
+              {user.username}
+            </SwiftUIText>
+
+            {/* Status */}
+            <SwiftUIText style="subheadline" color={getPresenceColor()}>
+              {getPresenceText()}
+            </SwiftUIText>
+
+            {/* Spotify Activity */}
+            {spotifyActivity?.track && (
+              <SwiftUIHStack spacing={8}>
+                <SwiftUIText style="caption" color="#1DB954">
+                  {spotifyActivity.isPlaying ? '♫ ' : '⏸ '}
+                  {spotifyActivity.track.name} - {spotifyActivity.track.artist}
+                </SwiftUIText>
+              </SwiftUIHStack>
+            )}
+
+            {SwiftUIDivider && <SwiftUIDivider />}
+
+            {/* Action Buttons */}
+            <SwiftUIButton
+              variant="bordered"
+              role="destructive"
+              systemImage="person.badge.minus"
+              onPress={() => handleAction(() => onRemoveFriend(user.id))}
+            >
+              Remove friend
+            </SwiftUIButton>
+
+            <SwiftUIButton
+              variant="bordered"
+              systemImage={isBlocked ? 'lock.open' : 'hand.raised'}
+              onPress={() => handleAction(() => onBlockUser(user.id))}
+            >
+              {isBlocked ? 'Unblock' : 'Block'}
+            </SwiftUIButton>
+
+            <SwiftUIButton
+              variant="bordered"
+              systemImage="flag"
+              onPress={() => handleAction(() => onReportUser(user.id))}
+            >
+              Report
+            </SwiftUIButton>
+          </SwiftUIVStack>
+        </SwiftUIBottomSheet>
+      </SwiftUIHost>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Fallback content component for Modal
+  // ═══════════════════════════════════════════════════════════════
   const CardContent = () => (
     <>
       {/* Profile Header */}
@@ -158,7 +259,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         />
 
         <View style={styles.nameContainer}>
-          <Text style={styles.username}>{user.username}</Text>
+          <RNText style={styles.username}>{user.username}</RNText>
           {user.badges && user.badges.length > 0 && (
             <BadgeRow badges={user.badges} size={24} spacing={6} style={styles.badges} />
           )}
@@ -167,9 +268,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         {/* Status */}
         <View style={styles.statusContainer}>
           <View style={[styles.statusDot, { backgroundColor: getPresenceColor() }]} />
-          <Text style={[styles.statusText, { color: getPresenceColor() }]}>
+          <RNText style={[styles.statusText, { color: getPresenceColor() }]}>
             {getPresenceText()}
-          </Text>
+          </RNText>
         </View>
       </View>
 
@@ -186,9 +287,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               size={16}
               color="#1DB954"
             />
-            <Text style={styles.spotifyLabel}>
+            <RNText style={styles.spotifyLabel}>
               {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
-            </Text>
+            </RNText>
           </View>
           <View style={styles.spotifyContent}>
             {spotifyActivity.track.albumArt && (
@@ -199,12 +300,12 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               />
             )}
             <View style={styles.trackInfo}>
-              <Text style={styles.trackName} numberOfLines={1}>
+              <RNText style={styles.trackName} numberOfLines={1}>
                 {spotifyActivity.track.name}
-              </Text>
-              <Text style={styles.trackArtist} numberOfLines={1}>
+              </RNText>
+              <RNText style={styles.trackArtist} numberOfLines={1}>
                 {spotifyActivity.track.artist}
-              </Text>
+              </RNText>
             </View>
           </View>
         </View>
@@ -217,9 +318,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           onPress={() => handleAction(() => onRemoveFriend(user.id))}
         >
           <Ionicons name="person-remove-outline" size={20} color={palette.error} />
-          <Text style={[styles.actionText, { color: palette.error }]}>
+          <RNText style={[styles.actionText, { color: palette.error }]}>
             Remove friend
-          </Text>
+          </RNText>
         </Pressable>
 
         <Pressable
@@ -231,9 +332,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
             size={20}
             color={palette.warning}
           />
-          <Text style={[styles.actionText, { color: palette.warning }]}>
+          <RNText style={[styles.actionText, { color: palette.warning }]}>
             {isBlocked ? 'Unblock' : 'Block'}
-          </Text>
+          </RNText>
         </Pressable>
 
         <Pressable
@@ -241,16 +342,16 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           onPress={() => handleAction(() => onReportUser(user.id))}
         >
           <Ionicons name="flag-outline" size={20} color={palette.textMuted} />
-          <Text style={[styles.actionText, { color: palette.textMuted }]}>
+          <RNText style={[styles.actionText, { color: palette.textMuted }]}>
             Report
-          </Text>
+          </RNText>
         </Pressable>
       </View>
     </>
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // All platforms: Modal with blur overlay
+  // Android / Fallback: Modal with blur overlay
   // ═══════════════════════════════════════════════════════════════
   return (
     <Modal
@@ -298,7 +399,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   swiftUIHost: {
-    width: 0,
+    position: 'absolute',
+    width: SCREEN_WIDTH,
     height: 0,
   },
   cardContainer: {
