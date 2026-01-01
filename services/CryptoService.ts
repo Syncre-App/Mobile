@@ -496,6 +496,22 @@ export const CryptoService = {
   },
 
   async resetIdentity(): Promise<void> {
+    // First, try to delete the server-side identity key
+    try {
+      const token = await StorageService.getAuthToken();
+      if (token) {
+        const response = await ApiService.delete('/keys/identity', token);
+        if (response.success) {
+          console.log('[CryptoService] Server-side identity key deleted successfully');
+        } else {
+          console.warn('[CryptoService] Failed to delete server-side identity:', response.error);
+        }
+      }
+    } catch (err) {
+      console.warn('[CryptoService] Error deleting server-side identity:', err);
+    }
+
+    // Then clear local storage
     await SecureStore.deleteItemAsync(IDENTITY_PRIVATE_KEY_KEY);
     await SecureStore.deleteItemAsync(IDENTITY_PUBLIC_KEY_KEY);
     await SecureStore.deleteItemAsync(IDENTITY_VERSION_KEY);
