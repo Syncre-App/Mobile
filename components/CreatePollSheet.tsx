@@ -27,12 +27,11 @@ let SwiftUIImage: any = null;
 let SwiftUITextField: any = null;
 let SwiftUISwitch: any = null;
 let SwiftUISpacer: any = null;
-let swiftUIBackground: any = null;
+let GlassEffectContainer: any = null;
 let swiftUICornerRadius: any = null;
-let swiftUIBorder: any = null;
 let swiftUIPadding: any = null;
-let swiftUIShadow: any = null;
 let swiftUIFrame: any = null;
+let swiftUIGlassEffect: any = null;
 
 if (Platform.OS === 'ios') {
   try {
@@ -47,13 +46,12 @@ if (Platform.OS === 'ios') {
     SwiftUITextField = swiftUI.TextField;
     SwiftUISwitch = swiftUI.Switch;
     SwiftUISpacer = swiftUI.Spacer;
+    GlassEffectContainer = swiftUI.GlassEffectContainer;
     const modifiers = require('@expo/ui/swift-ui/modifiers');
-    swiftUIBackground = modifiers.background;
     swiftUICornerRadius = modifiers.cornerRadius;
-    swiftUIBorder = modifiers.border;
     swiftUIPadding = modifiers.padding;
-    swiftUIShadow = modifiers.shadow;
     swiftUIFrame = modifiers.frame;
+    swiftUIGlassEffect = modifiers.glassEffect;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -94,12 +92,11 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
     SwiftUITextField &&
     SwiftUISwitch &&
     SwiftUISpacer &&
-    swiftUIBackground &&
+    GlassEffectContainer &&
     swiftUICornerRadius &&
-    swiftUIBorder &&
     swiftUIPadding &&
-    swiftUIShadow &&
-    swiftUIFrame;
+    swiftUIFrame &&
+    swiftUIGlassEffect;
   const optionIdRef = useRef(0);
   const buildOption = useCallback((): PollOption => {
     const id = optionIdRef.current;
@@ -278,7 +275,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet
+  // iOS: Native SwiftUI BottomSheet with Liquid Glass
   // ═══════════════════════════════════════════════════════════════
   if (canRenderSwiftUI) {
     return (
@@ -290,195 +287,194 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
               handleClose();
             }
           }}
-          presentationDetents={['medium', 'large']}
           presentationDragIndicator="visible"
         >
-          <SwiftUIVStack
-            alignment="center"
-            spacing={12}
-            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
-          >
+          <GlassEffectContainer>
             <SwiftUIVStack
-              key={`poll-sheet-${formKey}`}
-              alignment="leading"
+              alignment="center"
               spacing={12}
-              modifiers={[
-                swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.lg }),
-                swiftUIBackground('rgba(15, 23, 42, 0.9)'),
-                swiftUICornerRadius(22),
-                swiftUIBorder({ color: 'rgba(255, 255, 255, 0.12)', width: 1 }),
-                swiftUIShadow({ radius: 18, y: 10, color: 'rgba(0, 0, 0, 0.35)' }),
-                swiftUIFrame({ maxWidth: 440 }),
-              ]}
+              modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
             >
-              <SwiftUIHStack alignment="center" spacing={12}>
-                <SwiftUIVStack
-                  modifiers={[
-                    swiftUIFrame({ width: 36, height: 36 }),
-                    swiftUIBackground('rgba(10, 132, 255, 0.18)'),
-                    swiftUICornerRadius(18),
-                  ]}
-                >
-                  <SwiftUIImage systemName="chart.bar" size={16} color={palette.accent} />
-                </SwiftUIVStack>
-                <SwiftUIVStack alignment="leading" spacing={2}>
-                  <SwiftUIText size={17} weight="semibold" color={palette.text}>
-                    Create poll
-                  </SwiftUIText>
-                  <SwiftUIText size={12} color={palette.textMuted}>
-                    Ask a question and collect votes
-                  </SwiftUIText>
-                </SwiftUIVStack>
-                <SwiftUISpacer />
-                <SwiftUIButton
-                  onPress={handleClose}
-                  variant="borderless"
-                  modifiers={[
-                    swiftUIFrame({ width: 30, height: 30 }),
-                    swiftUIBackground('rgba(255, 255, 255, 0.08)'),
-                    swiftUICornerRadius(15),
-                  ]}
-                >
-                  <SwiftUIImage systemName="xmark" size={12} color={palette.textMuted} />
-                </SwiftUIButton>
-              </SwiftUIHStack>
-
-              <SwiftUIText size={12} color={palette.textMuted}>
-                Question
-              </SwiftUIText>
-              <SwiftUITextField
-                key={`poll-question-${formKey}`}
-                defaultValue={question}
-                placeholder="What's the question?"
-                multiline
-                numberOfLines={3}
-                onChangeText={(text: string) =>
-                  setQuestion(text.slice(0, MAX_QUESTION_LENGTH))
-                }
+              <SwiftUIVStack
+                key={`poll-sheet-${formKey}`}
+                alignment="leading"
+                spacing={12}
                 modifiers={[
-                  swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                  swiftUIBackground('rgba(255, 255, 255, 0.08)'),
-                  swiftUICornerRadius(12),
-                  swiftUIBorder({ color: 'rgba(255, 255, 255, 0.1)', width: 1 }),
+                  swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.lg }),
+                  swiftUIGlassEffect({ glass: { variant: 'regular' } }),
+                  swiftUICornerRadius(22),
+                  swiftUIFrame({ maxWidth: 440 }),
                 ]}
-              />
-              <SwiftUIText size={11} color={palette.textMuted}>
-                {question.length}/{MAX_QUESTION_LENGTH}
-              </SwiftUIText>
+              >
+                <SwiftUIHStack alignment="center" spacing={12}>
+                  <SwiftUIVStack
+                    modifiers={[
+                      swiftUIFrame({ width: 36, height: 36 }),
+                      swiftUIGlassEffect({ glass: { variant: 'clear', tint: palette.accent } }),
+                      swiftUICornerRadius(18),
+                    ]}
+                  >
+                    <SwiftUIImage systemName="chart.bar" size={16} color={palette.accent} />
+                  </SwiftUIVStack>
+                  <SwiftUIVStack alignment="leading" spacing={2}>
+                    <SwiftUIText size={17} weight="semibold" color={palette.text}>
+                      Create poll
+                    </SwiftUIText>
+                    <SwiftUIText size={12} color={palette.textMuted}>
+                      Ask a question and collect votes
+                    </SwiftUIText>
+                  </SwiftUIVStack>
+                  <SwiftUISpacer />
+                  <SwiftUIButton
+                    onPress={handleClose}
+                    variant="borderless"
+                    modifiers={[
+                      swiftUIFrame({ width: 30, height: 30 }),
+                      swiftUIGlassEffect({ glass: { variant: 'clear' } }),
+                      swiftUICornerRadius(15),
+                    ]}
+                  >
+                    <SwiftUIImage systemName="xmark" size={12} color={palette.textMuted} />
+                  </SwiftUIButton>
+                </SwiftUIHStack>
 
-              <SwiftUIText size={12} color={palette.textMuted}>
-                Options
-              </SwiftUIText>
-              <SwiftUIVStack alignment="leading" spacing={8}>
-                {options.map((option, index) => (
-                  <SwiftUIHStack key={option.id} alignment="center" spacing={8}>
-                    <SwiftUIVStack
-                      modifiers={[
-                        swiftUIFrame({ width: 24, height: 24 }),
-                        swiftUIBackground('rgba(37, 99, 235, 0.2)'),
-                        swiftUICornerRadius(12),
-                      ]}
-                    >
-                      <SwiftUIText size={11} weight="semibold" color={palette.accent}>
-                        {String(index + 1)}
-                      </SwiftUIText>
-                    </SwiftUIVStack>
-                    <SwiftUITextField
-                      defaultValue={option.text}
-                      placeholder={`${index + 1}. option`}
-                      onChangeText={(text: string) => handleOptionChange(option.id, text)}
-                      modifiers={[
-                        swiftUIFrame({ maxWidth: 260, alignment: 'leading' }),
-                        swiftUIPadding({ horizontal: 10, vertical: 8 }),
-                        swiftUIBackground('rgba(255, 255, 255, 0.08)'),
-                        swiftUICornerRadius(12),
-                        swiftUIBorder({ color: 'rgba(255, 255, 255, 0.1)', width: 1 }),
-                      ]}
-                    />
-                    {options.length > MIN_OPTIONS ? (
-                      <SwiftUIButton
-                        onPress={() => handleRemoveOption(option.id)}
-                        variant="borderless"
-                        modifiers={[
-                          swiftUIFrame({ width: 28, height: 28 }),
-                          swiftUIBackground('rgba(239, 68, 68, 0.12)'),
-                          swiftUICornerRadius(14),
-                        ]}
-                      >
-                        <SwiftUIImage systemName="xmark.circle.fill" size={16} color="#EF4444" />
-                      </SwiftUIButton>
-                    ) : null}
-                  </SwiftUIHStack>
-                ))}
-              </SwiftUIVStack>
-
-              {options.length < MAX_OPTIONS ? (
-                <SwiftUIButton
-                  onPress={handleAddOption}
-                  variant="borderless"
+                <SwiftUIText size={12} color={palette.textMuted}>
+                  Question
+                </SwiftUIText>
+                <SwiftUITextField
+                  key={`poll-question-${formKey}`}
+                  defaultValue={question}
+                  placeholder="What's the question?"
+                  multiline
+                  numberOfLines={3}
+                  onChangeText={(text: string) =>
+                    setQuestion(text.slice(0, MAX_QUESTION_LENGTH))
+                  }
                   modifiers={[
                     swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                    swiftUIBackground('rgba(37, 99, 235, 0.15)'),
-                    swiftUICornerRadius(14),
-                    swiftUIBorder({ color: 'rgba(37, 99, 235, 0.3)', width: 1 }),
+                    swiftUIGlassEffect({ glass: { variant: 'clear' } }),
+                    swiftUICornerRadius(12),
                   ]}
-                >
-                  <SwiftUIHStack alignment="center" spacing={8}>
-                    <SwiftUIImage systemName="plus.circle" size={16} color={palette.accent} />
-                    <SwiftUIText size={13} weight="medium" color={palette.accent}>
-                      Add option
-                    </SwiftUIText>
-                  </SwiftUIHStack>
-                </SwiftUIButton>
-              ) : null}
-
-              <SwiftUIHStack alignment="center" spacing={10}>
-                <SwiftUIText size={13} color={palette.text}>
-                  Allow multiple answers
-                </SwiftUIText>
-                <SwiftUISpacer />
-                <SwiftUISwitch
-                  value={multiSelect}
-                  onValueChange={(value: boolean) => setMultiSelect(value)}
-                  color={palette.accent}
                 />
-              </SwiftUIHStack>
+                <SwiftUIText size={11} color={palette.textMuted}>
+                  {question.length}/{MAX_QUESTION_LENGTH}
+                </SwiftUIText>
 
-              <SwiftUIHStack spacing={10}>
-                <SwiftUIButton
-                  onPress={handleClose}
-                  variant="borderless"
-                  modifiers={[
-                    swiftUIPadding({ horizontal: 14, vertical: 10 }),
-                    swiftUIBackground('rgba(255, 255, 255, 0.08)'),
-                    swiftUICornerRadius(12),
-                    swiftUIFrame({ maxWidth: 160 }),
-                  ]}
-                >
-                  <SwiftUIText size={13} weight="medium" color={palette.textMuted}>
-                    Cancel
+                <SwiftUIText size={12} color={palette.textMuted}>
+                  Options
+                </SwiftUIText>
+                <SwiftUIVStack alignment="leading" spacing={8}>
+                  {options.map((option, index) => (
+                    <SwiftUIHStack key={option.id} alignment="center" spacing={8}>
+                      <SwiftUIVStack
+                        modifiers={[
+                          swiftUIFrame({ width: 24, height: 24 }),
+                          swiftUIGlassEffect({ glass: { variant: 'clear', tint: palette.accent } }),
+                          swiftUICornerRadius(12),
+                        ]}
+                      >
+                        <SwiftUIText size={11} weight="semibold" color={palette.accent}>
+                          {String(index + 1)}
+                        </SwiftUIText>
+                      </SwiftUIVStack>
+                      <SwiftUITextField
+                        defaultValue={option.text}
+                        placeholder={`${index + 1}. option`}
+                        onChangeText={(text: string) => handleOptionChange(option.id, text)}
+                        modifiers={[
+                          swiftUIFrame({ maxWidth: 260, alignment: 'leading' }),
+                          swiftUIPadding({ horizontal: 10, vertical: 8 }),
+                          swiftUIGlassEffect({ glass: { variant: 'clear' } }),
+                          swiftUICornerRadius(12),
+                        ]}
+                      />
+                      {options.length > MIN_OPTIONS ? (
+                        <SwiftUIButton
+                          onPress={() => handleRemoveOption(option.id)}
+                          variant="borderless"
+                          modifiers={[
+                            swiftUIFrame({ width: 28, height: 28 }),
+                            swiftUIGlassEffect({ glass: { variant: 'clear', tint: '#EF4444' } }),
+                            swiftUICornerRadius(14),
+                          ]}
+                        >
+                          <SwiftUIImage systemName="xmark.circle.fill" size={16} color="#EF4444" />
+                        </SwiftUIButton>
+                      ) : null}
+                    </SwiftUIHStack>
+                  ))}
+                </SwiftUIVStack>
+
+                {options.length < MAX_OPTIONS ? (
+                  <SwiftUIButton
+                    onPress={handleAddOption}
+                    variant="borderless"
+                    modifiers={[
+                      swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                      swiftUIGlassEffect({ glass: { variant: 'clear', tint: palette.accent } }),
+                      swiftUICornerRadius(14),
+                    ]}
+                  >
+                    <SwiftUIHStack alignment="center" spacing={8}>
+                      <SwiftUIImage systemName="plus.circle" size={16} color={palette.accent} />
+                      <SwiftUIText size={13} weight="medium" color={palette.accent}>
+                        Add option
+                      </SwiftUIText>
+                    </SwiftUIHStack>
+                  </SwiftUIButton>
+                ) : null}
+
+                <SwiftUIHStack alignment="center" spacing={10}>
+                  <SwiftUIText size={13} color={palette.text}>
+                    Allow multiple answers
                   </SwiftUIText>
-                </SwiftUIButton>
-                <SwiftUIButton
-                  onPress={handleCreate}
-                  disabled={!isValid || isCreating}
-                  variant="borderless"
-                  modifiers={[
-                    swiftUIPadding({ horizontal: 14, vertical: 10 }),
-                    swiftUIBackground(
-                      isValid && !isCreating ? palette.accent : 'rgba(59, 130, 246, 0.4)'
-                    ),
-                    swiftUICornerRadius(12),
-                    swiftUIFrame({ maxWidth: 180 }),
-                  ]}
-                >
-                  <SwiftUIText size={13} weight="semibold" color="#ffffff">
-                    {isCreating ? 'Creating...' : 'Create'}
-                  </SwiftUIText>
-                </SwiftUIButton>
-              </SwiftUIHStack>
+                  <SwiftUISpacer />
+                  <SwiftUISwitch
+                    value={multiSelect}
+                    onValueChange={(value: boolean) => setMultiSelect(value)}
+                    color={palette.accent}
+                  />
+                </SwiftUIHStack>
+
+                <SwiftUIHStack spacing={10}>
+                  <SwiftUIButton
+                    onPress={handleClose}
+                    variant="borderless"
+                    modifiers={[
+                      swiftUIPadding({ horizontal: 14, vertical: 10 }),
+                      swiftUIGlassEffect({ glass: { variant: 'clear' } }),
+                      swiftUICornerRadius(12),
+                      swiftUIFrame({ maxWidth: 160 }),
+                    ]}
+                  >
+                    <SwiftUIText size={13} weight="medium" color={palette.textMuted}>
+                      Cancel
+                    </SwiftUIText>
+                  </SwiftUIButton>
+                  <SwiftUIButton
+                    onPress={handleCreate}
+                    disabled={!isValid || isCreating}
+                    variant="borderless"
+                    modifiers={[
+                      swiftUIPadding({ horizontal: 14, vertical: 10 }),
+                      swiftUIGlassEffect({
+                        glass: {
+                          variant: isValid && !isCreating ? 'regular' : 'clear',
+                          tint: palette.accent,
+                        },
+                      }),
+                      swiftUICornerRadius(12),
+                      swiftUIFrame({ maxWidth: 180 }),
+                    ]}
+                  >
+                    <SwiftUIText size={13} weight="semibold" color="#ffffff">
+                      {isCreating ? 'Creating...' : 'Create'}
+                    </SwiftUIText>
+                  </SwiftUIButton>
+                </SwiftUIHStack>
+              </SwiftUIVStack>
             </SwiftUIVStack>
-          </SwiftUIVStack>
+          </GlassEffectContainer>
         </SwiftUIBottomSheet>
       </SwiftUIHost>
     );
