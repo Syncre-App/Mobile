@@ -105,6 +105,23 @@ const getInitials = (name: string): string => {
   return letters.slice(0, 2).toUpperCase();
 };
 
+// SF Symbol mapping for badges
+const BADGE_SF_SYMBOLS: Record<string, { symbol: string; color: string }> = {
+  staff: { symbol: 'shield.fill', color: '#EF4444' },
+  developer: { symbol: 'chevron.left.forwardslash.chevron.right', color: '#22C55E' },
+  support: { symbol: 'heart.fill', color: '#EC4899' },
+  donator: { symbol: 'dollarsign.circle.fill', color: '#F59E0B' },
+  early_access: { symbol: 'star.fill', color: '#8B5CF6' },
+  tester: { symbol: 'ant.fill', color: '#06B6D4' },
+  bug_hunter: { symbol: 'ladybug.fill', color: '#10B981' },
+  premium: { symbol: 'crown.fill', color: '#F59E0B' },
+  og: { symbol: 'flame.fill', color: '#F97316' },
+  verified: { symbol: 'checkmark.seal.fill', color: '#3B82F6' },
+  bot: { symbol: 'cpu', color: '#6366F1' },
+  system: { symbol: 'gear', color: '#64748B' },
+  jewish: { symbol: 'star.of.david.fill', color: '#3B82F6' },
+};
+
 export const ProfileCard: React.FC<ProfileCardProps> = ({
   visible,
   user,
@@ -355,7 +372,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet with Liquid Glass
+  // iOS: Native SwiftUI BottomSheet - Use React Native content
+  // for proper profile picture and badge rendering
   // ═══════════════════════════════════════════════════════════════
   if (canRenderSwiftUI) {
     return (
@@ -371,94 +389,114 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         >
           <SwiftUIVStack
             alignment="center"
-            spacing={14}
+            spacing={12}
             modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
           >
             {/* Close button */}
             <SwiftUIHStack
               alignment="center"
-              spacing={8}
-              modifiers={[swiftUIFrame({ maxWidth: 340, alignment: 'trailing' })]}
+              modifiers={[swiftUIFrame({ maxWidth: 360, alignment: 'trailing' })]}
             >
               <SwiftUISpacer />
               <SwiftUIButton
                 systemImage="xmark"
                 onPress={onClose}
                 variant="plain"
-                modifiers={[swiftUIFrame({ width: 32, height: 32 })]}
               />
             </SwiftUIHStack>
 
-            {/* Avatar */}
-            <SwiftUIZStack modifiers={[swiftUIFrame({ width: 96, height: 96 })]}>
+            {/* Avatar with profile picture */}
+            {safeUser.profile_picture ? (
+              <SwiftUIImage
+                source={{ uri: safeUser.profile_picture }}
+                modifiers={[
+                  swiftUIFrame({ width: 100, height: 100 }),
+                  swiftUICornerRadius(50),
+                  swiftUIClipShape('circle'),
+                ]}
+              />
+            ) : (
               <SwiftUIVStack
                 modifiers={[
-                  swiftUIFrame({ width: 96, height: 96 }),
+                  swiftUIFrame({ width: 100, height: 100 }),
                   swiftUIBackground('rgba(59, 130, 246, 0.3)'),
-                  swiftUICornerRadius(48),
+                  swiftUICornerRadius(50),
                   swiftUIClipShape('circle'),
                 ]}
               >
-                <SwiftUIText size={34} weight="semibold" color="#ffffff">
+                <SwiftUIText size={36} weight="semibold" color="#ffffff">
                   {initials}
                 </SwiftUIText>
               </SwiftUIVStack>
-            </SwiftUIZStack>
+            )}
 
-            {/* Name and badges */}
-            <SwiftUIText size={20} weight="bold" color={palette.text} lineLimit={1}>
+            {/* Name */}
+            <SwiftUIText size={22} weight="bold" color={palette.text} lineLimit={1}>
               {displayName}
             </SwiftUIText>
-            {badgeLabel ? (
-              <SwiftUIText size={12} color={palette.textMuted} lineLimit={1}>
-                {badgeLabel}
-              </SwiftUIText>
+
+            {/* Badges - using SF Symbols */}
+            {safeUser.badges && safeUser.badges.length > 0 ? (
+              <SwiftUIHStack alignment="center" spacing={6}>
+                {safeUser.badges.map((badge, index) => {
+                  const badgeInfo = BADGE_SF_SYMBOLS[badge];
+                  if (!badgeInfo) return null;
+                  return (
+                    <SwiftUIImage
+                      key={`badge-${index}`}
+                      systemName={badgeInfo.symbol}
+                      size={20}
+                      color={badgeInfo.color}
+                    />
+                  );
+                })}
+              </SwiftUIHStack>
             ) : null}
 
             {/* Presence status */}
             <SwiftUIHStack alignment="center" spacing={6}>
               <SwiftUIVStack
                 modifiers={[
-                  swiftUIFrame({ width: 8, height: 8 }),
+                  swiftUIFrame({ width: 10, height: 10 }),
                   swiftUIBackground(getPresenceColor()),
-                  swiftUICornerRadius(4),
+                  swiftUICornerRadius(5),
                 ]}
               />
-              <SwiftUIText size={12} color={getPresenceColor()}>
+              <SwiftUIText size={14} color={getPresenceColor()}>
                 {getPresenceText()}
               </SwiftUIText>
             </SwiftUIHStack>
 
             {/* Spotify activity */}
             {isLoadingSpotify ? (
-              <SwiftUIText size={12} color={palette.textMuted}>
-                Loading Spotify activity...
+              <SwiftUIText size={13} color={palette.textMuted}>
+                Loading Spotify...
               </SwiftUIText>
             ) : spotifyActivity?.track ? (
               <SwiftUIVStack
                 alignment="leading"
                 spacing={4}
                 modifiers={[
-                  swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
                   swiftUIBackground('rgba(29, 185, 84, 0.15)'),
-                  swiftUICornerRadius(12),
-                  swiftUIFrame({ maxWidth: 320, alignment: 'leading' }),
+                  swiftUICornerRadius(14),
+                  swiftUIFrame({ maxWidth: 340, alignment: 'leading' }),
                 ]}
               >
                 <SwiftUIHStack alignment="center" spacing={6}>
                   <SwiftUIImage
                     systemName={spotifyActivity.isPlaying ? 'play.circle.fill' : 'pause.circle'}
-                    size={14}
+                    size={16}
                     color="#1DB954"
                   />
-                  <SwiftUIText size={11} weight="semibold" color="#1DB954">
+                  <SwiftUIText size={12} weight="semibold" color="#1DB954">
                     {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
                   </SwiftUIText>
                 </SwiftUIHStack>
-                <SwiftUIText size={13} weight="semibold" color={palette.text} lineLimit={1}>
+                <SwiftUIText size={14} weight="semibold" color={palette.text} lineLimit={1}>
                   {spotifyActivity.track.name}
                 </SwiftUIText>
-                <SwiftUIText size={12} color={palette.textMuted} lineLimit={1}>
+                <SwiftUIText size={13} color={palette.textMuted} lineLimit={1}>
                   {spotifyActivity.track.artist}
                 </SwiftUIText>
               </SwiftUIVStack>
@@ -467,25 +505,25 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
             {/* Action buttons */}
             <SwiftUIVStack
               alignment="leading"
-              spacing={8}
-              modifiers={[swiftUIFrame({ maxWidth: 340, alignment: 'leading' })]}
+              spacing={10}
+              modifiers={[swiftUIFrame({ maxWidth: 360, alignment: 'leading' })]}
             >
               {/* Remove friend */}
               <SwiftUIHStack
                 alignment="center"
-                spacing={10}
+                spacing={12}
                 modifiers={[
-                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
+                  swiftUIPadding({ horizontal: 16, vertical: 14 }),
                   swiftUIBackground('rgba(239, 68, 68, 0.12)'),
-                  swiftUICornerRadius(12),
+                  swiftUICornerRadius(14),
                   swiftUIOnTapGesture(() => {
                     if (!user?.id) return;
                     handleAction(() => onRemoveFriend(user.id));
                   }),
                 ]}
               >
-                <SwiftUIImage systemName="person.fill.xmark" size={16} color={palette.error} />
-                <SwiftUIText size={14} weight="medium" color={palette.error}>
+                <SwiftUIImage systemName="person.badge.minus" size={18} color={palette.error} />
+                <SwiftUIText size={15} weight="medium" color={palette.error}>
                   Remove friend
                 </SwiftUIText>
                 <SwiftUISpacer />
@@ -494,11 +532,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               {/* Block */}
               <SwiftUIHStack
                 alignment="center"
-                spacing={10}
+                spacing={12}
                 modifiers={[
-                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
+                  swiftUIPadding({ horizontal: 16, vertical: 14 }),
                   swiftUIBackground('rgba(251, 191, 36, 0.12)'),
-                  swiftUICornerRadius(12),
+                  swiftUICornerRadius(14),
                   swiftUIOnTapGesture(() => {
                     if (!user?.id) return;
                     handleAction(() => onBlockUser(user.id));
@@ -506,11 +544,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 ]}
               >
                 <SwiftUIImage
-                  systemName={isBlocked ? 'hand.raised.slash' : 'hand.raised'}
-                  size={16}
+                  systemName={isBlocked ? 'hand.raised.slash.fill' : 'hand.raised.fill'}
+                  size={18}
                   color={palette.warning}
                 />
-                <SwiftUIText size={14} weight="medium" color={palette.warning}>
+                <SwiftUIText size={15} weight="medium" color={palette.warning}>
                   {isBlocked ? 'Unblock' : 'Block'}
                 </SwiftUIText>
                 <SwiftUISpacer />
@@ -519,11 +557,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               {/* Report */}
               <SwiftUIHStack
                 alignment="center"
-                spacing={10}
+                spacing={12}
                 modifiers={[
-                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
+                  swiftUIPadding({ horizontal: 16, vertical: 14 }),
                   swiftUIBackground('rgba(255, 255, 255, 0.06)'),
-                  swiftUICornerRadius(12),
+                  swiftUICornerRadius(14),
                   swiftUIOnTapGesture(() => {
                     if (!user?.id) return;
                     handleAction(() => onReportUser(user.id));
