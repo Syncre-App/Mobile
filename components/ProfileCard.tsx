@@ -30,12 +30,12 @@ let SwiftUIButton: any = null;
 let SwiftUIImage: any = null;
 let SwiftUISpacer: any = null;
 let SwiftUIZStack: any = null;
-let GlassEffectContainer: any = null;
 let swiftUICornerRadius: any = null;
+let swiftUIBackground: any = null;
 let swiftUIPadding: any = null;
 let swiftUIFrame: any = null;
 let swiftUIClipShape: any = null;
-let swiftUIGlassEffect: any = null;
+let swiftUIOnTapGesture: any = null;
 
 if (Platform.OS === 'ios') {
   try {
@@ -49,13 +49,13 @@ if (Platform.OS === 'ios') {
     SwiftUIImage = swiftUI.Image;
     SwiftUISpacer = swiftUI.Spacer;
     SwiftUIZStack = swiftUI.ZStack;
-    GlassEffectContainer = swiftUI.GlassEffectContainer;
     const modifiers = require('@expo/ui/swift-ui/modifiers');
     swiftUICornerRadius = modifiers.cornerRadius;
+    swiftUIBackground = modifiers.background;
     swiftUIPadding = modifiers.padding;
     swiftUIFrame = modifiers.frame;
     swiftUIClipShape = modifiers.clipShape;
-    swiftUIGlassEffect = modifiers.glassEffect;
+    swiftUIOnTapGesture = modifiers.onTapGesture;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -129,12 +129,12 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     SwiftUIImage &&
     SwiftUISpacer &&
     SwiftUIZStack &&
-    GlassEffectContainer &&
     swiftUICornerRadius &&
+    swiftUIBackground &&
     swiftUIPadding &&
     swiftUIFrame &&
     swiftUIClipShape &&
-    swiftUIGlassEffect;
+    swiftUIOnTapGesture;
 
   const fetchSpotifyActivity = useCallback(async () => {
     if (!user?.id) return;
@@ -369,187 +369,175 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           }}
           presentationDragIndicator="visible"
         >
-          <GlassEffectContainer>
-            <SwiftUIVStack
+          <SwiftUIVStack
+            alignment="center"
+            spacing={14}
+            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
+          >
+            {/* Close button */}
+            <SwiftUIHStack
               alignment="center"
-              spacing={12}
-              modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
+              spacing={8}
+              modifiers={[swiftUIFrame({ maxWidth: 340, alignment: 'trailing' })]}
             >
+              <SwiftUISpacer />
+              <SwiftUIButton
+                systemImage="xmark"
+                onPress={onClose}
+                variant="plain"
+                modifiers={[swiftUIFrame({ width: 32, height: 32 })]}
+              />
+            </SwiftUIHStack>
+
+            {/* Avatar */}
+            <SwiftUIZStack modifiers={[swiftUIFrame({ width: 96, height: 96 })]}>
               <SwiftUIVStack
-                alignment="center"
-                spacing={14}
                 modifiers={[
-                  swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.lg }),
-                  swiftUIGlassEffect({ glass: { variant: 'regular' } }),
-                  swiftUICornerRadius(26),
-                  swiftUIFrame({ maxWidth: 380 }),
+                  swiftUIFrame({ width: 96, height: 96 }),
+                  swiftUIBackground('rgba(59, 130, 246, 0.3)'),
+                  swiftUICornerRadius(48),
+                  swiftUIClipShape('circle'),
                 ]}
               >
-                <SwiftUIHStack
-                  alignment="center"
-                  spacing={8}
-                  modifiers={[swiftUIFrame({ maxWidth: 340, alignment: 'trailing' })]}
-                >
-                  <SwiftUISpacer />
-                  <SwiftUIButton
-                    onPress={onClose}
-                    variant="borderless"
-                    modifiers={[
-                      swiftUIFrame({ width: 32, height: 32 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear' } }),
-                      swiftUICornerRadius(16),
-                    ]}
-                  >
-                    <SwiftUIImage systemName="xmark" size={12} color={palette.textMuted} />
-                  </SwiftUIButton>
-                </SwiftUIHStack>
-
-                <SwiftUIZStack modifiers={[swiftUIFrame({ width: 96, height: 96 })]}>
-                  <SwiftUIVStack
-                    modifiers={[
-                      swiftUIFrame({ width: 96, height: 96 }),
-                      swiftUIGlassEffect({ glass: { variant: 'regular', tint: palette.accent } }),
-                      swiftUICornerRadius(48),
-                      swiftUIClipShape('circle'),
-                    ]}
-                  >
-                    <SwiftUIText size={34} weight="semibold" color="#ffffff">
-                      {initials}
-                    </SwiftUIText>
-                  </SwiftUIVStack>
-                </SwiftUIZStack>
-
-                <SwiftUIText size={20} weight="bold" color={palette.text} lineLimit={1}>
-                  {displayName}
+                <SwiftUIText size={34} weight="semibold" color="#ffffff">
+                  {initials}
                 </SwiftUIText>
-                {badgeLabel ? (
-                  <SwiftUIText size={11} color={palette.textMuted} lineLimit={1}>
-                    {badgeLabel}
-                  </SwiftUIText>
-                ) : null}
+              </SwiftUIVStack>
+            </SwiftUIZStack>
+
+            {/* Name and badges */}
+            <SwiftUIText size={20} weight="bold" color={palette.text} lineLimit={1}>
+              {displayName}
+            </SwiftUIText>
+            {badgeLabel ? (
+              <SwiftUIText size={12} color={palette.textMuted} lineLimit={1}>
+                {badgeLabel}
+              </SwiftUIText>
+            ) : null}
+
+            {/* Presence status */}
+            <SwiftUIHStack alignment="center" spacing={6}>
+              <SwiftUIVStack
+                modifiers={[
+                  swiftUIFrame({ width: 8, height: 8 }),
+                  swiftUIBackground(getPresenceColor()),
+                  swiftUICornerRadius(4),
+                ]}
+              />
+              <SwiftUIText size={12} color={getPresenceColor()}>
+                {getPresenceText()}
+              </SwiftUIText>
+            </SwiftUIHStack>
+
+            {/* Spotify activity */}
+            {isLoadingSpotify ? (
+              <SwiftUIText size={12} color={palette.textMuted}>
+                Loading Spotify activity...
+              </SwiftUIText>
+            ) : spotifyActivity?.track ? (
+              <SwiftUIVStack
+                alignment="leading"
+                spacing={4}
+                modifiers={[
+                  swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                  swiftUIBackground('rgba(29, 185, 84, 0.15)'),
+                  swiftUICornerRadius(12),
+                  swiftUIFrame({ maxWidth: 320, alignment: 'leading' }),
+                ]}
+              >
                 <SwiftUIHStack alignment="center" spacing={6}>
-                  <SwiftUIVStack
-                    modifiers={[
-                      swiftUIFrame({ width: 8, height: 8 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear', tint: getPresenceColor() } }),
-                      swiftUICornerRadius(4),
-                    ]}
+                  <SwiftUIImage
+                    systemName={spotifyActivity.isPlaying ? 'play.circle.fill' : 'pause.circle'}
+                    size={14}
+                    color="#1DB954"
                   />
-                  <SwiftUIText size={12} color={getPresenceColor()}>
-                    {getPresenceText()}
+                  <SwiftUIText size={11} weight="semibold" color="#1DB954">
+                    {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
                   </SwiftUIText>
                 </SwiftUIHStack>
-
-                {isLoadingSpotify ? (
-                  <SwiftUIText size={12} color={palette.textMuted}>
-                    Loading Spotify activity...
-                  </SwiftUIText>
-                ) : spotifyActivity?.track ? (
-                  <SwiftUIVStack
-                    alignment="leading"
-                    spacing={6}
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear', tint: '#1DB954' } }),
-                      swiftUICornerRadius(14),
-                      swiftUIFrame({ maxWidth: 320, alignment: 'leading' }),
-                    ]}
-                  >
-                    <SwiftUIHStack alignment="center" spacing={6}>
-                      <SwiftUIImage
-                        systemName={spotifyActivity.isPlaying ? 'play.circle.fill' : 'pause.circle'}
-                        size={14}
-                        color="#1DB954"
-                      />
-                      <SwiftUIText size={11} weight="semibold" color="#1DB954">
-                        {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
-                      </SwiftUIText>
-                    </SwiftUIHStack>
-                    <SwiftUIText size={13} weight="semibold" color={palette.text} lineLimit={1}>
-                      {spotifyActivity.track.name}
-                    </SwiftUIText>
-                    <SwiftUIText size={12} color={palette.textMuted} lineLimit={1}>
-                      {spotifyActivity.track.artist}
-                    </SwiftUIText>
-                  </SwiftUIVStack>
-                ) : null}
-
-                <SwiftUIVStack
-                  alignment="leading"
-                  spacing={8}
-                  modifiers={[swiftUIFrame({ maxWidth: 340, alignment: 'leading' })]}
-                >
-                  <SwiftUIButton
-                    onPress={() => {
-                      if (!user?.id) return;
-                      handleAction(() => onRemoveFriend(user.id));
-                    }}
-                    disabled={!canTakeActions}
-                    variant="borderless"
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear', tint: palette.error } }),
-                      swiftUICornerRadius(14),
-                    ]}
-                  >
-                    <SwiftUIHStack alignment="center" spacing={10}>
-                      <SwiftUIImage systemName="person.fill.xmark" size={16} color={palette.error} />
-                      <SwiftUIText size={14} weight="medium" color={palette.error}>
-                        Remove friend
-                      </SwiftUIText>
-                      <SwiftUISpacer />
-                    </SwiftUIHStack>
-                  </SwiftUIButton>
-                  <SwiftUIButton
-                    onPress={() => {
-                      if (!user?.id) return;
-                      handleAction(() => onBlockUser(user.id));
-                    }}
-                    disabled={!canTakeActions}
-                    variant="borderless"
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear', tint: palette.warning } }),
-                      swiftUICornerRadius(14),
-                    ]}
-                  >
-                    <SwiftUIHStack alignment="center" spacing={10}>
-                      <SwiftUIImage
-                        systemName={isBlocked ? 'hand.raised.slash' : 'hand.raised'}
-                        size={16}
-                        color={palette.warning}
-                      />
-                      <SwiftUIText size={14} weight="medium" color={palette.warning}>
-                        {isBlocked ? 'Unblock' : 'Block'}
-                      </SwiftUIText>
-                      <SwiftUISpacer />
-                    </SwiftUIHStack>
-                  </SwiftUIButton>
-                  <SwiftUIButton
-                    onPress={() => {
-                      if (!user?.id) return;
-                      handleAction(() => onReportUser(user.id));
-                    }}
-                    disabled={!canTakeActions}
-                    variant="borderless"
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear' } }),
-                      swiftUICornerRadius(14),
-                    ]}
-                  >
-                    <SwiftUIHStack alignment="center" spacing={10}>
-                      <SwiftUIImage systemName="flag" size={16} color={palette.textMuted} />
-                      <SwiftUIText size={14} weight="medium" color={palette.textMuted}>
-                        Report
-                      </SwiftUIText>
-                      <SwiftUISpacer />
-                    </SwiftUIHStack>
-                  </SwiftUIButton>
-                </SwiftUIVStack>
+                <SwiftUIText size={13} weight="semibold" color={palette.text} lineLimit={1}>
+                  {spotifyActivity.track.name}
+                </SwiftUIText>
+                <SwiftUIText size={12} color={palette.textMuted} lineLimit={1}>
+                  {spotifyActivity.track.artist}
+                </SwiftUIText>
               </SwiftUIVStack>
+            ) : null}
+
+            {/* Action buttons */}
+            <SwiftUIVStack
+              alignment="leading"
+              spacing={8}
+              modifiers={[swiftUIFrame({ maxWidth: 340, alignment: 'leading' })]}
+            >
+              {/* Remove friend */}
+              <SwiftUIHStack
+                alignment="center"
+                spacing={10}
+                modifiers={[
+                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
+                  swiftUIBackground('rgba(239, 68, 68, 0.12)'),
+                  swiftUICornerRadius(12),
+                  swiftUIOnTapGesture(() => {
+                    if (!user?.id) return;
+                    handleAction(() => onRemoveFriend(user.id));
+                  }),
+                ]}
+              >
+                <SwiftUIImage systemName="person.fill.xmark" size={16} color={palette.error} />
+                <SwiftUIText size={14} weight="medium" color={palette.error}>
+                  Remove friend
+                </SwiftUIText>
+                <SwiftUISpacer />
+              </SwiftUIHStack>
+
+              {/* Block */}
+              <SwiftUIHStack
+                alignment="center"
+                spacing={10}
+                modifiers={[
+                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
+                  swiftUIBackground('rgba(251, 191, 36, 0.12)'),
+                  swiftUICornerRadius(12),
+                  swiftUIOnTapGesture(() => {
+                    if (!user?.id) return;
+                    handleAction(() => onBlockUser(user.id));
+                  }),
+                ]}
+              >
+                <SwiftUIImage
+                  systemName={isBlocked ? 'hand.raised.slash' : 'hand.raised'}
+                  size={16}
+                  color={palette.warning}
+                />
+                <SwiftUIText size={14} weight="medium" color={palette.warning}>
+                  {isBlocked ? 'Unblock' : 'Block'}
+                </SwiftUIText>
+                <SwiftUISpacer />
+              </SwiftUIHStack>
+
+              {/* Report */}
+              <SwiftUIHStack
+                alignment="center"
+                spacing={10}
+                modifiers={[
+                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
+                  swiftUIBackground('rgba(255, 255, 255, 0.06)'),
+                  swiftUICornerRadius(12),
+                  swiftUIOnTapGesture(() => {
+                    if (!user?.id) return;
+                    handleAction(() => onReportUser(user.id));
+                  }),
+                ]}
+              >
+                <SwiftUIImage systemName="flag" size={16} color={palette.textMuted} />
+                <SwiftUIText size={14} weight="medium" color={palette.textMuted}>
+                  Report
+                </SwiftUIText>
+                <SwiftUISpacer />
+              </SwiftUIHStack>
             </SwiftUIVStack>
-          </GlassEffectContainer>
+          </SwiftUIVStack>
         </SwiftUIBottomSheet>
       </SwiftUIHost>
     );

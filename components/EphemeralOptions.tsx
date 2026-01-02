@@ -21,11 +21,11 @@ let SwiftUIText: any = null;
 let SwiftUIButton: any = null;
 let SwiftUIImage: any = null;
 let SwiftUISpacer: any = null;
-let GlassEffectContainer: any = null;
 let swiftUICornerRadius: any = null;
+let swiftUIBackground: any = null;
 let swiftUIPadding: any = null;
 let swiftUIFrame: any = null;
-let swiftUIGlassEffect: any = null;
+let swiftUIOnTapGesture: any = null;
 if (Platform.OS === 'ios') {
   try {
     const swiftUI = require('@expo/ui/swift-ui');
@@ -37,12 +37,12 @@ if (Platform.OS === 'ios') {
     SwiftUIButton = swiftUI.Button;
     SwiftUIImage = swiftUI.Image;
     SwiftUISpacer = swiftUI.Spacer;
-    GlassEffectContainer = swiftUI.GlassEffectContainer;
     const modifiers = require('@expo/ui/swift-ui/modifiers');
     swiftUICornerRadius = modifiers.cornerRadius;
+    swiftUIBackground = modifiers.background;
     swiftUIPadding = modifiers.padding;
     swiftUIFrame = modifiers.frame;
-    swiftUIGlassEffect = modifiers.glassEffect;
+    swiftUIOnTapGesture = modifiers.onTapGesture;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -84,11 +84,11 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
     SwiftUIButton &&
     SwiftUIImage &&
     SwiftUISpacer &&
-    GlassEffectContainer &&
     swiftUICornerRadius &&
+    swiftUIBackground &&
     swiftUIPadding &&
     swiftUIFrame &&
-    swiftUIGlassEffect;
+    swiftUIOnTapGesture;
 
   const handleClose = () => {
     if (onClose) {
@@ -144,7 +144,7 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet with Liquid Glass
+  // iOS: Native SwiftUI BottomSheet
   // ═══════════════════════════════════════════════════════════════
   if (canRenderSwiftUI) {
     return (
@@ -158,106 +158,89 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
           }}
           presentationDragIndicator="visible"
         >
-          <GlassEffectContainer>
-            <SwiftUIVStack
-              alignment="center"
-              spacing={12}
-              modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
-            >
+          <SwiftUIVStack
+            alignment="center"
+            spacing={12}
+            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
+          >
+            {/* Header */}
+            <SwiftUIHStack alignment="center" spacing={12}>
               <SwiftUIVStack
-                alignment="leading"
-                spacing={12}
                 modifiers={[
-                  swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.lg }),
-                  swiftUIGlassEffect({ glass: { variant: 'regular' } }),
-                  swiftUICornerRadius(22),
-                  swiftUIFrame({ maxWidth: 420 }),
+                  swiftUIFrame({ width: 36, height: 36 }),
+                  swiftUIBackground('rgba(10, 132, 255, 0.18)'),
+                  swiftUICornerRadius(18),
                 ]}
               >
-                <SwiftUIHStack alignment="center" spacing={12}>
-                  <SwiftUIVStack
-                    modifiers={[
-                      swiftUIFrame({ width: 36, height: 36 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear', tint: palette.accent } }),
-                      swiftUICornerRadius(18),
-                    ]}
-                  >
-                    <SwiftUIImage systemName="timer" size={16} color={palette.accent} />
-                  </SwiftUIVStack>
-                  <SwiftUIVStack
-                    alignment="leading"
-                    spacing={2}
-                    modifiers={[swiftUIFrame({ maxWidth: 220, alignment: 'leading' })]}
-                  >
-                    <SwiftUIText size={17} weight="semibold" color={palette.text}>
-                      Disappearing Message
-                    </SwiftUIText>
-                    <SwiftUIText size={12} color={palette.textMuted}>
-                      Choose how long before messages disappear
-                    </SwiftUIText>
-                  </SwiftUIVStack>
-                  <SwiftUISpacer />
-                  <SwiftUIButton
-                    onPress={handleClose}
-                    variant="borderless"
-                    modifiers={[
-                      swiftUIFrame({ width: 30, height: 30 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear' } }),
-                      swiftUICornerRadius(15),
-                    ]}
-                  >
-                    <SwiftUIImage systemName="xmark" size={12} color={palette.textMuted} />
-                  </SwiftUIButton>
-                </SwiftUIHStack>
-
-                <SwiftUIVStack alignment="leading" spacing={10}>
-                  {DURATION_OPTIONS.map((option) => {
-                    const isSelected = selectedDuration === option.value;
-                    return (
-                      <SwiftUIButton
-                        key={option.value ?? 'off'}
-                        onPress={() => handleSelectOption(option.value)}
-                        variant="borderless"
-                        modifiers={[
-                          swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                          swiftUIGlassEffect({
-                            glass: {
-                              variant: isSelected ? 'regular' : 'clear',
-                              tint: isSelected ? palette.accent : undefined,
-                            },
-                          }),
-                          swiftUICornerRadius(14),
-                        ]}
-                      >
-                        <SwiftUIHStack alignment="center" spacing={12}>
-                          <SwiftUIVStack
-                            alignment="leading"
-                            spacing={2}
-                            modifiers={[swiftUIFrame({ maxWidth: 240, alignment: 'leading' })]}
-                          >
-                            <SwiftUIText size={15} weight="medium" color={palette.text}>
-                              {option.label}
-                            </SwiftUIText>
-                            <SwiftUIText size={12} color={palette.textMuted}>
-                              {option.description}
-                            </SwiftUIText>
-                          </SwiftUIVStack>
-                          <SwiftUISpacer />
-                          {isSelected ? (
-                            <SwiftUIImage
-                              systemName="checkmark.circle.fill"
-                              size={18}
-                              color={palette.accent}
-                            />
-                          ) : null}
-                        </SwiftUIHStack>
-                      </SwiftUIButton>
-                    );
-                  })}
-                </SwiftUIVStack>
+                <SwiftUIImage systemName="timer" size={16} color={palette.accent} />
               </SwiftUIVStack>
+              <SwiftUIVStack
+                alignment="leading"
+                spacing={2}
+                modifiers={[swiftUIFrame({ maxWidth: 220, alignment: 'leading' })]}
+              >
+                <SwiftUIText size={17} weight="semibold" color={palette.text}>
+                  Disappearing Message
+                </SwiftUIText>
+                <SwiftUIText size={12} color={palette.textMuted}>
+                  Choose how long before messages disappear
+                </SwiftUIText>
+              </SwiftUIVStack>
+              <SwiftUISpacer />
+              <SwiftUIButton
+                systemImage="xmark"
+                onPress={handleClose}
+                variant="plain"
+                modifiers={[
+                  swiftUIFrame({ width: 30, height: 30 }),
+                ]}
+              />
+            </SwiftUIHStack>
+
+            {/* Options */}
+            <SwiftUIVStack alignment="leading" spacing={6}>
+              {DURATION_OPTIONS.map((option) => {
+                const isSelected = selectedDuration === option.value;
+                return (
+                  <SwiftUIHStack
+                    key={option.value ?? 'off'}
+                    alignment="center"
+                    spacing={12}
+                    modifiers={[
+                      swiftUIPadding({ horizontal: 14, vertical: 12 }),
+                      swiftUIBackground(
+                        isSelected ? 'rgba(10, 132, 255, 0.25)' : 'rgba(255, 255, 255, 0.06)'
+                      ),
+                      swiftUICornerRadius(12),
+                      swiftUIFrame({ maxWidth: 380 }),
+                      swiftUIOnTapGesture(() => handleSelectOption(option.value)),
+                    ]}
+                  >
+                    <SwiftUIVStack
+                      alignment="leading"
+                      spacing={2}
+                      modifiers={[swiftUIFrame({ maxWidth: 280, alignment: 'leading' })]}
+                    >
+                      <SwiftUIText size={16} weight="medium" color={palette.text}>
+                        {option.label}
+                      </SwiftUIText>
+                      <SwiftUIText size={13} color={palette.textMuted}>
+                        {option.description}
+                      </SwiftUIText>
+                    </SwiftUIVStack>
+                    <SwiftUISpacer />
+                    {isSelected ? (
+                      <SwiftUIImage
+                        systemName="checkmark.circle.fill"
+                        size={22}
+                        color={palette.accent}
+                      />
+                    ) : null}
+                  </SwiftUIHStack>
+                );
+              })}
             </SwiftUIVStack>
-          </GlassEffectContainer>
+          </SwiftUIVStack>
         </SwiftUIBottomSheet>
       </SwiftUIHost>
     );

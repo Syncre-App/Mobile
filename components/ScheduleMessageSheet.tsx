@@ -23,11 +23,11 @@ let SwiftUIButton: any = null;
 let SwiftUIImage: any = null;
 let SwiftUISpacer: any = null;
 let SwiftUIDatePicker: any = null;
-let GlassEffectContainer: any = null;
 let swiftUICornerRadius: any = null;
+let swiftUIBackground: any = null;
 let swiftUIPadding: any = null;
 let swiftUIFrame: any = null;
-let swiftUIGlassEffect: any = null;
+let swiftUIOnTapGesture: any = null;
 
 if (Platform.OS === 'ios') {
   try {
@@ -41,12 +41,12 @@ if (Platform.OS === 'ios') {
     SwiftUIImage = swiftUI.Image;
     SwiftUISpacer = swiftUI.Spacer;
     SwiftUIDatePicker = swiftUI.DatePicker;
-    GlassEffectContainer = swiftUI.GlassEffectContainer;
     const modifiers = require('@expo/ui/swift-ui/modifiers');
     swiftUICornerRadius = modifiers.cornerRadius;
+    swiftUIBackground = modifiers.background;
     swiftUIPadding = modifiers.padding;
     swiftUIFrame = modifiers.frame;
-    swiftUIGlassEffect = modifiers.glassEffect;
+    swiftUIOnTapGesture = modifiers.onTapGesture;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -108,11 +108,11 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
     SwiftUIImage &&
     SwiftUISpacer &&
     SwiftUIDatePicker &&
-    GlassEffectContainer &&
     swiftUICornerRadius &&
+    swiftUIBackground &&
     swiftUIPadding &&
     swiftUIFrame &&
-    swiftUIGlassEffect;
+    swiftUIOnTapGesture;
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const date = new Date();
     date.setMinutes(date.getMinutes() + 30);
@@ -306,10 +306,9 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet with Liquid Glass
+  // iOS: Native SwiftUI BottomSheet
   // ═══════════════════════════════════════════════════════════════
   if (canRenderSwiftUI) {
-    const quickRows = [quickScheduleOptions.slice(0, 2), quickScheduleOptions.slice(2)];
     return (
       <SwiftUIHost style={styles.swiftUIHost} useViewportSizeMeasurement>
         <SwiftUIBottomSheet
@@ -321,179 +320,137 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
           }}
           presentationDragIndicator="visible"
         >
-          <GlassEffectContainer>
-            <SwiftUIVStack
-              alignment="center"
-              spacing={12}
-              modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
-            >
+          <SwiftUIVStack
+            key={`schedule-sheet-${pickerSeed}`}
+            alignment="center"
+            spacing={12}
+            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
+          >
+            {/* Header */}
+            <SwiftUIHStack alignment="center" spacing={12}>
               <SwiftUIVStack
-                alignment="leading"
-                spacing={12}
                 modifiers={[
-                  swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.lg }),
-                  swiftUIGlassEffect({ glass: { variant: 'regular' } }),
-                  swiftUICornerRadius(22),
-                  swiftUIFrame({ maxWidth: 440 }),
+                  swiftUIFrame({ width: 36, height: 36 }),
+                  swiftUIBackground('rgba(10, 132, 255, 0.18)'),
+                  swiftUICornerRadius(18),
                 ]}
               >
-                <SwiftUIHStack alignment="center" spacing={12}>
-                  <SwiftUIVStack
-                    modifiers={[
-                      swiftUIFrame({ width: 36, height: 36 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear', tint: palette.accent } }),
-                      swiftUICornerRadius(18),
-                    ]}
-                  >
-                    <SwiftUIImage systemName="calendar" size={16} color={palette.accent} />
-                  </SwiftUIVStack>
-                  <SwiftUIVStack alignment="leading" spacing={2}>
-                    <SwiftUIText size={17} weight="semibold" color={palette.text}>
-                      Schedule message
-                    </SwiftUIText>
-                    <SwiftUIText size={12} color={palette.textMuted}>
-                      Send it later without leaving the chat
-                    </SwiftUIText>
-                  </SwiftUIVStack>
-                  <SwiftUISpacer />
-                  <SwiftUIButton
-                    onPress={onClose}
-                    variant="borderless"
-                    modifiers={[
-                      swiftUIFrame({ width: 30, height: 30 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear' } }),
-                      swiftUICornerRadius(15),
-                    ]}
-                  >
-                    <SwiftUIImage systemName="xmark" size={12} color={palette.textMuted} />
-                  </SwiftUIButton>
-                </SwiftUIHStack>
-
-                {messagePreview ? (
-                  <SwiftUIVStack
-                    alignment="leading"
-                    spacing={4}
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear' } }),
-                      swiftUICornerRadius(12),
-                    ]}
-                  >
-                    <SwiftUIText size={11} color={palette.textMuted}>
-                      Message
-                    </SwiftUIText>
-                    <SwiftUIText size={13} color={palette.text} lineLimit={2}>
-                      {messagePreview}
-                    </SwiftUIText>
-                  </SwiftUIVStack>
-                ) : null}
-
-                <SwiftUIHStack
-                  alignment="center"
-                  spacing={8}
-                  modifiers={[
-                    swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                    swiftUIGlassEffect({ glass: { variant: 'clear' } }),
-                    swiftUICornerRadius(12),
-                  ]}
-                >
-                  <SwiftUIImage systemName="clock" size={14} color={palette.textMuted} />
-                  <SwiftUIText size={12} color={palette.textMuted}>
-                    Scheduled for {formatDate(selectedDate)} at {formatTime(selectedDate)}
-                  </SwiftUIText>
-                </SwiftUIHStack>
-
-                <SwiftUIText size={12} color={palette.textMuted}>
-                  Quick picks
-                </SwiftUIText>
-                <SwiftUIVStack alignment="leading" spacing={8}>
-                  {quickRows.map((row, rowIndex) => (
-                    <SwiftUIHStack key={`quick-row-${rowIndex}`} spacing={8}>
-                      {row.map((option) => (
-                        <SwiftUIButton
-                          key={option.label}
-                          onPress={() => handleQuickSchedule(option)}
-                          variant="borderless"
-                          modifiers={[
-                            swiftUIPadding({ horizontal: 12, vertical: 8 }),
-                            swiftUIGlassEffect({ glass: { variant: 'clear' } }),
-                            swiftUICornerRadius(18),
-                          ]}
-                        >
-                          <SwiftUIText size={12} color={palette.text}>
-                            {option.label}
-                          </SwiftUIText>
-                        </SwiftUIButton>
-                      ))}
-                    </SwiftUIHStack>
-                  ))}
-                </SwiftUIVStack>
-
-                <SwiftUIText size={12} color={palette.textMuted}>
-                  Custom time
-                </SwiftUIText>
-                <SwiftUIVStack
-                  key={`schedule-picker-${pickerSeed}`}
-                  modifiers={[
-                    swiftUIPadding({ horizontal: 4, vertical: 6 }),
-                    swiftUIGlassEffect({ glass: { variant: 'clear' } }),
-                    swiftUICornerRadius(14),
-                  ]}
-                >
-                  <SwiftUIDatePicker
-                    initialDate={selectedDate.toISOString()}
-                    displayedComponents="dateAndTime"
-                    variant="wheel"
-                    onDateSelected={(date: Date) => setSelectedDate(date)}
-                    color={palette.accent}
-                  />
-                </SwiftUIVStack>
-
-                <SwiftUIHStack spacing={10}>
-                  <SwiftUIButton
-                    onPress={onClose}
-                    variant="borderless"
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 14, vertical: 10 }),
-                      swiftUIGlassEffect({ glass: { variant: 'clear' } }),
-                      swiftUICornerRadius(12),
-                      swiftUIFrame({ maxWidth: 160 }),
-                    ]}
-                  >
-                    <SwiftUIText size={13} weight="medium" color={palette.textMuted}>
-                      Cancel
-                    </SwiftUIText>
-                  </SwiftUIButton>
-                  <SwiftUIButton
-                    onPress={handleConfirm}
-                    disabled={!isValidDate}
-                    variant="borderless"
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 14, vertical: 10 }),
-                      swiftUIGlassEffect({
-                        glass: {
-                          variant: isValidDate ? 'regular' : 'clear',
-                          tint: palette.accent,
-                        },
-                      }),
-                      swiftUICornerRadius(12),
-                      swiftUIFrame({ maxWidth: 180 }),
-                    ]}
-                  >
-                    <SwiftUIText size={13} weight="semibold" color="#ffffff">
-                      Schedule
-                    </SwiftUIText>
-                  </SwiftUIButton>
-                </SwiftUIHStack>
-
-                {!isValidDate ? (
-                  <SwiftUIText size={11} color="#EF4444">
-                    Time must be in the future
-                  </SwiftUIText>
-                ) : null}
+                <SwiftUIImage systemName="calendar" size={16} color={palette.accent} />
               </SwiftUIVStack>
+              <SwiftUIVStack alignment="leading" spacing={2}>
+                <SwiftUIText size={17} weight="semibold" color={palette.text}>
+                  Schedule message
+                </SwiftUIText>
+                <SwiftUIText size={12} color={palette.textMuted}>
+                  Send it later without leaving the chat
+                </SwiftUIText>
+              </SwiftUIVStack>
+              <SwiftUISpacer />
+              <SwiftUIButton
+                systemImage="xmark"
+                onPress={onClose}
+                variant="plain"
+                modifiers={[swiftUIFrame({ width: 30, height: 30 })]}
+              />
+            </SwiftUIHStack>
+
+            {/* Message preview */}
+            {messagePreview ? (
+              <SwiftUIVStack
+                alignment="leading"
+                spacing={4}
+                modifiers={[
+                  swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                  swiftUIBackground('rgba(255, 255, 255, 0.06)'),
+                  swiftUICornerRadius(10),
+                  swiftUIFrame({ maxWidth: 380 }),
+                ]}
+              >
+                <SwiftUIText size={11} color={palette.textMuted}>
+                  Message
+                </SwiftUIText>
+                <SwiftUIText size={13} color={palette.text} lineLimit={2}>
+                  {messagePreview}
+                </SwiftUIText>
+              </SwiftUIVStack>
+            ) : null}
+
+            {/* Current schedule summary */}
+            <SwiftUIHStack
+              alignment="center"
+              spacing={8}
+              modifiers={[
+                swiftUIPadding({ horizontal: 12, vertical: 10 }),
+                swiftUIBackground('rgba(255, 255, 255, 0.06)'),
+                swiftUICornerRadius(10),
+                swiftUIFrame({ maxWidth: 380 }),
+              ]}
+            >
+              <SwiftUIImage systemName="clock" size={14} color={palette.textMuted} />
+              <SwiftUIText size={13} color={palette.textMuted}>
+                Scheduled for {formatDate(selectedDate)} at {formatTime(selectedDate)}
+              </SwiftUIText>
+            </SwiftUIHStack>
+
+            {/* Quick picks */}
+            <SwiftUIVStack alignment="leading" spacing={6} modifiers={[swiftUIFrame({ maxWidth: 380 })]}>
+              <SwiftUIText size={12} color={palette.textMuted}>
+                Quick picks
+              </SwiftUIText>
+              <SwiftUIHStack spacing={8}>
+                {quickScheduleOptions.map((option) => (
+                  <SwiftUIHStack
+                    key={option.label}
+                    alignment="center"
+                    modifiers={[
+                      swiftUIPadding({ horizontal: 12, vertical: 8 }),
+                      swiftUIBackground('rgba(255, 255, 255, 0.06)'),
+                      swiftUICornerRadius(16),
+                      swiftUIOnTapGesture(() => handleQuickSchedule(option)),
+                    ]}
+                  >
+                    <SwiftUIText size={13} color={palette.text}>
+                      {option.label}
+                    </SwiftUIText>
+                  </SwiftUIHStack>
+                ))}
+              </SwiftUIHStack>
             </SwiftUIVStack>
-          </GlassEffectContainer>
+
+            {/* Date picker */}
+            <SwiftUIVStack alignment="leading" spacing={6} modifiers={[swiftUIFrame({ maxWidth: 380 })]}>
+              <SwiftUIText size={12} color={palette.textMuted}>
+                Custom time
+              </SwiftUIText>
+              <SwiftUIDatePicker
+                initialDate={selectedDate.toISOString()}
+                displayedComponents="dateAndTime"
+                variant="compact"
+                onDateSelected={(date: Date) => setSelectedDate(date)}
+                color={palette.accent}
+              />
+            </SwiftUIVStack>
+
+            {/* Footer buttons */}
+            <SwiftUIHStack spacing={12} modifiers={[swiftUIFrame({ maxWidth: 380 })]}>
+              <SwiftUIButton onPress={onClose} variant="bordered">
+                Cancel
+              </SwiftUIButton>
+              <SwiftUIButton
+                onPress={handleConfirm}
+                disabled={!isValidDate}
+                variant="borderedProminent"
+              >
+                Schedule
+              </SwiftUIButton>
+            </SwiftUIHStack>
+
+            {!isValidDate ? (
+              <SwiftUIText size={11} color="#EF4444">
+                Time must be in the future
+              </SwiftUIText>
+            ) : null}
+          </SwiftUIVStack>
         </SwiftUIBottomSheet>
       </SwiftUIHost>
     );
