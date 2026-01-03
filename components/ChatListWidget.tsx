@@ -165,6 +165,14 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     }
   }, [chats, currentUserId, fetchUserDetails]);
 
+  useEffect(() => {
+    if (!profileCardVisible || !profileCardUser?.id) return;
+    const updatedUser = userDetails[profileCardUser.id];
+    if (updatedUser && updatedUser !== profileCardUser) {
+      setProfileCardUser(updatedUser);
+    }
+  }, [profileCardVisible, profileCardUser, userDetails]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await onRefresh();

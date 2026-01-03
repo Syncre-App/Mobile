@@ -124,6 +124,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [pickerSeed, setPickerSeed] = useState(0);
+  const [activeQuickOption, setActiveQuickOption] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -132,6 +133,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
       date.setSeconds(0);
       date.setMilliseconds(0);
       setSelectedDate(date);
+      setActiveQuickOption('30 min');
       setPickerSeed((seed) => seed + 1);
     }
   }, [visible]);
@@ -143,6 +145,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
     }
     if (date) {
       setSelectedDate(date);
+      setActiveQuickOption(null);
     }
   };
 
@@ -157,11 +160,13 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   const openDatePicker = () => {
     setPickerMode('date');
     setShowDatePicker(true);
+    setActiveQuickOption(null);
   };
 
   const openTimePicker = () => {
     setPickerMode('time');
     setShowTimePicker(true);
+    setActiveQuickOption(null);
   };
 
   const quickScheduleOptions = [
@@ -183,6 +188,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
     date.setMilliseconds(0);
     setSelectedDate(date);
     setPickerSeed((seed) => seed + 1);
+    setActiveQuickOption(option.label);
   };
 
   const isValidDate = selectedDate > new Date();
@@ -190,6 +196,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   const SheetContent = () => (
     <View style={styles.cardContainer}>
       <View style={styles.content}>
+        <View style={styles.sheetHandle} />
         <View style={styles.header}>
           <View style={styles.headerIcon}>
             <Ionicons name="calendar-outline" size={18} color={palette.accent} />
@@ -221,25 +228,36 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
 
         <Text style={styles.sectionLabel}>Quick picks</Text>
         <View style={styles.quickOptions}>
-          {quickScheduleOptions.map((option) => (
-            <Pressable
-              key={option.label}
-              style={styles.quickOption}
-              onPress={() => handleQuickSchedule(option)}
-            >
-              <Text style={styles.quickOptionText}>{option.label}</Text>
-            </Pressable>
-          ))}
+          {quickScheduleOptions.map((option) => {
+            const isActive = activeQuickOption === option.label;
+            return (
+              <Pressable
+                key={option.label}
+                style={[styles.quickOption, isActive && styles.quickOptionActive]}
+                onPress={() => handleQuickSchedule(option)}
+              >
+                <Text style={[styles.quickOptionText, isActive && styles.quickOptionTextActive]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         <Text style={styles.sectionLabel}>Custom time</Text>
 
         <View style={styles.dateTimeRow}>
-          <Pressable style={styles.dateTimeButton} onPress={openDatePicker}>
+          <Pressable
+            style={[styles.dateTimeButton, showDatePicker && styles.dateTimeButtonActive]}
+            onPress={openDatePicker}
+          >
             <Ionicons name="calendar" size={18} color={palette.accent} />
             <Text style={styles.dateTimeText}>{formatDate(selectedDate)}</Text>
           </Pressable>
-          <Pressable style={styles.dateTimeButton} onPress={openTimePicker}>
+          <Pressable
+            style={[styles.dateTimeButton, showTimePicker && styles.dateTimeButtonActive]}
+            onPress={openTimePicker}
+          >
             <Ionicons name="time" size={18} color={palette.accent} />
             <Text style={styles.dateTimeText}>{formatTime(selectedDate)}</Text>
           </Pressable>
@@ -353,6 +371,26 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
               />
             </SwiftUIHStack>
 
+            {messagePreview ? (
+              <SwiftUIVStack
+                alignment="leading"
+                spacing={4}
+                modifiers={[
+                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
+                  swiftUIBackground('rgba(255, 255, 255, 0.06)'),
+                  swiftUICornerRadius(12),
+                  swiftUIFrame({ maxWidth: 340, alignment: 'leading' }),
+                ]}
+              >
+                <SwiftUIText size={12} weight="medium" color={palette.textMuted}>
+                  Message
+                </SwiftUIText>
+                <SwiftUIText size={14} color={palette.text} lineLimit={2}>
+                  {messagePreview}
+                </SwiftUIText>
+              </SwiftUIVStack>
+            ) : null}
+
             {/* Scheduled time display */}
             <SwiftUIHStack
               alignment="center"
@@ -375,40 +413,50 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                 Quick picks
               </SwiftUIText>
               <SwiftUIHStack spacing={8}>
-                {quickScheduleOptions.slice(0, 3).map((option) => (
-                  <SwiftUIHStack
-                    key={option.label}
-                    alignment="center"
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 14, vertical: 10 }),
-                      swiftUIBackground('rgba(255, 255, 255, 0.08)'),
-                      swiftUICornerRadius(20),
-                      swiftUIOnTapGesture(() => handleQuickSchedule(option)),
-                    ]}
-                  >
-                    <SwiftUIText size={14} color={palette.text}>
-                      {option.label}
-                    </SwiftUIText>
-                  </SwiftUIHStack>
-                ))}
+                {quickScheduleOptions.slice(0, 3).map((option) => {
+                  const isActive = activeQuickOption === option.label;
+                  return (
+                    <SwiftUIHStack
+                      key={option.label}
+                      alignment="center"
+                      modifiers={[
+                        swiftUIPadding({ horizontal: 14, vertical: 10 }),
+                        swiftUIBackground(
+                          isActive ? 'rgba(10, 132, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)'
+                        ),
+                        swiftUICornerRadius(20),
+                        swiftUIOnTapGesture(() => handleQuickSchedule(option)),
+                      ]}
+                    >
+                      <SwiftUIText size={14} weight={isActive ? 'semibold' : 'medium'} color={palette.text}>
+                        {option.label}
+                      </SwiftUIText>
+                    </SwiftUIHStack>
+                  );
+                })}
               </SwiftUIHStack>
               <SwiftUIHStack spacing={8}>
-                {quickScheduleOptions.slice(3).map((option) => (
-                  <SwiftUIHStack
-                    key={option.label}
-                    alignment="center"
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 14, vertical: 10 }),
-                      swiftUIBackground('rgba(255, 255, 255, 0.08)'),
-                      swiftUICornerRadius(20),
-                      swiftUIOnTapGesture(() => handleQuickSchedule(option)),
-                    ]}
-                  >
-                    <SwiftUIText size={14} color={palette.text}>
-                      {option.label}
-                    </SwiftUIText>
-                  </SwiftUIHStack>
-                ))}
+                {quickScheduleOptions.slice(3).map((option) => {
+                  const isActive = activeQuickOption === option.label;
+                  return (
+                    <SwiftUIHStack
+                      key={option.label}
+                      alignment="center"
+                      modifiers={[
+                        swiftUIPadding({ horizontal: 14, vertical: 10 }),
+                        swiftUIBackground(
+                          isActive ? 'rgba(10, 132, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)'
+                        ),
+                        swiftUICornerRadius(20),
+                        swiftUIOnTapGesture(() => handleQuickSchedule(option)),
+                      ]}
+                    >
+                      <SwiftUIText size={14} weight={isActive ? 'semibold' : 'medium'} color={palette.text}>
+                        {option.label}
+                      </SwiftUIText>
+                    </SwiftUIHStack>
+                  );
+                })}
               </SwiftUIHStack>
             </SwiftUIVStack>
 
@@ -426,6 +474,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                     const newDate = new Date(selectedDate);
                     newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
                     setSelectedDate(newDate);
+                    setActiveQuickOption(null);
                   }}
                   color={palette.accent}
                 />
@@ -437,6 +486,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                     const newDate = new Date(selectedDate);
                     newDate.setHours(date.getHours(), date.getMinutes());
                     setSelectedDate(newDate);
+                    setActiveQuickOption(null);
                   }}
                   color={palette.accent}
                 />
@@ -522,6 +572,14 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
   },
+  sheetHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -553,8 +611,10 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
   },
   previewContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     padding: spacing.sm,
     marginBottom: spacing.md,
   },
@@ -571,14 +631,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'rgba(10, 132, 255, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(10, 132, 255, 0.35)',
     borderRadius: radii.md,
     padding: spacing.sm,
     marginBottom: spacing.md,
   },
   summaryText: {
-    color: palette.textMuted,
+    color: palette.text,
     fontSize: 13,
+    ...font('medium'),
   },
   sectionLabel: {
     color: palette.textMuted,
@@ -601,9 +664,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
+  quickOptionActive: {
+    backgroundColor: 'rgba(10, 132, 255, 0.22)',
+    borderColor: 'rgba(10, 132, 255, 0.55)',
+  },
   quickOptionText: {
     color: palette.text,
     fontSize: 13,
+  },
+  quickOptionTextActive: {
+    color: palette.text,
+    ...font('semibold'),
   },
   dateTimeRow: {
     flexDirection: 'row',
@@ -616,11 +687,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(37, 99, 235, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: radii.md,
     paddingVertical: spacing.sm,
+  },
+  dateTimeButtonActive: {
+    backgroundColor: 'rgba(10, 132, 255, 0.16)',
+    borderColor: 'rgba(10, 132, 255, 0.45)',
   },
   dateTimeText: {
     color: palette.text,
@@ -642,6 +717,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   cancelButtonText: {
     color: palette.textMuted,

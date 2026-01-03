@@ -95,7 +95,7 @@ interface ProfileCardProps {
   presence?: 'online' | 'idle' | 'offline';
 }
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const getInitials = (name: string): string => {
   const trimmed = name.trim();
@@ -237,6 +237,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const initials = getInitials(displayName);
   const badgeLabel = safeUser.badges?.length ? safeUser.badges.join(' / ') : '';
   const canTakeActions = Boolean(safeUser.id);
+  const shouldUseSwiftUICard = canRenderSwiftUI && !safeUser.profile_picture;
 
   // ═══════════════════════════════════════════════════════════════
   // Shared content component
@@ -247,25 +248,22 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       <View style={styles.profileHeader}>
         <UserAvatar
           uri={safeUser.profile_picture}
-          name={safeUser.username}
-          size={100}
+          name={displayName}
+          size={96}
           presence={presence}
           presencePlacement="overlay"
         />
 
-        <View style={styles.nameContainer}>
-          <RNText style={styles.username}>{safeUser.username}</RNText>
-          {safeUser.badges && safeUser.badges.length > 0 && (
-            <BadgeRow badges={safeUser.badges} size={24} spacing={6} style={styles.badges} />
-          )}
-        </View>
+        <RNText style={styles.username}>{displayName}</RNText>
 
-        {/* Status */}
-        <View style={styles.statusContainer}>
-          <View style={[styles.statusDot, { backgroundColor: getPresenceColor() }]} />
-          <RNText style={[styles.statusText, { color: getPresenceColor() }]}>
-            {getPresenceText()}
-          </RNText>
+        <View style={styles.metaRow}>
+          {safeUser.badges && safeUser.badges.length > 0 && (
+            <BadgeRow badges={safeUser.badges} size={22} spacing={6} style={styles.badges} />
+          )}
+          <View style={styles.statusPill}>
+            <View style={[styles.statusDot, { backgroundColor: getPresenceColor() }]} />
+            <RNText style={styles.statusText}>{getPresenceText()}</RNText>
+          </View>
         </View>
       </View>
 
@@ -372,10 +370,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet - Use React Native content
-  // for proper profile picture and badge rendering
+  // iOS: Native SwiftUI BottomSheet when no remote avatar is needed.
   // ═══════════════════════════════════════════════════════════════
-  if (canRenderSwiftUI) {
+  if (shouldUseSwiftUICard) {
     return (
       <SwiftUIHost style={styles.swiftUIHost} useViewportSizeMeasurement>
         <SwiftUIBottomSheet
@@ -435,36 +432,46 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               {displayName}
             </SwiftUIText>
 
-            {/* Badges - using SF Symbols */}
-            {safeUser.badges && safeUser.badges.length > 0 ? (
-              <SwiftUIHStack alignment="center" spacing={6}>
-                {safeUser.badges.map((badge, index) => {
-                  const badgeInfo = BADGE_SF_SYMBOLS[badge];
-                  if (!badgeInfo) return null;
-                  return (
-                    <SwiftUIImage
-                      key={`badge-${index}`}
-                      systemName={badgeInfo.symbol}
-                      size={20}
-                      color={badgeInfo.color}
-                    />
-                  );
-                })}
-              </SwiftUIHStack>
-            ) : null}
+            <SwiftUIHStack alignment="center" spacing={10}>
+              {/* Badges - using SF Symbols */}
+              {safeUser.badges && safeUser.badges.length > 0 ? (
+                <SwiftUIHStack alignment="center" spacing={6}>
+                  {safeUser.badges.map((badge, index) => {
+                    const badgeInfo = BADGE_SF_SYMBOLS[badge];
+                    if (!badgeInfo) return null;
+                    return (
+                      <SwiftUIImage
+                        key={`badge-${index}`}
+                        systemName={badgeInfo.symbol}
+                        size={20}
+                        color={badgeInfo.color}
+                      />
+                    );
+                  })}
+                </SwiftUIHStack>
+              ) : null}
 
-            {/* Presence status */}
-            <SwiftUIHStack alignment="center" spacing={6}>
-              <SwiftUIVStack
+              {/* Presence status */}
+              <SwiftUIHStack
+                alignment="center"
+                spacing={6}
                 modifiers={[
-                  swiftUIFrame({ width: 10, height: 10 }),
-                  swiftUIBackground(getPresenceColor()),
-                  swiftUICornerRadius(5),
+                  swiftUIPadding({ horizontal: 10, vertical: 6 }),
+                  swiftUIBackground('rgba(255, 255, 255, 0.08)'),
+                  swiftUICornerRadius(999),
                 ]}
-              />
-              <SwiftUIText size={14} color={getPresenceColor()}>
-                {getPresenceText()}
-              </SwiftUIText>
+              >
+                <SwiftUIVStack
+                  modifiers={[
+                    swiftUIFrame({ width: 8, height: 8 }),
+                    swiftUIBackground(getPresenceColor()),
+                    swiftUICornerRadius(4),
+                  ]}
+                />
+                <SwiftUIText size={13} color={palette.textMuted}>
+                  {getPresenceText()}
+                </SwiftUIText>
+              </SwiftUIHStack>
             </SwiftUIHStack>
 
             {/* Spotify activity */}
@@ -593,11 +600,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       statusBarTranslucent
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <View style={styles.blurOverlay}>
-          <Pressable style={styles.cardContainer} onPress={(e) => e.stopPropagation()}>
-            {renderCard()}
-          </Pressable>
-        </View>
+        <Pressable style={styles.cardContainer} onPress={(e) => e.stopPropagation()}>
+          {renderCard(styles.sheetCard)}
+        </Pressable>
       </Pressable>
     </Modal>
   );
@@ -606,30 +611,20 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  blurOverlay: {
-    flex: 1,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+    padding: spacing.lg,
+    backgroundColor: 'rgba(3, 7, 18, 0.65)',
   },
   swiftUIHost: {
     position: 'absolute',
     width: SCREEN_WIDTH,
     height: 0,
   },
-  sheetCardContainer: {
-    width: '100%',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
   cardContainer: {
-    width: SCREEN_WIDTH - spacing.xl * 2,
+    width: '100%',
     maxWidth: 380,
+    alignSelf: 'center',
   },
   card: {
     width: '100%',
@@ -668,10 +663,7 @@ const styles = StyleSheet.create({
   profileHeader: {
     alignItems: 'center',
     marginBottom: spacing.lg,
-  },
-  nameContainer: {
-    alignItems: 'center',
-    marginTop: spacing.md,
+    gap: spacing.sm,
   },
   username: {
     color: palette.text,
@@ -679,14 +671,26 @@ const styles = StyleSheet.create({
     ...font('bold'),
     textAlign: 'center',
   },
-  badges: {
-    marginTop: spacing.sm,
-  },
-  statusContainer: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.sm,
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  badges: {
+    marginBottom: 0,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   statusDot: {
     width: 8,
@@ -696,6 +700,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 14,
     ...font('medium'),
+    color: palette.textMuted,
   },
   spotifyContainer: {
     backgroundColor: 'rgba(29, 185, 84, 0.1)',
