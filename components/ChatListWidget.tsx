@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { ApiService } from '../services/ApiService';
@@ -11,6 +11,7 @@ import { font, palette, radii, spacing } from '../theme/designSystem';
 import { UserAvatar } from './UserAvatar';
 import BadgeIcon from './BadgeIcon';
 import { ProfileCard } from './ProfileCard';
+import { NativeContextMenu, ContextMenuAction } from './NativeContextMenu';
 
 interface Chat {
   id: number;
@@ -90,6 +91,10 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const [userDetails, setUserDetails] = useState<{ [key: string]: User }>({});
   const [profileCardUser, setProfileCardUser] = useState<User | null>(null);
   const [profileCardVisible, setProfileCardVisible] = useState(false);
+  
+  // Double-tap detection for DM chats
+  const lastTapRef = useRef<{ chatId: string; timestamp: number } | null>(null);
+  const DOUBLE_TAP_DELAY = 300; // ms
   
   const getCurrentUserId = async () => {
     try {
@@ -246,13 +251,40 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   };
 
   const handleChatPress = (chat: Chat) => {
+    const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
+    const now = Date.now();
+    
+    // For DM chats, check for double-tap to show ProfileCard
+    if (!chat.isGroup) {
+      const lastTap = lastTapRef.current;
+      if (lastTap && lastTap.chatId === chatIdKey && now - lastTap.timestamp < DOUBLE_TAP_DELAY) {
+        // Double-tap detected - show ProfileCard
+        lastTapRef.current = null;
+        const otherUserId = getOtherUserId(chat);
+        if (otherUserId) {
+          const cachedUser = userDetails[otherUserId];
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setProfileCardUser(cachedUser || { id: otherUserId, username: 'Loading...', email: '' });
+          setProfileCardVisible(true);
+        }
+        return;
+      }
+      // First tap - record it
+      lastTapRef.current = { chatId: chatIdKey, timestamp: now };
+    }
+    
+    // Navigate to chat
     router.push({
       pathname: '/chat/[id]',
-      params: { id: chat.id?.toString?.() ?? String(chat.id) },
+      params: { id: chatIdKey },
     } as any);
   };
 
   const handleChatLongPress = (chat: Chat) => {
+    // Only handle long press for group chats
+    // DM chats use NativeContextMenu instead
+    if (!chat.isGroup) return;
+    
     const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
     const unread = unreadCounts[chatIdKey] || 0;
     const commonActions = [
@@ -260,29 +292,54 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       { text: 'Cancel', style: 'cancel' as const },
     ].filter(Boolean) as { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[];
 
-    if (chat.isGroup) {
-      const actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [];
-      actions.push({ text: 'Leave group', style: 'destructive', onPress: () => onLeaveGroup(chat) });
-      actions.push(...commonActions);
+    const actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [];
+    actions.push({ text: 'Leave group', style: 'destructive', onPress: () => onLeaveGroup(chat) });
+    actions.push(...commonActions);
 
-      Alert.alert('Group Options', getGroupDisplayName(chat), actions);
-      return;
-    }
-
-    // For DM chats, show ProfileCard instead of Alert
-    const otherUserId = getOtherUserId(chat);
-    if (!otherUserId) return;
-
-    const cachedUser = userDetails[otherUserId];
-    // Always show ProfileCard, even if user details are loading
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setProfileCardUser(cachedUser || { id: otherUserId, username: 'Loading...', email: '' });
-    setProfileCardVisible(true);
+    Alert.alert('Group Options', getGroupDisplayName(chat), actions);
   };
 
   const handleProfileCardClose = () => {
     setProfileCardVisible(false);
     setProfileCardUser(null);
+  };
+
+  // Get context menu actions for DM chats
+  const getDMContextMenuActions = (otherUserId: string, chatIdKey: string): ContextMenuAction[] => {
+    const unread = unreadCounts[chatIdKey] || 0;
+    const isUserBlocked = blockedUserIds?.has(otherUserId) ?? false;
+    
+    const actions: ContextMenuAction[] = [];
+    
+    if (unread > 0) {
+      actions.push({
+        title: 'Mark as read',
+        systemIcon: 'checkmark.circle',
+        onPress: () => onMarkRead(chatIdKey),
+      });
+    }
+    
+    actions.push({
+      title: 'Remove friend',
+      systemIcon: 'person.badge.minus',
+      destructive: true,
+      onPress: () => onRemoveFriend(otherUserId),
+    });
+    
+    actions.push({
+      title: isUserBlocked ? 'Unblock' : 'Block',
+      systemIcon: isUserBlocked ? 'hand.raised.slash' : 'hand.raised',
+      destructive: !isUserBlocked,
+      onPress: () => onToggleBlock(otherUserId, isUserBlocked),
+    });
+    
+    actions.push({
+      title: 'Report',
+      systemIcon: 'flag',
+      onPress: () => onReportUser(otherUserId),
+    });
+    
+    return actions;
   };
 
   const getPresenceForUser = (userId: string): 'online' | 'idle' | 'offline' => {
@@ -330,6 +387,91 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const chatStreak = streaks[chatIdKey];
     const streakCount = chatStreak?.currentStreak || 0;
 
+    const chatCardContent = (
+      <View style={[styles.chatCard, hasUnread && styles.chatCardUnread]}>
+        <UserAvatar
+          uri={avatarUri}
+          name={displayName}
+          size={56}
+          presence={presenceValue}
+          presencePlacement="overlay"
+          style={styles.avatarContainer}
+        />
+
+        <View style={styles.chatContent}>
+          <View style={styles.chatTitleRow}>
+            <Text style={styles.chatName} numberOfLines={1}>
+              {displayName}
+            </Text>
+            {userBadges.length > 0 && (
+              <View style={styles.badgeContainer}>
+                {userBadges.slice(0, 3).map((badge: string, idx: number) => (
+                  <View key={`${chat.id}-badge-${badge}-${idx}`} style={styles.badgeWrapper}>
+                    <BadgeIcon
+                      type={badge as any}
+                      size={22}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+            {hasUnread && (
+              <View style={styles.chatUnreadPill}>
+                <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
+              </View>
+            )}
+            {streakCount > 0 && (
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakText}>{streakCount}</Text>
+              </View>
+            )}
+          </View>
+          {groupSubtitle ? (
+            <Text style={styles.chatSubtitle} numberOfLines={1}>
+              {groupSubtitle}
+            </Text>
+          ) : (
+            !isGroupChat && lastSeenLabel ? (
+              <Text style={styles.chatSubtitle} numberOfLines={1}>
+                {lastSeenLabel}
+              </Text>
+            ) : null
+          )}
+        </View>
+
+        <View style={styles.rightColumn}>
+          {isRemoving ? (
+            <ActivityIndicator size="small" color={palette.error} />
+          ) : (
+            <Ionicons name="chevron-forward" size={16} color="rgba(255, 255, 255, 0.4)" />
+          )}
+        </View>
+      </View>
+    );
+
+    // For DM chats, wrap with NativeContextMenu
+    if (!isGroupChat && otherUserId) {
+      const contextMenuActions = getDMContextMenuActions(otherUserId, chatIdKey);
+      
+      return (
+        <NativeContextMenu
+          actions={contextMenuActions}
+          title={displayName}
+          disabled={isRemoving}
+        >
+          <TouchableOpacity
+            onPress={() => !isRemoving && handleChatPress(chat)}
+            style={styles.chatItem}
+            activeOpacity={0.75}
+            disabled={isRemoving}
+          >
+            {chatCardContent}
+          </TouchableOpacity>
+        </NativeContextMenu>
+      );
+    }
+
+    // For group chats, use regular long press
     return (
       <TouchableOpacity
         onPress={() => !isRemoving && handleChatPress(chat)}
@@ -338,65 +480,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         activeOpacity={0.75}
         disabled={isRemoving}
       >
-        <View style={[styles.chatCard, hasUnread && styles.chatCardUnread]}>
-          <UserAvatar
-            uri={avatarUri}
-            name={displayName}
-            size={56}
-            presence={presenceValue}
-            presencePlacement="overlay"
-            style={styles.avatarContainer}
-          />
-
-          <View style={styles.chatContent}>
-            <View style={styles.chatTitleRow}>
-              <Text style={styles.chatName} numberOfLines={1}>
-                {displayName}
-              </Text>
-              {userBadges.length > 0 && (
-                <View style={styles.badgeContainer}>
-                  {userBadges.slice(0, 3).map((badge: string, idx: number) => (
-                    <View key={`${chat.id}-badge-${badge}-${idx}`} style={styles.badgeWrapper}>
-                      <BadgeIcon
-                        type={badge as any}
-                        size={22}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-              {hasUnread && (
-                <View style={styles.chatUnreadPill}>
-                  <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
-                </View>
-              )}
-              {streakCount > 0 && (
-                <View style={styles.streakBadge}>
-                  <Text style={styles.streakText}>🔥 {streakCount}</Text>
-                </View>
-              )}
-            </View>
-            {groupSubtitle ? (
-              <Text style={styles.chatSubtitle} numberOfLines={1}>
-                {groupSubtitle}
-              </Text>
-            ) : (
-              !isGroupChat && lastSeenLabel ? (
-                <Text style={styles.chatSubtitle} numberOfLines={1}>
-                  {lastSeenLabel}
-                </Text>
-              ) : null
-            )}
-          </View>
-
-          <View style={styles.rightColumn}>
-            {isRemoving ? (
-              <ActivityIndicator size="small" color={palette.error} />
-            ) : (
-              <Ionicons name="chevron-forward" size={16} color="rgba(255, 255, 255, 0.4)" />
-            )}
-          </View>
-        </View>
+        {chatCardContent}
       </TouchableOpacity>
     );
   };
@@ -464,10 +548,6 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         visible={profileCardVisible}
         user={profileCardUser}
         onClose={handleProfileCardClose}
-        onRemoveFriend={onRemoveFriend}
-        onBlockUser={(userId) => onToggleBlock(userId, blockedUserIds?.has(userId) ?? false)}
-        onReportUser={onReportUser}
-        isBlocked={profileCardUser ? (blockedUserIds?.has(profileCardUser.id) ?? false) : false}
         presence={profileCardUser ? getPresenceForUser(profileCardUser.id) : 'offline'}
       />
     </View>

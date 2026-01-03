@@ -54,12 +54,14 @@ export default function ProfileTab() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Disconnect WebSocket
               WebSocketService.getInstance().disconnect();
+              // Only clear local data, don't delete server-side keys
               await Promise.all([
-                CryptoService.resetIdentity(),
                 PinService.clearPin(),
                 StorageService.clear(),
               ]);
+              // Redirect to login
               router.replace('/');
             } catch (error) {
               console.error('Failed to logout:', error);

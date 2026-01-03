@@ -41,15 +41,14 @@ export default function ProfileScreen() {
         {
           text: 'Logout',
           onPress: async () => {
-            const [{ StorageService }, { CryptoService }, { PinService }] = await Promise.all([
+            const [{ StorageService }, { PinService }] = await Promise.all([
               import('../services/StorageService'),
-              import('../services/CryptoService'),
               import('../services/PinService'),
             ]);
+            // Only clear local data, don't delete server-side keys
             await Promise.all([
-              CryptoService.resetIdentity(),
               PinService.clearPin(),
-              StorageService.removeAuthToken(),
+              StorageService.clear(),
             ]);
             router.replace('/' as any);
           },

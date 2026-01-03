@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -12,7 +12,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { UserAvatar } from './UserAvatar';
 import { BadgeRow } from './BadgeIcon';
@@ -62,23 +61,15 @@ interface ProfileCardProps {
   visible: boolean;
   user: ProfileCardUser | null;
   onClose: () => void;
-  onRemoveFriend: (userId: string) => void;
-  onBlockUser: (userId: string) => void;
-  onReportUser: (userId: string) => void;
-  isBlocked?: boolean;
   presence?: 'online' | 'idle' | 'offline';
 }
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const ProfileCard: React.FC<ProfileCardProps> = ({
   visible,
   user,
   onClose,
-  onRemoveFriend,
-  onBlockUser,
-  onReportUser,
-  isBlocked = false,
   presence = 'offline',
 }) => {
   const [spotifyActivity, setSpotifyActivity] = useState<SpotifyActivity | null>(null);
@@ -87,10 +78,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const shouldUseSwiftUI = canUseSwiftUI();
   const canRenderSwiftUI = shouldUseSwiftUI && Host && BottomSheet;
 
-  // Fetch Spotify activity only once when card becomes visible
+  // Reset state when card closes
   useEffect(() => {
     if (!visible) {
-      // Reset when card closes
       setSpotifyActivity(null);
       setHasFetchedSpotify(false);
       setIsLoadingSpotify(false);
@@ -106,7 +96,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         if (!token) return;
 
         const response = await ApiService.getUserActivity(user.id, token);
-        // Only set activity if there's an actual track playing or paused
         if (response.success && response.data?.activity?.track) {
           setSpotifyActivity(response.data.activity);
         } else {
@@ -123,12 +112,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 
     fetchActivity();
   }, [visible, user?.id, hasFetchedSpotify]);
-
-  const handleAction = (action: () => void) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    action();
-    onClose();
-  };
 
   const formatLastSeen = (lastSeen?: string | null): string => {
     if (!lastSeen) return 'Unknown';
@@ -169,40 +152,51 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     }
   };
 
+  // Format milliseconds to mm:ss
+  const formatTime = (ms: number): string => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   if (!user && !visible) return null;
   const safeUser: ProfileCardUser = user ?? {
     id: '',
     username: 'Loading...',
   };
   const displayName = safeUser.username || safeUser.email || 'User';
-  const canTakeActions = Boolean(safeUser.id);
 
   // ═══════════════════════════════════════════════════════════════
-  // Shared Card Content - Pure React Native
+  // Profile View - Main content without actions
   // ═══════════════════════════════════════════════════════════════
-  const CardContent = ({ isSwiftUISheet = false }: { isSwiftUISheet?: boolean }) => (
-    <View style={[styles.cardContent, isSwiftUISheet && styles.swiftUICardContent]}>
-      {/* Profile Header */}
-      <View style={styles.profileHeader}>
+  const ProfileView = () => (
+    <View style={styles.profileView}>
+      {/* Large Avatar */}
+      <View style={styles.avatarContainer}>
         <UserAvatar
           uri={safeUser.profile_picture}
           name={displayName}
-          size={96}
+          size={120}
           presence={presence}
           presencePlacement="overlay"
         />
+      </View>
 
-        <RNText style={styles.username}>{displayName}</RNText>
+      {/* Username */}
+      <RNText style={styles.username}>{displayName}</RNText>
 
-        <View style={styles.metaRow}>
-          {safeUser.badges && safeUser.badges.length > 0 && (
-            <BadgeRow badges={safeUser.badges} size={22} spacing={6} style={styles.badges} />
-          )}
-          <View style={styles.statusPill}>
-            <View style={[styles.statusDot, { backgroundColor: getPresenceColor() }]} />
-            <RNText style={styles.statusText}>{getPresenceText()}</RNText>
-          </View>
+      {/* Badges */}
+      {safeUser.badges && safeUser.badges.length > 0 && (
+        <View style={styles.badgesContainer}>
+          <BadgeRow badges={safeUser.badges} size={24} spacing={8} />
         </View>
+      )}
+
+      {/* Status Pill */}
+      <View style={styles.statusPill}>
+        <View style={[styles.statusDot, { backgroundColor: getPresenceColor() }]} />
+        <RNText style={styles.statusText}>{getPresenceText()}</RNText>
       </View>
 
       {/* Spotify Activity */}
@@ -214,12 +208,12 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         <View style={styles.spotifyContainer}>
           <View style={styles.spotifyHeader}>
             <Ionicons
-              name={spotifyActivity.isPlaying ? 'play-circle' : 'pause-circle'}
-              size={16}
+              name={spotifyActivity.isPlaying ? 'musical-notes' : 'pause'}
+              size={14}
               color="#1DB954"
             />
             <RNText style={styles.spotifyLabel}>
-              {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
+              {spotifyActivity.isPlaying ? 'Listening to Spotify' : 'Paused'}
             </RNText>
           </View>
           <View style={styles.spotifyContent}>
@@ -242,73 +236,45 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               </RNText>
             </View>
           </View>
+          {/* Progress Bar */}
+          {spotifyActivity.track.duration > 0 && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View 
+                  style={[
+                    styles.progressFill, 
+                    { 
+                      width: `${Math.min(100, (spotifyActivity.track.progress / spotifyActivity.track.duration) * 100)}%` 
+                    }
+                  ]} 
+                />
+              </View>
+              <View style={styles.progressTimes}>
+                <RNText style={styles.progressTime}>
+                  {formatTime(spotifyActivity.track.progress)}
+                </RNText>
+                <RNText style={styles.progressTime}>
+                  {formatTime(spotifyActivity.track.duration)}
+                </RNText>
+              </View>
+            </View>
+          )}
         </View>
       ) : null}
-
-      {/* Action Buttons */}
-      <View style={styles.actionsContainer}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.actionButton,
-            styles.actionButtonDanger,
-            pressed && styles.actionButtonPressed,
-          ]}
-          onPress={() => {
-            if (!canTakeActions) return;
-            handleAction(() => onRemoveFriend(safeUser.id));
-          }}
-          disabled={!canTakeActions}
-        >
-          <Ionicons name="person-remove-outline" size={20} color={palette.error} />
-          <RNText style={[styles.actionText, { color: palette.error }]}>
-            Remove friend
-          </RNText>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.actionButton,
-            styles.actionButtonWarning,
-            pressed && styles.actionButtonPressed,
-          ]}
-          onPress={() => {
-            if (!canTakeActions) return;
-            handleAction(() => onBlockUser(safeUser.id));
-          }}
-          disabled={!canTakeActions}
-        >
-          <Ionicons
-            name={isBlocked ? 'lock-open-outline' : 'ban-outline'}
-            size={20}
-            color={palette.warning}
-          />
-          <RNText style={[styles.actionText, { color: palette.warning }]}>
-            {isBlocked ? 'Unblock' : 'Block'}
-          </RNText>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.actionButton,
-            pressed && styles.actionButtonPressed,
-          ]}
-          onPress={() => {
-            if (!canTakeActions) return;
-            handleAction(() => onReportUser(safeUser.id));
-          }}
-          disabled={!canTakeActions}
-        >
-          <Ionicons name="flag-outline" size={20} color={palette.textMuted} />
-          <RNText style={[styles.actionText, { color: palette.textMuted }]}>
-            Report
-          </RNText>
-        </Pressable>
-      </View>
     </View>
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet with RN content inside
+  // Card Content - Just renders Profile View
+  // ═══════════════════════════════════════════════════════════════
+  const CardContent = ({ isSwiftUISheet = false }: { isSwiftUISheet?: boolean }) => (
+    <View style={[styles.cardContent, isSwiftUISheet && styles.swiftUICardContent]}>
+      <ProfileView />
+    </View>
+  );
+
+  // ═══════════════════════════════════════════════════════════════
+  // iOS: Native SwiftUI BottomSheet
   // ═══════════════════════════════════════════════════════════════
   if (canRenderSwiftUI) {
     return (
@@ -320,10 +286,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               onClose();
             }
           }}
-          presentationDetents={['medium', 'large']}
+          presentationDetents={[0.55, 'large']}
           presentationDragIndicator="visible"
         >
-          <ScrollView 
+          <ScrollView
             style={styles.swiftUIScrollView}
             contentContainerStyle={styles.swiftUIScrollContent}
             showsVerticalScrollIndicator={false}
@@ -336,7 +302,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Android / Fallback: Modal with gradient card
+  // Android / Fallback: Modal
   // ═══════════════════════════════════════════════════════════════
   return (
     <Modal
@@ -349,13 +315,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.cardContainer} onPress={(e) => e.stopPropagation()}>
           <LinearGradient
-            colors={['rgba(30, 41, 59, 0.95)', 'rgba(15, 23, 42, 0.98)']}
+            colors={['rgba(30, 41, 59, 0.98)', 'rgba(15, 23, 42, 0.99)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={styles.card}
           >
             <Pressable style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color={palette.textMuted} />
+              <Ionicons name="close" size={22} color={palette.textMuted} />
             </Pressable>
             <CardContent />
           </LinearGradient>
@@ -379,7 +345,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   swiftUICardContent: {
-    paddingTop: spacing.sm,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.xl,
   },
 
@@ -389,19 +355,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'stretch',
     padding: spacing.lg,
-    backgroundColor: 'rgba(3, 7, 18, 0.65)',
+    backgroundColor: 'rgba(3, 7, 18, 0.7)',
   },
   cardContainer: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 400,
     alignSelf: 'center',
   },
   card: {
     width: '100%',
     borderRadius: radii.xxl,
-    padding: spacing.xl,
+    paddingVertical: spacing.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.5,
@@ -411,51 +377,49 @@ const styles = StyleSheet.create({
   closeButton: {
     position: 'absolute',
     top: spacing.md,
-    right: spacing.md,
+    left: spacing.md,
     zIndex: 10,
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Card content styles
+  // Card content
   cardContent: {
     paddingHorizontal: spacing.lg,
+    minHeight: 300,
   },
-  profileHeader: {
+
+  // Profile View styles
+  profileView: {
     alignItems: 'center',
+    paddingTop: spacing.lg,
+  },
+  avatarContainer: {
     marginBottom: spacing.lg,
-    gap: spacing.sm,
   },
   username: {
     color: palette.text,
-    fontSize: 24,
+    fontSize: 26,
     ...font('bold'),
     textAlign: 'center',
+    marginBottom: spacing.sm,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  badges: {
-    marginBottom: 0,
+  badgesContainer: {
+    marginBottom: spacing.md,
   },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    marginBottom: spacing.lg,
   },
   statusDot: {
     width: 8,
@@ -470,12 +434,12 @@ const styles = StyleSheet.create({
 
   // Spotify styles
   spotifyContainer: {
-    backgroundColor: 'rgba(29, 185, 84, 0.1)',
-    borderRadius: radii.lg,
+    width: '100%',
+    backgroundColor: 'rgba(29, 185, 84, 0.08)',
+    borderRadius: radii.xl,
     padding: spacing.md,
-    marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(29, 185, 84, 0.2)',
+    borderColor: 'rgba(29, 185, 84, 0.15)',
   },
   spotifyHeader: {
     flexDirection: 'row',
@@ -485,7 +449,7 @@ const styles = StyleSheet.create({
   },
   spotifyLabel: {
     color: '#1DB954',
-    fontSize: 12,
+    fontSize: 11,
     ...font('semibold'),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -493,56 +457,50 @@ const styles = StyleSheet.create({
   spotifyContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   albumArt: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.sm,
+    width: 56,
+    height: 56,
+    borderRadius: radii.md,
   },
   trackInfo: {
     flex: 1,
   },
   trackName: {
     color: palette.text,
-    fontSize: 14,
+    fontSize: 15,
     ...font('semibold'),
   },
   trackArtist: {
     color: palette.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     marginTop: 2,
   },
 
-  // Action button styles
-  actionsContainer: {
-    gap: spacing.sm,
+  // Progress bar styles
+  progressContainer: {
+    marginTop: spacing.sm,
   },
-  actionButton: {
+  progressBar: {
+    height: 3,
+    backgroundColor: 'rgba(29, 185, 84, 0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#1DB954',
+    borderRadius: 2,
+  },
+  progressTimes: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
   },
-  actionButtonDanger: {
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-    borderColor: 'rgba(239, 68, 68, 0.15)',
-  },
-  actionButtonWarning: {
-    backgroundColor: 'rgba(251, 191, 36, 0.08)',
-    borderColor: 'rgba(251, 191, 36, 0.15)',
-  },
-  actionButtonPressed: {
-    opacity: 0.7,
-    transform: [{ scale: 0.98 }],
-  },
-  actionText: {
-    fontSize: 15,
+  progressTime: {
+    color: palette.textMuted,
+    fontSize: 10,
     ...font('medium'),
   },
 });
