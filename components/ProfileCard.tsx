@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text as RNText,
   View,
+  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -20,42 +21,15 @@ import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { canUseSwiftUI } from '../utils/swiftUi';
 
-// SwiftUI imports for iOS
-let SwiftUIHost: any = null;
-let SwiftUIBottomSheet: any = null;
-let SwiftUIVStack: any = null;
-let SwiftUIHStack: any = null;
-let SwiftUIText: any = null;
-let SwiftUIButton: any = null;
-let SwiftUIImage: any = null;
-let SwiftUISpacer: any = null;
-let SwiftUIZStack: any = null;
-let swiftUICornerRadius: any = null;
-let swiftUIBackground: any = null;
-let swiftUIPadding: any = null;
-let swiftUIFrame: any = null;
-let swiftUIClipShape: any = null;
-let swiftUIOnTapGesture: any = null;
+// SwiftUI imports for iOS - only BottomSheet and Host
+let Host: any = null;
+let BottomSheet: any = null;
 
 if (Platform.OS === 'ios') {
   try {
     const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIHost = swiftUI.Host;
-    SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIVStack = swiftUI.VStack;
-    SwiftUIHStack = swiftUI.HStack;
-    SwiftUIText = swiftUI.Text;
-    SwiftUIButton = swiftUI.Button;
-    SwiftUIImage = swiftUI.Image;
-    SwiftUISpacer = swiftUI.Spacer;
-    SwiftUIZStack = swiftUI.ZStack;
-    const modifiers = require('@expo/ui/swift-ui/modifiers');
-    swiftUICornerRadius = modifiers.cornerRadius;
-    swiftUIBackground = modifiers.background;
-    swiftUIPadding = modifiers.padding;
-    swiftUIFrame = modifiers.frame;
-    swiftUIClipShape = modifiers.clipShape;
-    swiftUIOnTapGesture = modifiers.onTapGesture;
+    Host = swiftUI.Host;
+    BottomSheet = swiftUI.BottomSheet;
   } catch (e) {
     console.warn('SwiftUI components not available:', e);
   }
@@ -95,32 +69,7 @@ interface ProfileCardProps {
   presence?: 'online' | 'idle' | 'offline';
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const getInitials = (name: string): string => {
-  const trimmed = name.trim();
-  if (!trimmed) return '?';
-  const parts = trimmed.split(/\s+/);
-  const letters = parts.map((part) => part[0]).join('');
-  return letters.slice(0, 2).toUpperCase();
-};
-
-// SF Symbol mapping for badges
-const BADGE_SF_SYMBOLS: Record<string, { symbol: string; color: string }> = {
-  staff: { symbol: 'shield.fill', color: '#EF4444' },
-  developer: { symbol: 'chevron.left.forwardslash.chevron.right', color: '#22C55E' },
-  support: { symbol: 'heart.fill', color: '#EC4899' },
-  donator: { symbol: 'dollarsign.circle.fill', color: '#F59E0B' },
-  early_access: { symbol: 'star.fill', color: '#8B5CF6' },
-  tester: { symbol: 'ant.fill', color: '#06B6D4' },
-  bug_hunter: { symbol: 'ladybug.fill', color: '#10B981' },
-  premium: { symbol: 'crown.fill', color: '#F59E0B' },
-  og: { symbol: 'flame.fill', color: '#F97316' },
-  verified: { symbol: 'checkmark.seal.fill', color: '#3B82F6' },
-  bot: { symbol: 'cpu', color: '#6366F1' },
-  system: { symbol: 'gear', color: '#64748B' },
-  jewish: { symbol: 'star.of.david.fill', color: '#3B82F6' },
-};
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const ProfileCard: React.FC<ProfileCardProps> = ({
   visible,
@@ -134,54 +83,46 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 }) => {
   const [spotifyActivity, setSpotifyActivity] = useState<SpotifyActivity | null>(null);
   const [isLoadingSpotify, setIsLoadingSpotify] = useState(false);
+  const [hasFetchedSpotify, setHasFetchedSpotify] = useState(false);
   const shouldUseSwiftUI = canUseSwiftUI();
-  const canRenderSwiftUI =
-    shouldUseSwiftUI &&
-    SwiftUIHost &&
-    SwiftUIBottomSheet &&
-    SwiftUIVStack &&
-    SwiftUIHStack &&
-    SwiftUIText &&
-    SwiftUIButton &&
-    SwiftUIImage &&
-    SwiftUISpacer &&
-    SwiftUIZStack &&
-    swiftUICornerRadius &&
-    swiftUIBackground &&
-    swiftUIPadding &&
-    swiftUIFrame &&
-    swiftUIClipShape &&
-    swiftUIOnTapGesture;
+  const canRenderSwiftUI = shouldUseSwiftUI && Host && BottomSheet;
 
-  const fetchSpotifyActivity = useCallback(async () => {
-    if (!user?.id) return;
-
-    setIsLoadingSpotify(true);
-    try {
-      const token = await StorageService.getAuthToken();
-      if (!token) return;
-
-      const response = await ApiService.getUserActivity(user.id, token);
-      if (response.success && response.data?.activity) {
-        setSpotifyActivity(response.data.activity);
-      } else {
-        setSpotifyActivity(null);
-      }
-    } catch (err) {
-      console.error('Error fetching Spotify activity:', err);
-      setSpotifyActivity(null);
-    } finally {
-      setIsLoadingSpotify(false);
-    }
-  }, [user?.id]);
-
+  // Fetch Spotify activity only once when card becomes visible
   useEffect(() => {
-    if (visible && user?.id) {
-      fetchSpotifyActivity();
-    } else {
+    if (!visible) {
+      // Reset when card closes
       setSpotifyActivity(null);
+      setHasFetchedSpotify(false);
+      setIsLoadingSpotify(false);
+      return;
     }
-  }, [visible, user?.id, fetchSpotifyActivity]);
+
+    if (!user?.id || hasFetchedSpotify) return;
+
+    const fetchActivity = async () => {
+      setIsLoadingSpotify(true);
+      try {
+        const token = await StorageService.getAuthToken();
+        if (!token) return;
+
+        const response = await ApiService.getUserActivity(user.id, token);
+        // Only set activity if there's an actual track playing or paused
+        if (response.success && response.data?.activity?.track) {
+          setSpotifyActivity(response.data.activity);
+        } else {
+          setSpotifyActivity(null);
+        }
+      } catch (err) {
+        console.error('Error fetching Spotify activity:', err);
+        setSpotifyActivity(null);
+      } finally {
+        setIsLoadingSpotify(false);
+        setHasFetchedSpotify(true);
+      }
+    };
+
+    fetchActivity();
+  }, [visible, user?.id, hasFetchedSpotify]);
 
   const handleAction = (action: () => void) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -234,16 +175,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     username: 'Loading...',
   };
   const displayName = safeUser.username || safeUser.email || 'User';
-  const initials = getInitials(displayName);
-  const badgeLabel = safeUser.badges?.length ? safeUser.badges.join(' / ') : '';
   const canTakeActions = Boolean(safeUser.id);
-  const shouldUseSwiftUICard = canRenderSwiftUI && !safeUser.profile_picture;
 
   // ═══════════════════════════════════════════════════════════════
-  // Shared content component
+  // Shared Card Content - Pure React Native
   // ═══════════════════════════════════════════════════════════════
-  const CardContent = () => (
-    <>
+  const CardContent = ({ isSwiftUISheet = false }: { isSwiftUISheet?: boolean }) => (
+    <View style={[styles.cardContent, isSwiftUISheet && styles.swiftUICardContent]}>
       {/* Profile Header */}
       <View style={styles.profileHeader}>
         <UserAvatar
@@ -290,6 +228,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 source={{ uri: spotifyActivity.track.albumArt }}
                 style={styles.albumArt}
                 contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={spotifyActivity.track.id}
+                transition={0}
               />
             )}
             <View style={styles.trackInfo}>
@@ -307,7 +248,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       {/* Action Buttons */}
       <View style={styles.actionsContainer}>
         <Pressable
-          style={styles.actionButton}
+          style={({ pressed }) => [
+            styles.actionButton,
+            styles.actionButtonDanger,
+            pressed && styles.actionButtonPressed,
+          ]}
           onPress={() => {
             if (!canTakeActions) return;
             handleAction(() => onRemoveFriend(safeUser.id));
@@ -321,7 +266,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         </Pressable>
 
         <Pressable
-          style={styles.actionButton}
+          style={({ pressed }) => [
+            styles.actionButton,
+            styles.actionButtonWarning,
+            pressed && styles.actionButtonPressed,
+          ]}
           onPress={() => {
             if (!canTakeActions) return;
             handleAction(() => onBlockUser(safeUser.id));
@@ -339,7 +288,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         </Pressable>
 
         <Pressable
-          style={styles.actionButton}
+          style={({ pressed }) => [
+            styles.actionButton,
+            pressed && styles.actionButtonPressed,
+          ]}
           onPress={() => {
             if (!canTakeActions) return;
             handleAction(() => onReportUser(safeUser.id));
@@ -352,244 +304,39 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           </RNText>
         </Pressable>
       </View>
-    </>
-  );
-
-  const renderCard = (cardStyle?: any) => (
-    <LinearGradient
-      colors={['rgba(30, 41, 59, 0.95)', 'rgba(15, 23, 42, 0.98)']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={[styles.card, cardStyle]}
-    >
-      <Pressable style={styles.closeButton} onPress={onClose}>
-        <Ionicons name="close" size={24} color={palette.textMuted} />
-      </Pressable>
-      <CardContent />
-    </LinearGradient>
+    </View>
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet when no remote avatar is needed.
+  // iOS: Native SwiftUI BottomSheet with RN content inside
   // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUICard) {
+  if (canRenderSwiftUI) {
     return (
-      <SwiftUIHost style={styles.swiftUIHost} useViewportSizeMeasurement>
-        <SwiftUIBottomSheet
+      <Host style={styles.swiftUIHost}>
+        <BottomSheet
           isOpened={visible}
           onIsOpenedChange={(isOpened: boolean) => {
             if (!isOpened) {
               onClose();
             }
           }}
+          presentationDetents={['medium', 'large']}
           presentationDragIndicator="visible"
         >
-          <SwiftUIVStack
-            alignment="center"
-            spacing={12}
-            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
+          <ScrollView 
+            style={styles.swiftUIScrollView}
+            contentContainerStyle={styles.swiftUIScrollContent}
+            showsVerticalScrollIndicator={false}
           >
-            {/* Close button */}
-            <SwiftUIHStack
-              alignment="center"
-              modifiers={[swiftUIFrame({ maxWidth: 360, alignment: 'trailing' })]}
-            >
-              <SwiftUISpacer />
-              <SwiftUIButton
-                systemImage="xmark"
-                onPress={onClose}
-                variant="plain"
-              />
-            </SwiftUIHStack>
-
-            {/* Avatar with profile picture */}
-            {safeUser.profile_picture ? (
-              <SwiftUIImage
-                source={{ uri: safeUser.profile_picture }}
-                modifiers={[
-                  swiftUIFrame({ width: 100, height: 100 }),
-                  swiftUICornerRadius(50),
-                  swiftUIClipShape('circle'),
-                ]}
-              />
-            ) : (
-              <SwiftUIVStack
-                modifiers={[
-                  swiftUIFrame({ width: 100, height: 100 }),
-                  swiftUIBackground('rgba(59, 130, 246, 0.3)'),
-                  swiftUICornerRadius(50),
-                  swiftUIClipShape('circle'),
-                ]}
-              >
-                <SwiftUIText size={36} weight="semibold" color="#ffffff">
-                  {initials}
-                </SwiftUIText>
-              </SwiftUIVStack>
-            )}
-
-            {/* Name */}
-            <SwiftUIText size={22} weight="bold" color={palette.text} lineLimit={1}>
-              {displayName}
-            </SwiftUIText>
-
-            <SwiftUIHStack alignment="center" spacing={10}>
-              {/* Badges - using SF Symbols */}
-              {safeUser.badges && safeUser.badges.length > 0 ? (
-                <SwiftUIHStack alignment="center" spacing={6}>
-                  {safeUser.badges.map((badge, index) => {
-                    const badgeInfo = BADGE_SF_SYMBOLS[badge];
-                    if (!badgeInfo) return null;
-                    return (
-                      <SwiftUIImage
-                        key={`badge-${index}`}
-                        systemName={badgeInfo.symbol}
-                        size={20}
-                        color={badgeInfo.color}
-                      />
-                    );
-                  })}
-                </SwiftUIHStack>
-              ) : null}
-
-              {/* Presence status */}
-              <SwiftUIHStack
-                alignment="center"
-                spacing={6}
-                modifiers={[
-                  swiftUIPadding({ horizontal: 10, vertical: 6 }),
-                  swiftUIBackground('rgba(255, 255, 255, 0.08)'),
-                  swiftUICornerRadius(999),
-                ]}
-              >
-                <SwiftUIVStack
-                  modifiers={[
-                    swiftUIFrame({ width: 8, height: 8 }),
-                    swiftUIBackground(getPresenceColor()),
-                    swiftUICornerRadius(4),
-                  ]}
-                />
-                <SwiftUIText size={13} color={palette.textMuted}>
-                  {getPresenceText()}
-                </SwiftUIText>
-              </SwiftUIHStack>
-            </SwiftUIHStack>
-
-            {/* Spotify activity */}
-            {isLoadingSpotify ? (
-              <SwiftUIText size={13} color={palette.textMuted}>
-                Loading Spotify...
-              </SwiftUIText>
-            ) : spotifyActivity?.track ? (
-              <SwiftUIVStack
-                alignment="leading"
-                spacing={4}
-                modifiers={[
-                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
-                  swiftUIBackground('rgba(29, 185, 84, 0.15)'),
-                  swiftUICornerRadius(14),
-                  swiftUIFrame({ maxWidth: 340, alignment: 'leading' }),
-                ]}
-              >
-                <SwiftUIHStack alignment="center" spacing={6}>
-                  <SwiftUIImage
-                    systemName={spotifyActivity.isPlaying ? 'play.circle.fill' : 'pause.circle'}
-                    size={16}
-                    color="#1DB954"
-                  />
-                  <SwiftUIText size={12} weight="semibold" color="#1DB954">
-                    {spotifyActivity.isPlaying ? 'Listening on Spotify' : 'Spotify paused'}
-                  </SwiftUIText>
-                </SwiftUIHStack>
-                <SwiftUIText size={14} weight="semibold" color={palette.text} lineLimit={1}>
-                  {spotifyActivity.track.name}
-                </SwiftUIText>
-                <SwiftUIText size={13} color={palette.textMuted} lineLimit={1}>
-                  {spotifyActivity.track.artist}
-                </SwiftUIText>
-              </SwiftUIVStack>
-            ) : null}
-
-            {/* Action buttons */}
-            <SwiftUIVStack
-              alignment="leading"
-              spacing={10}
-              modifiers={[swiftUIFrame({ maxWidth: 360, alignment: 'leading' })]}
-            >
-              {/* Remove friend */}
-              <SwiftUIHStack
-                alignment="center"
-                spacing={12}
-                modifiers={[
-                  swiftUIPadding({ horizontal: 16, vertical: 14 }),
-                  swiftUIBackground('rgba(239, 68, 68, 0.12)'),
-                  swiftUICornerRadius(14),
-                  swiftUIOnTapGesture(() => {
-                    if (!user?.id) return;
-                    handleAction(() => onRemoveFriend(user.id));
-                  }),
-                ]}
-              >
-                <SwiftUIImage systemName="person.badge.minus" size={18} color={palette.error} />
-                <SwiftUIText size={15} weight="medium" color={palette.error}>
-                  Remove friend
-                </SwiftUIText>
-                <SwiftUISpacer />
-              </SwiftUIHStack>
-
-              {/* Block */}
-              <SwiftUIHStack
-                alignment="center"
-                spacing={12}
-                modifiers={[
-                  swiftUIPadding({ horizontal: 16, vertical: 14 }),
-                  swiftUIBackground('rgba(251, 191, 36, 0.12)'),
-                  swiftUICornerRadius(14),
-                  swiftUIOnTapGesture(() => {
-                    if (!user?.id) return;
-                    handleAction(() => onBlockUser(user.id));
-                  }),
-                ]}
-              >
-                <SwiftUIImage
-                  systemName={isBlocked ? 'hand.raised.slash.fill' : 'hand.raised.fill'}
-                  size={18}
-                  color={palette.warning}
-                />
-                <SwiftUIText size={15} weight="medium" color={palette.warning}>
-                  {isBlocked ? 'Unblock' : 'Block'}
-                </SwiftUIText>
-                <SwiftUISpacer />
-              </SwiftUIHStack>
-
-              {/* Report */}
-              <SwiftUIHStack
-                alignment="center"
-                spacing={12}
-                modifiers={[
-                  swiftUIPadding({ horizontal: 16, vertical: 14 }),
-                  swiftUIBackground('rgba(255, 255, 255, 0.06)'),
-                  swiftUICornerRadius(14),
-                  swiftUIOnTapGesture(() => {
-                    if (!user?.id) return;
-                    handleAction(() => onReportUser(user.id));
-                  }),
-                ]}
-              >
-                <SwiftUIImage systemName="flag" size={16} color={palette.textMuted} />
-                <SwiftUIText size={14} weight="medium" color={palette.textMuted}>
-                  Report
-                </SwiftUIText>
-                <SwiftUISpacer />
-              </SwiftUIHStack>
-            </SwiftUIVStack>
-          </SwiftUIVStack>
-        </SwiftUIBottomSheet>
-      </SwiftUIHost>
+            <CardContent isSwiftUISheet />
+          </ScrollView>
+        </BottomSheet>
+      </Host>
     );
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Android / Fallback: Modal with blur overlay
+  // Android / Fallback: Modal with gradient card
   // ═══════════════════════════════════════════════════════════════
   return (
     <Modal
@@ -601,7 +348,17 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.cardContainer} onPress={(e) => e.stopPropagation()}>
-          {renderCard(styles.sheetCard)}
+          <LinearGradient
+            colors={['rgba(30, 41, 59, 0.95)', 'rgba(15, 23, 42, 0.98)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.card}
+          >
+            <Pressable style={styles.closeButton} onPress={onClose}>
+              <Ionicons name="close" size={24} color={palette.textMuted} />
+            </Pressable>
+            <CardContent />
+          </LinearGradient>
         </Pressable>
       </Pressable>
     </Modal>
@@ -609,17 +366,30 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 };
 
 const styles = StyleSheet.create({
+  // SwiftUI Host styles
+  swiftUIHost: {
+    position: 'absolute',
+    width: SCREEN_WIDTH,
+    height: 0,
+  },
+  swiftUIScrollView: {
+    flex: 1,
+  },
+  swiftUIScrollContent: {
+    flexGrow: 1,
+  },
+  swiftUICardContent: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+  },
+
+  // Modal styles
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
     alignItems: 'stretch',
     padding: spacing.lg,
     backgroundColor: 'rgba(3, 7, 18, 0.65)',
-  },
-  swiftUIHost: {
-    position: 'absolute',
-    width: SCREEN_WIDTH,
-    height: 0,
   },
   cardContainer: {
     width: '100%',
@@ -638,16 +408,6 @@ const styles = StyleSheet.create({
     shadowRadius: 40,
     elevation: 24,
   },
-  sheetCard: {
-    shadowOpacity: 0.3,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 16,
-  },
-  sheetContent: {
-    padding: spacing.xl,
-    paddingTop: spacing.md,
-  },
   closeButton: {
     position: 'absolute',
     top: spacing.md,
@@ -659,6 +419,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Card content styles
+  cardContent: {
+    paddingHorizontal: spacing.lg,
   },
   profileHeader: {
     alignItems: 'center',
@@ -702,6 +467,8 @@ const styles = StyleSheet.create({
     ...font('medium'),
     color: palette.textMuted,
   },
+
+  // Spotify styles
   spotifyContainer: {
     backgroundColor: 'rgba(29, 185, 84, 0.1)',
     borderRadius: radii.lg,
@@ -746,8 +513,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+
+  // Action button styles
   actionsContainer: {
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   actionButton: {
     flexDirection: 'row',
@@ -759,6 +528,18 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  actionButtonDanger: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  actionButtonWarning: {
+    backgroundColor: 'rgba(251, 191, 36, 0.08)',
+    borderColor: 'rgba(251, 191, 36, 0.15)',
+  },
+  actionButtonPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
   },
   actionText: {
     fontSize: 15,
