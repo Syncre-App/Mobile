@@ -979,6 +979,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isMediaOnlyMessage =
     hasPreviewableMedia && !hasContent && !message.replyTo && !message.isPlaceholder && !isDeletedMessage && !showExpiredBubble;
   const messageRowMaxWidth = Math.round(Dimensions.get('window').width * 0.82);
+  const hasReactions = Array.isArray(message.reactions) && message.reactions.length > 0;
   const containerStyle = [
     styles.messageRow,
     { maxWidth: messageRowMaxWidth },
@@ -987,6 +988,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
     message.replyTo && styles.messageRowWithReply,
     isMediaOnlyMessage && styles.messageRowMedia,
+    hasReactions && styles.messageRowWithReactions,
   ];
   const previewableImageAttachments = useMemo(
     () =>
@@ -7000,6 +7002,9 @@ const styles = StyleSheet.create({
   },
   messageRowWithReply: {
     marginTop: 10,
+  },
+  messageRowWithReactions: {
+    marginBottom: 16,
   },
   messageRowMedia: {
     maxWidth: '100%',

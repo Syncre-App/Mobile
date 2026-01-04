@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
   listContainer: {
     flexGrow: 1,
     paddingHorizontal: spacing.sm,
-    paddingBottom: 100, // Extra padding for tab bar
+    paddingBottom: 140, // Extra padding for tab bar + safe area
   },
   chatItem: {
     marginBottom: spacing.sm,

@@ -18,6 +18,7 @@ import { BadgeRow } from './BadgeIcon';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+import { WebSocketService } from '../services/WebSocketService';
 import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS - only BottomSheet and Host
@@ -130,7 +131,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       fetchSpotifyActivity(user.id, true);
     }
 
-    // Set up periodic refresh while card is open
+    // Set up periodic refresh while card is open (as fallback)
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
     }
@@ -148,6 +149,32 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       }
     };
   }, [visible, user?.id, fetchSpotifyActivity]);
+
+  // Listen for real-time Spotify activity updates via WebSocket
+  useEffect(() => {
+    if (!visible || !user?.id) return;
+
+    const wsService = WebSocketService.getInstance();
+    
+    const handleMessage = (message: { type: string; userId?: string | number; activity?: SpotifyActivity | null }) => {
+      // Only handle activity_update messages for the user we're viewing
+      if (message.type !== 'activity_update') return;
+      if (String(message.userId) !== String(user.id)) return;
+      
+      if (message.activity?.track) {
+        setSpotifyActivity(message.activity);
+      } else {
+        // Activity is null - user stopped/paused listening
+        setSpotifyActivity(null);
+      }
+    };
+
+    const unsubscribe = wsService.addMessageListener(handleMessage);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [visible, user?.id]);
 
   const formatLastSeen = (lastSeen?: string | null): string => {
     if (!lastSeen) return 'Unknown';
