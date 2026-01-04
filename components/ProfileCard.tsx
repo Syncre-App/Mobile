@@ -74,13 +74,16 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   presence = 'offline',
 }) => {
   const [spotifyActivity, setSpotifyActivity] = useState<SpotifyActivity | null>(null);
+  const [localProgress, setLocalProgress] = useState<number>(0);
   const [isLoadingSpotify, setIsLoadingSpotify] = useState(false);
   const lastFetchedUserIdRef = useRef<string | null>(null);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastProgressUpdateRef = useRef<number>(Date.now());
   const shouldUseSwiftUI = canUseSwiftUI();
   const canRenderSwiftUI = shouldUseSwiftUI && Host && BottomSheet;
 
-  const SPOTIFY_REFRESH_INTERVAL = 10000; // 10 seconds
+  const SPOTIFY_REFRESH_INTERVAL = 3000; // 3 seconds for API refresh (progress is local)
 
   const fetchSpotifyActivity = useCallback(async (userId: string, showLoading = false) => {
     if (showLoading) {
@@ -163,9 +166,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       
       if (message.activity?.track) {
         setSpotifyActivity(message.activity);
+        // Reset local progress tracking when we get new data
+        setLocalProgress(message.activity.track.progress);
+        lastProgressUpdateRef.current = Date.now();
       } else {
         // Activity is null - user stopped/paused listening
         setSpotifyActivity(null);
+        setLocalProgress(0);
       }
     };
 
@@ -175,6 +182,41 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       unsubscribe();
     };
   }, [visible, user?.id]);
+
+  // Update local progress when spotifyActivity changes from API
+  useEffect(() => {
+    if (spotifyActivity?.track?.progress !== undefined) {
+      setLocalProgress(spotifyActivity.track.progress);
+      lastProgressUpdateRef.current = Date.now();
+    }
+  }, [spotifyActivity?.track?.progress, spotifyActivity?.track?.id]);
+
+  // Animate progress bar locally every 100ms while playing
+  useEffect(() => {
+    if (!visible || !spotifyActivity?.isPlaying || !spotifyActivity?.track) {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      return;
+    }
+
+    progressIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - lastProgressUpdateRef.current;
+      const newProgress = (spotifyActivity.track?.progress || 0) + elapsed;
+      const duration = spotifyActivity.track?.duration || 1;
+      
+      // Cap at duration to prevent overflow
+      setLocalProgress(Math.min(newProgress, duration));
+    }, 100);
+
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    };
+  }, [visible, spotifyActivity?.isPlaying, spotifyActivity?.track?.progress, spotifyActivity?.track?.id, spotifyActivity?.track?.duration]);
 
   const formatLastSeen = (lastSeen?: string | null): string => {
     if (!lastSeen) return 'Unknown';
@@ -307,14 +349,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                   style={[
                     styles.progressFill, 
                     { 
-                      width: `${Math.min(100, (spotifyActivity.track.progress / spotifyActivity.track.duration) * 100)}%` 
+                      width: `${Math.min(100, (localProgress / spotifyActivity.track.duration) * 100)}%` 
                     }
                   ]} 
                 />
               </View>
               <View style={styles.progressTimes}>
                 <RNText style={styles.progressTime}>
-                  {formatTime(spotifyActivity.track.progress)}
+                  {formatTime(localProgress)}
                 </RNText>
                 <RNText style={styles.progressTime}>
                   {formatTime(spotifyActivity.track.duration)}

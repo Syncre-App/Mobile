@@ -56,15 +56,18 @@ export default function ProfileTab() {
             try {
               // Disconnect WebSocket
               WebSocketService.getInstance().disconnect();
-              // Only clear local data, don't delete server-side keys
+              // Clear all local data including SecureStore (identity keys, PIN)
               await Promise.all([
+                CryptoService.clearLocalIdentity(),
                 PinService.clearPin(),
                 StorageService.clear(),
               ]);
-              // Redirect to login
+              // Redirect to login screen (root index shows LoginScreen when no token)
               router.replace('/');
             } catch (error) {
               console.error('Failed to logout:', error);
+              // Even if clearing fails, still redirect to login
+              router.replace('/');
             }
           },
         },

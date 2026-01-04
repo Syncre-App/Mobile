@@ -519,6 +519,19 @@ export const CryptoService = {
     recipientPublicKeyCache.clear();
   },
 
+  /**
+   * Clear only local identity data (SecureStore) without touching server-side keys.
+   * Used for logout to ensure all sensitive data is removed from device.
+   */
+  async clearLocalIdentity(): Promise<void> {
+    await SecureStore.deleteItemAsync(IDENTITY_PRIVATE_KEY_KEY);
+    await SecureStore.deleteItemAsync(IDENTITY_PUBLIC_KEY_KEY);
+    await SecureStore.deleteItemAsync(IDENTITY_VERSION_KEY);
+    await StorageService.removeItem(DEVICE_REGISTRATION_KEY);
+    recipientPublicKeyCache.clear();
+    console.log('[CryptoService] Local identity data cleared');
+  },
+
   async rotateDeviceIdentity(): Promise<void> {
     const token = await StorageService.getAuthToken();
     if (!token) {
