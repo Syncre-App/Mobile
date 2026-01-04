@@ -133,35 +133,60 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         }
       });
 
-      const newUserDetails: { [key: string]: User } = { ...userDetails };
-      
-      for (const userId of userIds) {
-        if (!newUserDetails[userId]) {
-          try {
-            const response = await ApiService.getUserById(userId, token);
-            if (response.success && response.data) {
-              newUserDetails[userId] = response.data;
-              UserCacheService.addUser({
-                ...response.data,
-                id: response.data.id?.toString?.() ?? String(response.data.id),
-              });
-            }
-          } catch (error) {
-            console.log(`Error fetching user ${userId}:`, error);
-            newUserDetails[userId] = {
-              id: userId,
-              username: 'Loading...',
-              email: '',
-            };
+      // Use functional update to avoid stale closure issues
+      setUserDetails(prevUserDetails => {
+        const newUserDetails: { [key: string]: User } = { ...prevUserDetails };
+        const userIdsToFetch: string[] = [];
+        
+        // Collect user IDs that need to be fetched
+        // Skip if already have valid data (not just placeholder)
+        for (const userId of userIds) {
+          const existing = newUserDetails[userId];
+          if (!existing || existing.username === 'Loading...') {
+            userIdsToFetch.push(userId);
           }
         }
-      }
-
-      setUserDetails(newUserDetails);
+        
+        // If no users to fetch, return as-is
+        if (userIdsToFetch.length === 0) {
+          return prevUserDetails;
+        }
+        
+        // Fetch users async and update state
+        (async () => {
+          const fetchedUsers: { [key: string]: User } = {};
+          
+          // Fetch all users in parallel
+          await Promise.all(
+            userIdsToFetch.map(async (userId) => {
+              try {
+                const response = await ApiService.getUserById(userId, token);
+                if (response.success && response.data) {
+                  fetchedUsers[userId] = response.data;
+                  UserCacheService.addUser({
+                    ...response.data,
+                    id: response.data.id?.toString?.() ?? String(response.data.id),
+                  });
+                }
+              } catch (error) {
+                console.log(`Error fetching user ${userId}:`, error);
+                // Don't add placeholder - will retry next time
+              }
+            })
+          );
+          
+          // Update state with fetched users
+          if (Object.keys(fetchedUsers).length > 0) {
+            setUserDetails(prev => ({ ...prev, ...fetchedUsers }));
+          }
+        })();
+        
+        return prevUserDetails;
+      });
     } catch (error) {
       console.log('❌ Error fetching user details:', error);
     }
-  }, [chats, currentUserId, userDetails]);
+  }, [chats, currentUserId]);
 
   useEffect(() => {
     getCurrentUserId();

@@ -207,10 +207,32 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   }, [visible, user?.id]);
 
   // Update local progress when spotifyActivity changes from API
+  // Only sync if track changed or there's a significant drift (>3 seconds)
+  const lastTrackIdRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    if (spotifyActivity?.track?.progress !== undefined) {
-      setLocalProgress(spotifyActivity.track.progress);
+    if (!spotifyActivity?.track) return;
+    
+    const newProgress = spotifyActivity.track.progress;
+    const newTrackId = spotifyActivity.track.id;
+    const trackChanged = lastTrackIdRef.current !== newTrackId;
+    
+    if (trackChanged) {
+      // Track changed - sync immediately
+      lastTrackIdRef.current = newTrackId;
+      setLocalProgress(newProgress);
       lastProgressUpdateRef.current = Date.now();
+    } else {
+      // Same track - only sync if drift is significant (>3 seconds)
+      const expectedProgress = localProgress;
+      const drift = Math.abs(newProgress - expectedProgress);
+      
+      if (drift > 3000) {
+        // Significant drift detected (seek, pause/resume, etc.)
+        setLocalProgress(newProgress);
+        lastProgressUpdateRef.current = Date.now();
+      }
+      // Otherwise, let local animation continue smoothly
     }
   }, [spotifyActivity?.track?.progress, spotifyActivity?.track?.id]);
 
