@@ -52,10 +52,10 @@ export default function Index() {
           return;
         }
         
-        console.log('✅ Token is valid - navigating to home');
-        // Token is valid, navigate to home screen
+        console.log('✅ Token is valid - navigating to tabs');
+        // Token is valid, navigate to main tabs
         setIsAuthenticated(true);
-        router.replace('/home' as any);
+        router.replace('/(tabs)' as any);
       } else {
         console.log('❌ Token is invalid - clearing and show login');
         // Token is invalid, clear it and show login

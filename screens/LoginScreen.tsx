@@ -89,7 +89,7 @@ export const LoginScreen: React.FC = () => {
           if (data?.requires_terms_acceptance || !user?.terms_accepted_at) {
             router.replace('/terms' as any);
           } else {
-            router.replace('/home' as any);
+            router.replace('/(tabs)' as any);
           }
         } else {
           setErrorMessage('Missing authentication token');

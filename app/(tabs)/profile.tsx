@@ -53,24 +53,27 @@ export default function ProfileTab() {
           text: 'Log Out',
           style: 'destructive',
           onPress: async () => {
-                try {
-                  // Disconnect WebSocket (also clears its internal state)
-                  WebSocketService.getInstance().disconnect();
-                  // Clear user cache from memory
-                  UserCacheService.clear();
-                  // Clear all local data including SecureStore (identity keys)
-                  await Promise.all([
-                    CryptoService.clearLocalIdentity(),
-                    StorageService.clear(),
-                  ]);
-                  // Redirect to login screen (root index shows LoginScreen when no token)
-                  router.replace('/');
-                } catch (error) {
-                  console.error('Failed to logout:', error);
-                  // Even if clearing fails, still redirect to login
-                  router.replace('/');
-                }
-              },
+            try {
+              // Disconnect WebSocket (also clears its internal state)
+              WebSocketService.getInstance().disconnect();
+              // Clear user cache from memory
+              UserCacheService.clear();
+              // Clear all local data including SecureStore (identity keys)
+              await Promise.all([
+                CryptoService.clearLocalIdentity(),
+                StorageService.clear(),
+              ]);
+              // Navigate to root - dismissAll first to clear navigation stack
+              while (router.canGoBack()) {
+                router.back();
+              }
+              router.replace('/');
+            } catch (error) {
+              console.error('Failed to logout:', error);
+              // Even if clearing fails, still redirect to login
+              router.replace('/');
+            }
+          },
         },
       ]
     );

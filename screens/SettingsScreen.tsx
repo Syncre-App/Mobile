@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Switch as RNSwitch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -16,6 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UpdateService } from '../services/UpdateService';
+import { ApiService } from '../services/ApiService';
 import { AppBackground } from '../components/AppBackground';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { SpotifyConnection } from '../components/SpotifyConnection';
@@ -29,6 +31,8 @@ export const SettingsScreen: React.FC = () => {
   const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true);
+  const [devWrapUserId, setDevWrapUserId] = useState('');
+  const [devWrapLoading, setDevWrapLoading] = useState(false);
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
@@ -82,6 +86,36 @@ export const SettingsScreen: React.FC = () => {
 
   const handleLanguagePress = () => {
     Alert.alert('Language', 'Multiple languages will be supported in future updates');
+  };
+
+  const handleSendDevWrap = async () => {
+    if (!devWrapUserId.trim()) {
+      NotificationService.show('error', 'Please enter a user ID');
+      return;
+    }
+    setDevWrapLoading(true);
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) {
+        NotificationService.show('error', 'Not authenticated');
+        return;
+      }
+      const response = await ApiService.post(
+        '/admin/send-wrap',
+        { userId: devWrapUserId.trim() },
+        token
+      );
+      if (response.success) {
+        NotificationService.show('success', 'Wrap sent successfully');
+        setDevWrapUserId('');
+      } else {
+        NotificationService.show('error', response.error || 'Failed to send wrap');
+      }
+    } catch (error: any) {
+      NotificationService.show('error', error?.message || 'Failed to send wrap');
+    } finally {
+      setDevWrapLoading(false);
+    }
   };
 
   // ═══════════════════════════════════════════════════════════════
@@ -240,6 +274,38 @@ export const SettingsScreen: React.FC = () => {
           </View>
           {renderSettingItem(null, 'App Version', appVersion, undefined, undefined, false)}
         </View>
+
+        {/* Developer Tools Section */}
+        {__DEV__ && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderView}>
+              <Text style={styles.sectionTitle}>Developer Tools</Text>
+            </View>
+            <View style={styles.devToolItem}>
+              <Text style={styles.devToolLabel}>Send Wrap to User ID</Text>
+              <View style={styles.devToolRow}>
+                <TextInput
+                  style={styles.devToolInput}
+                  placeholder="User ID"
+                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                  value={devWrapUserId}
+                  onChangeText={setDevWrapUserId}
+                  keyboardType="number-pad"
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  style={[styles.devToolButton, devWrapLoading && styles.devToolButtonDisabled]}
+                  onPress={handleSendDevWrap}
+                  disabled={devWrapLoading}
+                >
+                  <Text style={styles.devToolButtonText}>
+                    {devWrapLoading ? 'Sending...' : 'Send'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -353,5 +419,44 @@ const styles = StyleSheet.create({
   },
   settingRight: {
     marginLeft: spacing.md,
+  },
+  devToolItem: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  devToolLabel: {
+    color: palette.text,
+    fontSize: 14,
+    ...font('medium'),
+    marginBottom: spacing.sm,
+  },
+  devToolRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  devToolInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    color: palette.text,
+    fontSize: 14,
+  },
+  devToolButton: {
+    backgroundColor: palette.accent,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  devToolButtonDisabled: {
+    opacity: 0.5,
+  },
+  devToolButtonText: {
+    color: palette.text,
+    fontSize: 14,
+    ...font('semibold'),
   },
 });

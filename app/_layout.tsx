@@ -46,10 +46,12 @@ export default function RootLayout() {
         // Identity is now handled during login flow via password
         // No separate identity screen needed
         setMaintenance(false);
+        // Go to (tabs) which contains the main app - index.tsx will handle further validation
         return { path: '/(tabs)', allowChatNavigation: true };
       }
 
       setMaintenance(false);
+      // No token - show login screen at root index
       return { path: '/', allowChatNavigation: false };
     } catch {
       setMaintenance(true);
@@ -64,8 +66,16 @@ export default function RootLayout() {
 
   const extractWrapDateFromNotification = (response: Notifications.NotificationResponse | null) => {
     const data = response?.notification?.request?.content?.data as any;
-    if (!data || data?.type !== 'daily_wrap') return null;
-    return data?.date || data?.day || null;
+    if (!data) return null;
+    // Support both daily_wrap and monthly_wrap notification types
+    if (data?.type === 'daily_wrap') {
+      return data?.date || data?.day || null;
+    }
+    if (data?.type === 'monthly_wrap') {
+      // Monthly wrap uses month (YYYY-MM), convert to first day of month for route
+      return data?.month ? `${data.month}-01` : null;
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -92,11 +102,15 @@ export default function RootLayout() {
     bootstrapNavigation();
 
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('📱 Notification tap received:', JSON.stringify(response?.notification?.request?.content?.data));
       const chatId = extractChatIdFromNotification(response);
       const wrapDate = extractWrapDateFromNotification(response);
+      console.log('📱 Extracted - chatId:', chatId, 'wrapDate:', wrapDate);
       if (wrapDate) {
+        console.log('📱 Navigating to wrap:', `/wrap/${wrapDate}`);
         router.push(`/wrap/${wrapDate}` as any);
       } else if (chatId) {
+        console.log('📱 Navigating to chat:', `/chat/${chatId}`);
         router.push(`/chat/${chatId}`);
       }
     });
