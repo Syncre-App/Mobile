@@ -683,20 +683,42 @@ export const CryptoService = {
     uniqueRecipients.add(currentUserId);
 
     const envelopes: EnvelopeEntry[] = [];
+    const skippedRecipients: string[] = [];
+
     for (const userId of uniqueRecipients) {
-      const publicKey =
-        userId === currentUserId ? identity.publicKey : await getRecipientPublicKey(userId, token);
-      envelopes.push(
-        await encryptForRecipient({
-          chatId,
-          message,
-          recipientUserId: userId,
-          recipientPublicKey: publicKey,
-          privateKeyBytes,
-          senderPublicKey: identity.publicKey,
-          recipientDeviceId: null,
-        })
-      );
+      try {
+        const publicKey =
+          userId === currentUserId ? identity.publicKey : await getRecipientPublicKey(userId, token);
+        envelopes.push(
+          await encryptForRecipient({
+            chatId,
+            message,
+            recipientUserId: userId,
+            recipientPublicKey: publicKey,
+            privateKeyBytes,
+            senderPublicKey: identity.publicKey,
+            recipientDeviceId: null,
+          })
+        );
+      } catch (error: any) {
+        // Skip recipients who haven't set up E2E yet
+        if (error?.message?.includes('not set up end-to-end encryption')) {
+          console.warn(`[CryptoService] Skipping recipient ${userId} - no E2E key yet`);
+          skippedRecipients.push(userId);
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    // At minimum, we need to be able to encrypt for ourselves
+    const hasOwnEnvelope = envelopes.some(e => e.recipientId === currentUserId);
+    if (!hasOwnEnvelope) {
+      throw new Error('Cannot encrypt message - sender identity not available');
+    }
+
+    if (skippedRecipients.length > 0) {
+      console.warn(`[CryptoService] ${skippedRecipients.length} recipient(s) skipped due to missing E2E setup`);
     }
 
     return { envelopes, senderDeviceId };

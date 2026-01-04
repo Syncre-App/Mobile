@@ -59,18 +59,20 @@ export default function ProfileTab() {
               // Clear user cache from memory
               UserCacheService.clear();
               // Clear all local data including SecureStore (identity keys)
-              await Promise.all([
-                CryptoService.clearLocalIdentity(),
-                StorageService.clear(),
-              ]);
-              // Navigate to root - dismissAll first to clear navigation stack
-              while (router.canGoBack()) {
-                router.back();
-              }
+              await CryptoService.clearLocalIdentity();
+              await CryptoService.clearBackupKey();
+              await StorageService.clear();
+
+              // Small delay to ensure storage is cleared before navigation
+              await new Promise(resolve => setTimeout(resolve, 100));
+
+              // Navigate to login screen and reset navigation stack
+              router.dismissAll();
               router.replace('/');
             } catch (error) {
               console.error('Failed to logout:', error);
               // Even if clearing fails, still redirect to login
+              router.dismissAll();
               router.replace('/');
             }
           },
