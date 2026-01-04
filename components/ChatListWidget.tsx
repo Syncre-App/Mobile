@@ -94,15 +94,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const [profileCardUser, setProfileCardUser] = useState<User | null>(null);
   const [profileCardVisible, setProfileCardVisible] = useState(false);
   
-  // Debug: log received chats
-  useEffect(() => {
-    console.log(`[ChatListWidget] Received ${chats.length} chats:`, chats.map(c => ({
-      id: c.id,
-      isGroup: c.isGroup,
-      participantCount: c.participants?.length,
-      userIds: (() => { try { return JSON.parse(c.users); } catch { return c.users; } })(),
-    })));
-  }, [chats]);
+
   
   // Ref to track userDetails for async operations
   const userDetailsRef = useRef<{ [key: string]: User }>({});
@@ -277,7 +269,6 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       const otherUserId = userIds.find((id: string | number) => String(id) !== currentUserId);
       return otherUserId ? String(otherUserId) : null;
     } catch (error) {
-      console.log('Error parsing chat users:', error);
       return null;
     }
   };
@@ -673,8 +664,9 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     <View style={styles.container}>
       <FlatList
         data={chats}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={(item) => `chat-${item.id}`}
         renderItem={renderChatItem}
+        extraData={{ userDetails, userStatuses, currentUserId }}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl
