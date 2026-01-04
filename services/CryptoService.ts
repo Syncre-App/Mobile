@@ -20,9 +20,12 @@ if (typeof globalThis.Buffer === 'undefined') {
 const IDENTITY_PRIVATE_KEY_KEY = 'e2ee_identity_private_v2';
 const IDENTITY_PUBLIC_KEY_KEY = 'e2ee_identity_public_v2';
 const IDENTITY_VERSION_KEY = 'e2ee_identity_version_v2';
+const BACKUP_KEY_STORAGE = 'e2ee_backup_key_v1';
+const BACKUP_SALT_STORAGE = 'e2ee_backup_salt_v1';
 
 // Crypto constants
 const KEY_INFO_CONTEXT = 'syncre-chat-v1';
+const BACKUP_KEY_INFO = 'syncre-backup-v1';
 const DEVICE_REGISTRATION_KEY = 'syncre_identity_registration_v2';
 const HKDF_KEY_LENGTH = 32;
 const IDENTITY_PBKDF_ITERATIONS = 100000;
@@ -66,6 +69,17 @@ export interface EncryptedIdentityKey {
   salt: string;
   iterations: number;
   version: number;
+}
+
+export interface BackupEnvelope {
+  userId: string;
+  payload: string;
+  nonce: string;
+  keyVersion: number;
+}
+
+export interface EncryptedPayloadWithBackup extends EncryptedPayload {
+  backupEnvelopes?: BackupEnvelope[];
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -782,6 +796,222 @@ export const CryptoService = {
         token: params.token,
         identityKey: response.data as EncryptedIdentityKey,
       });
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // BACKUP KEY FUNCTIONS
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Initialize backup key from password
+   * This should be called during login after identity is set up
+   */
+  async initializeBackupKey(params: { password: string; token: string }): Promise<boolean> {
+    const { password, token } = params;
+
+    try {
+      // 1. Try to get existing backup salt from server
+      const saltResponse = await ApiService.get('/keys/backup/salt', token);
+      let salt: Uint8Array;
+
+      if (saltResponse.success && saltResponse.data?.salt) {
+        // Use existing salt
+        salt = fromBase64(saltResponse.data.salt);
+        console.log('[CryptoService] Using existing backup salt from server');
+      } else {
+        // Generate new salt (first device)
+        salt = randomBytes(32);
+        const saveResponse = await ApiService.post(
+          '/keys/backup/salt',
+          { salt: toBase64(salt), version: 1 },
+          token
+        );
+        if (!saveResponse.success) {
+          console.error('[CryptoService] Failed to save backup salt:', saveResponse.error);
+          return false;
+        }
+        console.log('[CryptoService] Created and saved new backup salt');
+      }
+
+      // 2. Derive backup key from password using PBKDF2 + HKDF
+      const passwordBytes = utf8ToBytes(password);
+      const passwordKey = pbkdf2DeriveKey(SHA256, passwordBytes, salt, IDENTITY_PBKDF_ITERATIONS, 32);
+
+      const info = utf8ToBytes(BACKUP_KEY_INFO);
+      const hkdf = new HKDF(SHA256, passwordKey, new Uint8Array(32), info);
+      const backupKey = hkdf.expand(HKDF_KEY_LENGTH);
+      hkdf.clean();
+
+      // 3. Store in SecureStore
+      await SecureStore.setItemAsync(BACKUP_KEY_STORAGE, toBase64(backupKey));
+      await SecureStore.setItemAsync(BACKUP_SALT_STORAGE, toBase64(salt));
+
+      console.log('[CryptoService] Backup key initialized successfully');
+      return true;
+    } catch (error) {
+      console.error('[CryptoService] Failed to initialize backup key:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Get the stored backup key
+   */
+  async getBackupKey(): Promise<Uint8Array | null> {
+    try {
+      const keyBase64 = await SecureStore.getItemAsync(BACKUP_KEY_STORAGE);
+      if (!keyBase64) {
+        return null;
+      }
+      return fromBase64(keyBase64);
+    } catch (error) {
+      console.error('[CryptoService] Failed to get backup key:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Check if backup key is available
+   */
+  async hasBackupKey(): Promise<boolean> {
+    try {
+      const keyBase64 = await SecureStore.getItemAsync(BACKUP_KEY_STORAGE);
+      return Boolean(keyBase64);
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Encrypt message with backup key for self-decryption on any device
+   */
+  async encryptForBackup(message: string): Promise<BackupEnvelope | null> {
+    try {
+      const backupKey = await this.getBackupKey();
+      if (!backupKey) {
+        console.warn('[CryptoService] No backup key available');
+        return null;
+      }
+
+      const cipher = new XChaCha20Poly1305(backupKey);
+      const nonce = randomBytes(24);
+      const messageBytes = utf8ToBytes(message);
+      const encrypted = cipher.seal(nonce, messageBytes);
+
+      // Get current user ID
+      const userData = await StorageService.getObject<{ id: string | number }>('user_data');
+      const userId = userData?.id?.toString() || '';
+
+      return {
+        userId,
+        payload: toBase64(encrypted),
+        nonce: toBase64(nonce),
+        keyVersion: 1,
+      };
+    } catch (error) {
+      console.error('[CryptoService] Failed to encrypt for backup:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Decrypt message from backup envelope
+   */
+  async decryptFromBackup(backupEnvelope: {
+    payload: string;
+    nonce: string;
+  }): Promise<string | null> {
+    try {
+      const backupKey = await this.getBackupKey();
+      if (!backupKey) {
+        console.warn('[CryptoService] No backup key available for decryption');
+        return null;
+      }
+
+      const cipher = new XChaCha20Poly1305(backupKey);
+      const nonce = fromBase64(backupEnvelope.nonce);
+      const ciphertext = fromBase64(backupEnvelope.payload);
+
+      const plaintext = cipher.open(nonce, ciphertext);
+      if (!plaintext) {
+        console.error('[CryptoService] Failed to decrypt backup envelope');
+        return null;
+      }
+
+      return bytesToUtf8(plaintext);
+    } catch (error) {
+      console.error('[CryptoService] Failed to decrypt from backup:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Build encrypted payload with backup envelope included
+   */
+  async buildEncryptedPayloadWithBackup(params: {
+    chatId: string;
+    message: string;
+    recipientUserIds: string[];
+    token: string;
+    currentUserId: string;
+  }): Promise<EncryptedPayloadWithBackup> {
+    const { chatId, message, recipientUserIds, token, currentUserId } = params;
+
+    // Build normal envelopes
+    const basePayload = await this.buildEncryptedPayload({
+      chatId,
+      message,
+      recipientUserIds,
+      token,
+      currentUserId,
+    });
+
+    // Add backup envelope for the sender
+    const backupEnvelope = await this.encryptForBackup(message);
+    const backupEnvelopes = backupEnvelope ? [backupEnvelope] : undefined;
+
+    return {
+      ...basePayload,
+      backupEnvelopes,
+    };
+  },
+
+  /**
+   * Clear backup key (for logout or reset)
+   */
+  async clearBackupKey(): Promise<void> {
+    try {
+      await SecureStore.deleteItemAsync(BACKUP_KEY_STORAGE);
+      await SecureStore.deleteItemAsync(BACKUP_SALT_STORAGE);
+      console.log('[CryptoService] Backup key cleared');
+    } catch (error) {
+      console.error('[CryptoService] Failed to clear backup key:', error);
+    }
+  },
+
+  /**
+   * Reset all E2EE data (for complete reset)
+   */
+  async resetAllE2EE(): Promise<void> {
+    try {
+      // Clear identity keys
+      await SecureStore.deleteItemAsync(IDENTITY_PRIVATE_KEY_KEY);
+      await SecureStore.deleteItemAsync(IDENTITY_PUBLIC_KEY_KEY);
+      await SecureStore.deleteItemAsync(IDENTITY_VERSION_KEY);
+
+      // Clear device registration
+      await StorageService.remove(DEVICE_REGISTRATION_KEY);
+
+      // Clear backup key
+      await this.clearBackupKey();
+
+      // Clear recipient key cache
+      recipientPublicKeyCache.clear();
+
+      console.log('[CryptoService] All E2EE data reset');
+    } catch (error) {
+      console.error('[CryptoService] Failed to reset E2EE data:', error);
     }
   },
 };

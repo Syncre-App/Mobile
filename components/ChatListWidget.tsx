@@ -656,9 +656,9 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     </View>
   );
 
-  // Tab bar height (approximate) + extra spacing
-  const TAB_BAR_HEIGHT = 80;
-  const bottomPadding = insets.bottom + TAB_BAR_HEIGHT + spacing.lg;
+  // Tab bar height (approximate) + extra spacing for safe scrolling
+  const TAB_BAR_HEIGHT = 100;
+  const bottomPadding = insets.bottom + TAB_BAR_HEIGHT + spacing.xl;
 
   return (
     <View style={styles.container}>

@@ -78,6 +78,17 @@ export const LoginScreen: React.FC = () => {
               identityKey: identityKey,
             });
             console.log('[LoginScreen] E2EE identity initialized');
+
+            // Initialize backup key for message history access
+            const backupKeySuccess = await CryptoService.initializeBackupKey({
+              password: password,
+              token: token,
+            });
+            if (backupKeySuccess) {
+              console.log('[LoginScreen] Backup key initialized');
+            } else {
+              console.warn('[LoginScreen] Backup key initialization failed (non-blocking)');
+            }
           } catch (cryptoError: any) {
             console.error('[LoginScreen] Failed to initialize E2EE:', cryptoError);
             // Don't block login, but warn user

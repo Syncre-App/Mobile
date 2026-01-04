@@ -2357,17 +2357,29 @@ const ChatScreen: React.FC = () => {
             : [];
 
         let content: string | null = null;
-        if (raw.isEncrypted && Array.isArray(raw.envelopes)) {
+        if (raw.isEncrypted && (Array.isArray(raw.envelopes) || raw.backupEnvelope)) {
           if (!chatId) {
             continue;
           }
-          const decrypted = await CryptoService.decryptMessage({
-            chatId: String(chatId),
-            envelopes: raw.envelopes,
-            senderId,
-            currentUserId: ownerId,
-            token: token || undefined,
-          });
+          let decrypted: string | null = null;
+
+          // Try normal decryption first
+          if (Array.isArray(raw.envelopes) && raw.envelopes.length) {
+            decrypted = await CryptoService.decryptMessage({
+              chatId: String(chatId),
+              envelopes: raw.envelopes,
+              senderId,
+              currentUserId: ownerId,
+              token: token || undefined,
+            });
+          }
+
+          // Fallback to backup envelope if normal decryption failed
+          if (!decrypted && raw.backupEnvelope) {
+            console.log(`[Chat] Trying backup envelope fallback for message ${raw.id}...`);
+            decrypted = await CryptoService.decryptFromBackup(raw.backupEnvelope);
+          }
+
           if (decrypted) {
             content = decrypted;
           } else {
@@ -3780,7 +3792,7 @@ const ChatScreen: React.FC = () => {
         throw new Error('No chat recipients available');
       }
 
-      const encryptedPayload = await CryptoService.buildEncryptedPayload({
+      const encryptedPayload = await CryptoService.buildEncryptedPayloadWithBackup({
         chatId,
         message: encodeMessagePayload(trimmed, resolveReplyMetadata(editingMessage.replyTo)),
         recipientUserIds: recipientIds,
@@ -3793,6 +3805,7 @@ const ChatScreen: React.FC = () => {
         chatId,
         messageId: editingMessage.id,
         envelopes: encryptedPayload.envelopes,
+        backupEnvelopes: encryptedPayload.backupEnvelopes,
         senderDeviceId: encryptedPayload.senderDeviceId,
         messageType: 'e2ee',
       });
@@ -4528,7 +4541,7 @@ const ChatScreen: React.FC = () => {
       }
 
       const previewText = trimmedMessage.slice(0, 300);
-      const encryptedPayload = await CryptoService.buildEncryptedPayload({
+      const encryptedPayload = await CryptoService.buildEncryptedPayloadWithBackup({
         chatId,
         message: encodedPayload,
         recipientUserIds: recipientIds,
@@ -4540,6 +4553,7 @@ const ChatScreen: React.FC = () => {
         type: 'message_send',
         chatId,
         envelopes: encryptedPayload.envelopes,
+        backupEnvelopes: encryptedPayload.backupEnvelopes,
         senderDeviceId: encryptedPayload.senderDeviceId,
         messageType: 'e2ee',
         replyMetadata: normalizedReply,
@@ -4935,13 +4949,20 @@ const ChatScreen: React.FC = () => {
           try {
             const token = authTokenRef.current ?? (await StorageService.getAuthToken());
             authTokenRef.current = token || null;
-            const decrypted = await CryptoService.decryptMessage({
+            let decrypted = await CryptoService.decryptMessage({
               chatId: targetChatId,
               envelopes,
               senderId: payload.senderId ?? payload.userId ?? null,
               currentUserId,
               token: token || undefined,
             });
+
+            // Fallback to backup envelope if normal decryption failed
+            if (!decrypted && payload.backupEnvelope) {
+              console.log('[Chat] Trying backup envelope fallback...');
+              decrypted = await CryptoService.decryptFromBackup(payload.backupEnvelope);
+            }
+
             if (!decrypted) {
               console.warn('Decryption failed for sent message envelope.');
               requestReencrypt('live_decrypt_failed');
@@ -4998,20 +5019,29 @@ const ChatScreen: React.FC = () => {
         }
         case 'message_envelope': {
           const envelopes = Array.isArray(payload.envelopes) ? payload.envelopes : [];
-          if (!envelopes.length) {
+          if (!envelopes.length && !payload.backupEnvelope) {
             return;
           }
 
           try {
             const token = authTokenRef.current ?? (await StorageService.getAuthToken());
             authTokenRef.current = token || null;
-            const decrypted = await CryptoService.decryptMessage({
-              chatId: targetChatId,
-              envelopes,
-              senderId: payload.senderId ?? payload.userId ?? null,
-              currentUserId,
-              token: token || undefined,
-            });
+            let decrypted = envelopes.length
+              ? await CryptoService.decryptMessage({
+                  chatId: targetChatId,
+                  envelopes,
+                  senderId: payload.senderId ?? payload.userId ?? null,
+                  currentUserId,
+                  token: token || undefined,
+                })
+              : null;
+
+            // Fallback to backup envelope if normal decryption failed
+            if (!decrypted && payload.backupEnvelope) {
+              console.log('[Chat] Trying backup envelope fallback for incoming message...');
+              decrypted = await CryptoService.decryptFromBackup(payload.backupEnvelope);
+            }
+
             if (!decrypted) {
               console.warn('Decryption failed for incoming message envelope.');
               requestReencrypt('live_decrypt_failed');
@@ -5287,17 +5317,26 @@ const ChatScreen: React.FC = () => {
           }
           const attachments = mapServerAttachments(payload.attachments);
           const editedAt = payload.editedAt || payload.timestamp || new Date().toISOString();
-          if (Array.isArray(payload.envelopes) && payload.envelopes.length) {
+          if ((Array.isArray(payload.envelopes) && payload.envelopes.length) || payload.backupEnvelope) {
             try {
               const token = authTokenRef.current ?? (await StorageService.getAuthToken());
               authTokenRef.current = token || null;
-              const decrypted = await CryptoService.decryptMessage({
-                chatId: targetChatId,
-                envelopes: payload.envelopes,
-                senderId: payload.senderId ?? payload.userId ?? null,
-                currentUserId,
-                token: token || undefined,
-              });
+              let decrypted = payload.envelopes?.length
+                ? await CryptoService.decryptMessage({
+                    chatId: targetChatId,
+                    envelopes: payload.envelopes,
+                    senderId: payload.senderId ?? payload.userId ?? null,
+                    currentUserId,
+                    token: token || undefined,
+                  })
+                : null;
+
+              // Fallback to backup envelope if normal decryption failed
+              if (!decrypted && payload.backupEnvelope) {
+                console.log(`[Chat] Trying backup envelope fallback for edited message ${editedId}...`);
+                decrypted = await CryptoService.decryptFromBackup(payload.backupEnvelope);
+              }
+
               if (!decrypted) {
                 console.warn(`Failed to decrypt edited message ${editedId}`);
                 return;
