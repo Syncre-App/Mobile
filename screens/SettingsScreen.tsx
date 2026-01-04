@@ -64,6 +64,10 @@ export const SettingsScreen: React.FC = () => {
     router.push('/settings/blocked-users');
   };
 
+  const handleChangePassword = () => {
+    router.push('/settings/change-password');
+  };
+
   const handleReportInfo = () => {
     Alert.alert(
       'How to Report Content',
@@ -191,6 +195,21 @@ export const SettingsScreen: React.FC = () => {
             'Clear Cache',
             'Clear cached data to free up space',
             handleClearCache,
+            undefined,
+            false
+          )}
+        </View>
+
+        {/* Account Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
+            <Text style={styles.sectionTitle}>Account</Text>
+          </View>
+          {renderSettingItem(
+            'key',
+            'Change Password',
+            'Update your account password',
+            handleChangePassword,
             undefined,
             false
           )}

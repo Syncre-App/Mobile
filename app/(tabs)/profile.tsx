@@ -18,7 +18,6 @@ import { UserAvatar } from '../../components/UserAvatar';
 import { BadgeRow } from '../../components/BadgeIcon';
 import { StorageService } from '../../services/StorageService';
 import { CryptoService } from '../../services/CryptoService';
-import { PinService } from '../../services/PinService';
 import { WebSocketService } from '../../services/WebSocketService';
 import { font, palette, radii, spacing } from '../../theme/designSystem';
 
@@ -56,10 +55,9 @@ export default function ProfileTab() {
             try {
               // Disconnect WebSocket
               WebSocketService.getInstance().disconnect();
-              // Clear all local data including SecureStore (identity keys, PIN)
+              // Clear all local data including SecureStore (identity keys)
               await Promise.all([
                 CryptoService.clearLocalIdentity(),
-                PinService.clearPin(),
                 StorageService.clear(),
               ]);
               // Redirect to login screen (root index shows LoginScreen when no token)

@@ -15,8 +15,7 @@ import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
-import { IdentityService } from '../services/IdentityService';
-import { CryptoService } from '../services/CryptoService';
+import { CryptoService, EncryptedIdentityKey } from '../services/CryptoService';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 
 export const LoginScreen: React.FC = () => {
@@ -70,19 +69,25 @@ export const LoginScreen: React.FC = () => {
         }
 
         if (token) {
-          const [needsSetup, localIdentity] = await Promise.all([
-            IdentityService.requiresBootstrap(token),
-            CryptoService.getStoredIdentity(),
-          ]);
+          // Initialize E2EE identity with password
+          try {
+            const identityKey = (data?.identityKey as EncryptedIdentityKey) || null;
+            await CryptoService.initializeFromLogin({
+              password: password,
+              token: token,
+              identityKey: identityKey,
+            });
+            console.log('[LoginScreen] E2EE identity initialized');
+          } catch (cryptoError: any) {
+            console.error('[LoginScreen] Failed to initialize E2EE:', cryptoError);
+            // Don't block login, but warn user
+            notificationService.show('error', 'Failed to initialize secure messaging. Some features may not work.', 'Warning');
+          }
 
           notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');
 
           if (data?.requires_terms_acceptance || !user?.terms_accepted_at) {
             router.replace('/terms' as any);
-          } else if (needsSetup) {
-            router.replace('/identity?mode=setup' as any);
-          } else if (!localIdentity) {
-            router.replace('/identity?mode=unlock' as any);
           } else {
             router.replace('/home' as any);
           }

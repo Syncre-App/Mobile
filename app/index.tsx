@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import NotificationBridge from '../components/NotificationBridge';
 import { NotificationProvider } from '../components/NotificationCenter';
@@ -7,17 +7,15 @@ import { AppBackground } from '../components/AppBackground';
 import { LoginScreen } from '../screens/LoginScreen';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
+import { CryptoService } from '../services/CryptoService';
 import { palette } from '../theme/designSystem';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  useEffect(() => {
-    validateTokenAndNavigate();
-  }, []);
-
-  const validateTokenAndNavigate = async () => {
+  const validateTokenAndNavigate = useCallback(async () => {
+    setIsLoading(true);
     try {
       console.log('🔍 Checking for existing token...');
       const token = await StorageService.getAuthToken();
@@ -41,6 +39,19 @@ export default function Index() {
           router.replace('/terms' as any);
           return;
         }
+        
+        // Check if we have local identity - if not, user needs to re-login
+        // (password is needed to decrypt identity from server)
+        const hasLocalIdentity = await CryptoService.hasLocalIdentity();
+        if (!hasLocalIdentity) {
+          console.log('🔑 No local identity - user needs to re-login');
+          await StorageService.removeAuthToken();
+          await StorageService.removeItem('user_data');
+          setIsAuthenticated(false);
+          setIsLoading(false);
+          return;
+        }
+        
         console.log('✅ Token is valid - navigating to home');
         // Token is valid, navigate to home screen
         setIsAuthenticated(true);
@@ -51,6 +62,7 @@ export default function Index() {
         await StorageService.removeAuthToken();
         await StorageService.removeItem('user_data');
         setIsAuthenticated(false);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('❌ Error validating token:', error);
@@ -58,10 +70,16 @@ export default function Index() {
       await StorageService.removeAuthToken();
       await StorageService.removeItem('user_data');
       setIsAuthenticated(false);
-    } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Re-validate when screen comes into focus (e.g., after logout)
+  useFocusEffect(
+    useCallback(() => {
+      validateTokenAndNavigate();
+    }, [validateTokenAndNavigate])
+  );
 
   if (isLoading) {
     return (

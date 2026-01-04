@@ -18,7 +18,6 @@ import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { ApiService } from '../services/ApiService';
 import { CryptoService } from '../services/CryptoService';
-import { IdentityService } from '../services/IdentityService';
 import { AppBackground } from '../components/AppBackground';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 
@@ -230,33 +229,24 @@ export const PrivacyScreen: React.FC = () => {
 
     Alert.alert(
       'Rotate encryption keys',
-      'This will revoke the current device keys, request history re-encrypt from others, and restart your secure identity.',
+      'This will revoke the current device keys and log you out. You will need to log in again to generate new keys.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Rotate',
+          text: 'Rotate & Logout',
           style: 'destructive',
           onPress: async () => {
             setIsRotatingKeys(true);
             try {
               await CryptoService.rotateDeviceIdentity();
-              NotificationService.show('success', 'Keys rotated. Rebooting identity...');
-              setIsBootstrapping(true);
-              const needsBootstrap = await IdentityService.requiresBootstrap();
-              if (needsBootstrap) {
-                router.push('/identity');
-                IdentityService.startBootstrapWatcher({
-                  onComplete: () => setIsBootstrapping(false),
-                });
-              } else {
-                NotificationService.show('info', 'Identity already initialized. You may need to relaunch.');
-                setIsBootstrapping(false);
-              }
+              NotificationService.show('success', 'Keys rotated. Please log in again.');
+              // Clear local data and redirect to login
+              await StorageService.clear();
+              router.replace('/');
             } catch (error) {
               NotificationService.show('error', 'Failed to rotate keys. Please try again.');
             } finally {
               setIsRotatingKeys(false);
-              setIsBootstrapping(false);
             }
           },
         },

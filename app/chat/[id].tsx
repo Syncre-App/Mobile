@@ -1563,9 +1563,11 @@ const ChatScreen: React.FC = () => {
     identityRepairRef.current = true;
     NotificationService.show(
       'error',
-      'Secure identity missing. Please set up your PIN to unlock messages.'
+      'Secure identity missing. Please log in again to restore encryption.'
     );
-    router.push('/identity?mode=setup');
+    // Clear auth and redirect to login - password is needed to decrypt identity
+    StorageService.removeAuthToken();
+    router.replace('/');
   }, []);
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

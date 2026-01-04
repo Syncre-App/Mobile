@@ -8,9 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiService } from '../services/ApiService';
 import Constants from 'expo-constants';
 import { UpdateService } from '../services/UpdateService';
-import { IdentityService } from '../services/IdentityService';
 import { StorageService } from '../services/StorageService';
-import { CryptoService } from '../services/CryptoService';
 import { ShareIntentService } from '../services/ShareIntentService';
 import { palette } from '../theme/designSystem';
 
@@ -45,19 +43,8 @@ export default function RootLayout() {
 
       const token = await StorageService.getAuthToken();
       if (token) {
-        const needsIdentitySetup = await IdentityService.requiresBootstrap(token);
-        const hasLocalIdentity = Boolean(await CryptoService.getStoredIdentity());
-
-        if (needsIdentitySetup) {
-          setMaintenance(false);
-          return { path: '/identity?mode=setup', allowChatNavigation: false };
-        }
-
-        if (!hasLocalIdentity) {
-          setMaintenance(false);
-          return { path: '/identity?mode=unlock', allowChatNavigation: false };
-        }
-
+        // Identity is now handled during login flow via password
+        // No separate identity screen needed
         setMaintenance(false);
         return { path: '/(tabs)', allowChatNavigation: true };
       }
@@ -195,7 +182,6 @@ export default function RootLayout() {
           <Stack.Screen name="verify" />
           <Stack.Screen name="reset" />
           <Stack.Screen name="terms" />
-          <Stack.Screen name="identity" />
           <Stack.Screen name="maintenance" />
           <Stack.Screen name="update" />
           <Stack.Screen name="profile" />
@@ -206,6 +192,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings/edit-profile" options={{ title: 'Edit Profile' }} />
           <Stack.Screen name="settings/privacy" options={{ title: 'Privacy' }} />
           <Stack.Screen name="settings/blocked-users" options={{ title: 'Blocked Users' }} />
+          <Stack.Screen name="settings/change-password" options={{ title: 'Change Password' }} />
           <Stack.Screen name="spotify/callback" />
           <Stack.Screen name="share/index" />
           <Stack.Screen name="wrap/[date]" />
