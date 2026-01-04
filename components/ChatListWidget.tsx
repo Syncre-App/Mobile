@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
@@ -86,6 +87,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   onLeaveGroup = () => {},
   onMarkRead = () => {},
 }) => {
+  const insets = useSafeAreaInsets();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [userDetails, setUserDetails] = useState<{ [key: string]: User }>({});
@@ -549,6 +551,10 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     </View>
   );
 
+  // Tab bar height (approximate) + extra spacing
+  const TAB_BAR_HEIGHT = 80;
+  const bottomPadding = insets.bottom + TAB_BAR_HEIGHT + spacing.lg;
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -564,7 +570,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             colors={[palette.accent]}
           />
         }
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[styles.listContainer, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       />
@@ -586,7 +592,7 @@ const styles = StyleSheet.create({
   listContainer: {
     flexGrow: 1,
     paddingHorizontal: spacing.sm,
-    paddingBottom: 140, // Extra padding for tab bar + safe area
+    // paddingBottom is set dynamically in the component
   },
   chatItem: {
     marginBottom: spacing.sm,

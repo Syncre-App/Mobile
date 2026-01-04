@@ -106,6 +106,22 @@ class UserCache {
     }
     return Date.now() - cached.lastFetched > maxAgeMs;
   }
+
+  /**
+   * Clear all cached user data (used on logout)
+   */
+  clear(): void {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
+    this.cache.clear();
+    this.hydrated = false;
+    this.hydrating = null;
+    StorageService.removeItem(STORAGE_KEY).catch((err) =>
+      console.warn('[UserCache] Failed to remove persisted cache:', err)
+    );
+  }
 }
 
 export const UserCacheService = new UserCache();

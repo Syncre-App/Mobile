@@ -161,6 +161,16 @@ export class WebSocketService {
     this.isConnecting = false;
     this.isAuthenticated = false;
     this.currentToken = null;
+    this.reconnectAttempts = 0;
+    
+    // Clear all cached state to prevent data leaking between accounts
+    this.userStatuses = {};
+    this.lastSeenMap = {};
+    this.joinedChats.clear();
+    this.pendingMessages = [];
+    this.typingListeners.clear();
+    this.stopTypingListeners.clear();
+    
     this.notifyConnectionStatusListeners(false);
   }
 

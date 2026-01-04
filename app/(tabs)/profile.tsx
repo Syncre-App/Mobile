@@ -19,6 +19,7 @@ import { BadgeRow } from '../../components/BadgeIcon';
 import { StorageService } from '../../services/StorageService';
 import { CryptoService } from '../../services/CryptoService';
 import { WebSocketService } from '../../services/WebSocketService';
+import { UserCacheService } from '../../services/UserCacheService';
 import { font, palette, radii, spacing } from '../../theme/designSystem';
 
 export default function ProfileTab() {
@@ -52,22 +53,24 @@ export default function ProfileTab() {
           text: 'Log Out',
           style: 'destructive',
           onPress: async () => {
-            try {
-              // Disconnect WebSocket
-              WebSocketService.getInstance().disconnect();
-              // Clear all local data including SecureStore (identity keys)
-              await Promise.all([
-                CryptoService.clearLocalIdentity(),
-                StorageService.clear(),
-              ]);
-              // Redirect to login screen (root index shows LoginScreen when no token)
-              router.replace('/');
-            } catch (error) {
-              console.error('Failed to logout:', error);
-              // Even if clearing fails, still redirect to login
-              router.replace('/');
-            }
-          },
+                try {
+                  // Disconnect WebSocket (also clears its internal state)
+                  WebSocketService.getInstance().disconnect();
+                  // Clear user cache from memory
+                  UserCacheService.clear();
+                  // Clear all local data including SecureStore (identity keys)
+                  await Promise.all([
+                    CryptoService.clearLocalIdentity(),
+                    StorageService.clear(),
+                  ]);
+                  // Redirect to login screen (root index shows LoginScreen when no token)
+                  router.replace('/');
+                } catch (error) {
+                  console.error('Failed to logout:', error);
+                  // Even if clearing fails, still redirect to login
+                  router.replace('/');
+                }
+              },
         },
       ]
     );
