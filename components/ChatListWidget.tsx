@@ -94,6 +94,24 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const [profileCardUser, setProfileCardUser] = useState<User | null>(null);
   const [profileCardVisible, setProfileCardVisible] = useState(false);
   
+  // Debug: log received chats
+  useEffect(() => {
+    console.log(`[ChatListWidget] Received ${chats.length} chats:`, chats.map(c => ({
+      id: c.id,
+      isGroup: c.isGroup,
+      participantCount: c.participants?.length,
+      userIds: (() => { try { return JSON.parse(c.users); } catch { return c.users; } })(),
+    })));
+  }, [chats]);
+  
+  // Ref to track userDetails for async operations
+  const userDetailsRef = useRef<{ [key: string]: User }>({});
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    userDetailsRef.current = userDetails;
+  }, [userDetails]);
+  
   // Double-tap detection for DM chats
   const lastTapRef = useRef<{ chatId: string; timestamp: number } | null>(null);
   const pendingNavigationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,7 +123,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       if (token) {
         const response = await ApiService.get('/user/me', token);
         if (response.success && response.data) {
-          setCurrentUserId(response.data.id);
+          setCurrentUserId(String(response.data.id));
         }
       }
     } catch (error) {
@@ -116,73 +134,113 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const fetchUserDetails = useCallback(async () => {
     try {
       const token = await StorageService.getAuthToken();
-      if (!token) return;
+      if (!token || !currentUserId) return;
 
-      const userIds = new Set<string>();
-      
+      // First, extract users directly from chat.participants (already hydrated by backend)
+      const usersFromParticipants: { [key: string]: User } = {};
+      const userIdsNeeded = new Set<string>();
+
       chats.forEach(chat => {
+        // Get userIds from chat.users
+        let chatUserIds: string[] = [];
         try {
-          const chatUserIds = JSON.parse(chat.users);
-          chatUserIds.forEach((id: string) => {
-            if (id !== currentUserId) {
-              userIds.add(id);
-            }
-          });
+          chatUserIds = JSON.parse(chat.users).map((id: string | number) => String(id));
         } catch (error) {
           console.log('Error parsing chat users:', error);
+          return;
+        }
+
+        // If participants are available, use them directly
+        if (Array.isArray(chat.participants) && chat.participants.length > 0) {
+          chat.participants.forEach((participant) => {
+            const participantId = String(participant.id);
+            if (participantId !== currentUserId) {
+              // Find the matching userIds entry for this participant
+              // The participant.id might be padded (e.g., '0759724098076751')
+              // but chatUserIds might have it without padding ('759724098076751')
+              const matchingUserId = chatUserIds.find(uid => 
+                uid === participantId || 
+                uid === participantId.replace(/^0+/, '') ||
+                participantId === uid.padStart(16, '0')
+              );
+              
+              if (matchingUserId) {
+                // Store under the userIds key (what we'll look up by)
+                usersFromParticipants[matchingUserId] = {
+                  ...participant,
+                  id: matchingUserId, // Use the ID format from userIds
+                } as User;
+              } else {
+                // Fallback: store under participant's own ID
+                usersFromParticipants[participantId] = participant as User;
+              }
+            }
+          });
+        } else {
+          // No participants, need to fetch these users
+          chatUserIds.forEach(id => {
+            if (id !== currentUserId) {
+              userIdsNeeded.add(id);
+            }
+          });
         }
       });
 
-      // Use functional update to avoid stale closure issues
-      setUserDetails(prevUserDetails => {
-        const newUserDetails: { [key: string]: User } = { ...prevUserDetails };
-        const userIdsToFetch: string[] = [];
-        
-        // Collect user IDs that need to be fetched
-        // Skip if already have valid data (not just placeholder)
-        for (const userId of userIds) {
-          const existing = newUserDetails[userId];
-          if (!existing || existing.username === 'Loading...') {
-            userIdsToFetch.push(userId);
-          }
+      // Add users from participants to cache and state
+      if (Object.keys(usersFromParticipants).length > 0) {
+        UserCacheService.addUsers(Object.values(usersFromParticipants));
+        setUserDetails(prev => ({ ...prev, ...usersFromParticipants }));
+        userDetailsRef.current = { ...userDetailsRef.current, ...usersFromParticipants };
+      }
+
+      // Check which users still need to be fetched
+      const currentDetails = userDetailsRef.current;
+      const userIdsToFetch: string[] = [];
+      
+      for (const userId of userIdsNeeded) {
+        const existing = currentDetails[userId];
+        if (!existing || existing.username === 'Loading...') {
+          userIdsToFetch.push(userId);
         }
-        
-        // If no users to fetch, return as-is
-        if (userIdsToFetch.length === 0) {
-          return prevUserDetails;
-        }
-        
-        // Fetch users async and update state
-        (async () => {
-          const fetchedUsers: { [key: string]: User } = {};
-          
-          // Fetch all users in parallel
-          await Promise.all(
-            userIdsToFetch.map(async (userId) => {
-              try {
-                const response = await ApiService.getUserById(userId, token);
-                if (response.success && response.data) {
-                  fetchedUsers[userId] = response.data;
-                  UserCacheService.addUser({
-                    ...response.data,
-                    id: response.data.id?.toString?.() ?? String(response.data.id),
-                  });
-                }
-              } catch (error) {
-                console.log(`Error fetching user ${userId}:`, error);
-                // Don't add placeholder - will retry next time
-              }
-            })
-          );
-          
-          // Update state with fetched users
-          if (Object.keys(fetchedUsers).length > 0) {
-            setUserDetails(prev => ({ ...prev, ...fetchedUsers }));
+      }
+
+      if (userIdsToFetch.length === 0) return;
+
+      console.log(`[ChatListWidget] Fetching ${userIdsToFetch.length} users:`, userIdsToFetch);
+
+      // Fetch remaining users in parallel
+      const fetchPromises = userIdsToFetch.map(async (userId) => {
+        try {
+          const response = await ApiService.getUserById(userId, token);
+          if (response.success && response.data) {
+            const userData: User = {
+              ...response.data,
+              id: userId, // Use the requested ID, not the DB ID
+            };
+            UserCacheService.addUser(userData);
+            return { userId, userData };
           }
-        })();
-        
-        return prevUserDetails;
+        } catch (error) {
+          console.log(`Error fetching user ${userId}:`, error);
+        }
+        return null;
       });
+
+      const results = await Promise.all(fetchPromises);
+      
+      // Collect successful fetches
+      const fetchedUsers: { [key: string]: User } = {};
+      for (const result of results) {
+        if (result) {
+          fetchedUsers[result.userId] = result.userData;
+        }
+      }
+
+      // Update state with all fetched users at once
+      if (Object.keys(fetchedUsers).length > 0) {
+        console.log(`[ChatListWidget] Fetched ${Object.keys(fetchedUsers).length} users successfully`);
+        setUserDetails(prev => ({ ...prev, ...fetchedUsers }));
+      }
     } catch (error) {
       console.log('❌ Error fetching user details:', error);
     }
@@ -216,8 +274,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     if (!currentUserId) return null;
     try {
       const userIds = JSON.parse(chat.users);
-      const otherUserId = userIds.find((id: string) => id !== currentUserId);
-      return otherUserId || null;
+      const otherUserId = userIds.find((id: string | number) => String(id) !== currentUserId);
+      return otherUserId ? String(otherUserId) : null;
     } catch (error) {
       console.log('Error parsing chat users:', error);
       return null;
@@ -230,6 +288,18 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const otherUserId = getOtherUserId(chat);
     if (!otherUserId) return 'Unknown User';
 
+    // First try to get user from chat.participants (already hydrated by backend)
+    const participantUser = chat.participants?.find(p => {
+      const pId = String(p.id);
+      return pId === otherUserId || 
+             pId.replace(/^0+/, '') === otherUserId.replace(/^0+/, '');
+    });
+    
+    if (participantUser) {
+      return participantUser.username || 'Loading...';
+    }
+
+    // Fallback to userDetails state
     const user = userDetails[otherUserId];
     if (user) {
       return user.username || user.email || 'Loading...';
@@ -406,7 +476,28 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const isGroupChat = Boolean(chat.isGroup);
     const displayName = isGroupChat ? getGroupDisplayName(chat) : getChatDisplayName(chat);
     const otherUserId = isGroupChat ? null : getOtherUserId(chat);
-    const cachedUser = otherUserId ? userDetails[otherUserId] : null;
+    
+    // Try to get user from chat.participants first (already hydrated by backend),
+    // then fallback to userDetails state
+    const cachedUser = otherUserId 
+      ? (chat.participants?.find(p => {
+          const pId = String(p.id);
+          // Match with or without leading zeros
+          return pId === otherUserId || 
+                 pId.replace(/^0+/, '') === otherUserId.replace(/^0+/, '');
+        }) || userDetails[otherUserId])
+      : null;
+
+    // Debug log for DM chats
+    if (!isGroupChat) {
+      console.log(`[ChatListWidget] Chat ${chat.id} DM:`, {
+        otherUserId,
+        displayName,
+        cachedUserName: cachedUser?.username,
+        cachedUserBadges: cachedUser?.badges,
+        participantsCount: chat.participants?.length,
+      });
+    }
     const statusValueRaw =
       otherUserId && userStatuses[otherUserId]
         ? userStatuses[otherUserId]
@@ -422,9 +513,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const hasUnread = unread > 0;
     const avatarUri = isGroupChat
       ? chat.avatarUrl || undefined
-      : otherUserId
-        ? userDetails[otherUserId]?.profile_picture
-        : undefined;
+      : (cachedUser as User | undefined)?.profile_picture || undefined;
     const groupSubtitle = isGroupChat ? getGroupSubtitle(chat) : null;
     const presenceValue = isGroupChat
       ? undefined

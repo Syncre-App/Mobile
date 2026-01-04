@@ -216,6 +216,11 @@ export default function TabLayout() {
         if (response.success && response.data) {
           success = true;
           const chatList = response.data.chats || [];
+          console.log(`[_layout] Loaded ${chatList.length} chats:`, chatList.map((c: any) => ({
+            id: c.id,
+            participantCount: c.participants?.length,
+            participants: c.participants?.map((p: any) => p.username),
+          })));
           setChats(chatList);
           if (Array.isArray(chatList)) {
             chatList.forEach((chat: any) => {
