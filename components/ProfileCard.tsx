@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -74,44 +74,80 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 }) => {
   const [spotifyActivity, setSpotifyActivity] = useState<SpotifyActivity | null>(null);
   const [isLoadingSpotify, setIsLoadingSpotify] = useState(false);
-  const [hasFetchedSpotify, setHasFetchedSpotify] = useState(false);
+  const lastFetchedUserIdRef = useRef<string | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shouldUseSwiftUI = canUseSwiftUI();
   const canRenderSwiftUI = shouldUseSwiftUI && Host && BottomSheet;
 
-  // Reset state when card closes
-  useEffect(() => {
-    if (!visible) {
+  const SPOTIFY_REFRESH_INTERVAL = 10000; // 10 seconds
+
+  const fetchSpotifyActivity = useCallback(async (userId: string, showLoading = false) => {
+    if (showLoading) {
+      setIsLoadingSpotify(true);
+    }
+    try {
+      const token = await StorageService.getAuthToken();
+      if (!token) return;
+
+      const response = await ApiService.getUserActivity(userId, token);
+      if (response.success && response.data?.activity?.track) {
+        setSpotifyActivity(response.data.activity);
+      } else {
+        setSpotifyActivity(null);
+      }
+    } catch (err) {
+      console.error('Error fetching Spotify activity:', err);
       setSpotifyActivity(null);
-      setHasFetchedSpotify(false);
+    } finally {
+      if (showLoading) {
+        setIsLoadingSpotify(false);
+      }
+    }
+  }, []);
+
+  // Fetch Spotify activity when card opens or user changes
+  useEffect(() => {
+    // Cleanup interval on close
+    if (!visible) {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+      setSpotifyActivity(null);
       setIsLoadingSpotify(false);
+      lastFetchedUserIdRef.current = null;
       return;
     }
 
-    if (!user?.id || hasFetchedSpotify) return;
+    if (!user?.id) return;
 
-    const fetchActivity = async () => {
-      setIsLoadingSpotify(true);
-      try {
-        const token = await StorageService.getAuthToken();
-        if (!token) return;
+    // Only fetch if user changed or first time
+    const shouldFetch = lastFetchedUserIdRef.current !== user.id;
+    
+    if (shouldFetch) {
+      lastFetchedUserIdRef.current = user.id;
+      // Initial fetch with loading indicator
+      fetchSpotifyActivity(user.id, true);
+    }
 
-        const response = await ApiService.getUserActivity(user.id, token);
-        if (response.success && response.data?.activity?.track) {
-          setSpotifyActivity(response.data.activity);
-        } else {
-          setSpotifyActivity(null);
-        }
-      } catch (err) {
-        console.error('Error fetching Spotify activity:', err);
-        setSpotifyActivity(null);
-      } finally {
-        setIsLoadingSpotify(false);
-        setHasFetchedSpotify(true);
+    // Set up periodic refresh while card is open
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+    }
+    
+    refreshIntervalRef.current = setInterval(() => {
+      if (user?.id) {
+        fetchSpotifyActivity(user.id, false); // Silent refresh
+      }
+    }, SPOTIFY_REFRESH_INTERVAL);
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
       }
     };
-
-    fetchActivity();
-  }, [visible, user?.id, hasFetchedSpotify]);
+  }, [visible, user?.id, fetchSpotifyActivity]);
 
   const formatLastSeen = (lastSeen?: string | null): string => {
     if (!lastSeen) return 'Unknown';

@@ -94,6 +94,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   
   // Double-tap detection for DM chats
   const lastTapRef = useRef<{ chatId: string; timestamp: number } | null>(null);
+  const pendingNavigationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const DOUBLE_TAP_DELAY = 300; // ms
   
   const getCurrentUserId = async () => {
@@ -257,9 +258,16 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     // For DM chats, check for double-tap to show ProfileCard
     if (!chat.isGroup) {
       const lastTap = lastTapRef.current;
+      
+      // Check if this is a double-tap
       if (lastTap && lastTap.chatId === chatIdKey && now - lastTap.timestamp < DOUBLE_TAP_DELAY) {
-        // Double-tap detected - show ProfileCard
+        // Double-tap detected - cancel pending navigation and show ProfileCard
+        if (pendingNavigationRef.current) {
+          clearTimeout(pendingNavigationRef.current);
+          pendingNavigationRef.current = null;
+        }
         lastTapRef.current = null;
+        
         const otherUserId = getOtherUserId(chat);
         if (otherUserId) {
           const cachedUser = userDetails[otherUserId];
@@ -269,11 +277,28 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         }
         return;
       }
-      // First tap - record it
+      
+      // First tap - record it and schedule navigation after delay
       lastTapRef.current = { chatId: chatIdKey, timestamp: now };
+      
+      // Cancel any existing pending navigation
+      if (pendingNavigationRef.current) {
+        clearTimeout(pendingNavigationRef.current);
+      }
+      
+      // Schedule navigation - will be cancelled if double-tap occurs
+      pendingNavigationRef.current = setTimeout(() => {
+        pendingNavigationRef.current = null;
+        router.push({
+          pathname: '/chat/[id]',
+          params: { id: chatIdKey },
+        } as any);
+      }, DOUBLE_TAP_DELAY);
+      
+      return;
     }
     
-    // Navigate to chat
+    // For group chats, navigate immediately
     router.push({
       pathname: '/chat/[id]',
       params: { id: chatIdKey },
@@ -561,7 +586,7 @@ const styles = StyleSheet.create({
   listContainer: {
     flexGrow: 1,
     paddingHorizontal: spacing.sm,
-    paddingBottom: spacing.xxl,
+    paddingBottom: 100, // Extra padding for tab bar
   },
   chatItem: {
     marginBottom: spacing.sm,

@@ -52,6 +52,7 @@ let SwiftUIHStack: any = null;
 let SwiftUIButton: any = null;
 let SwiftUIText: any = null;
 let SwiftUIVStack: any = null;
+let SwiftUIBottomSheet: any = null;
 let swiftUIBackground: any = null;
 let swiftUICornerRadius: any = null;
 let swiftUIPadding: any = null;
@@ -67,6 +68,7 @@ if (Platform.OS === 'ios') {
     SwiftUIButton = swiftUI.Button;
     SwiftUIText = swiftUI.Text;
     SwiftUIVStack = swiftUI.VStack;
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
     const modifiers = require('@expo/ui/swift-ui/modifiers');
     swiftUIBackground = modifiers.background;
     swiftUICornerRadius = modifiers.cornerRadius;
@@ -1803,20 +1805,9 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   const currentUserId = user?.id ? String(user.id) : null;
-  const shouldUseSwiftUIReactionPicker =
-    Platform.OS === 'ios' &&
-    canUseSwiftUI() &&
-    SwiftUIHost &&
-    SwiftUIVStack &&
-    SwiftUIHStack &&
-    SwiftUIButton &&
-    SwiftUIText &&
-    swiftUIBackground &&
-    swiftUICornerRadius &&
-    swiftUIPadding &&
-    swiftUIFrame &&
-    swiftUIBorder &&
-    swiftUIShadow;
+  // Disable SwiftUI reaction picker - the border/cornerRadius/background modifiers don't blend well
+  // The React Native fallback looks better with proper styling
+  const shouldUseSwiftUIReactionPicker = false;
 
   // Direct recipient for 1:1 chats (must be defined before handleReportUser and chatHeaderMenuActions)
   const directRecipient = useMemo(() => {
@@ -6462,57 +6453,110 @@ const ChatScreen: React.FC = () => {
         selectedDuration={ephemeralDuration}
         onSelectDuration={setEphemeralDuration}
       />
-      <Modal
-        visible={Boolean(threadRootId)}
-        transparent
-        animationType="slide"
-        onRequestClose={handleThreadClose}
-      >
-        <View style={styles.threadModalOverlay}>
-          <View style={styles.threadModalCard}>
-            <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
-            <View style={styles.threadModalBody}>
-              <View style={styles.threadModalHeader}>
-                <Text style={styles.threadModalTitle}>
+      {/* Thread/Reply Sheet - Uses SwiftUI BottomSheet on iOS, Modal fallback on Android */}
+      {Platform.OS === 'ios' && canUseSwiftUI() && SwiftUIHost && SwiftUIBottomSheet ? (
+        <SwiftUIHost style={styles.swiftUIThreadHost}>
+          <SwiftUIBottomSheet
+            isOpened={Boolean(threadRootId)}
+            onIsOpenedChange={(isOpened: boolean) => {
+              if (!isOpened) {
+                handleThreadClose();
+              }
+            }}
+            presentationDetents={[0.5, 'large']}
+            presentationDragIndicator="visible"
+          >
+            <ScrollView style={styles.threadSheetScroll} contentContainerStyle={styles.threadSheetContent}>
+              <View style={styles.threadSheetHeader}>
+                <Text style={styles.threadSheetTitle}>
                   {threadMessages.length > 1
                     ? `${threadMessages.length - 1} ${threadMessages.length - 1 === 1 ? 'Reply' : 'Replies'}`
                     : 'Thread'}
                 </Text>
-                <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
-                  <Ionicons name="close" size={20} color="#ffffff" />
+              </View>
+              {threadMessages.length ? (
+                threadMessages.map((threadMessage, index) => (
+                  <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
+                    <View style={styles.threadMessageHeader}>
+                      <Text style={styles.threadMessageAuthor}>
+                        {getReplyLabel(threadMessage.senderId)}
+                      </Text>
+                      <Text style={styles.threadMessageTimestamp}>
+                        {formatTimestamp(parseDate(threadMessage.timestamp))}
+                      </Text>
+                    </View>
+                    <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
+                    {index === 0 && (
+                      <Text style={styles.threadMessageBadge}>Original message</Text>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.threadEmptyText}>
+                  Original message is not available in this history.
+                </Text>
+              )}
+              <SwiftUIHost matchContents style={styles.threadSheetButtonHost}>
+                <SwiftUIButton variant="borderedProminent" onPress={handleThreadJumpToChat}>
+                  View in chat
+                </SwiftUIButton>
+              </SwiftUIHost>
+            </ScrollView>
+          </SwiftUIBottomSheet>
+        </SwiftUIHost>
+      ) : (
+        <Modal
+          visible={Boolean(threadRootId)}
+          transparent
+          animationType="slide"
+          onRequestClose={handleThreadClose}
+        >
+          <View style={styles.threadModalOverlay}>
+            <View style={styles.threadModalCard}>
+              <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
+              <View style={styles.threadModalBody}>
+                <View style={styles.threadModalHeader}>
+                  <Text style={styles.threadModalTitle}>
+                    {threadMessages.length > 1
+                      ? `${threadMessages.length - 1} ${threadMessages.length - 1 === 1 ? 'Reply' : 'Replies'}`
+                      : 'Thread'}
+                  </Text>
+                  <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
+                    <Ionicons name="close" size={20} color="#ffffff" />
+                  </Pressable>
+                </View>
+                <ScrollView contentContainerStyle={styles.threadModalScroll}>
+                  {threadMessages.length ? (
+                    threadMessages.map((threadMessage, index) => (
+                      <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
+                        <View style={styles.threadMessageHeader}>
+                          <Text style={styles.threadMessageAuthor}>
+                            {getReplyLabel(threadMessage.senderId)}
+                          </Text>
+                          <Text style={styles.threadMessageTimestamp}>
+                            {formatTimestamp(parseDate(threadMessage.timestamp))}
+                          </Text>
+                        </View>
+                        <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
+                        {index === 0 && (
+                          <Text style={styles.threadMessageBadge}>Original message</Text>
+                        )}
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.threadEmptyText}>
+                      Original message is not available in this history.
+                    </Text>
+                  )}
+                </ScrollView>
+                <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
+                  <Text style={styles.threadJumpButtonText}>View in chat</Text>
                 </Pressable>
               </View>
-              <ScrollView contentContainerStyle={styles.threadModalScroll}>
-                {threadMessages.length ? (
-                  threadMessages.map((threadMessage, index) => (
-                    <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
-                      <View style={styles.threadMessageHeader}>
-                        <Text style={styles.threadMessageAuthor}>
-                          {getReplyLabel(threadMessage.senderId)}
-                        </Text>
-                        <Text style={styles.threadMessageTimestamp}>
-                          {formatTimestamp(parseDate(threadMessage.timestamp))}
-                        </Text>
-                      </View>
-                      <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
-                      {index === 0 && (
-                        <Text style={styles.threadMessageBadge}>Original message</Text>
-                      )}
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.threadEmptyText}>
-                    Original message is not available in this history.
-                  </Text>
-                )}
-              </ScrollView>
-              <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
-                <Text style={styles.threadJumpButtonText}>View in chat</Text>
-              </Pressable>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
       <Modal
         visible={Boolean(previewContext)}
         transparent
@@ -7403,6 +7447,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  // SwiftUI BottomSheet styles for thread
+  swiftUIThreadHost: {
+    position: 'absolute',
+    width: Dimensions.get('window').width,
+    height: 0,
+  },
+  threadSheetScroll: {
+    flex: 1,
+  },
+  threadSheetContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  threadSheetHeader: {
+    marginBottom: 16,
+  },
+  threadSheetTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  threadSheetButtonHost: {
+    marginTop: 16,
+    alignSelf: 'stretch',
+  },
   threadSummaryButton: {
     marginTop: 6,
     alignSelf: 'flex-start',
@@ -7818,14 +7888,13 @@ const styles = StyleSheet.create({
     gap: REACTION_BUTTON_GAP,
     paddingHorizontal: REACTION_CARD_PADDING,
     paddingVertical: REACTION_CARD_PADDING,
-    borderRadius: 20,
-    backgroundColor: 'rgba(15, 19, 36, 0.9)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 24,
+    backgroundColor: 'rgba(28, 28, 30, 0.95)',
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
     elevation: 14,
     zIndex: 51,
   },
@@ -7840,14 +7909,12 @@ const styles = StyleSheet.create({
     width: REACTION_BUTTON_SIZE,
     height: REACTION_BUTTON_SIZE,
     borderRadius: REACTION_BUTTON_SIZE / 2,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   reactionEmojiButtonActive: {
-    backgroundColor: 'rgba(44, 130, 255, 0.35)',
-    borderWidth: 1.5,
-    borderColor: '#2C82FF',
+    backgroundColor: 'rgba(10, 132, 255, 0.25)',
   },
   reactionEmojiText: {
     fontSize: 20,
