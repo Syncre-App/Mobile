@@ -95,13 +95,36 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 
       const response = await ApiService.getUserActivity(userId, token);
       if (response.success && response.data?.activity?.track) {
-        setSpotifyActivity(response.data.activity);
-      } else {
+        const newActivity = response.data.activity;
+        setSpotifyActivity(prev => {
+          // Only update if track changed or isPlaying changed to avoid unnecessary re-renders
+          if (!prev || 
+              prev.track?.id !== newActivity.track.id || 
+              prev.isPlaying !== newActivity.isPlaying) {
+            return newActivity;
+          }
+          // Update progress silently without full re-render
+          return {
+            ...prev,
+            track: {
+              ...prev.track!,
+              progress: newActivity.track.progress,
+            },
+          };
+        });
+        // Update progress tracking
+        setLocalProgress(newActivity.track.progress);
+        lastProgressUpdateRef.current = Date.now();
+      } else if (showLoading) {
+        // Only clear on initial load, not on silent refresh
         setSpotifyActivity(null);
       }
     } catch (err) {
       console.error('Error fetching Spotify activity:', err);
-      setSpotifyActivity(null);
+      // Don't clear on error during silent refresh
+      if (showLoading) {
+        setSpotifyActivity(null);
+      }
     } finally {
       if (showLoading) {
         setIsLoadingSpotify(false);

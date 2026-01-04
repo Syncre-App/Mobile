@@ -301,6 +301,21 @@ async function bootstrapIdentity({ pin, token, identityResponse, forceBackup = f
   }
 
   const existing = identityResponse || (await ApiService.get('/keys/identity', token));
+  
+  // Debug logging - remove after fix
+  console.log('[CryptoService] bootstrapIdentity - server response:', JSON.stringify({
+    success: existing.success,
+    statusCode: existing.statusCode,
+    hasEncryptedPrivateKey: !!existing.data?.encryptedPrivateKey,
+    encryptedKeyLength: existing.data?.encryptedPrivateKey?.length,
+    hasNonce: !!existing.data?.nonce,
+    nonceValue: existing.data?.nonce?.substring?.(0, 30),
+    hasSalt: !!existing.data?.salt,
+    saltValue: existing.data?.salt?.substring?.(0, 30),
+    iterations: existing.data?.iterations,
+    version: existing.data?.version,
+  }, null, 2));
+  
   const remoteHasEncrypted = existing.success && Boolean(existing.data?.encryptedPrivateKey);
   const remoteIterations = existing.data?.iterations || IDENTITY_PBKDF_ITERATIONS;
   const shouldUploadLocal = forceBackup || !remoteHasEncrypted;
@@ -322,7 +337,9 @@ async function bootstrapIdentity({ pin, token, identityResponse, forceBackup = f
       throw new Error('Incomplete identity key payload');
     }
     const saltBytes = fromBase64(saltBase64);
-    const iterations = existing.data.iterations || 150000;
+    // Use server-provided iterations, fallback to our constant (60000), NOT the old 150000
+    const iterations = existing.data.iterations || IDENTITY_PBKDF_ITERATIONS;
+    console.log('[CryptoService] Decrypting with iterations:', iterations, 'salt length:', saltBytes.length, 'nonce:', nonceBase64?.substring(0, 20));
     const passphraseKey = await derivePassphraseKey(pin, saltBytes, iterations);
 
     const encryptedBase64 = existing.data.encryptedPrivateKey;
