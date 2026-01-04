@@ -1001,7 +1001,7 @@ export const CryptoService = {
       await SecureStore.deleteItemAsync(IDENTITY_VERSION_KEY);
 
       // Clear device registration
-      await StorageService.remove(DEVICE_REGISTRATION_KEY);
+      await StorageService.removeItem(DEVICE_REGISTRATION_KEY);
 
       // Clear backup key
       await this.clearBackupKey();
