@@ -66,13 +66,11 @@ export default function ProfileTab() {
               // Small delay to ensure storage is cleared before navigation
               await new Promise(resolve => setTimeout(resolve, 100));
 
-              // Navigate to login screen and reset navigation stack
-              router.dismissAll();
+              // Navigate to login screen
               router.replace('/');
             } catch (error) {
               console.error('Failed to logout:', error);
               // Even if clearing fails, still redirect to login
-              router.dismissAll();
               router.replace('/');
             }
           },

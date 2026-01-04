@@ -28,7 +28,8 @@ const KEY_INFO_CONTEXT = 'syncre-chat-v1';
 const BACKUP_KEY_INFO = 'syncre-backup-v1';
 const DEVICE_REGISTRATION_KEY = 'syncre_identity_registration_v2';
 const HKDF_KEY_LENGTH = 32;
-const IDENTITY_PBKDF_ITERATIONS = 100000;
+// Reduced from 100000 for better mobile performance while maintaining security
+const IDENTITY_PBKDF_ITERATIONS = 50000;
 
 export interface EnvelopeEntry {
   recipientId: string;
