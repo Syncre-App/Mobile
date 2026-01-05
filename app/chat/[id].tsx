@@ -7045,7 +7045,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   messageRowWithReactions: {
-    marginBottom: 16,
+    marginBottom: 36,
   },
   messageRowMedia: {
     maxWidth: '100%',
