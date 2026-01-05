@@ -2546,54 +2546,65 @@ const ChatScreen: React.FC = () => {
         return;
       }
 
-      setMessagesAnimated((prev) => {
+      // Use setMessagesWithoutAnimation to avoid layout jumps on status updates
+      setMessagesWithoutAnimation((prev) => {
+        // If we have a specific messageId, only update that message
+        if (messageId) {
+          const targetIndex = prev.findIndex((msg) => msg.id === String(messageId));
+          if (targetIndex === -1) {
+            return prev;
+          }
+          const target = prev[targetIndex];
+          if (target.senderId !== currentUserId || target.isPlaceholder) {
+            return prev;
+          }
+          // Skip if already at same or higher status
+          const statusOrder = { sending: 0, sent: 1, delivered: 2, seen: 3 };
+          if (statusOrder[target.status || 'sending'] >= statusOrder[status]) {
+            // Still add receipt if it's a new one
+            if (status === 'seen' && receipt?.userId) {
+              const existing = Array.isArray(target.seenBy) ? target.seenBy : [];
+              if (!existing.some((entry) => entry.userId === receipt.userId)) {
+                const next = [...prev];
+                next[targetIndex] = { ...target, seenBy: [...existing, receipt] };
+                return next;
+              }
+            }
+            return prev;
+          }
+          const deliveredAt = status === 'delivered' && timestamp ? timestamp : target.deliveredAt;
+          const seenAtValue = status === 'seen' && timestamp ? timestamp : target.seenAt;
+          const seenBy = status === 'seen' && receipt?.userId
+            ? [...(Array.isArray(target.seenBy) ? target.seenBy : []).filter((e) => e.userId !== receipt.userId), receipt]
+            : target.seenBy;
+          const next = [...prev];
+          next[targetIndex] = { ...target, status, deliveredAt, seenAt: seenAtValue ?? target.seenAt, seenBy };
+          return next;
+        }
+
+        // Batch update for all unread outgoing messages (legacy fallback)
+        let hasChanges = false;
         const next = prev.map((msg) => {
-          if (msg.senderId !== currentUserId || msg.isPlaceholder) {
+          if (msg.senderId !== currentUserId || msg.isPlaceholder || msg.status === 'seen') {
             return msg;
           }
-
-          const applyReceipt = (target: Message): Message => {
-            const deliveredAt = status === 'delivered' && timestamp ? timestamp : target.deliveredAt;
-            const seenAtValue = status === 'seen' && timestamp ? timestamp : target.seenAt;
-
-            if (status !== 'seen' || !receipt?.userId) {
-              return {
-                ...target,
-                status,
-                deliveredAt,
-                seenAt: seenAtValue ?? target.seenAt,
-              };
-            }
-            const existing = Array.isArray(target.seenBy) ? target.seenBy : [];
-            const alreadyIndexed = existing.some((entry) => entry.userId === receipt.userId);
-            const mergedReceipts = alreadyIndexed ? existing : [...existing, receipt];
-            return {
-              ...target,
-              status,
-              deliveredAt,
-              seenAt: seenAtValue ?? target.seenAt,
-              seenBy: mergedReceipts,
-            };
-          };
-
-          if (messageId) {
-            if (msg.id === String(messageId)) {
-              return applyReceipt(msg);
-            }
+          const statusOrder = { sending: 0, sent: 1, delivered: 2, seen: 3 };
+          if (statusOrder[msg.status || 'sending'] >= statusOrder[status]) {
             return msg;
           }
-
-          if (msg.status !== 'seen') {
-            return applyReceipt(msg);
-          }
-
-          return msg;
+          hasChanges = true;
+          const deliveredAt = status === 'delivered' && timestamp ? timestamp : msg.deliveredAt;
+          const seenAtValue = status === 'seen' && timestamp ? timestamp : msg.seenAt;
+          const seenBy = status === 'seen' && receipt?.userId
+            ? [...(Array.isArray(msg.seenBy) ? msg.seenBy : []).filter((e) => e.userId !== receipt.userId), receipt]
+            : msg.seenBy;
+          return { ...msg, status, deliveredAt, seenAt: seenAtValue ?? msg.seenAt, seenBy };
         });
 
-        return next;
+        return hasChanges ? next : prev;
       });
     },
-    [currentUserId, setMessagesAnimated]
+    [currentUserId, setMessagesWithoutAnimation]
   );
 
   const applyAckToLatestMessage = useCallback(
@@ -2613,7 +2624,8 @@ const ChatScreen: React.FC = () => {
       const normalizePreview = (value: string) => value.trim().slice(0, 300);
       const incomingPreview = normalizePreview(previewText);
 
-      setMessagesAnimated((prev) => {
+      // Use setMessagesWithoutAnimation to avoid layout jumps when updating message ID
+      setMessagesWithoutAnimation((prev) => {
         const candidates = prev
           .map((msg, index) => ({ msg, index }))
           .filter(
@@ -2663,7 +2675,7 @@ const ChatScreen: React.FC = () => {
         return next;
       });
     },
-    [currentUserId, setMessagesAnimated]
+    [currentUserId, setMessagesWithoutAnimation]
   );
 
   const markChatAsSeen = useCallback(async () => {
@@ -6322,6 +6334,10 @@ const ChatScreen: React.FC = () => {
                 scrollEventThrottle={16}
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfigRef.current}
+                maintainVisibleContentPosition={{
+                  minIndexForVisible: 1,
+                  autoscrollToTopThreshold: 100,
+                }}
                 refreshControl={
                   <RefreshControl
                     tintColor="#2C82FF"
