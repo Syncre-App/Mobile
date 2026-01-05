@@ -2434,6 +2434,24 @@ const ChatScreen: React.FC = () => {
           ? rawBadges.map((entry: any) => String(entry))
           : senderProfile.badges || [];
         const seenBy = isSystem ? [] : mapServerReceipts((raw as any)?.seenBy);
+        
+        // Handle poll messages
+        const isPollMessage = (raw as any)?.isPoll || (raw as any)?.messageType === 'poll' || (raw as any)?.message_type === 'poll';
+        const pollData = (raw as any)?.poll;
+        const userVotes = (raw as any)?.userVotes;
+        
+        // Store poll data in pollsData state
+        if (isPollMessage && pollData) {
+          setPollsData((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(String(idValue), {
+              poll: pollData,
+              userVotes: userVotes || [],
+            });
+            return newMap;
+          });
+        }
+
         results.push({
           id: String(idValue),
           senderId: isSystem ? 'system' : String(senderId),
@@ -2459,6 +2477,9 @@ const ChatScreen: React.FC = () => {
           isPlaceholder: Boolean(isDeleted),
           seenBy,
           reactions,
+          // Poll data
+          isPoll: isPollMessage,
+          poll: pollData,
         });
       }
 
@@ -2726,6 +2747,29 @@ const ChatScreen: React.FC = () => {
           nextCursorRef.current = null;
           initialLoadCompleteRef.current = true;
           return;
+        }
+
+        // Extract poll data from raw messages before transforming
+        const pollUpdates = new Map<string, { poll: PollData; userVotes: number[] }>();
+        for (const raw of rawMessages) {
+          const isPollMsg = raw?.isPoll || raw?.messageType === 'poll' || raw?.message_type === 'poll';
+          if (isPollMsg && raw?.poll) {
+            const msgId = String(raw.id ?? `${chatIdentifier}-${raw.createdAt ?? raw.created_at ?? Date.now()}`);
+            pollUpdates.set(msgId, {
+              poll: raw.poll,
+              userVotes: raw.userVotes || [],
+            });
+          }
+        }
+        // Update polls state
+        if (pollUpdates.size > 0) {
+          setPollsData((prev) => {
+            const newMap = new Map(prev);
+            for (const [msgId, pollInfo] of pollUpdates) {
+              newMap.set(msgId, pollInfo);
+            }
+            return newMap;
+          });
         }
 
         const transformed = await transformMessages(rawMessages, otherUserId ?? null, token, {
@@ -4560,6 +4604,7 @@ const ChatScreen: React.FC = () => {
         attachments: attachmentIds,
         preview: previewText,
         expiresIn: ephemeralDuration,
+        senderTimestamp: ephemeralDuration ? new Date().toISOString() : undefined,
       });
 
     } catch (error) {
@@ -4632,14 +4677,45 @@ const ChatScreen: React.FC = () => {
 
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+      // Build E2EE encrypted payload for scheduled message
+      const otherParticipants = participantIdsRef.current
+        .filter((participantId) => participantId !== currentUserId)
+        .filter(Boolean);
+
+      const recipientIds =
+        otherParticipants.length > 0
+          ? otherParticipants
+          : otherUserIdRef.current
+            ? [otherUserIdRef.current]
+            : [];
+
+      // Get reply metadata if replying
+      const normalizedReply = replyContext ? resolveReplyMetadata(replyContext) : null;
+      const encodedPayload = encodeMessagePayload(trimmedMessage, normalizedReply);
+
+      // Encrypt the message
+      const encryptedPayload = await CryptoService.buildEncryptedPayloadWithBackup({
+        chatId,
+        message: encodedPayload,
+        recipientUserIds: recipientIds,
+        token,
+        currentUserId,
+      });
+
       const response = await ApiService.scheduleMessage(
         chatId,
         {
-          content: trimmedMessage,
+          content: trimmedMessage, // Plain text for preview only
           attachments: attachmentIds,
           replyTo: replyContext?.messageId ? Number(replyContext.messageId) : undefined,
           scheduledFor: scheduledFor.toISOString(),
           timezone,
+          // E2EE fields
+          isEncrypted: true,
+          envelopes: encryptedPayload.envelopes,
+          backupEnvelopes: encryptedPayload.backupEnvelopes,
+          senderDeviceId: encryptedPayload.senderDeviceId,
+          replyMetadata: normalizedReply,
         },
         token
       );
@@ -4656,7 +4732,7 @@ const ChatScreen: React.FC = () => {
       console.error('Error scheduling message:', error);
       NotificationService.show('error', 'Failed to schedule message');
     }
-  }, [chatId, currentUserId, newMessage, pendingAttachments, replyContext]);
+  }, [chatId, currentUserId, newMessage, pendingAttachments, replyContext, resolveReplyMetadata]);
 
   const handleCreatePoll = useCallback(async (data: { question: string; options: string[]; multiSelect: boolean }) => {
     if (!currentUserId || !chatId) {

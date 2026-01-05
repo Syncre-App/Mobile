@@ -124,7 +124,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [pickerSeed, setPickerSeed] = useState(0);
-  const [activeQuickOption, setActiveQuickOption] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -133,7 +132,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
       date.setSeconds(0);
       date.setMilliseconds(0);
       setSelectedDate(date);
-      setActiveQuickOption('30 min');
       setPickerSeed((seed) => seed + 1);
     }
   }, [visible]);
@@ -145,7 +143,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
     }
     if (date) {
       setSelectedDate(date);
-      setActiveQuickOption(null);
     }
   };
 
@@ -160,35 +157,11 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   const openDatePicker = () => {
     setPickerMode('date');
     setShowDatePicker(true);
-    setActiveQuickOption(null);
   };
 
   const openTimePicker = () => {
     setPickerMode('time');
     setShowTimePicker(true);
-    setActiveQuickOption(null);
-  };
-
-  const quickScheduleOptions = [
-    { label: '30 min', minutes: 30 },
-    { label: '1 hour', minutes: 60 },
-    { label: '3 hours', minutes: 180 },
-    { label: 'Tomorrow morning', preset: 'tomorrow_morning' },
-  ];
-
-  const handleQuickSchedule = (option: typeof quickScheduleOptions[0]) => {
-    const date = new Date();
-    if (option.preset === 'tomorrow_morning') {
-      date.setDate(date.getDate() + 1);
-      date.setHours(9, 0, 0, 0);
-    } else if (option.minutes) {
-      date.setMinutes(date.getMinutes() + option.minutes);
-    }
-    date.setSeconds(0);
-    date.setMilliseconds(0);
-    setSelectedDate(date);
-    setPickerSeed((seed) => seed + 1);
-    setActiveQuickOption(option.label);
   };
 
   const isValidDate = selectedDate > new Date();
@@ -224,24 +197,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
           <Text style={styles.summaryText}>
             Scheduled for {formatDate(selectedDate)} at {formatTime(selectedDate)}
           </Text>
-        </View>
-
-        <Text style={styles.sectionLabel}>Quick picks</Text>
-        <View style={styles.quickOptions}>
-          {quickScheduleOptions.map((option) => {
-            const isActive = activeQuickOption === option.label;
-            return (
-              <Pressable
-                key={option.label}
-                style={[styles.quickOption, isActive && styles.quickOptionActive]}
-                onPress={() => handleQuickSchedule(option)}
-              >
-                <Text style={[styles.quickOptionText, isActive && styles.quickOptionTextActive]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
         </View>
 
         <Text style={styles.sectionLabel}>Custom time</Text>
@@ -407,59 +362,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
               </SwiftUIText>
             </SwiftUIHStack>
 
-            {/* Quick picks */}
-            <SwiftUIVStack alignment="leading" spacing={8}>
-              <SwiftUIText size={13} weight="medium" color={palette.textMuted}>
-                Quick picks
-              </SwiftUIText>
-              <SwiftUIHStack spacing={8}>
-                {quickScheduleOptions.slice(0, 3).map((option) => {
-                  const isActive = activeQuickOption === option.label;
-                  return (
-                    <SwiftUIHStack
-                      key={option.label}
-                      alignment="center"
-                      modifiers={[
-                        swiftUIPadding({ horizontal: 14, vertical: 10 }),
-                        swiftUIBackground(
-                          isActive ? 'rgba(10, 132, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)'
-                        ),
-                        swiftUICornerRadius(20),
-                        swiftUIOnTapGesture(() => handleQuickSchedule(option)),
-                      ]}
-                    >
-                      <SwiftUIText size={14} weight={isActive ? 'semibold' : 'medium'} color={palette.text}>
-                        {option.label}
-                      </SwiftUIText>
-                    </SwiftUIHStack>
-                  );
-                })}
-              </SwiftUIHStack>
-              <SwiftUIHStack spacing={8}>
-                {quickScheduleOptions.slice(3).map((option) => {
-                  const isActive = activeQuickOption === option.label;
-                  return (
-                    <SwiftUIHStack
-                      key={option.label}
-                      alignment="center"
-                      modifiers={[
-                        swiftUIPadding({ horizontal: 14, vertical: 10 }),
-                        swiftUIBackground(
-                          isActive ? 'rgba(10, 132, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)'
-                        ),
-                        swiftUICornerRadius(20),
-                        swiftUIOnTapGesture(() => handleQuickSchedule(option)),
-                      ]}
-                    >
-                      <SwiftUIText size={14} weight={isActive ? 'semibold' : 'medium'} color={palette.text}>
-                        {option.label}
-                      </SwiftUIText>
-                    </SwiftUIHStack>
-                  );
-                })}
-              </SwiftUIHStack>
-            </SwiftUIVStack>
-
             {/* Date picker */}
             <SwiftUIVStack alignment="leading" spacing={8}>
               <SwiftUIText size={13} weight="medium" color={palette.textMuted}>
@@ -474,7 +376,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                     const newDate = new Date(selectedDate);
                     newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
                     setSelectedDate(newDate);
-                    setActiveQuickOption(null);
                   }}
                   color={palette.accent}
                 />
@@ -486,7 +387,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                     const newDate = new Date(selectedDate);
                     newDate.setHours(date.getHours(), date.getMinutes());
                     setSelectedDate(newDate);
-                    setActiveQuickOption(null);
                   }}
                   color={palette.accent}
                 />
@@ -649,32 +549,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  quickOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  quickOption: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  quickOptionActive: {
-    backgroundColor: 'rgba(10, 132, 255, 0.22)',
-    borderColor: 'rgba(10, 132, 255, 0.55)',
-  },
-  quickOptionText: {
-    color: palette.text,
-    fontSize: 13,
-  },
-  quickOptionTextActive: {
-    color: palette.text,
-    ...font('semibold'),
   },
   dateTimeRow: {
     flexDirection: 'row',

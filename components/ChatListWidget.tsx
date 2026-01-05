@@ -665,10 +665,24 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   // Tab bar height (approximate) + extra spacing for safe scrolling
   const TAB_BAR_HEIGHT = 140;
   const bottomPadding = insets.bottom + TAB_BAR_HEIGHT + spacing.xxl;
+  const flatListRef = useRef<FlatList>(null);
+
+  // Reset scroll position when navigating back to this screen
+  useEffect(() => {
+    // Scroll to top when chats data changes and has items
+    if (chats.length > 0 && flatListRef.current) {
+      // Small delay to ensure the list has rendered
+      const timeoutId = setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }, 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [chats.length]);
 
   return (
     <View style={styles.container}>
       <FlatList
+        ref={flatListRef}
         data={chats}
         keyExtractor={(item) => `chat-${item.id}`}
         renderItem={renderChatItem}
@@ -685,6 +699,10 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         contentContainerStyle={[styles.listContainer, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        removeClippedSubviews={false}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={21}
       />
 
       <ProfileCard
