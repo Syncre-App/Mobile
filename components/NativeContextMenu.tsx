@@ -88,7 +88,7 @@ export const NativeContextMenu: React.FC<NativeContextMenuProps> = ({
 
     return (
       <View style={style}>
-        <Host matchContents>
+        <Host>
           <ContextMenu activationMethod={activationMethod}>
             <ContextMenu.Items>
               {actions.map((action, index) => (

@@ -275,25 +275,31 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
 
   const getChatDisplayName = (chat: Chat): string => {
     if (!currentUserId) return 'Loading...';
-    
+
     const otherUserId = getOtherUserId(chat);
     if (!otherUserId) return 'Unknown User';
 
     // First try to get user from chat.participants (already hydrated by backend)
     const participantUser = chat.participants?.find(p => {
       const pId = String(p.id);
-      return pId === otherUserId || 
+      return pId === otherUserId ||
              pId.replace(/^0+/, '') === otherUserId.replace(/^0+/, '');
     });
-    
+
     if (participantUser) {
-      return participantUser.username || 'Loading...';
+      const username = participantUser.username?.trim();
+      if (username && username.length > 0) return username;
+      const email = participantUser.email?.trim();
+      if (email && email.length > 0) return email;
     }
 
     // Fallback to userDetails state
     const user = userDetails[otherUserId];
     if (user) {
-      return user.username || user.email || 'Loading...';
+      const username = user.username?.trim();
+      if (username && username.length > 0) return username;
+      const email = user.email?.trim();
+      if (email && email.length > 0) return email;
     }
 
     return 'Loading...';
@@ -533,7 +539,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         <View style={styles.chatContent}>
           <View style={styles.chatTitleRow}>
             <Text style={styles.chatName} numberOfLines={1}>
-              {displayName}
+              {displayName || 'Unknown'}
             </Text>
             {userBadges.length > 0 && (
               <View style={styles.badgeContainer}>
@@ -657,8 +663,8 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   );
 
   // Tab bar height (approximate) + extra spacing for safe scrolling
-  const TAB_BAR_HEIGHT = 100;
-  const bottomPadding = insets.bottom + TAB_BAR_HEIGHT + spacing.xl;
+  const TAB_BAR_HEIGHT = 140;
+  const bottomPadding = insets.bottom + TAB_BAR_HEIGHT + spacing.xxl;
 
   return (
     <View style={styles.container}>
@@ -761,12 +767,14 @@ const styles = StyleSheet.create({
     ...font('semibold'),
     marginBottom: 2,
     flexShrink: 1,
+    minWidth: 40,
   },
   badgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginLeft: 1,
+    flexShrink: 0,
   },
   badgeWrapper: {
     shadowColor: '#ffffff',
