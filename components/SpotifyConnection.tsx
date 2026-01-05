@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -86,6 +87,44 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
     return () => clearInterval(interval);
   }, [fetchStatus, isConnected]);
 
+  // Handle deep link callback for Android
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const handleDeepLink = (event: { url: string }) => {
+      console.log('[Spotify] Deep link received:', event.url);
+      if (event.url.includes('spotify/callback')) {
+        const parsed = Linking.parse(event.url);
+        const params = parsed?.queryParams || {};
+        const success = params.success === 'true' || params.success === '1';
+        
+        if (success) {
+          console.log('[Spotify] Callback success via deep link');
+          fetchStatus();
+          router.replace({
+            pathname: '/spotify/callback',
+            params: {
+              success: 'true',
+              error: '',
+              userId: params.userId ? String(params.userId) : '',
+            },
+          } as any);
+        }
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    
+    // Check if app was opened with a URL
+    Linking.getInitialURL().then((url) => {
+      if (url && url.includes('spotify/callback')) {
+        handleDeepLink({ url });
+      }
+    });
+
+    return () => subscription.remove();
+  }, [fetchStatus, router]);
+
   const handleConnect = useCallback(async () => {
     setIsConnecting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -98,12 +137,29 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
 
       const response = await ApiService.getSpotifyAuthUrl(token);
       if (response.success && response.data?.url) {
-        const redirectUrl = Linking.createURL('spotify/callback');
+        // Use the scheme directly for Android compatibility
+        const redirectUrl = Platform.select({
+          ios: Linking.createURL('spotify/callback'),
+          android: 'syncre://spotify/callback',
+          default: Linking.createURL('spotify/callback'),
+        });
+        
+        console.log('[Spotify] Opening auth session with redirect:', redirectUrl);
+        
         const result = await WebBrowser.openAuthSessionAsync(
           response.data.url,
-          redirectUrl
+          redirectUrl,
+          {
+            showInRecents: true,
+            // Android specific: prefer external browser for OAuth
+            preferEphemeralSession: Platform.OS === 'android',
+          }
         );
+        
+        console.log('[Spotify] Auth session result:', result.type);
+        
         if (result.type === 'success' && result.url) {
+          console.log('[Spotify] Success URL:', result.url);
           const parsed = Linking.parse(result.url);
           const params = parsed?.queryParams || {};
           const success = params.success === 'true' || params.success === '1';
@@ -118,6 +174,15 @@ export const SpotifyConnection: React.FC<SpotifyConnectionProps> = ({
             },
           } as any);
           fetchStatus();
+        } else if (result.type === 'cancel') {
+          console.log('[Spotify] Auth cancelled by user');
+        } else if (result.type === 'dismiss') {
+          // On Android, dismiss can mean the redirect happened
+          console.log('[Spotify] Auth dismissed, checking status...');
+          // Give it a moment then check status
+          setTimeout(() => {
+            fetchStatus();
+          }, 1000);
         }
       } else {
         throw new Error('Failed to get authorization URL');
