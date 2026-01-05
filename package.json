@@ -1,7 +1,7 @@
 {
   "name": "syncre",
   "main": "expo-router/entry",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "scripts": {
     "start": "EXPO_USE_FAST_RESOLVER=1 RCT_NO_LAUNCH_PACKAGER=1 expo start",
     "android": "expo run:android",
