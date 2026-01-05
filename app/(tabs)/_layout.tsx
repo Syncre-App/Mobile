@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { NativeTabs, Icon, Label, Badge } from 'expo-router/unstable-native-tabs';
+import { NativeTabs, Icon, Label, Badge, VectorIcon } from 'expo-router/unstable-native-tabs';
 import { Platform } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Notifications from 'expo-notifications';
 import { ApiService } from '../../services/ApiService';
 import { StorageService } from '../../services/StorageService';
@@ -497,28 +498,28 @@ export default function TabLayout() {
         disableTransparentOnScrollEdge
       >
         <NativeTabs.Trigger name="index">
-          <Icon 
-            sf={{ default: 'message', selected: 'message.fill' }} 
-            androidSrc={require('../../assets/logo.png')}
-          />
+          {Platform.select({
+            ios: <Icon sf={{ default: 'message', selected: 'message.fill' }} />,
+            android: <Icon src={<VectorIcon family={MaterialCommunityIcons} name="message-text" />} />,
+          })}
           <Label>Chats</Label>
           {unreadBadge && <Badge>{unreadBadge}</Badge>}
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="friends">
-          <Icon 
-            sf={{ default: 'person.2', selected: 'person.2.fill' }} 
-            androidSrc={require('../../assets/logo.png')}
-          />
+          {Platform.select({
+            ios: <Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />,
+            android: <Icon src={<VectorIcon family={MaterialCommunityIcons} name="account-group" />} />,
+          })}
           <Label>Friends</Label>
           {friendRequestsBadge && <Badge>{friendRequestsBadge}</Badge>}
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="profile">
-          <Icon 
-            sf={{ default: 'person.circle', selected: 'person.circle.fill' }} 
-            androidSrc={require('../../assets/logo.png')}
-          />
+          {Platform.select({
+            ios: <Icon sf={{ default: 'person.circle', selected: 'person.circle.fill' }} />,
+            android: <Icon src={<VectorIcon family={MaterialCommunityIcons} name="account-circle" />} />,
+          })}
           <Label>Profile</Label>
         </NativeTabs.Trigger>
       </NativeTabs>
