@@ -79,7 +79,7 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleCommunityGuidelines = () => {
-    Linking.openURL('https://syncre.app/terms');
+    Linking.openURL('https://syncre.xyz/terms');
   };
 
   const handleLanguagePress = () => {
