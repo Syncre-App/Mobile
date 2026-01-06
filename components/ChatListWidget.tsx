@@ -527,7 +527,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const streakCount = chatStreak?.currentStreak || 0;
 
     const chatCardContent = (
-      <View style={[styles.chatCard, hasUnread && styles.chatCardUnread]}>
+      <View style={styles.chatCard}>
         <UserAvatar
           uri={avatarUri}
           name={displayName}
@@ -554,11 +554,13 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
                 ))}
               </View>
             )}
+{/* Unread badge temporarily hidden
             {hasUnread && (
               <View style={styles.chatUnreadPill}>
                 <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
               </View>
             )}
+*/}
             {streakCount > 0 && (
               <View style={styles.streakBadge}>
                 <Text style={styles.streakText}>{streakCount}</Text>
