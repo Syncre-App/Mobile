@@ -4664,7 +4664,11 @@ const ChatScreen: React.FC = () => {
     scrollToMessageById(target);
   }, [scrollToMessageById, threadRootId]);
 
-  const handleScheduleMessage = useCallback(async (scheduledFor: Date) => {
+  const handleScheduleMessage = useCallback(async (scheduledFor: Date | null) => {
+    if (!scheduledFor) {
+      // User selected "Off" - just close the sheet
+      return;
+    }
     if (!currentUserId || !chatId) {
       return;
     }
@@ -6574,7 +6578,6 @@ const ChatScreen: React.FC = () => {
         visible={showScheduleSheet}
         onClose={() => setShowScheduleSheet(false)}
         onSchedule={handleScheduleMessage}
-        messagePreview={newMessage.trim() || undefined}
       />
       <CreatePollSheet
         visible={showPollSheet}
