@@ -281,8 +281,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   voterAvatar: {
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.5)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0)',
   },
   voteCount: {
     color: palette.textMuted,
