@@ -54,47 +54,50 @@ if (Platform.OS === 'ios') {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+export type ScheduleOption = '30m' | '1h' | '3h' | 'tomorrow' | 'custom' | null;
+
 interface ScheduleMessageSheetProps {
   visible: boolean;
   onClose: () => void;
-  onSchedule: (scheduledFor: Date) => void;
-  messagePreview?: string;
+  onSchedule: (scheduledFor: Date | null) => void;
 }
 
-const formatDate = (date: Date): string => {
+const getScheduleDate = (option: ScheduleOption, customDate?: Date): Date | null => {
+  if (option === null) return null;
+  if (option === 'custom' && customDate) return customDate;
+
   const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const isToday = date.toDateString() === now.toDateString();
-  const isTomorrow = date.toDateString() === tomorrow.toDateString();
-
-  if (isToday) {
-    return 'Today';
+  switch (option) {
+    case '30m':
+      return new Date(now.getTime() + 30 * 60 * 1000);
+    case '1h':
+      return new Date(now.getTime() + 60 * 60 * 1000);
+    case '3h':
+      return new Date(now.getTime() + 3 * 60 * 60 * 1000);
+    case 'tomorrow': {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(9, 0, 0, 0);
+      return tomorrow;
+    }
+    default:
+      return null;
   }
-  if (isTomorrow) {
-    return 'Tomorrow';
-  }
-
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    weekday: 'short',
-  });
 };
 
-const formatTime = (date: Date): string => {
-  return date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+const SCHEDULE_OPTIONS: { value: ScheduleOption; label: string; description: string }[] = [
+  { value: null, label: 'Off', description: 'Send immediately' },
+  { value: '30m', label: 'In 30 minutes', description: 'Send in half an hour' },
+  { value: '1h', label: 'In 1 hour', description: 'Send in one hour' },
+  { value: '3h', label: 'In 3 hours', description: 'Send in three hours' },
+  { value: 'tomorrow', label: 'Tomorrow morning', description: 'Send at 9:00 AM' },
+  { value: 'custom', label: 'Custom time', description: 'Pick a specific date and time' },
+];
 
 export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   visible,
   onClose,
   onSchedule,
-  messagePreview,
 }) => {
   const shouldUseSwiftUI = canUseSwiftUI();
   const canRenderSwiftUI =
@@ -113,166 +116,140 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
     swiftUIPadding &&
     swiftUIFrame &&
     swiftUIOnTapGesture;
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+
+  const [selectedOption, setSelectedOption] = useState<ScheduleOption>(null);
+  const [customDate, setCustomDate] = useState<Date>(() => {
     const date = new Date();
-    date.setMinutes(date.getMinutes() + 30);
+    date.setHours(date.getHours() + 1);
+    date.setMinutes(0);
     date.setSeconds(0);
-    date.setMilliseconds(0);
     return date;
   });
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
-  const [pickerSeed, setPickerSeed] = useState(0);
 
   useEffect(() => {
     if (visible) {
+      setSelectedOption(null);
+      setShowCustomPicker(false);
       const date = new Date();
-      date.setMinutes(date.getMinutes() + 30);
+      date.setHours(date.getHours() + 1);
+      date.setMinutes(0);
       date.setSeconds(0);
-      date.setMilliseconds(0);
-      setSelectedDate(date);
-      setPickerSeed((seed) => seed + 1);
+      setCustomDate(date);
     }
   }, [visible]);
 
-  const handleDateChange = (_event: any, date?: Date) => {
+  const handleSelectOption = (option: ScheduleOption) => {
+    setSelectedOption(option);
+    if (option === 'custom') {
+      setShowCustomPicker(true);
+    } else {
+      setShowCustomPicker(false);
+      const scheduledDate = getScheduleDate(option);
+      onSchedule(scheduledDate);
+      onClose();
+    }
+  };
+
+  const handleCustomDateChange = (_event: any, date?: Date) => {
     if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-      setShowTimePicker(false);
+      if (pickerMode === 'date') {
+        setPickerMode('time');
+      } else {
+        setShowCustomPicker(false);
+      }
     }
     if (date) {
-      setSelectedDate(date);
+      setCustomDate(date);
     }
   };
 
-  const handleConfirm = () => {
-    if (selectedDate <= new Date()) {
-      return;
+  const handleConfirmCustom = () => {
+    if (customDate > new Date()) {
+      onSchedule(customDate);
+      onClose();
     }
-    onSchedule(selectedDate);
-    onClose();
   };
 
-  const openDatePicker = () => {
-    setPickerMode('date');
-    setShowDatePicker(true);
-  };
-
-  const openTimePicker = () => {
-    setPickerMode('time');
-    setShowTimePicker(true);
-  };
-
-  const isValidDate = selectedDate > new Date();
+  const isCustomDateValid = customDate > new Date();
 
   const SheetContent = () => (
     <View style={styles.cardContainer}>
-      <View style={styles.content}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.header}>
+      <View style={styles.modalContent}>
+        <View style={styles.modalHeader}>
           <View style={styles.headerIcon}>
-            <Ionicons name="calendar-outline" size={18} color={palette.accent} />
+            <Ionicons name="time-outline" size={18} color={palette.accent} />
           </View>
           <View style={styles.headerText}>
-            <Text style={styles.title}>Schedule message</Text>
-            <Text style={styles.subtitle}>Send it later without leaving the chat</Text>
+            <Text style={styles.modalTitle}>Schedule Message</Text>
+            <Text style={styles.modalSubtitle}>
+              Choose when to send this message
+            </Text>
           </View>
           <Pressable onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={20} color={palette.textMuted} />
           </Pressable>
         </View>
 
-        {messagePreview ? (
-          <View style={styles.previewContainer}>
-            <Text style={styles.previewLabel}>Message:</Text>
-            <Text style={styles.previewText} numberOfLines={2}>
-              {messagePreview}
-            </Text>
-          </View>
-        ) : null}
-
-        <View style={styles.summaryRow}>
-          <Ionicons name="time-outline" size={16} color={palette.textMuted} />
-          <Text style={styles.summaryText}>
-            Scheduled for {formatDate(selectedDate)} at {formatTime(selectedDate)}
-          </Text>
+        <View style={styles.optionsList}>
+          {SCHEDULE_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value ?? 'off'}
+              style={[
+                styles.optionItem,
+                selectedOption === option.value && styles.optionItemSelected,
+              ]}
+              onPress={() => handleSelectOption(option.value)}
+            >
+              <View style={styles.optionContent}>
+                <Text style={styles.optionLabel}>{option.label}</Text>
+                <Text style={styles.optionDescription}>{option.description}</Text>
+              </View>
+              {selectedOption === option.value && (
+                <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
+              )}
+            </Pressable>
+          ))}
         </View>
 
-        <Text style={styles.sectionLabel}>Custom time</Text>
-
-        <View style={styles.dateTimeRow}>
-          <Pressable
-            style={[styles.dateTimeButton, showDatePicker && styles.dateTimeButtonActive]}
-            onPress={openDatePicker}
-          >
-            <Ionicons name="calendar" size={18} color={palette.accent} />
-            <Text style={styles.dateTimeText}>{formatDate(selectedDate)}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.dateTimeButton, showTimePicker && styles.dateTimeButtonActive]}
-            onPress={openTimePicker}
-          >
-            <Ionicons name="time" size={18} color={palette.accent} />
-            <Text style={styles.dateTimeText}>{formatTime(selectedDate)}</Text>
-          </Pressable>
-        </View>
-
-        {(showDatePicker || showTimePicker) && Platform.OS === 'ios' && (
-          <View style={styles.pickerContainer}>
+        {showCustomPicker && Platform.OS === 'ios' && (
+          <View style={styles.customPickerContainer}>
             <DateTimePicker
-              value={selectedDate}
-              mode={pickerMode}
+              value={customDate}
+              mode="datetime"
               display="spinner"
-              onChange={handleDateChange}
+              onChange={handleCustomDateChange}
               minimumDate={new Date()}
-              locale="en-US"
               textColor={palette.text}
             />
+            <View style={styles.customPickerActions}>
+              {!isCustomDateValid && (
+                <Text style={styles.errorText}>Select a future time</Text>
+              )}
+              <Pressable
+                style={[
+                  styles.confirmButton,
+                  !isCustomDateValid && styles.confirmButtonDisabled,
+                ]}
+                onPress={handleConfirmCustom}
+                disabled={!isCustomDateValid}
+              >
+                <Ionicons name="checkmark" size={18} color="#ffffff" />
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              </Pressable>
+            </View>
           </View>
         )}
 
-        {showDatePicker && Platform.OS === 'android' && (
+        {showCustomPicker && Platform.OS === 'android' && (
           <DateTimePicker
-            value={selectedDate}
-            mode="date"
+            value={customDate}
+            mode={pickerMode}
             display="default"
-            onChange={handleDateChange}
+            onChange={handleCustomDateChange}
             minimumDate={new Date()}
           />
-        )}
-
-        {showTimePicker && Platform.OS === 'android' && (
-          <DateTimePicker
-            value={selectedDate}
-            mode="time"
-            display="default"
-            onChange={handleDateChange}
-            is24Hour
-          />
-        )}
-
-        <View style={styles.footer}>
-          <Pressable style={styles.cancelButton} onPress={onClose}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.scheduleButton,
-              !isValidDate && styles.scheduleButtonDisabled,
-            ]}
-            onPress={handleConfirm}
-            disabled={!isValidDate}
-          >
-            <Ionicons name="send" size={16} color="#ffffff" />
-            <Text style={styles.scheduleButtonText}>Schedule</Text>
-          </Pressable>
-        </View>
-
-        {!isValidDate && (
-          <Text style={styles.errorText}>
-            Time must be in the future
-          </Text>
         )}
       </View>
     </View>
@@ -294,28 +271,31 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
           presentationDragIndicator="visible"
         >
           <SwiftUIVStack
-            key={`schedule-sheet-${pickerSeed}`}
             alignment="center"
-            spacing={16}
+            spacing={12}
             modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
           >
             {/* Header */}
             <SwiftUIHStack alignment="center" spacing={12}>
               <SwiftUIVStack
                 modifiers={[
-                  swiftUIFrame({ width: 40, height: 40 }),
+                  swiftUIFrame({ width: 36, height: 36 }),
                   swiftUIBackground('rgba(10, 132, 255, 0.18)'),
-                  swiftUICornerRadius(20),
+                  swiftUICornerRadius(18),
                 ]}
               >
-                <SwiftUIImage systemName="calendar.badge.clock" size={18} color={palette.accent} />
+                <SwiftUIImage systemName="clock" size={16} color={palette.accent} />
               </SwiftUIVStack>
-              <SwiftUIVStack alignment="leading" spacing={2}>
-                <SwiftUIText size={18} weight="semibold" color={palette.text}>
-                  Schedule message
+              <SwiftUIVStack
+                alignment="leading"
+                spacing={2}
+                modifiers={[swiftUIFrame({ maxWidth: 220, alignment: 'leading' })]}
+              >
+                <SwiftUIText size={17} weight="semibold" color={palette.text}>
+                  Schedule Message
                 </SwiftUIText>
-                <SwiftUIText size={13} color={palette.textMuted}>
-                  Send it later without leaving the chat
+                <SwiftUIText size={12} color={palette.textMuted}>
+                  Choose when to send this message
                 </SwiftUIText>
               </SwiftUIVStack>
               <SwiftUISpacer />
@@ -323,100 +303,96 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                 systemImage="xmark"
                 onPress={onClose}
                 variant="plain"
+                modifiers={[swiftUIFrame({ width: 30, height: 30 })]}
               />
             </SwiftUIHStack>
 
-            {messagePreview ? (
-              <SwiftUIVStack
-                alignment="leading"
-                spacing={4}
-                modifiers={[
-                  swiftUIPadding({ horizontal: 14, vertical: 12 }),
-                  swiftUIBackground('rgba(255, 255, 255, 0.06)'),
-                  swiftUICornerRadius(12),
-                  swiftUIFrame({ maxWidth: 340, alignment: 'leading' }),
-                ]}
-              >
-                <SwiftUIText size={12} weight="medium" color={palette.textMuted}>
-                  Message
-                </SwiftUIText>
-                <SwiftUIText size={14} color={palette.text} lineLimit={2}>
-                  {messagePreview}
-                </SwiftUIText>
-              </SwiftUIVStack>
-            ) : null}
+            {/* Options */}
+            <SwiftUIVStack alignment="leading" spacing={6}>
+              {SCHEDULE_OPTIONS.filter((o) => o.value !== 'custom').map((option) => {
+                const isSelected = selectedOption === option.value;
+                return (
+                  <SwiftUIHStack
+                    key={option.value ?? 'off'}
+                    alignment="center"
+                    spacing={12}
+                    modifiers={[
+                      swiftUIPadding({ horizontal: 14, vertical: 12 }),
+                      swiftUIBackground(
+                        isSelected ? 'rgba(10, 132, 255, 0.25)' : 'rgba(255, 255, 255, 0.06)'
+                      ),
+                      swiftUICornerRadius(12),
+                      swiftUIFrame({ maxWidth: 380 }),
+                      swiftUIOnTapGesture(() => handleSelectOption(option.value)),
+                    ]}
+                  >
+                    <SwiftUIVStack
+                      alignment="leading"
+                      spacing={2}
+                      modifiers={[swiftUIFrame({ maxWidth: 280, alignment: 'leading' })]}
+                    >
+                      <SwiftUIText size={16} weight="medium" color={palette.text}>
+                        {option.label}
+                      </SwiftUIText>
+                      <SwiftUIText size={13} color={palette.textMuted}>
+                        {option.description}
+                      </SwiftUIText>
+                    </SwiftUIVStack>
+                    <SwiftUISpacer />
+                    {isSelected ? (
+                      <SwiftUIImage
+                        systemName="checkmark.circle.fill"
+                        size={22}
+                        color={palette.accent}
+                      />
+                    ) : null}
+                  </SwiftUIHStack>
+                );
+              })}
+            </SwiftUIVStack>
 
-            {/* Scheduled time display */}
-            <SwiftUIHStack
-              alignment="center"
-              spacing={10}
-              modifiers={[
-                swiftUIPadding({ horizontal: 16, vertical: 12 }),
-                swiftUIBackground('rgba(10, 132, 255, 0.12)'),
-                swiftUICornerRadius(12),
-              ]}
-            >
-              <SwiftUIImage systemName="clock.fill" size={16} color={palette.accent} />
-              <SwiftUIText size={14} weight="medium" color={palette.text}>
-                {formatDate(selectedDate)} at {formatTime(selectedDate)}
-              </SwiftUIText>
-            </SwiftUIHStack>
-
-            {/* Date picker */}
+            {/* Custom time picker */}
             <SwiftUIVStack alignment="leading" spacing={8}>
               <SwiftUIText size={13} weight="medium" color={palette.textMuted}>
-                Custom time
+                Or pick a custom time
               </SwiftUIText>
               <SwiftUIHStack spacing={10}>
                 <SwiftUIDateTimePicker
-                  initialDate={selectedDate.toISOString()}
+                  initialDate={customDate.toISOString()}
                   displayedComponents="date"
                   variant="compact"
                   onDateSelected={(date: Date) => {
-                    const newDate = new Date(selectedDate);
+                    const newDate = new Date(customDate);
                     newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
-                    setSelectedDate(newDate);
+                    setCustomDate(newDate);
+                    setSelectedOption('custom');
                   }}
                   color={palette.accent}
                 />
                 <SwiftUIDateTimePicker
-                  initialDate={selectedDate.toISOString()}
+                  initialDate={customDate.toISOString()}
                   displayedComponents="hourAndMinute"
                   variant="compact"
                   onDateSelected={(date: Date) => {
-                    const newDate = new Date(selectedDate);
+                    const newDate = new Date(customDate);
                     newDate.setHours(date.getHours(), date.getMinutes());
-                    setSelectedDate(newDate);
+                    setCustomDate(newDate);
+                    setSelectedOption('custom');
                   }}
                   color={palette.accent}
                 />
               </SwiftUIHStack>
+              {selectedOption === 'custom' && (
+                <SwiftUIButton
+                  systemImage="checkmark"
+                  onPress={handleConfirmCustom}
+                  disabled={!isCustomDateValid}
+                  variant="borderedProminent"
+                >
+                  Schedule for custom time
+                </SwiftUIButton>
+              )}
             </SwiftUIVStack>
-
-            {/* Error message */}
-            {!isValidDate ? (
-              <SwiftUIHStack alignment="center" spacing={6}>
-                <SwiftUIImage systemName="exclamationmark.triangle.fill" size={14} color="#EF4444" />
-                <SwiftUIText size={13} color="#EF4444">
-                  Please select a time in the future
-                </SwiftUIText>
-              </SwiftUIHStack>
-            ) : null}
-
-            {/* Footer buttons */}
-            <SwiftUIHStack spacing={12}>
-              <SwiftUIButton onPress={onClose} variant="bordered">
-                Cancel
-              </SwiftUIButton>
-              <SwiftUIButton
-                systemImage="paperplane.fill"
-                onPress={handleConfirm}
-                disabled={!isValidDate}
-                variant="borderedProminent"
-              >
-                Schedule
-              </SwiftUIButton>
-            </SwiftUIHStack>
           </SwiftUIVStack>
         </SwiftUIBottomSheet>
       </SwiftUIHost>
@@ -448,10 +424,6 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: 0,
   },
-  sheetContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(3, 7, 18, 0.65)',
@@ -461,7 +433,7 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     width: '100%',
-    maxWidth: 440,
+    maxWidth: 420,
     alignSelf: 'center',
     backgroundColor: 'rgba(15, 23, 42, 0.9)',
     borderRadius: radii.xl,
@@ -469,18 +441,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
     overflow: 'hidden',
   },
-  content: {
+  modalContent: {
     padding: spacing.lg,
   },
-  sheetHandle: {
-    width: 42,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignSelf: 'center',
-    marginBottom: spacing.md,
-  },
-  header: {
+  modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -497,122 +461,75 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
   },
-  title: {
+  closeButton: {
+    padding: spacing.xs,
+    marginLeft: 'auto',
+  },
+  modalTitle: {
     color: palette.text,
     fontSize: 18,
     ...font('semibold'),
   },
-  subtitle: {
+  modalSubtitle: {
     color: palette.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
-  closeButton: {
-    padding: spacing.xs,
-  },
-  previewContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    padding: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  previewLabel: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  previewText: {
-    color: palette.text,
-    fontSize: 14,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: 'rgba(10, 132, 255, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(10, 132, 255, 0.35)',
-    borderRadius: radii.md,
-    padding: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  summaryText: {
-    color: palette.text,
-    fontSize: 13,
-    ...font('medium'),
-  },
-  sectionLabel: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  dateTimeRow: {
-    flexDirection: 'row',
+  optionsList: {
     gap: spacing.sm,
-    marginBottom: spacing.md,
   },
-  dateTimeButton: {
-    flex: 1,
+  optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    justifyContent: 'space-between',
+    padding: spacing.md,
     borderRadius: radii.md,
-    paddingVertical: spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
-  dateTimeButtonActive: {
-    backgroundColor: 'rgba(10, 132, 255, 0.16)',
-    borderColor: 'rgba(10, 132, 255, 0.45)',
+  optionItemSelected: {
+    backgroundColor: 'rgba(10, 132, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(10, 132, 255, 0.4)',
   },
-  dateTimeText: {
+  optionContent: {
+    flex: 1,
+  },
+  optionLabel: {
     color: palette.text,
-    fontSize: 14,
+    fontSize: 15,
     ...font('medium'),
   },
-  pickerContainer: {
-    marginBottom: spacing.md,
+  optionDescription: {
+    color: palette.textMuted,
+    fontSize: 12,
+    marginTop: 2,
   },
-  footer: {
+  customPickerContainer: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  customPickerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
-  cancelButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  cancelButtonText: {
-    color: palette.textMuted,
-    fontSize: 14,
-    ...font('medium'),
-  },
-  scheduleButton: {
-    flex: 1,
+  confirmButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.xs,
+    backgroundColor: palette.accent,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
-    backgroundColor: palette.accent,
   },
-  scheduleButtonDisabled: {
+  confirmButtonDisabled: {
     opacity: 0.5,
   },
-  scheduleButtonText: {
+  confirmButtonText: {
     color: '#ffffff',
     fontSize: 14,
     ...font('semibold'),
@@ -620,8 +537,6 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#EF4444',
     fontSize: 12,
-    textAlign: 'center',
-    marginTop: spacing.xs,
   },
 });
 

@@ -13,8 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserAvatar } from './UserAvatar';
-import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassySheet } from './GlassySheet';
+import { font, radii, spacing } from '../theme/designSystem';
 import { canUseSwiftUI } from '../utils/swiftUi';
 
 // SwiftUI imports for iOS
@@ -275,7 +274,7 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native BottomSheet
+  // iOS: Native BottomSheet (without GlassySheet to avoid nested SwiftUI)
   // ═══════════════════════════════════════════════════════════════
   if (shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost) {
     return (
@@ -290,9 +289,9 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
           presentationDetents={['medium', 'large']}
           presentationDragIndicator="visible"
         >
-          <GlassySheet>
+          <View style={styles.nativeSheetContainer}>
             <SheetContent />
-          </GlassySheet>
+          </View>
         </SwiftUIBottomSheet>
       </SwiftUIHost>
     );
@@ -324,6 +323,10 @@ const styles = StyleSheet.create({
   swiftUIHost: {
     width: 0,
     height: 0,
+  },
+  nativeSheetContainer: {
+    flex: 1,
+    backgroundColor: '#0F172A',
   },
   sheetContainer: {
     borderRadius: radii.xl,
