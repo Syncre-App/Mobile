@@ -7223,18 +7223,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
     minWidth: 120,
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   senderMetaAvatar: {
     marginRight: 8,
+    flexShrink: 0,
   },
   senderMetaDetails: {
     flex: 1,
+    flexShrink: 1,
     marginTop: 2,
+    overflow: 'hidden',
   },
   senderMetaName: {
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 12,
     fontWeight: '600',
+    flexShrink: 1,
   },
   badgeRow: {
     flexDirection: 'row',
