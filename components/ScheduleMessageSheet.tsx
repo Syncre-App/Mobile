@@ -352,7 +352,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
             </SwiftUIVStack>
 
             {/* Custom time picker */}
-            <SwiftUIVStack alignment="leading" spacing={8}>
+            <SwiftUIVStack alignment="center" spacing={8}>
               <SwiftUIText size={13} weight="medium" color={palette.textMuted}>
                 Or pick a custom time
               </SwiftUIText>

@@ -274,31 +274,8 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   );
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS: Native BottomSheet (without GlassySheet to avoid nested SwiftUI)
-  // ═══════════════════════════════════════════════════════════════
-  if (shouldUseSwiftUI && SwiftUIBottomSheet && SwiftUIHost) {
-    return (
-      <SwiftUIHost style={styles.swiftUIHost}>
-        <SwiftUIBottomSheet
-          isOpened={visible}
-          onIsOpenedChange={(isOpened: boolean) => {
-            if (!isOpened) {
-              onClose();
-            }
-          }}
-          presentationDetents={['medium', 'large']}
-          presentationDragIndicator="visible"
-        >
-          <View style={styles.nativeSheetContainer}>
-            <SheetContent />
-          </View>
-        </SwiftUIBottomSheet>
-      </SwiftUIHost>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Android / Fallback: Modal
+  // Modal for all platforms - SwiftUI BottomSheet doesn't support
+  // React Native View children properly
   // ═══════════════════════════════════════════════════════════════
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>

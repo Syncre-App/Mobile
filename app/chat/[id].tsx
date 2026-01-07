@@ -8221,7 +8221,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     columnGap: 12,
-    marginBottom: -12,
+    marginBottom: 0,
   },
   attachmentPreviewSlide: {
     width: Dimensions.get('window').width,
