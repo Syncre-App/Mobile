@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Modal,
   Platform,
@@ -17,7 +18,6 @@ import { UserAvatar } from './UserAvatar';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { canUseSwiftUI } from '../utils/swiftUi';
 
-// SwiftUI imports for iOS
 let SwiftUIHost: any = null;
 let SwiftUIBottomSheet: any = null;
 
@@ -30,6 +30,8 @@ if (Platform.OS === 'ios') {
     console.warn('SwiftUI components not available:', e);
   }
 }
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Friend {
   id: string;
@@ -196,14 +198,8 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   const shouldUseSwiftUI = canUseSwiftUI();
   const canRenderSwiftUI = shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet;
 
-  // Shared content component
-  const SheetContent = () => (
-    <View style={styles.container}>
-      <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFillObject} />
-      
-      {/* Drag Indicator - only for non-SwiftUI */}
-      {!canRenderSwiftUI && <View style={styles.dragIndicator} />}
-
+  const content = (
+    <>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerIcon}>
@@ -294,6 +290,19 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
           )}
         </Pressable>
       </View>
+    </>
+  );
+
+  // Shared content component
+  const sheetContent = canRenderSwiftUI ? (
+    <View style={styles.swiftUISheetContent}>
+      {content}
+    </View>
+  ) : (
+    <View style={styles.container}>
+      <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <View style={styles.dragIndicator} />
+      {content}
     </View>
   );
 
@@ -301,11 +310,8 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
   // iOS: Native SwiftUI BottomSheet
   // ═══════════════════════════════════════════════════════════════
   if (canRenderSwiftUI) {
-    // Only render SwiftUI Host when sheet should be visible to prevent blocking interactions
-    if (!visible) return null;
-    
     return (
-      <SwiftUIHost style={styles.swiftUIHost} useViewportSizeMeasurement>
+      <SwiftUIHost style={styles.swiftUIHost}>
         <SwiftUIBottomSheet
           isOpened={visible}
           onIsOpenedChange={(isOpened: boolean) => {
@@ -313,9 +319,10 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
               onClose();
             }
           }}
+          presentationDetents={[0.85, 'large']}
           presentationDragIndicator="visible"
         >
-          <SheetContent />
+          {sheetContent}
         </SwiftUIBottomSheet>
       </SwiftUIHost>
     );
@@ -331,7 +338,7 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SheetContent />
+      {sheetContent}
     </Modal>
   );
 };
@@ -542,11 +549,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   swiftUIHost: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
+    width: 0,
+    height: 0,
+  },
+  swiftUISheetContent: {
+    flex: 1,
+    paddingTop: 16,
   },
 });
