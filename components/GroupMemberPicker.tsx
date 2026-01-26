@@ -555,5 +555,9 @@ const styles = StyleSheet.create({
   swiftUISheetContent: {
     flex: 1,
     paddingTop: 16,
+    backgroundColor: 'rgba(15, 23, 42, 0.98)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
   },
 });
