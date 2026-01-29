@@ -7,31 +7,29 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		01042E48FE24B20450112167 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60BDFC55657E6C4C9D0062E8 /* ExpoModulesProvider.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		2DB3F30C3029D91030962114 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED06425F083087AEB248E5D /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		4F94E47D2EE2DE630093BA6D /* Syncre.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4F94E47C2EE2DE630093BA6D /* Syncre.icon */; };
-		9630BC83C10703246158DAFB /* libPods-syncre.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EC545D42D98D5B5BFDB6DD58 /* libPods-syncre.a */; };
-		A28E11670FE9D7C0F6F3C6C1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0E2567E476961FA88168B0B3 /* PrivacyInfo.xcprivacy */; };
+		6B67A090DC41A172D733ED62 /* libPods-Syncre.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C8A1EE23A0CAC0B9C8D4CD73 /* libPods-Syncre.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		D7B53D56BC81C57FF68FE52C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7A0D64B8AE25B06250A034B0 /* PrivacyInfo.xcprivacy */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0E2567E476961FA88168B0B3 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = syncre/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		13B07F961A680F5B00A75B9A /* syncre.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = syncre.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = syncre/Images.xcassets; sourceTree = "<group>"; };
-		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = syncre/Info.plist; sourceTree = "<group>"; };
-		467CC1A00E3398F93135B82A /* Pods-syncre.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-syncre.debug.xcconfig"; path = "Target Support Files/Pods-syncre/Pods-syncre.debug.xcconfig"; sourceTree = "<group>"; };
-		4F94E47C2EE2DE630093BA6D /* Syncre.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Syncre.icon; sourceTree = "<group>"; };
-		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = syncre/SplashScreen.storyboard; sourceTree = "<group>"; };
+		13B07F961A680F5B00A75B9A /* Syncre.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Syncre.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Syncre/Images.xcassets; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Syncre/Info.plist; sourceTree = "<group>"; };
+		32E577A5822B09E00979EBF6 /* Pods-Syncre.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Syncre.debug.xcconfig"; path = "Target Support Files/Pods-Syncre/Pods-Syncre.debug.xcconfig"; sourceTree = "<group>"; };
+		60BDFC55657E6C4C9D0062E8 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Syncre/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		7A0D64B8AE25B06250A034B0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Syncre/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		7F805DE5EF7FFE39E4F143BF /* Pods-Syncre.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Syncre.release.xcconfig"; path = "Target Support Files/Pods-Syncre/Pods-Syncre.release.xcconfig"; sourceTree = "<group>"; };
+		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Syncre/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		CED06425F083087AEB248E5D /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-syncre/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		E1EDFA1E5C7E16EFD75119C0 /* Pods-syncre.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-syncre.release.xcconfig"; path = "Target Support Files/Pods-syncre/Pods-syncre.release.xcconfig"; sourceTree = "<group>"; };
-		EC545D42D98D5B5BFDB6DD58 /* libPods-syncre.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-syncre.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C8A1EE23A0CAC0B9C8D4CD73 /* libPods-Syncre.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Syncre.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = syncre/AppDelegate.swift; sourceTree = "<group>"; };
-		F11748442D0722820044C1D9 /* syncre-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "syncre-Bridging-Header.h"; path = "syncre/syncre-Bridging-Header.h"; sourceTree = "<group>"; };
+		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Syncre/AppDelegate.swift; sourceTree = "<group>"; };
+		F11748442D0722820044C1D9 /* Syncre-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Syncre-Bridging-Header.h"; path = "Syncre/Syncre-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -39,44 +37,34 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9630BC83C10703246158DAFB /* libPods-syncre.a in Frameworks */,
+				6B67A090DC41A172D733ED62 /* libPods-Syncre.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		13B07FAE1A68108700A75B9A /* syncre */ = {
+		13B07FAE1A68108700A75B9A /* Syncre */ = {
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
-				F11748442D0722820044C1D9 /* syncre-Bridging-Header.h */,
+				F11748442D0722820044C1D9 /* Syncre-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
-				4F94E47C2EE2DE630093BA6D /* Syncre.icon */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				0E2567E476961FA88168B0B3 /* PrivacyInfo.xcprivacy */,
+				7A0D64B8AE25B06250A034B0 /* PrivacyInfo.xcprivacy */,
 			);
-			name = syncre;
+			name = Syncre;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				EC545D42D98D5B5BFDB6DD58 /* libPods-syncre.a */,
+				C8A1EE23A0CAC0B9C8D4CD73 /* libPods-Syncre.a */,
 			);
 			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		3335FF73C5443DAE78591283 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				467CC1A00E3398F93135B82A /* Pods-syncre.debug.xcconfig */,
-				E1EDFA1E5C7E16EFD75119C0 /* Pods-syncre.release.xcconfig */,
-			);
-			path = Pods;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -89,12 +77,12 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
-				13B07FAE1A68108700A75B9A /* syncre */,
+				13B07FAE1A68108700A75B9A /* Syncre */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				3335FF73C5443DAE78591283 /* Pods */,
-				E2010F31D30902B84D29379F /* ExpoModulesProviders */,
+				AA1C48C7C41C2F100443D004 /* Pods */,
+				B823C2819D5FCB10AFE0C48C /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -104,9 +92,27 @@
 		83CBBA001A601CBA00E9B192 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13B07F961A680F5B00A75B9A /* syncre.app */,
+				13B07F961A680F5B00A75B9A /* Syncre.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AA1C48C7C41C2F100443D004 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				32E577A5822B09E00979EBF6 /* Pods-Syncre.debug.xcconfig */,
+				7F805DE5EF7FFE39E4F143BF /* Pods-Syncre.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		B823C2819D5FCB10AFE0C48C /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				D2FB2D892AD6A8FB554F45D9 /* Syncre */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -115,48 +121,40 @@
 				BB2F792C24A3F905000567C9 /* Expo.plist */,
 			);
 			name = Supporting;
-			path = syncre/Supporting;
+			path = Syncre/Supporting;
 			sourceTree = "<group>";
 		};
-		CBD166D921CACCDF457C4BEB /* syncre */ = {
+		D2FB2D892AD6A8FB554F45D9 /* Syncre */ = {
 			isa = PBXGroup;
 			children = (
-				CED06425F083087AEB248E5D /* ExpoModulesProvider.swift */,
+				60BDFC55657E6C4C9D0062E8 /* ExpoModulesProvider.swift */,
 			);
-			name = syncre;
-			sourceTree = "<group>";
-		};
-		E2010F31D30902B84D29379F /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				CBD166D921CACCDF457C4BEB /* syncre */,
-			);
-			name = ExpoModulesProviders;
+			name = Syncre;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		13B07F861A680F5B00A75B9A /* syncre */ = {
+		13B07F861A680F5B00A75B9A /* Syncre */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "syncre" */;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Syncre" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				B0B8061ED11EE39D4D81AEF9 /* [Expo] Configure project */,
+				27719C4FEE093F85BBAE9E7F /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				6B6F608EB4E47E0AA2C06764 /* [CP] Embed Pods Frameworks */,
+				6C9C6A302853825034C080F2 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = syncre;
-			productName = syncre;
-			productReference = 13B07F961A680F5B00A75B9A /* syncre.app */;
+			name = Syncre;
+			productName = Syncre;
+			productReference = 13B07F961A680F5B00A75B9A /* Syncre.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -172,7 +170,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "syncre" */;
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Syncre" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -185,7 +183,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				13B07F861A680F5B00A75B9A /* syncre */,
+				13B07F861A680F5B00A75B9A /* Syncre */,
 			);
 		};
 /* End PBXProject section */
@@ -198,8 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				4F94E47D2EE2DE630093BA6D /* Syncre.icon in Resources */,
-				A28E11670FE9D7C0F6F3C6C1 /* PrivacyInfo.xcprivacy in Resources */,
+				D7B53D56BC81C57FF68FE52C /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,20 +235,44 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-syncre-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-Syncre-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		6B6F608EB4E47E0AA2C06764 /* [CP] Embed Pods Frameworks */ = {
+		27719C4FEE093F85BBAE9E7F /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/Syncre/Syncre.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-Syncre/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-Syncre/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Syncre/expo-configure-project.sh\"\n";
+		};
+		6C9C6A302853825034C080F2 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-syncre/Pods-syncre-frameworks.sh",
+				"${PODS_ROOT}/Target Support Files/Pods-Syncre/Pods-Syncre-frameworks.sh",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
@@ -264,7 +285,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-syncre/Pods-syncre-frameworks.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Syncre/Pods-Syncre-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
@@ -273,7 +294,7 @@
 			files = (
 			);
 			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-syncre/Pods-syncre-resources.sh",
+				"${PODS_ROOT}/Target Support Files/Pods-Syncre/Pods-Syncre-resources.sh",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXApplication/ExpoApplication_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
@@ -348,32 +369,8 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-syncre/Pods-syncre-resources.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Syncre/Pods-Syncre-resources.sh\"\n";
 			showEnvVarsInLog = 0;
-		};
-		B0B8061ED11EE39D4D81AEF9 /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/.xcode.env",
-				"$(SRCROOT)/.xcode.env.local",
-				"$(SRCROOT)/syncre/syncre.entitlements",
-				"$(SRCROOT)/Pods/Target Support Files/Pods-syncre/expo-configure-project.sh",
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/Pods/Target Support Files/Pods-syncre/ExpoModulesProvider.swift",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-syncre/expo-configure-project.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -383,7 +380,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				2DB3F30C3029D91030962114 /* ExpoModulesProvider.swift in Sources */,
+				01042E48FE24B20450112167 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -392,34 +389,24 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 467CC1A00E3398F93135B82A /* Pods-syncre.debug.xcconfig */;
+			baseConfigurationReference = 32E577A5822B09E00979EBF6 /* Pods-Syncre.debug.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = Syncre;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = syncre/syncre.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Syncre/Syncre.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = R9PZGUCNJ3;
-				ENABLE_APP_SANDBOX = YES;
 				ENABLE_BITCODE = NO;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
-				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
-				ENABLE_RESOURCE_ACCESS_CAMERA = YES;
-				ENABLE_RESOURCE_ACCESS_LOCATION = YES;
-				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
 					"FB_SONARKIT_ENABLED=1",
 				);
-				INFOPLIST_FILE = syncre/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Syncre;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_FILE = Syncre/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.7;
+				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -427,38 +414,30 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = xyz.syncre.app;
-				PRODUCT_NAME = syncre;
-				REGISTER_APP_GROUPS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_OBJC_BRIDGING_HEADER = "syncre/syncre-Bridging-Header.h";
+				PRODUCT_NAME = Syncre;
+				SWIFT_OBJC_BRIDGING_HEADER = "Syncre/Syncre-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = E1EDFA1E5C7E16EFD75119C0 /* Pods-syncre.release.xcconfig */;
+			baseConfigurationReference = 7F805DE5EF7FFE39E4F143BF /* Pods-Syncre.release.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = Syncre;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = syncre/syncre.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Syncre/Syncre.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = R9PZGUCNJ3;
-				INFOPLIST_FILE = syncre/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Syncre;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_FILE = Syncre/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.7;
+				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -466,14 +445,10 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = xyz.syncre.app;
-				PRODUCT_NAME = syncre;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_OBJC_BRIDGING_HEADER = "syncre/syncre-Bridging-Header.h";
+				PRODUCT_NAME = Syncre;
+				SWIFT_OBJC_BRIDGING_HEADER = "Syncre/Syncre-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
@@ -599,7 +574,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "syncre" */ = {
+		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Syncre" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
@@ -608,7 +583,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "syncre" */ = {
+		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Syncre" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,

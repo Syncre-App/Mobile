@@ -5823,7 +5823,7 @@ const ChatScreen: React.FC = () => {
       const isFirstInGroup =
         !previousMessage || previousMessage.senderId !== messageItem.senderId || !!previousMessage.isPlaceholder;
       const isLastInGroup =
-        !nextMessage || nextMessage.senderId !== messageItem.senderId || !!nextMessage.isPlaceholder;
+        !nextMessage || nextMessage.senderId !== messageItem.senderId || !!nextMessage.isPlaceholder || !!nextMessage.replyTo;
 
       const shouldShowStatus = lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
       const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
