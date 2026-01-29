@@ -40,11 +40,9 @@
 			</array>
 		</dict>
 	</array>
-	<key>NSPrivacyAccessedAPIs</key>
+	<key>NSPrivacyCollectedDataTypes</key>
 	<array/>
 	<key>NSPrivacyTracking</key>
 	<false/>
-	<key>NSPrivacyTrackingDomains</key>
-	<array/>
 </dict>
 </plist>
