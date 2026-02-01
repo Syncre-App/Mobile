@@ -43,7 +43,7 @@
     "expo-font": "~14.0.9",
     "expo-haptics": "~15.0.7",
     "expo-image": "~3.0.10",
-    "expo-image-picker": "^17.0.8",
+    "expo-image-picker": "^17.0.10",
     "expo-insights": "~0.10.7",
     "expo-intent-launcher": "^11.0.1",
     "expo-linear-gradient": "~15.0.8",
