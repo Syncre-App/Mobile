@@ -1713,6 +1713,7 @@ const ChatScreen: React.FC = () => {
   const [showEphemeralSheet, setShowEphemeralSheet] = useState(false);
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
   const [pollsData, setPollsData] = useState<Map<string, { poll: PollData; userVotes: number[] }>>(new Map());
+  const pollDecryptAttemptedRef = useRef<Set<string>>(new Set());
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
@@ -2443,14 +2444,16 @@ const ChatScreen: React.FC = () => {
         
         // Store poll data in pollsData state
         if (isPollMessage && pollData) {
+          const pollEntry = pollData;
           setPollsData((prev) => {
             const newMap = new Map(prev);
             newMap.set(String(idValue), {
-              poll: pollData,
+              poll: pollEntry,
               userVotes: userVotes || [],
             });
             return newMap;
           });
+          void hydratePollFromEncrypted(String(idValue), pollEntry);
         }
 
         results.push({
@@ -4829,14 +4832,18 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.votePoll(chatId, pollId, [optionId], token);
 
       if (response.success && response.data) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: response.data.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
       }
     } catch (error) {
       console.error('Error voting on poll:', error);
@@ -4858,14 +4865,18 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.removeVotePoll(chatId, pollId, optionId, token);
 
       if (response.success && response.data) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: response.data.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
       }
     } catch (error) {
       console.error('Error removing vote:', error);
@@ -4887,15 +4898,19 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.closePoll(chatId, pollId, token);
 
       if (response.success && response.data) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           const existing = prev.get(messageId);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: existing?.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
         NotificationService.show('success', 'Poll closed');
       }
     } catch (error) {
@@ -4912,14 +4927,18 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.getPollByMessageId(messageId, token);
 
       if (response.success && response.data?.poll) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: response.data.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
       }
     } catch (error) {
       console.error('Error fetching poll:', error);
@@ -4929,6 +4948,11 @@ const ChatScreen: React.FC = () => {
   const hydratePollFromEncrypted = useCallback(
     async (messageId: string, poll: PollData) => {
       if (!poll?.encryptedPayload || !currentUserId || !chatId) return;
+      const attemptKey = `${messageId}:${poll.payloadVersion || 1}:${Array.isArray(poll.encryptedPayload) ? poll.encryptedPayload.length : 0}`;
+      if (pollDecryptAttemptedRef.current.has(attemptKey)) {
+        return;
+      }
+      pollDecryptAttemptedRef.current.add(attemptKey);
       const hasPlainText =
         typeof poll.question === 'string' &&
         poll.question.trim().length > 0 &&
@@ -5008,15 +5032,6 @@ const ChatScreen: React.FC = () => {
     },
     [chatId, currentUserId]
   );
-
-  useEffect(() => {
-    if (!pollsData.size) return;
-    pollsData.forEach((entry, messageId) => {
-      if (entry?.poll?.encryptedPayload) {
-        hydratePollFromEncrypted(messageId, entry.poll);
-      }
-    });
-  }, [pollsData, hydratePollFromEncrypted]);
 
   useEffect(() => {
     if (replyContext) {
@@ -5486,6 +5501,9 @@ const ChatScreen: React.FC = () => {
             });
             return newMap;
           });
+          if (newEntry.poll?.encryptedPayload) {
+            void hydratePollFromEncrypted(String(payload.messageId), newEntry.poll);
+          }
           setMessagesAnimated((prev) => {
             const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
             if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {

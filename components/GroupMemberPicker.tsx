@@ -195,7 +195,9 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
     );
   };
 
-  const shouldUseSwiftUI = canUseSwiftUI();
+  // SwiftUI BottomSheet is rendering blank on iOS in this project,
+  // force the React Native Modal path until fixed.
+  const shouldUseSwiftUI = false;
   const canRenderSwiftUI = shouldUseSwiftUI && SwiftUIHost && SwiftUIBottomSheet;
 
   const content = (
