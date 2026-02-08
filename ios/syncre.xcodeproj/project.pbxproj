@@ -7,26 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		01042E48FE24B20450112167 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60BDFC55657E6C4C9D0062E8 /* ExpoModulesProvider.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		327F8127D2EAC10222032477 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D717520638DDFD26A1555BB8 /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		6B67A090DC41A172D733ED62 /* libPods-Syncre.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C8A1EE23A0CAC0B9C8D4CD73 /* libPods-Syncre.a */; };
+		AD2BBB99443B7E100A2E940B /* libPods-Syncre.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DA9F3CBA973E317AEEE8FD84 /* libPods-Syncre.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		D7B53D56BC81C57FF68FE52C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7A0D64B8AE25B06250A034B0 /* PrivacyInfo.xcprivacy */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		F36E7E2F8425F4BAF5FC4FBB /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 10DDDF8C0D5EADDAB00A9202 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		10DDDF8C0D5EADDAB00A9202 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Syncre/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* Syncre.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Syncre.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Syncre/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Syncre/Info.plist; sourceTree = "<group>"; };
-		32E577A5822B09E00979EBF6 /* Pods-Syncre.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Syncre.debug.xcconfig"; path = "Target Support Files/Pods-Syncre/Pods-Syncre.debug.xcconfig"; sourceTree = "<group>"; };
-		60BDFC55657E6C4C9D0062E8 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Syncre/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		7A0D64B8AE25B06250A034B0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Syncre/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		7F805DE5EF7FFE39E4F143BF /* Pods-Syncre.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Syncre.release.xcconfig"; path = "Target Support Files/Pods-Syncre/Pods-Syncre.release.xcconfig"; sourceTree = "<group>"; };
+		303DDFFFAE5AD6CF281BAFF9 /* Pods-Syncre.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Syncre.release.xcconfig"; path = "Target Support Files/Pods-Syncre/Pods-Syncre.release.xcconfig"; sourceTree = "<group>"; };
+		8513A898E73B5E3418B16308 /* Pods-Syncre.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Syncre.debug.xcconfig"; path = "Target Support Files/Pods-Syncre/Pods-Syncre.debug.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Syncre/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		C8A1EE23A0CAC0B9C8D4CD73 /* libPods-Syncre.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Syncre.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D717520638DDFD26A1555BB8 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Syncre/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		DA9F3CBA973E317AEEE8FD84 /* libPods-Syncre.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Syncre.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Syncre/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Syncre-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Syncre-Bridging-Header.h"; path = "Syncre/Syncre-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6B67A090DC41A172D733ED62 /* libPods-Syncre.a in Frameworks */,
+				AD2BBB99443B7E100A2E940B /* libPods-Syncre.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,7 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				7A0D64B8AE25B06250A034B0 /* PrivacyInfo.xcprivacy */,
+				10DDDF8C0D5EADDAB00A9202 /* PrivacyInfo.xcprivacy */,
 			);
 			name = Syncre;
 			sourceTree = "<group>";
@@ -62,9 +62,27 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				C8A1EE23A0CAC0B9C8D4CD73 /* libPods-Syncre.a */,
+				DA9F3CBA973E317AEEE8FD84 /* libPods-Syncre.a */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		59EA8AAA3843FF4F3CA15C3F /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				CA79B939A06D6F758E2927A2 /* Syncre */,
+			);
+			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
+		6E1AD2F80FFF210BD4ABFD55 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				8513A898E73B5E3418B16308 /* Pods-Syncre.debug.xcconfig */,
+				303DDFFFAE5AD6CF281BAFF9 /* Pods-Syncre.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -81,8 +99,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				AA1C48C7C41C2F100443D004 /* Pods */,
-				B823C2819D5FCB10AFE0C48C /* ExpoModulesProviders */,
+				6E1AD2F80FFF210BD4ABFD55 /* Pods */,
+				59EA8AAA3843FF4F3CA15C3F /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -97,24 +115,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		AA1C48C7C41C2F100443D004 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				32E577A5822B09E00979EBF6 /* Pods-Syncre.debug.xcconfig */,
-				7F805DE5EF7FFE39E4F143BF /* Pods-Syncre.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
-			sourceTree = "<group>";
-		};
-		B823C2819D5FCB10AFE0C48C /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				D2FB2D892AD6A8FB554F45D9 /* Syncre */,
-			);
-			name = ExpoModulesProviders;
-			sourceTree = "<group>";
-		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
@@ -124,10 +124,10 @@
 			path = Syncre/Supporting;
 			sourceTree = "<group>";
 		};
-		D2FB2D892AD6A8FB554F45D9 /* Syncre */ = {
+		CA79B939A06D6F758E2927A2 /* Syncre */ = {
 			isa = PBXGroup;
 			children = (
-				60BDFC55657E6C4C9D0062E8 /* ExpoModulesProvider.swift */,
+				D717520638DDFD26A1555BB8 /* ExpoModulesProvider.swift */,
 			);
 			name = Syncre;
 			sourceTree = "<group>";
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Syncre" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				27719C4FEE093F85BBAE9E7F /* [Expo] Configure project */,
+				3EBFBE1F49CC43942B3DC3DB /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				6C9C6A302853825034C080F2 /* [CP] Embed Pods Frameworks */,
+				4AC9E88463D833EDAEB8320A /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				D7B53D56BC81C57FF68FE52C /* PrivacyInfo.xcprivacy in Resources */,
+				F36E7E2F8425F4BAF5FC4FBB /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,7 +242,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		27719C4FEE093F85BBAE9E7F /* [Expo] Configure project */ = {
+		3EBFBE1F49CC43942B3DC3DB /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -266,7 +266,7 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Syncre/expo-configure-project.sh\"\n";
 		};
-		6C9C6A302853825034C080F2 /* [CP] Embed Pods Frameworks */ = {
+		4AC9E88463D833EDAEB8320A /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -380,7 +380,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				01042E48FE24B20450112167 /* ExpoModulesProvider.swift in Sources */,
+				327F8127D2EAC10222032477 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -389,7 +389,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 32E577A5822B09E00979EBF6 /* Pods-Syncre.debug.xcconfig */;
+			baseConfigurationReference = 8513A898E73B5E3418B16308 /* Pods-Syncre.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -425,7 +425,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 7F805DE5EF7FFE39E4F143BF /* Pods-Syncre.release.xcconfig */;
+			baseConfigurationReference = 303DDFFFAE5AD6CF281BAFF9 /* Pods-Syncre.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
