@@ -302,7 +302,8 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
     </View>
   ) : (
     <View style={styles.container}>
-      <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <View style={styles.dimOverlay} />
       <View style={styles.dragIndicator} />
       {content}
     </View>
@@ -348,7 +349,11 @@ export const GroupMemberPicker: React.FC<GroupMemberPickerProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    backgroundColor: 'rgba(8, 10, 16, 0.92)',
+  },
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 7, 12, 0.35)',
   },
   dragIndicator: {
     width: 36,
