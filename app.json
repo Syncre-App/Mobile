@@ -93,7 +93,8 @@
       "@react-native-community/datetimepicker",
       "expo-font",
       "expo-localization",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
