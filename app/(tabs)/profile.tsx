@@ -54,20 +54,25 @@ export default function ProfileTab() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Disconnect WebSocket (also clears its internal state)
+              // Disconnect WebSocket first (synchronous-ish)
               WebSocketService.getInstance().disconnect();
-              // Clear user cache from memory
+              // Clear user cache from memory (synchronous)
               UserCacheService.clear();
-              // Clear all local data including SecureStore (identity keys)
-              await CryptoService.clearLocalIdentity();
-              await CryptoService.clearBackupKey();
-              await StorageService.clear();
 
-              // Small delay to ensure storage is cleared before navigation
-              await new Promise(resolve => setTimeout(resolve, 100));
+              // Clear auth token FIRST - this is what index.tsx checks
+              await StorageService.removeAuthToken();
 
-              // Navigate to login screen
+              // Navigate immediately - don't wait for other cleanup
               router.replace('/');
+
+              // Clear remaining data in background (non-blocking)
+              Promise.all([
+                CryptoService.clearLocalIdentity(),
+                CryptoService.clearBackupKey(),
+                StorageService.removeItem('user_data'),
+              ]).catch((error) => {
+                console.warn('Background cleanup error:', error);
+              });
             } catch (error) {
               console.error('Failed to logout:', error);
               // Even if clearing fails, still redirect to login
