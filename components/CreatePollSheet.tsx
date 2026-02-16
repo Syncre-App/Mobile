@@ -1,63 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  Dimensions,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { canUseSwiftUI } from '../utils/swiftUi';
-
-// SwiftUI imports for iOS
-let SwiftUIHost: any = null;
-let SwiftUIBottomSheet: any = null;
-let SwiftUIVStack: any = null;
-let SwiftUIHStack: any = null;
-let SwiftUIText: any = null;
-let SwiftUIButton: any = null;
-let SwiftUIImage: any = null;
-let SwiftUITextField: any = null;
-let SwiftUISwitch: any = null;
-let SwiftUISpacer: any = null;
-let swiftUICornerRadius: any = null;
-let swiftUIBackground: any = null;
-let swiftUIPadding: any = null;
-let swiftUIFrame: any = null;
-let swiftUIOnTapGesture: any = null;
-
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIHost = swiftUI.Host;
-    SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIVStack = swiftUI.VStack;
-    SwiftUIHStack = swiftUI.HStack;
-    SwiftUIText = swiftUI.Text;
-    SwiftUIButton = swiftUI.Button;
-    SwiftUIImage = swiftUI.Image;
-    SwiftUITextField = swiftUI.TextField;
-    SwiftUISwitch = swiftUI.Switch;
-    SwiftUISpacer = swiftUI.Spacer;
-    const modifiers = require('@expo/ui/swift-ui/modifiers');
-    swiftUICornerRadius = modifiers.cornerRadius;
-    swiftUIBackground = modifiers.background;
-    swiftUIPadding = modifiers.padding;
-    swiftUIFrame = modifiers.frame;
-    swiftUIOnTapGesture = modifiers.onTapGesture;
-  } catch (e) {
-    console.warn('SwiftUI components not available:', e);
-  }
-}
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const MAX_OPTIONS = 10;
 const MAX_OPTION_LENGTH = 50;
@@ -79,24 +35,6 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   onCreatePoll,
   isCreating = false,
 }) => {
-  const shouldUseSwiftUI = canUseSwiftUI();
-  const canRenderSwiftUI =
-    shouldUseSwiftUI &&
-    SwiftUIHost &&
-    SwiftUIBottomSheet &&
-    SwiftUIVStack &&
-    SwiftUIHStack &&
-    SwiftUIText &&
-    SwiftUIButton &&
-    SwiftUIImage &&
-    SwiftUITextField &&
-    SwiftUISwitch &&
-    SwiftUISpacer &&
-    swiftUICornerRadius &&
-    swiftUIBackground &&
-    swiftUIPadding &&
-    swiftUIFrame &&
-    swiftUIOnTapGesture;
   const optionIdRef = useRef(0);
   const buildOption = useCallback((): PollOption => {
     const id = optionIdRef.current;
@@ -106,14 +44,12 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<PollOption[]>(() => [buildOption(), buildOption()]);
   const [multiSelect, setMultiSelect] = useState(false);
-  const [formKey, setFormKey] = useState(0);
-  
+
   const resetForm = useCallback(() => {
     optionIdRef.current = 0;
     setQuestion('');
     setOptions([buildOption(), buildOption()]);
     setMultiSelect(false);
-    setFormKey((key) => key + 1);
   }, [buildOption]);
 
   const handleClose = useCallback(() => {
@@ -171,19 +107,32 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   const isValid = question.trim().length > 0 &&
     options.filter((opt) => opt.text.trim().length > 0).length >= MIN_OPTIONS;
 
-  const SheetContent = () => (
-    <View style={styles.cardContainer}>
-      <View style={styles.content}>
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={styles.dimOverlay} />
+        <View style={styles.dragIndicator} />
+
+        {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerIcon}>
-            <Ionicons name="stats-chart" size={22} color={palette.accent} />
+            <Ionicons name="stats-chart" size={20} color={palette.accent} />
           </View>
           <View style={styles.headerText}>
-            <Text style={styles.title}>Create poll</Text>
+            <Text style={styles.title}>Create Poll</Text>
             <Text style={styles.subtitle}>Ask a question and collect votes</Text>
           </View>
-          <Pressable onPress={handleClose} style={styles.closeButton}>
-            <Ionicons name="close" size={22} color={palette.textMuted} />
+          <Pressable style={styles.closeButton} onPress={handleClose}>
+            <Ionicons name="close" size={20} color={palette.textMuted} />
           </Pressable>
         </View>
 
@@ -192,6 +141,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Question */}
           <Text style={styles.label}>Question</Text>
           <TextInput
             style={styles.questionInput}
@@ -206,6 +156,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
             {question.length}/{MAX_QUESTION_LENGTH}
           </Text>
 
+          {/* Options */}
           <Text style={styles.label}>Options</Text>
           {options.map((option, index) => (
             <View key={option.id} style={styles.optionRow}>
@@ -216,7 +167,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
                 style={styles.optionInput}
                 value={option.text}
                 onChangeText={(text) => handleOptionChange(option.id, text)}
-                placeholder={`${index + 1}. option`}
+                placeholder={`Option ${index + 1}`}
                 placeholderTextColor="rgba(255, 255, 255, 0.4)"
                 maxLength={MAX_OPTION_LENGTH}
               />
@@ -225,7 +176,7 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
                   onPress={() => handleRemoveOption(option.id)}
                   style={styles.removeOptionButton}
                 >
-                  <Ionicons name="close-circle" size={22} color="#EF4444" />
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
                 </Pressable>
               )}
             </View>
@@ -233,11 +184,12 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
 
           {options.length < MAX_OPTIONS && (
             <Pressable style={styles.addOptionButton} onPress={handleAddOption}>
-              <Ionicons name="add-circle-outline" size={20} color={palette.accent} />
+              <Ionicons name="add-circle-outline" size={22} color={palette.accent} />
               <Text style={styles.addOptionText}>Add option</Text>
             </Pressable>
           )}
 
+          {/* Multi-select toggle */}
           <Pressable
             style={styles.multiSelectRow}
             onPress={() => {
@@ -246,12 +198,13 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
             }}
           >
             <View style={[styles.checkbox, multiSelect && styles.checkboxChecked]}>
-              {multiSelect && <Ionicons name="checkmark" size={14} color="#ffffff" />}
+              {multiSelect && <Ionicons name="checkmark" size={16} color="#0B1630" />}
             </View>
             <Text style={styles.multiSelectText}>Allow multiple answers</Text>
           </Pressable>
         </ScrollView>
 
+        {/* Footer */}
         <View style={styles.footer}>
           <Pressable style={styles.cancelButton} onPress={handleClose}>
             <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -266,242 +219,39 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
           >
             <Ionicons name="stats-chart" size={18} color="#ffffff" />
             <Text style={styles.createButtonText}>
-              {isCreating ? 'Creating...' : 'Create'}
+              {isCreating ? 'Creating...' : 'Create Poll'}
             </Text>
           </Pressable>
         </View>
-      </View>
-    </View>
-  );
-
-  // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet
-  // ═══════════════════════════════════════════════════════════════
-  if (canRenderSwiftUI) {
-    return (
-      <SwiftUIHost style={styles.swiftUIHost} useViewportSizeMeasurement>
-        <SwiftUIBottomSheet
-          isOpened={visible}
-          onIsOpenedChange={(isOpened: boolean) => {
-            if (!isOpened) {
-              handleClose();
-            }
-          }}
-          presentationDragIndicator="visible"
-        >
-          <SwiftUIVStack
-            key={`poll-sheet-${formKey}`}
-            alignment="center"
-            spacing={12}
-            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
-          >
-            {/* Header */}
-            <SwiftUIHStack alignment="center" spacing={12}>
-              <SwiftUIVStack
-                modifiers={[
-                  swiftUIFrame({ width: 36, height: 36 }),
-                  swiftUIBackground('rgba(10, 132, 255, 0.18)'),
-                  swiftUICornerRadius(18),
-                ]}
-              >
-                <SwiftUIImage systemName="chart.bar" size={16} color={palette.accent} />
-              </SwiftUIVStack>
-              <SwiftUIVStack alignment="leading" spacing={2}>
-                <SwiftUIText size={17} weight="semibold" color={palette.text}>
-                  Create poll
-                </SwiftUIText>
-                <SwiftUIText size={12} color={palette.textMuted}>
-                  Ask a question and collect votes
-                </SwiftUIText>
-              </SwiftUIVStack>
-              <SwiftUISpacer />
-              <SwiftUIButton
-                systemImage="xmark"
-                onPress={handleClose}
-                variant="plain"
-                modifiers={[swiftUIFrame({ width: 30, height: 30 })]}
-              />
-            </SwiftUIHStack>
-
-            {/* Question */}
-            <SwiftUIVStack alignment="leading" spacing={6} modifiers={[swiftUIFrame({ maxWidth: 380 })]}>
-              <SwiftUIText size={12} color={palette.textMuted}>
-                Question
-              </SwiftUIText>
-              <SwiftUITextField
-                key={`poll-question-${formKey}`}
-                defaultValue={question}
-                placeholder="What's the question?"
-                multiline
-                numberOfLines={3}
-                onChangeText={(text: string) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
-                modifiers={[
-                  swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                  swiftUIBackground('rgba(255, 255, 255, 0.08)'),
-                  swiftUICornerRadius(10),
-                ]}
-              />
-              <SwiftUIText size={11} color={palette.textMuted}>
-                {question.length}/{MAX_QUESTION_LENGTH}
-              </SwiftUIText>
-            </SwiftUIVStack>
-
-            {/* Options */}
-            <SwiftUIVStack alignment="leading" spacing={6} modifiers={[swiftUIFrame({ maxWidth: 380 })]}>
-              <SwiftUIText size={12} color={palette.textMuted}>
-                Options
-              </SwiftUIText>
-              <SwiftUIVStack alignment="leading" spacing={8}>
-                {options.map((option, index) => (
-                  <SwiftUIHStack key={option.id} alignment="center" spacing={8}>
-                    <SwiftUIVStack
-                      modifiers={[
-                        swiftUIFrame({ width: 24, height: 24 }),
-                        swiftUIBackground('rgba(37, 99, 235, 0.2)'),
-                        swiftUICornerRadius(12),
-                      ]}
-                    >
-                      <SwiftUIText size={11} weight="semibold" color={palette.accent}>
-                        {String(index + 1)}
-                      </SwiftUIText>
-                    </SwiftUIVStack>
-                    <SwiftUITextField
-                      defaultValue={option.text}
-                      placeholder={`${index + 1}. option`}
-                      onChangeText={(text: string) => handleOptionChange(option.id, text)}
-                      modifiers={[
-                        swiftUIFrame({ maxWidth: 260, alignment: 'leading' }),
-                        swiftUIPadding({ horizontal: 10, vertical: 8 }),
-                        swiftUIBackground('rgba(255, 255, 255, 0.08)'),
-                        swiftUICornerRadius(10),
-                      ]}
-                    />
-                    {options.length > MIN_OPTIONS ? (
-                      <SwiftUIButton
-                        systemImage="xmark.circle.fill"
-                        onPress={() => handleRemoveOption(option.id)}
-                        variant="plain"
-                        color="#EF4444"
-                        modifiers={[swiftUIFrame({ width: 28, height: 28 })]}
-                      />
-                    ) : null}
-                  </SwiftUIHStack>
-                ))}
-              </SwiftUIVStack>
-
-              {options.length < MAX_OPTIONS ? (
-                <SwiftUIHStack
-                  alignment="center"
-                  spacing={8}
-                  modifiers={[
-                    swiftUIPadding({ horizontal: 12, vertical: 10 }),
-                    swiftUIBackground('rgba(37, 99, 235, 0.12)'),
-                    swiftUICornerRadius(10),
-                    swiftUIOnTapGesture(handleAddOption),
-                  ]}
-                >
-                  <SwiftUIImage systemName="plus.circle" size={16} color={palette.accent} />
-                  <SwiftUIText size={13} weight="medium" color={palette.accent}>
-                    Add option
-                  </SwiftUIText>
-                </SwiftUIHStack>
-              ) : null}
-            </SwiftUIVStack>
-
-            {/* Multi-select toggle */}
-            <SwiftUIHStack alignment="center" spacing={10} modifiers={[swiftUIFrame({ maxWidth: 380 })]}>
-              <SwiftUIText size={14} color={palette.text}>
-                Allow multiple answers
-              </SwiftUIText>
-              <SwiftUISpacer />
-              <SwiftUISwitch
-                value={multiSelect}
-                onValueChange={(value: boolean) => setMultiSelect(value)}
-                color={palette.accent}
-              />
-            </SwiftUIHStack>
-
-            {/* Footer buttons */}
-            <SwiftUIHStack spacing={12} modifiers={[swiftUIFrame({ maxWidth: 380 })]}>
-              <SwiftUIButton onPress={handleClose} variant="bordered">
-                Cancel
-              </SwiftUIButton>
-              <SwiftUIButton
-                onPress={handleCreate}
-                disabled={!isValid || isCreating}
-                variant="borderedProminent"
-              >
-                {isCreating ? 'Creating...' : 'Create'}
-              </SwiftUIButton>
-            </SwiftUIHStack>
-          </SwiftUIVStack>
-        </SwiftUIBottomSheet>
-      </SwiftUIHost>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Android / Fallback: Modal
-  // ═══════════════════════════════════════════════════════════════
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalOverlay}
-      >
-        <Pressable style={styles.backdrop} onPress={handleClose} />
-        <SheetContent />
       </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  swiftUIHost: {
-    position: 'absolute',
-    width: SCREEN_WIDTH,
-    height: 0,
-  },
-  sheetContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
-  modalOverlay: {
+  container: {
     flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'stretch',
-    padding: spacing.lg,
+    backgroundColor: 'rgba(8, 10, 16, 0.92)',
   },
-  backdrop: {
+  dimOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(3, 7, 18, 0.65)',
+    backgroundColor: 'rgba(5, 7, 12, 0.35)',
   },
-  cardContainer: {
-    width: '100%',
-    maxWidth: 440,
+  dragIndicator: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    overflow: 'hidden',
-  },
-  content: {
-    maxHeight: 560,
+    marginTop: 8,
+    marginBottom: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 12,
   },
   headerIcon: {
     width: 44,
@@ -515,87 +265,85 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: palette.text,
+    color: '#ffffff',
     fontSize: 20,
     ...font('bold'),
     letterSpacing: -0.4,
   },
   subtitle: {
-    color: palette.textMuted,
+    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 14,
     marginTop: 4,
-    lineHeight: 18,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   scrollContent: {
-    padding: spacing.md,
-    maxHeight: 360,
+    flex: 1,
+    paddingHorizontal: 20,
   },
   label: {
-    color: palette.textMuted,
+    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 13,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginBottom: spacing.sm,
+    marginBottom: 10,
     ...font('semibold'),
   },
   questionInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: radii.lg,
-    padding: spacing.md,
-    color: palette.text,
-    fontSize: 16,
-    minHeight: 80,
+    padding: 16,
+    color: '#ffffff',
+    fontSize: 17,
+    minHeight: 100,
     textAlignVertical: 'top',
-    lineHeight: 22,
+    lineHeight: 24,
   },
   charCount: {
-    color: palette.textMuted,
-    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 12,
     textAlign: 'right',
-    marginTop: 4,
-    marginBottom: spacing.md,
+    marginTop: 6,
+    marginBottom: 24,
   },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-    minHeight: 48,
+    gap: 12,
+    marginBottom: 12,
   },
   optionNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   optionNumberText: {
     color: palette.accent,
-    fontSize: 13,
+    fontSize: 14,
     ...font('bold'),
   },
   optionInput: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: radii.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    color: palette.text,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: '#ffffff',
     fontSize: 16,
-    minHeight: 44,
+    minHeight: 50,
   },
   removeOptionButton: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -603,32 +351,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
+    gap: 10,
+    paddingVertical: 16,
+    marginTop: 8,
     borderRadius: radii.lg,
-    backgroundColor: 'rgba(37, 99, 235, 0.08)',
-    minHeight: 48,
+    backgroundColor: 'rgba(10, 132, 255, 0.08)',
+    minHeight: 56,
   },
   addOptionText: {
     color: palette.accent,
-    fontSize: 15,
-    ...font('medium'),
+    fontSize: 16,
+    ...font('semibold'),
   },
   multiSelectRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
+    gap: 14,
+    marginTop: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: radii.lg,
-    minHeight: 56,
+    minHeight: 60,
   },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 26,
+    height: 26,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.25)',
@@ -636,33 +384,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: palette.accent,
-    borderColor: palette.accent,
+    backgroundColor: '#ffffff',
+    borderColor: '#ffffff',
   },
   multiSelectText: {
-    color: palette.text,
+    color: '#ffffff',
     fontSize: 16,
     ...font('medium'),
   },
   footer: {
     flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.lg,
-    paddingTop: spacing.md,
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
   },
   cancelButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: 16,
     borderRadius: radii.lg,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    minHeight: 50,
+    minHeight: 54,
   },
   cancelButtonText: {
-    color: palette.text,
+    color: '#ffffff',
     fontSize: 16,
     ...font('semibold'),
   },
@@ -671,11 +420,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
+    gap: 10,
+    paddingVertical: 16,
     borderRadius: radii.lg,
     backgroundColor: palette.accent,
-    minHeight: 50,
+    minHeight: 54,
   },
   createButtonDisabled: {
     opacity: 0.4,
