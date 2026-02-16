@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState, useEffect } from 'react';
 import {
-  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -10,49 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { canUseSwiftUI } from '../utils/swiftUi';
-
-// SwiftUI imports for iOS
-let SwiftUIHost: any = null;
-let SwiftUIBottomSheet: any = null;
-let SwiftUIVStack: any = null;
-let SwiftUIHStack: any = null;
-let SwiftUIText: any = null;
-let SwiftUIButton: any = null;
-let SwiftUIImage: any = null;
-let SwiftUISpacer: any = null;
-let SwiftUIDateTimePicker: any = null;
-let swiftUICornerRadius: any = null;
-let swiftUIBackground: any = null;
-let swiftUIPadding: any = null;
-let swiftUIFrame: any = null;
-let swiftUIOnTapGesture: any = null;
-
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIHost = swiftUI.Host;
-    SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIVStack = swiftUI.VStack;
-    SwiftUIHStack = swiftUI.HStack;
-    SwiftUIText = swiftUI.Text;
-    SwiftUIButton = swiftUI.Button;
-    SwiftUIImage = swiftUI.Image;
-    SwiftUISpacer = swiftUI.Spacer;
-    SwiftUIDateTimePicker = swiftUI.DateTimePicker;
-    const modifiers = require('@expo/ui/swift-ui/modifiers');
-    swiftUICornerRadius = modifiers.cornerRadius;
-    swiftUIBackground = modifiers.background;
-    swiftUIPadding = modifiers.padding;
-    swiftUIFrame = modifiers.frame;
-    swiftUIOnTapGesture = modifiers.onTapGesture;
-  } catch (e) {
-    console.warn('SwiftUI components not available:', e);
-  }
-}
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export type ScheduleOption = '30m' | '1h' | '3h' | 'tomorrow' | 'custom' | null;
 
@@ -99,24 +57,6 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   onClose,
   onSchedule,
 }) => {
-  const shouldUseSwiftUI = canUseSwiftUI();
-  const canRenderSwiftUI =
-    shouldUseSwiftUI &&
-    SwiftUIHost &&
-    SwiftUIBottomSheet &&
-    SwiftUIVStack &&
-    SwiftUIHStack &&
-    SwiftUIText &&
-    SwiftUIButton &&
-    SwiftUIImage &&
-    SwiftUISpacer &&
-    SwiftUIDateTimePicker &&
-    swiftUICornerRadius &&
-    swiftUIBackground &&
-    swiftUIPadding &&
-    swiftUIFrame &&
-    swiftUIOnTapGesture;
-
   const [selectedOption, setSelectedOption] = useState<ScheduleOption>(null);
   const [customDate, setCustomDate] = useState<Date>(() => {
     const date = new Date();
@@ -174,24 +114,33 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
 
   const isCustomDateValid = customDate > new Date();
 
-  const SheetContent = () => (
-    <View style={styles.cardContainer}>
-      <View style={styles.modalContent}>
-        <View style={styles.modalHeader}>
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={styles.container}>
+        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={styles.dimOverlay} />
+        <View style={styles.dragIndicator} />
+
+        {/* Header */}
+        <View style={styles.header}>
           <View style={styles.headerIcon}>
-            <Ionicons name="time-outline" size={18} color={palette.accent} />
+            <Ionicons name="time-outline" size={20} color={palette.accent} />
           </View>
           <View style={styles.headerText}>
-            <Text style={styles.modalTitle}>Schedule Message</Text>
-            <Text style={styles.modalSubtitle}>
-              Choose when to send this message
-            </Text>
+            <Text style={styles.title}>Schedule Message</Text>
+            <Text style={styles.subtitle}>Choose when to send this message</Text>
           </View>
-          <Pressable onPress={onClose} style={styles.closeButton}>
+          <Pressable style={styles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={20} color={palette.textMuted} />
           </Pressable>
         </View>
 
+        {/* Options */}
         <View style={styles.optionsList}>
           {SCHEDULE_OPTIONS.map((option) => (
             <Pressable
@@ -207,12 +156,15 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                 <Text style={styles.optionDescription}>{option.description}</Text>
               </View>
               {selectedOption === option.value && (
-                <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
+                <View style={styles.checkCircle}>
+                  <Ionicons name="checkmark" size={16} color="#0B1630" />
+                </View>
               )}
             </Pressable>
           ))}
         </View>
 
+        {/* Custom Date Picker */}
         {showCustomPicker && Platform.OS === 'ios' && (
           <View style={styles.customPickerContainer}>
             <DateTimePicker
@@ -221,7 +173,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
               display="spinner"
               onChange={handleCustomDateChange}
               minimumDate={new Date()}
-              textColor={palette.text}
+              textColor="#ffffff"
             />
             <View style={styles.customPickerActions}>
               {!isCustomDateValid && (
@@ -236,7 +188,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
                 disabled={!isCustomDateValid}
               >
                 <Ionicons name="checkmark" size={18} color="#ffffff" />
-                <Text style={styles.confirmButtonText}>Confirm</Text>
+                <Text style={styles.confirmButtonText}>Schedule</Text>
               </Pressable>
             </View>
           </View>
@@ -252,291 +204,140 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
           />
         )}
       </View>
-    </View>
-  );
-
-  // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet
-  // ═══════════════════════════════════════════════════════════════
-  if (canRenderSwiftUI) {
-    return (
-      <SwiftUIHost style={styles.swiftUIHost} useViewportSizeMeasurement>
-        <SwiftUIBottomSheet
-          isOpened={visible}
-          onIsOpenedChange={(isOpened: boolean) => {
-            if (!isOpened) {
-              onClose();
-            }
-          }}
-          presentationDragIndicator="visible"
-        >
-          <SwiftUIVStack
-            alignment="center"
-            spacing={12}
-            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
-          >
-            {/* Header */}
-            <SwiftUIHStack alignment="center" spacing={12}>
-              <SwiftUIVStack
-                modifiers={[
-                  swiftUIFrame({ width: 36, height: 36 }),
-                  swiftUIBackground('rgba(10, 132, 255, 0.18)'),
-                  swiftUICornerRadius(18),
-                ]}
-              >
-                <SwiftUIImage systemName="clock" size={16} color={palette.accent} />
-              </SwiftUIVStack>
-              <SwiftUIVStack
-                alignment="leading"
-                spacing={2}
-                modifiers={[swiftUIFrame({ maxWidth: 220, alignment: 'leading' })]}
-              >
-                <SwiftUIText size={17} weight="semibold" color={palette.text}>
-                  Schedule Message
-                </SwiftUIText>
-                <SwiftUIText size={12} color={palette.textMuted}>
-                  Choose when to send this message
-                </SwiftUIText>
-              </SwiftUIVStack>
-              <SwiftUISpacer />
-              <SwiftUIButton
-                systemImage="xmark"
-                onPress={onClose}
-                variant="plain"
-                modifiers={[swiftUIFrame({ width: 30, height: 30 })]}
-              />
-            </SwiftUIHStack>
-
-            {/* Options */}
-            <SwiftUIVStack alignment="leading" spacing={6}>
-              {SCHEDULE_OPTIONS.filter((o) => o.value !== 'custom').map((option) => {
-                const isSelected = selectedOption === option.value;
-                return (
-                  <SwiftUIHStack
-                    key={option.value ?? 'off'}
-                    alignment="center"
-                    spacing={12}
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 14, vertical: 12 }),
-                      swiftUIBackground(
-                        isSelected ? 'rgba(10, 132, 255, 0.25)' : 'rgba(255, 255, 255, 0.06)'
-                      ),
-                      swiftUICornerRadius(12),
-                      swiftUIFrame({ maxWidth: 380 }),
-                      swiftUIOnTapGesture(() => handleSelectOption(option.value)),
-                    ]}
-                  >
-                    <SwiftUIVStack
-                      alignment="leading"
-                      spacing={2}
-                      modifiers={[swiftUIFrame({ maxWidth: 280, alignment: 'leading' })]}
-                    >
-                      <SwiftUIText size={16} weight="medium" color={palette.text}>
-                        {option.label}
-                      </SwiftUIText>
-                      <SwiftUIText size={13} color={palette.textMuted}>
-                        {option.description}
-                      </SwiftUIText>
-                    </SwiftUIVStack>
-                    <SwiftUISpacer />
-                    {isSelected ? (
-                      <SwiftUIImage
-                        systemName="checkmark.circle.fill"
-                        size={22}
-                        color={palette.accent}
-                      />
-                    ) : null}
-                  </SwiftUIHStack>
-                );
-              })}
-            </SwiftUIVStack>
-
-            {/* Custom time picker */}
-            <SwiftUIVStack alignment="center" spacing={8}>
-              <SwiftUIText size={13} weight="medium" color={palette.textMuted}>
-                Or pick a custom time
-              </SwiftUIText>
-              <SwiftUIHStack spacing={10}>
-                <SwiftUIDateTimePicker
-                  initialDate={customDate.toISOString()}
-                  displayedComponents="date"
-                  variant="compact"
-                  onDateSelected={(date: Date) => {
-                    const newDate = new Date(customDate);
-                    newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
-                    setCustomDate(newDate);
-                    setSelectedOption('custom');
-                  }}
-                  color={palette.accent}
-                />
-                <SwiftUIDateTimePicker
-                  initialDate={customDate.toISOString()}
-                  displayedComponents="hourAndMinute"
-                  variant="compact"
-                  onDateSelected={(date: Date) => {
-                    const newDate = new Date(customDate);
-                    newDate.setHours(date.getHours(), date.getMinutes());
-                    setCustomDate(newDate);
-                    setSelectedOption('custom');
-                  }}
-                  color={palette.accent}
-                />
-              </SwiftUIHStack>
-              {selectedOption === 'custom' && (
-                <SwiftUIButton
-                  systemImage="checkmark"
-                  onPress={handleConfirmCustom}
-                  disabled={!isCustomDateValid}
-                  variant="borderedProminent"
-                >
-                  Schedule for custom time
-                </SwiftUIButton>
-              )}
-            </SwiftUIVStack>
-          </SwiftUIVStack>
-        </SwiftUIBottomSheet>
-      </SwiftUIHost>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Android / Fallback: Modal
-  // ═══════════════════════════════════════════════════════════════
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable onPress={(e) => e.stopPropagation()}>
-          <SheetContent />
-        </Pressable>
-      </Pressable>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  swiftUIHost: {
-    position: 'absolute',
-    width: SCREEN_WIDTH,
-    height: 0,
-  },
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(3, 7, 18, 0.65)',
-    justifyContent: 'flex-end',
-    alignItems: 'stretch',
-    padding: spacing.lg,
+    backgroundColor: 'rgba(8, 10, 16, 0.92)',
   },
-  cardContainer: {
-    width: '100%',
-    maxWidth: 420,
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 7, 12, 0.35)',
+  },
+  dragIndicator: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 20,
   },
-  modalContent: {
-    padding: spacing.lg,
-  },
-  modalHeader: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    gap: 12,
   },
   headerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(10, 132, 255, 0.18)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerText: {
     flex: 1,
   },
+  title: {
+    color: '#ffffff',
+    fontSize: 20,
+    ...font('bold'),
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    marginTop: 4,
+  },
   closeButton: {
-    padding: spacing.xs,
-    marginLeft: 'auto',
-  },
-  modalTitle: {
-    color: palette.text,
-    fontSize: 18,
-    ...font('semibold'),
-  },
-  modalSubtitle: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   optionsList: {
+    paddingHorizontal: 20,
     gap: spacing.sm,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
-    borderRadius: radii.md,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: radii.lg,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    minHeight: 64,
   },
   optionItemSelected: {
-    backgroundColor: 'rgba(10, 132, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(10, 132, 255, 0.4)',
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
   },
   optionContent: {
     flex: 1,
   },
   optionLabel: {
-    color: palette.text,
-    fontSize: 15,
-    ...font('medium'),
+    color: '#ffffff',
+    fontSize: 17,
+    ...font('semibold'),
   },
   optionDescription: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   customPickerContainer: {
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
+    marginTop: 24,
+    paddingTop: 20,
+    marginHorizontal: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   customPickerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    gap: 16,
+    marginTop: 16,
   },
   confirmButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: palette.accent,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: radii.lg,
+    minHeight: 50,
   },
   confirmButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   confirmButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    ...font('semibold'),
+    fontSize: 16,
+    ...font('bold'),
   },
   errorText: {
     color: '#EF4444',
-    fontSize: 12,
+    fontSize: 14,
+    ...font('medium'),
   },
 });
 

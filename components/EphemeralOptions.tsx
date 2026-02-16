@@ -1,54 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
-  Dimensions,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { canUseSwiftUI } from '../utils/swiftUi';
-
-// SwiftUI imports for iOS
-let SwiftUIHost: any = null;
-let SwiftUIBottomSheet: any = null;
-let SwiftUIVStack: any = null;
-let SwiftUIHStack: any = null;
-let SwiftUIText: any = null;
-let SwiftUIButton: any = null;
-let SwiftUIImage: any = null;
-let SwiftUISpacer: any = null;
-let swiftUICornerRadius: any = null;
-let swiftUIBackground: any = null;
-let swiftUIPadding: any = null;
-let swiftUIFrame: any = null;
-let swiftUIOnTapGesture: any = null;
-if (Platform.OS === 'ios') {
-  try {
-    const swiftUI = require('@expo/ui/swift-ui');
-    SwiftUIHost = swiftUI.Host;
-    SwiftUIBottomSheet = swiftUI.BottomSheet;
-    SwiftUIVStack = swiftUI.VStack;
-    SwiftUIHStack = swiftUI.HStack;
-    SwiftUIText = swiftUI.Text;
-    SwiftUIButton = swiftUI.Button;
-    SwiftUIImage = swiftUI.Image;
-    SwiftUISpacer = swiftUI.Spacer;
-    const modifiers = require('@expo/ui/swift-ui/modifiers');
-    swiftUICornerRadius = modifiers.cornerRadius;
-    swiftUIBackground = modifiers.background;
-    swiftUIPadding = modifiers.padding;
-    swiftUIFrame = modifiers.frame;
-    swiftUIOnTapGesture = modifiers.onTapGesture;
-  } catch (e) {
-    console.warn('SwiftUI components not available:', e);
-  }
-}
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export type EphemeralDuration = '5m' | '1h' | '24h' | '7d' | null;
 
@@ -73,23 +33,6 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
   visible = false,
   onClose,
 }) => {
-  const shouldUseSwiftUI = canUseSwiftUI();
-  const canRenderSwiftUI =
-    shouldUseSwiftUI &&
-    SwiftUIHost &&
-    SwiftUIBottomSheet &&
-    SwiftUIVStack &&
-    SwiftUIHStack &&
-    SwiftUIText &&
-    SwiftUIButton &&
-    SwiftUIImage &&
-    SwiftUISpacer &&
-    swiftUICornerRadius &&
-    swiftUIBackground &&
-    swiftUIPadding &&
-    swiftUIFrame &&
-    swiftUIOnTapGesture;
-
   const handleClose = () => {
     if (onClose) {
       onClose();
@@ -101,24 +44,33 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
     handleClose();
   };
 
-  const SheetContent = () => (
-    <View style={styles.cardContainer}>
-      <View style={styles.modalContent}>
-        <View style={styles.modalHeader}>
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <View style={styles.container}>
+        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={styles.dimOverlay} />
+        <View style={styles.dragIndicator} />
+
+        {/* Header */}
+        <View style={styles.header}>
           <View style={styles.headerIcon}>
-            <Ionicons name="timer-outline" size={18} color={palette.accent} />
+            <Ionicons name="timer-outline" size={20} color={palette.accent} />
           </View>
           <View style={styles.headerText}>
-            <Text style={styles.modalTitle}>Disappearing Message</Text>
-            <Text style={styles.modalSubtitle}>
-              Choose how long before messages disappear
-            </Text>
+            <Text style={styles.title}>Disappearing Message</Text>
+            <Text style={styles.subtitle}>Choose how long before messages disappear</Text>
           </View>
-          <Pressable onPress={handleClose} style={styles.closeButton}>
+          <Pressable style={styles.closeButton} onPress={handleClose}>
             <Ionicons name="close" size={20} color={palette.textMuted} />
           </Pressable>
         </View>
 
+        {/* Options */}
         <View style={styles.optionsList}>
           {DURATION_OPTIONS.map((option) => (
             <Pressable
@@ -134,226 +86,110 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
                 <Text style={styles.optionDescription}>{option.description}</Text>
               </View>
               {selectedDuration === option.value && (
-                <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
+                <View style={styles.checkCircle}>
+                  <Ionicons name="checkmark" size={16} color="#0B1630" />
+                </View>
               )}
             </Pressable>
           ))}
         </View>
       </View>
-    </View>
-  );
-
-  // ═══════════════════════════════════════════════════════════════
-  // iOS: Native SwiftUI BottomSheet
-  // ═══════════════════════════════════════════════════════════════
-  if (canRenderSwiftUI) {
-    return (
-      <SwiftUIHost style={styles.swiftUIHost} useViewportSizeMeasurement>
-        <SwiftUIBottomSheet
-          isOpened={visible}
-          onIsOpenedChange={(isOpened: boolean) => {
-            if (!isOpened) {
-              handleClose();
-            }
-          }}
-          presentationDragIndicator="visible"
-        >
-          <SwiftUIVStack
-            alignment="center"
-            spacing={12}
-            modifiers={[swiftUIPadding({ horizontal: spacing.lg, vertical: spacing.md })]}
-          >
-            {/* Header */}
-            <SwiftUIHStack alignment="center" spacing={12}>
-              <SwiftUIVStack
-                modifiers={[
-                  swiftUIFrame({ width: 36, height: 36 }),
-                  swiftUIBackground('rgba(10, 132, 255, 0.18)'),
-                  swiftUICornerRadius(18),
-                ]}
-              >
-                <SwiftUIImage systemName="timer" size={16} color={palette.accent} />
-              </SwiftUIVStack>
-              <SwiftUIVStack
-                alignment="leading"
-                spacing={2}
-                modifiers={[swiftUIFrame({ maxWidth: 220, alignment: 'leading' })]}
-              >
-                <SwiftUIText size={17} weight="semibold" color={palette.text}>
-                  Disappearing Message
-                </SwiftUIText>
-                <SwiftUIText size={12} color={palette.textMuted}>
-                  Choose how long before messages disappear
-                </SwiftUIText>
-              </SwiftUIVStack>
-              <SwiftUISpacer />
-              <SwiftUIButton
-                systemImage="xmark"
-                onPress={handleClose}
-                variant="plain"
-                modifiers={[
-                  swiftUIFrame({ width: 30, height: 30 }),
-                ]}
-              />
-            </SwiftUIHStack>
-
-            {/* Options */}
-            <SwiftUIVStack alignment="leading" spacing={6}>
-              {DURATION_OPTIONS.map((option) => {
-                const isSelected = selectedDuration === option.value;
-                return (
-                  <SwiftUIHStack
-                    key={option.value ?? 'off'}
-                    alignment="center"
-                    spacing={12}
-                    modifiers={[
-                      swiftUIPadding({ horizontal: 14, vertical: 12 }),
-                      swiftUIBackground(
-                        isSelected ? 'rgba(10, 132, 255, 0.25)' : 'rgba(255, 255, 255, 0.06)'
-                      ),
-                      swiftUICornerRadius(12),
-                      swiftUIFrame({ maxWidth: 380 }),
-                      swiftUIOnTapGesture(() => handleSelectOption(option.value)),
-                    ]}
-                  >
-                    <SwiftUIVStack
-                      alignment="leading"
-                      spacing={2}
-                      modifiers={[swiftUIFrame({ maxWidth: 280, alignment: 'leading' })]}
-                    >
-                      <SwiftUIText size={16} weight="medium" color={palette.text}>
-                        {option.label}
-                      </SwiftUIText>
-                      <SwiftUIText size={13} color={palette.textMuted}>
-                        {option.description}
-                      </SwiftUIText>
-                    </SwiftUIVStack>
-                    <SwiftUISpacer />
-                    {isSelected ? (
-                      <SwiftUIImage
-                        systemName="checkmark.circle.fill"
-                        size={22}
-                        color={palette.accent}
-                      />
-                    ) : null}
-                  </SwiftUIHStack>
-                );
-              })}
-            </SwiftUIVStack>
-          </SwiftUIVStack>
-        </SwiftUIBottomSheet>
-      </SwiftUIHost>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Android / Fallback: Modal
-  // ═══════════════════════════════════════════════════════════════
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
-      <Pressable style={styles.modalOverlay} onPress={handleClose}>
-        <Pressable onPress={(e) => e.stopPropagation()}>
-          <SheetContent />
-        </Pressable>
-      </Pressable>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  swiftUIHost: {
-    position: 'absolute',
-    width: SCREEN_WIDTH,
-    height: 0,
-  },
-  sheetContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(3, 7, 18, 0.65)',
-    justifyContent: 'flex-end',
-    alignItems: 'stretch',
-    padding: spacing.lg,
+    backgroundColor: 'rgba(8, 10, 16, 0.92)',
   },
-  cardContainer: {
-    width: '100%',
-    maxWidth: 420,
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 7, 12, 0.35)',
+  },
+  dragIndicator: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 20,
   },
-  modalContent: {
-    padding: spacing.lg,
-  },
-  modalHeader: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    gap: 12,
   },
   headerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(10, 132, 255, 0.18)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerText: {
     flex: 1,
   },
+  title: {
+    color: '#ffffff',
+    fontSize: 20,
+    ...font('bold'),
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    marginTop: 4,
+  },
   closeButton: {
-    padding: spacing.xs,
-    marginLeft: 'auto',
-  },
-  modalTitle: {
-    color: palette.text,
-    fontSize: 18,
-    ...font('semibold'),
-  },
-  modalSubtitle: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   optionsList: {
+    paddingHorizontal: 20,
     gap: spacing.sm,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
-    borderRadius: radii.md,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: radii.lg,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    minHeight: 64,
   },
   optionItemSelected: {
-    backgroundColor: 'rgba(10, 132, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(10, 132, 255, 0.4)',
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
   },
   optionContent: {
     flex: 1,
   },
   optionLabel: {
-    color: palette.text,
-    fontSize: 15,
-    ...font('medium'),
+    color: '#ffffff',
+    fontSize: 17,
+    ...font('semibold'),
   },
   optionDescription: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

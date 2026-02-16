@@ -363,9 +363,14 @@ export class ApiService {
   static async createPoll(
     chatId: string | number,
     data: {
-      question: string;
-      options: string[];
+      question?: string;
+      options?: string[];
+      optionsCount?: number;
       multiSelect?: boolean;
+      encryptedPollPayload?: any;
+      backupEnvelopes?: any;
+      pollPayloadVersion?: number;
+      senderDeviceId?: string | null;
     },
     token: string
   ): Promise<ApiResponse> {

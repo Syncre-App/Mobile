@@ -39,6 +39,7 @@ import { CreatePollSheet } from '../../components/CreatePollSheet';
 import { PollMessage, type PollData } from '../../components/PollMessage';
 import { NativeContextMenu, type ContextMenuAction } from '../../components/NativeContextMenu';
 import { canUseSwiftUI } from '../../utils/swiftUi';
+import { decodePollPayload, decodePollPayloadFromJson, encodePollPayload } from '../../utils/pollPayload';
 import { font, palette, radii, spacing } from '../../theme/designSystem';
 import leo from 'leo-profanity';
 
@@ -1712,6 +1713,7 @@ const ChatScreen: React.FC = () => {
   const [showEphemeralSheet, setShowEphemeralSheet] = useState(false);
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
   const [pollsData, setPollsData] = useState<Map<string, { poll: PollData; userVotes: number[] }>>(new Map());
+  const pollDecryptAttemptedRef = useRef<Set<string>>(new Set());
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
@@ -2442,14 +2444,16 @@ const ChatScreen: React.FC = () => {
         
         // Store poll data in pollsData state
         if (isPollMessage && pollData) {
+          const pollEntry = pollData;
           setPollsData((prev) => {
             const newMap = new Map(prev);
             newMap.set(String(idValue), {
-              poll: pollData,
+              poll: pollEntry,
               userVotes: userVotes || [],
             });
             return newMap;
           });
+          void hydratePollFromEncrypted(String(idValue), pollEntry);
         }
 
         results.push({
@@ -4763,7 +4767,42 @@ const ChatScreen: React.FC = () => {
         throw new Error('Missing auth token');
       }
 
-      const response = await ApiService.createPoll(chatId, data, token);
+      const encodedPayload = encodePollPayload({
+        question: data.question,
+        options: data.options,
+      });
+
+      const otherParticipants = participantIdsRef.current
+        .filter((participantId) => participantId !== currentUserId)
+        .filter(Boolean);
+
+      const recipientIds =
+        otherParticipants.length > 0
+          ? otherParticipants
+          : otherUserIdRef.current
+            ? [otherUserIdRef.current]
+            : [];
+
+      const encryptedPayload = await CryptoService.buildEncryptedPayloadWithBackup({
+        chatId,
+        message: encodedPayload,
+        recipientUserIds: recipientIds,
+        token,
+        currentUserId,
+      });
+
+      const response = await ApiService.createPoll(
+        chatId,
+        {
+          optionsCount: data.options.length,
+          multiSelect: data.multiSelect,
+          encryptedPollPayload: encryptedPayload.envelopes,
+          backupEnvelopes: encryptedPayload.backupEnvelopes,
+          pollPayloadVersion: 1,
+          senderDeviceId: encryptedPayload.senderDeviceId,
+        },
+        token
+      );
 
       if (response.success) {
         NotificationService.show('success', 'Poll created');
@@ -4793,14 +4832,18 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.votePoll(chatId, pollId, [optionId], token);
 
       if (response.success && response.data) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: response.data.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
       }
     } catch (error) {
       console.error('Error voting on poll:', error);
@@ -4822,14 +4865,18 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.removeVotePoll(chatId, pollId, optionId, token);
 
       if (response.success && response.data) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: response.data.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
       }
     } catch (error) {
       console.error('Error removing vote:', error);
@@ -4851,15 +4898,19 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.closePoll(chatId, pollId, token);
 
       if (response.success && response.data) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           const existing = prev.get(messageId);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: existing?.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
         NotificationService.show('success', 'Poll closed');
       }
     } catch (error) {
@@ -4876,19 +4927,111 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.getPollByMessageId(messageId, token);
 
       if (response.success && response.data?.poll) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: response.data.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
       }
     } catch (error) {
       console.error('Error fetching poll:', error);
     }
   }, []);
+
+  const hydratePollFromEncrypted = useCallback(
+    async (messageId: string, poll: PollData) => {
+      if (!poll?.encryptedPayload || !currentUserId || !chatId) return;
+      const attemptKey = `${messageId}:${poll.payloadVersion || 1}:${Array.isArray(poll.encryptedPayload) ? poll.encryptedPayload.length : 0}`;
+      if (pollDecryptAttemptedRef.current.has(attemptKey)) {
+        return;
+      }
+      pollDecryptAttemptedRef.current.add(attemptKey);
+      const hasPlainText =
+        typeof poll.question === 'string' &&
+        poll.question.trim().length > 0 &&
+        Array.isArray(poll.options) &&
+        poll.options.some((opt) => typeof opt.text === 'string' && opt.text.trim().length > 0);
+      if (hasPlainText) return;
+
+      const envelopes = Array.isArray(poll.encryptedPayload) ? poll.encryptedPayload : [];
+      const backupEnvelopes = Array.isArray(poll.backupEnvelopes) ? poll.backupEnvelopes : [];
+      if (!envelopes.length && !backupEnvelopes.length) return;
+
+      try {
+        const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+        authTokenRef.current = token || null;
+
+        let decrypted = envelopes.length
+          ? await CryptoService.decryptMessage({
+              chatId,
+              envelopes,
+              senderId: poll.creatorId,
+              currentUserId,
+              token: token || undefined,
+            })
+          : null;
+
+        if (!decrypted && backupEnvelopes.length > 0) {
+          const backup =
+            backupEnvelopes.find((entry: any) => String(entry?.userId ?? '') === String(currentUserId)) ||
+            backupEnvelopes[0];
+          if (backup?.payload && backup?.nonce) {
+            decrypted = await CryptoService.decryptFromBackup(backup);
+          }
+        }
+
+        if (!decrypted) {
+          return;
+        }
+
+        const decoded =
+          decodePollPayload(decrypted) ||
+          decodePollPayloadFromJson(decrypted);
+
+        if (!decoded) {
+          return;
+        }
+
+        setPollsData((prev) => {
+          const existing = prev.get(messageId);
+          if (!existing) return prev;
+          const existingOptions = Array.isArray(existing.poll.options) ? existing.poll.options : [];
+          const optionIds = existingOptions.length
+            ? existingOptions.map((opt) => opt.id)
+            : decoded.options.map((_, idx) => idx + 1);
+          const nextOptions = decoded.options.map((text, idx) => ({
+            id: optionIds[idx] ?? idx + 1,
+            text,
+          }));
+          const nextPoll = {
+            ...existing.poll,
+            question: decoded.question,
+            options: nextOptions,
+          };
+          const sameQuestion = existing.poll.question === nextPoll.question;
+          const sameOptions =
+            existingOptions.length === nextOptions.length &&
+            existingOptions.every((opt, idx) => opt.text === nextOptions[idx]?.text);
+          if (sameQuestion && sameOptions) {
+            return prev;
+          }
+          const newMap = new Map(prev);
+          newMap.set(messageId, { ...existing, poll: nextPoll });
+          return newMap;
+        });
+      } catch (error) {
+        console.warn('Failed to decrypt poll payload:', error);
+      }
+    },
+    [chatId, currentUserId]
+  );
 
   useEffect(() => {
     if (replyContext) {
@@ -5344,6 +5487,10 @@ const ChatScreen: React.FC = () => {
                 voters: [],
               })),
               totalVotes: 0,
+              encryptedPayload: payload.encryptedPayload,
+              backupEnvelopes: payload.backupEnvelopes,
+              payloadVersion: payload.payloadVersion,
+              senderDeviceId: payload.senderDeviceId ?? null,
             },
           };
           setPollsData((prev) => {
@@ -5354,6 +5501,9 @@ const ChatScreen: React.FC = () => {
             });
             return newMap;
           });
+          if (newEntry.poll?.encryptedPayload) {
+            void hydratePollFromEncrypted(String(payload.messageId), newEntry.poll);
+          }
           setMessagesAnimated((prev) => {
             const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
             if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
@@ -5832,17 +5982,18 @@ const ChatScreen: React.FC = () => {
       // Render PollMessage for poll type messages
       if (messageItem.isPoll && messageItem.poll) {
         const pollDataEntry = pollsData.get(messageItem.id);
+        const poll = pollDataEntry?.poll ?? messageItem.poll;
         const userVotes = pollDataEntry?.userVotes || [];
-        const isCreator = messageItem.poll.creatorId === currentUserId;
+        const isCreator = poll.creatorId === currentUserId;
 
         return (
           <PollMessage
             key={messageItem.id}
-            poll={messageItem.poll}
+            poll={poll}
             userVotes={userVotes}
-            onVote={(optionId) => handlePollVote(messageItem.id, messageItem.poll!.id, optionId)}
-            onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, messageItem.poll!.id, optionId)}
-            onClose={() => handleClosePoll(messageItem.id, messageItem.poll!.id)}
+            onVote={(optionId) => handlePollVote(messageItem.id, poll.id, optionId)}
+            onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, poll.id, optionId)}
+            onClose={() => handleClosePoll(messageItem.id, poll.id)}
             isCreator={isCreator}
           />
         );
@@ -7138,6 +7289,7 @@ const styles = StyleSheet.create({
   },
   messageRowWithReply: {
     marginTop: 10,
+    marginBottom: 6,
   },
   messageRowWithReactions: {
     marginBottom: 36,
@@ -7621,7 +7773,8 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   threadSummaryButton: {
-    marginTop: 6,
+    marginTop: 8,
+    marginBottom: 4,
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,

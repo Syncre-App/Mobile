@@ -346,6 +346,42 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     return label;
   };
 
+  const matchesUserId = (a?: string | number | null, b?: string | number | null): boolean => {
+    if (!a || !b) return false;
+    const aStr = String(a);
+    const bStr = String(b);
+    return (
+      aStr === bStr ||
+      aStr.replace(/^0+/, '') === bStr.replace(/^0+/, '') ||
+      aStr.padStart(16, '0') === bStr.padStart(16, '0')
+    );
+  };
+
+  const resolveUserLabel = (userId: string | null | undefined, participants: User[] = []): string => {
+    if (!userId) return 'Someone';
+    const normalized = String(userId);
+    const participant = participants.find((p) => matchesUserId(p.id, normalized));
+    if (participant?.username) return participant.username;
+    if (participant?.email) return participant.email;
+    const cached = userDetails[normalized];
+    if (cached?.username) return cached.username;
+    if (cached?.email) return cached.email;
+    return 'Someone';
+  };
+
+  const getLastMessagePreview = (chat: Chat, isGroupChat: boolean, fallback: string): string => {
+    const lastMessage = chat.lastMessage;
+    if (!lastMessage || !lastMessage.content) {
+      return fallback;
+    }
+    const preview = String(lastMessage.content).trim();
+    if (!preview) return fallback;
+    if (!isGroupChat) return preview;
+    const senderId = (lastMessage as any).sender_id ?? (lastMessage as any).senderId ?? null;
+    const senderLabel = resolveUserLabel(senderId, chat.participants || []);
+    return `${senderLabel}: ${preview}`;
+  };
+
   const handleChatPress = (chat: Chat) => {
     const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
     const now = Date.now();
@@ -526,8 +562,11 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const chatStreak = streaks[chatIdKey];
     const streakCount = chatStreak?.currentStreak || 0;
 
+    const subtitleFallback = isGroupChat ? groupSubtitle || '' : (lastSeenLabel || '');
+    const lastMessagePreview = getLastMessagePreview(chat, isGroupChat, subtitleFallback);
+
     const chatCardContent = (
-      <View style={styles.chatCard}>
+      <View style={[styles.chatCard, hasUnread && styles.chatCardUnread]}>
         <UserAvatar
           uri={avatarUri}
           name={displayName}
@@ -554,30 +593,22 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
                 ))}
               </View>
             )}
-{/* Unread badge temporarily hidden
             {hasUnread && (
               <View style={styles.chatUnreadPill}>
                 <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
               </View>
             )}
-*/}
             {streakCount > 0 && (
               <View style={styles.streakBadge}>
                 <Text style={styles.streakText}>{streakCount}</Text>
               </View>
             )}
           </View>
-          {groupSubtitle ? (
+          {lastMessagePreview ? (
             <Text style={styles.chatSubtitle} numberOfLines={1}>
-              {groupSubtitle}
+              {lastMessagePreview}
             </Text>
-          ) : (
-            !isGroupChat && lastSeenLabel ? (
-              <Text style={styles.chatSubtitle} numberOfLines={1}>
-                {lastSeenLabel}
-              </Text>
-            ) : null
-          )}
+          ) : null}
         </View>
 
         <View style={styles.rightColumn}>
@@ -746,13 +777,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Border removed for cleaner UI
     shadowColor: '#010103',
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   chatCardUnread: {
     borderColor: 'rgba(37, 99, 235, 0.35)',
@@ -865,8 +895,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.xl,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Border removed to match chatCard
   },
   skeletonAvatar: {
     width: 56,

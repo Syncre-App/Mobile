@@ -2,7 +2,7 @@
   "expo": {
     "name": "Syncre",
     "slug": "syncre",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "scheme": "syncre",
@@ -56,7 +56,10 @@
               "scheme": "syncre"
             }
           ],
-          "category": ["DEFAULT", "BROWSABLE"]
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ]
         }
       ]
     },
@@ -86,7 +89,12 @@
           "color": "#2C82FF"
         }
       ],
-      "expo-video"
+      "expo-video",
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "expo-localization",
+      "expo-secure-store",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
