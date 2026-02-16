@@ -734,7 +734,82 @@ interface MessageBubbleProps {
   isFiltered?: boolean;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({
+const areSeenReceiptListsEqual = (
+  previous: SeenReceipt[] | null | undefined,
+  next: SeenReceipt[] | null | undefined
+): boolean => {
+  if (previous === next) {
+    return true;
+  }
+  const prevList = Array.isArray(previous) ? previous : [];
+  const nextList = Array.isArray(next) ? next : [];
+  if (prevList.length !== nextList.length) {
+    return false;
+  }
+  for (let i = 0; i < prevList.length; i += 1) {
+    const prevItem = prevList[i];
+    const nextItem = nextList[i];
+    if (
+      prevItem?.userId !== nextItem?.userId ||
+      prevItem?.username !== nextItem?.username ||
+      prevItem?.avatarUrl !== nextItem?.avatarUrl ||
+      prevItem?.seenAt !== nextItem?.seenAt
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const areContextMenuActionsEqual = (
+  previous: ContextMenuAction[] | undefined,
+  next: ContextMenuAction[] | undefined
+): boolean => {
+  if (previous === next) {
+    return true;
+  }
+  const prevList = Array.isArray(previous) ? previous : [];
+  const nextList = Array.isArray(next) ? next : [];
+  if (prevList.length !== nextList.length) {
+    return false;
+  }
+  for (let i = 0; i < prevList.length; i += 1) {
+    const prevItem = prevList[i];
+    const nextItem = nextList[i];
+    if (
+      prevItem?.title !== nextItem?.title ||
+      prevItem?.systemIcon !== nextItem?.systemIcon ||
+      Boolean(prevItem?.destructive) !== Boolean(nextItem?.destructive)
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const areMessageBubblePropsEqual = (
+  previous: Readonly<MessageBubbleProps>,
+  next: Readonly<MessageBubbleProps>
+): boolean => {
+  if (previous.message !== next.message) return false;
+  if (previous.isMine !== next.isMine) return false;
+  if (previous.isFirstInGroup !== next.isFirstInGroup) return false;
+  if (previous.isLastInGroup !== next.isLastInGroup) return false;
+  if (previous.showStatus !== next.showStatus) return false;
+  if (previous.showTimestamp !== next.showTimestamp) return false;
+  if (previous.isHighlighted !== next.isHighlighted) return false;
+  if (previous.replyCount !== next.replyCount) return false;
+  if (previous.showSenderMetadata !== next.showSenderMetadata) return false;
+  if (previous.isGroupChat !== next.isGroupChat) return false;
+  if (previous.currentUserId !== next.currentUserId) return false;
+  if (previous.isFiltered !== next.isFiltered) return false;
+  if ((previous.directRecipient?.id ?? null) !== (next.directRecipient?.id ?? null)) return false;
+  if (!areSeenReceiptListsEqual(previous.seenOverride, next.seenOverride)) return false;
+  if (!areContextMenuActionsEqual(previous.contextMenuActions, next.contextMenuActions)) return false;
+  return true;
+};
+
+const MessageBubbleImpl: React.FC<MessageBubbleProps> = ({
   message,
   isMine,
   isFirstInGroup,
@@ -1493,6 +1568,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
+const MessageBubble = React.memo(MessageBubbleImpl, areMessageBubblePropsEqual);
+MessageBubble.displayName = 'MessageBubble';
+
 const ChatScreen: React.FC = () => {
   const { id } = useLocalSearchParams();
   const chatId = useMemo(() => (Array.isArray(id) ? id[0] : id), [id]);
@@ -2232,6 +2310,27 @@ const ChatScreen: React.FC = () => {
       }
     });
     return counts;
+  }, [messages]);
+
+  const messageGroupBoundaries = useMemo(() => {
+    const grouping = new Map<string, { isFirstInGroup: boolean; isLastInGroup: boolean }>();
+    for (let i = 0; i < messages.length; i += 1) {
+      const messageItem = messages[i];
+      const previousMessage = i > 0 ? messages[i - 1] : null;
+      const nextMessage = i < messages.length - 1 ? messages[i + 1] : null;
+      grouping.set(messageItem.id, {
+        isFirstInGroup:
+          !previousMessage ||
+          previousMessage.senderId !== messageItem.senderId ||
+          Boolean(previousMessage.isPlaceholder),
+        isLastInGroup:
+          !nextMessage ||
+          nextMessage.senderId !== messageItem.senderId ||
+          Boolean(nextMessage.isPlaceholder) ||
+          Boolean(nextMessage.replyTo),
+      });
+    }
+    return grouping;
   }, [messages]);
 
   const seenPlacementMap = useMemo(() => {
@@ -3208,7 +3307,7 @@ const ChatScreen: React.FC = () => {
         isNearTopRef.current = false;
       }
     },
-    [chatId, hasMore, isLoadingMore, messages, setMessagesAnimated, transformMessages]
+    [chatId, handleIdentityMissing, hasMore, isLoadingMore, setMessagesWithoutAnimation, transformMessages]
   );
 
   const handleComposerChange = useCallback(
@@ -5108,18 +5207,6 @@ const ChatScreen: React.FC = () => {
     };
   }, [chatId, wsService, currentUserId, receiverNameRef, scrollToBottom]);
 
-  useEffect(() => {
-    // Debug: log when decorated list or typing state changes so we can confirm the typing item is present
-    try {
-      console.log('decoratedData updated - isRemoteTyping:', isRemoteTyping, 'items:', decoratedData.length);
-      // print a compact summary of the last few items to avoid enormous logs
-      const tail = decoratedData.slice(-6).map((it) => ({ kind: it.kind, id: it.id }));
-      console.log('decoratedData tail:', tail);
-    } catch (e) {
-      // ignore logging errors
-    }
-  }, [decoratedData, isRemoteTyping]);
-
   const handleIncomingMessage = useCallback(
     async (message: WebSocketMessage) => {
       if (!chatId) {
@@ -5922,8 +6009,10 @@ const ChatScreen: React.FC = () => {
     }
   }, [decoratedData]);
 
+  const isGroupChat = Boolean(chatDetails?.isGroup);
+
   const renderChatItem = useCallback(
-    ({ item, index }: { item: ChatListItem; index: number }) => {
+    ({ item }: { item: ChatListItem; index: number }) => {
       if (item.kind === 'typing') {
         return <TypingIndicator label={formatTypingLabel(typingUsers)} />;
       }
@@ -5949,31 +6038,10 @@ const ChatScreen: React.FC = () => {
           </View>
         );
       }
-      const previousMessage = (() => {
-        for (let i = index - 1; i >= 0; i -= 1) {
-          const prevItem = decoratedData[i];
-          if (prevItem?.kind === 'message') {
-            return prevItem.message;
-          }
-        }
-        return null;
-      })();
-
-      const nextMessage = (() => {
-        for (let i = index + 1; i < decoratedData.length; i += 1) {
-          const nextItem = decoratedData[i];
-          if (nextItem?.kind === 'message') {
-            return nextItem.message;
-          }
-        }
-        return null;
-      })();
-
       const isMine = Boolean(currentUserId && messageItem.senderId === currentUserId);
-      const isFirstInGroup =
-        !previousMessage || previousMessage.senderId !== messageItem.senderId || !!previousMessage.isPlaceholder;
-      const isLastInGroup =
-        !nextMessage || nextMessage.senderId !== messageItem.senderId || !!nextMessage.isPlaceholder || !!nextMessage.replyTo;
+      const boundaries = messageGroupBoundaries.get(messageItem.id);
+      const isFirstInGroup = boundaries?.isFirstInGroup ?? true;
+      const isLastInGroup = boundaries?.isLastInGroup ?? true;
 
       const shouldShowStatus = lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
       const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
@@ -6016,7 +6084,7 @@ const ChatScreen: React.FC = () => {
           isHighlighted={highlightedMessageId === messageItem.id || contextTargetId === messageItem.id}
           replyCount={replyCount}
           onOpenThread={(messageId) => setThreadRootId(messageId)}
-          showSenderMetadata={Boolean(chatDetails?.isGroup && isFirstInGroup && !messageItem.isPlaceholder)}
+          showSenderMetadata={Boolean(isGroupChat && isFirstInGroup && !messageItem.isPlaceholder)}
           onBubblePress={() => {
             if (reactionPicker) {
               closeReactionPicker();
@@ -6030,7 +6098,7 @@ const ChatScreen: React.FC = () => {
           onAttachmentPress={handleAttachmentTap}
           onDownloadAttachment={handleDownloadAttachment}
           onLinkPress={handleOpenLink}
-          isGroupChat={Boolean(chatDetails?.isGroup)}
+          isGroupChat={isGroupChat}
           directRecipient={directRecipient}
           seenOverride={seenPlacementMap.get(messageItem.id) ?? null}
           onReact={handleToggleReaction}
@@ -6041,15 +6109,18 @@ const ChatScreen: React.FC = () => {
     },
     [
       currentUserId,
-      decoratedData,
+      messageGroupBoundaries,
       replyCounts,
       buildReplyPayloadFromMessage,
       highlightedMessageId,
+      contextTargetId,
       lastOutgoingMessageId,
       timestampVisibleFor,
-      Boolean(chatDetails?.isGroup),
+      isGroupChat,
       directRecipient,
+      closeReactionPicker,
       handleAttachmentTap,
+      handleDownloadAttachment,
       handleOpenLink,
       seenPlacementMap,
       handleToggleReaction,
@@ -6059,6 +6130,7 @@ const ChatScreen: React.FC = () => {
       contentFilterMode,
       typingUsers,
       formatTypingLabel,
+      reactionPicker,
       pollsData,
       handlePollVote,
       handlePollRemoveVote,
@@ -6211,7 +6283,6 @@ const ChatScreen: React.FC = () => {
     ]
   );
 
-  const isGroupChat = Boolean(chatDetails?.isGroup);
   const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
   const shouldShowAddButton = !isGroupChat && Boolean(directRecipient?.id || otherUserIdRef.current);
   const shouldShowSettingsButton = isGroupChat && isGroupOwner;
