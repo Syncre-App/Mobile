@@ -777,13 +777,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Border removed for cleaner UI
     shadowColor: '#010103',
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   chatCardUnread: {
     borderColor: 'rgba(37, 99, 235, 0.35)',
@@ -896,8 +895,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.xl,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Border removed to match chatCard
   },
   skeletonAvatar: {
     width: 56,

@@ -179,7 +179,7 @@ export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
       <View style={styles.modalContent}>
         <View style={styles.modalHeader}>
           <View style={styles.headerIcon}>
-            <Ionicons name="time-outline" size={18} color={palette.accent} />
+            <Ionicons name="time-outline" size={22} color={palette.accent} />
           </View>
           <View style={styles.headerText}>
             <Text style={styles.modalTitle}>Schedule Message</Text>
@@ -447,14 +447,14 @@ const styles = StyleSheet.create({
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   headerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(10, 132, 255, 0.18)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -462,18 +462,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   closeButton: {
-    padding: spacing.xs,
-    marginLeft: 'auto',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalTitle: {
     color: palette.text,
-    fontSize: 18,
-    ...font('semibold'),
+    fontSize: 20,
+    ...font('bold'),
+    letterSpacing: -0.4,
   },
   modalSubtitle: {
     color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 14,
+    marginTop: 4,
+    lineHeight: 18,
   },
   optionsList: {
     gap: spacing.sm,
@@ -482,61 +488,67 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
-    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    minHeight: 56,
   },
   optionItemSelected: {
-    backgroundColor: 'rgba(10, 132, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(10, 132, 255, 0.4)',
+    backgroundColor: 'rgba(10, 132, 255, 0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(10, 132, 255, 0.35)',
   },
   optionContent: {
     flex: 1,
   },
   optionLabel: {
     color: palette.text,
-    fontSize: 15,
-    ...font('medium'),
+    fontSize: 16,
+    ...font('semibold'),
   },
   optionDescription: {
     color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 3,
+    lineHeight: 17,
   },
   customPickerContainer: {
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
   },
   customPickerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
   confirmButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    justifyContent: 'center',
+    gap: spacing.sm,
     backgroundColor: palette.accent,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
+    minHeight: 50,
   },
   confirmButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   confirmButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    ...font('semibold'),
+    fontSize: 16,
+    ...font('bold'),
   },
   errorText: {
     color: '#EF4444',
-    fontSize: 12,
+    fontSize: 13,
+    ...font('medium'),
   },
 });
 

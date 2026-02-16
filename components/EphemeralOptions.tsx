@@ -106,7 +106,7 @@ export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
       <View style={styles.modalContent}>
         <View style={styles.modalHeader}>
           <View style={styles.headerIcon}>
-            <Ionicons name="timer-outline" size={18} color={palette.accent} />
+            <Ionicons name="timer-outline" size={22} color={palette.accent} />
           </View>
           <View style={styles.headerText}>
             <Text style={styles.modalTitle}>Disappearing Message</Text>
@@ -298,14 +298,14 @@ const styles = StyleSheet.create({
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   headerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(10, 132, 255, 0.18)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -313,18 +313,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   closeButton: {
-    padding: spacing.xs,
-    marginLeft: 'auto',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalTitle: {
     color: palette.text,
-    fontSize: 18,
-    ...font('semibold'),
+    fontSize: 20,
+    ...font('bold'),
+    letterSpacing: -0.4,
   },
   modalSubtitle: {
     color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 14,
+    marginTop: 4,
+    lineHeight: 18,
   },
   optionsList: {
     gap: spacing.sm,
@@ -333,27 +339,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
-    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    minHeight: 56,
   },
   optionItemSelected: {
-    backgroundColor: 'rgba(10, 132, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(10, 132, 255, 0.4)',
+    backgroundColor: 'rgba(10, 132, 255, 0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(10, 132, 255, 0.35)',
   },
   optionContent: {
     flex: 1,
   },
   optionLabel: {
     color: palette.text,
-    fontSize: 15,
-    ...font('medium'),
+    fontSize: 16,
+    ...font('semibold'),
   },
   optionDescription: {
     color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 3,
+    lineHeight: 17,
   },
 });
 
