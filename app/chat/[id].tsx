@@ -638,6 +638,7 @@ const REACTION_BUTTON_SIZE = 36;
 const REACTION_BUTTON_GAP = 8;
 const REACTION_CARD_PADDING = 10;
 const REACTION_LABEL_HEIGHT = 24;
+const decryptionCache = new Map<string, string>();
 const huWords = [
   "bazdmeg", "bazmeg", "geci", "fasz", "kurva", "picsa", "szar", "szopd", "kibaszott",
   "buzi", "köcsög", "baszik", "kúr", "nemnormális", "balfasz", "fing", "ribanc",
@@ -2338,6 +2339,8 @@ const ChatScreen: React.FC = () => {
       let missingEnvelope = false;
       const timezoneFallback = options?.timezone || TimezoneService.getTimezone();
 
+      const pollUpdates = new Map<string, { poll: PollData; userVotes: number[] }>();
+
       for (const raw of rawMessages) {
         const idValue = raw.id ?? `${chatId}-${raw.createdAt ?? raw.created_at ?? Date.now()}`;
         const senderId = raw.senderId ?? raw.sender_id;
@@ -2372,7 +2375,10 @@ const ChatScreen: React.FC = () => {
             : [];
 
         let content: string | null = null;
-        if (raw.isEncrypted && (Array.isArray(raw.envelopes) || raw.backupEnvelope)) {
+        const cached = decryptionCache.get(String(idValue));
+        if (cached) {
+          content = cached;
+        } else if (raw.isEncrypted && (Array.isArray(raw.envelopes) || raw.backupEnvelope)) {
           if (!chatId) {
             continue;
           }
@@ -2397,11 +2403,14 @@ const ChatScreen: React.FC = () => {
 
           if (decrypted) {
             content = decrypted;
+            decryptionCache.set(String(idValue), decrypted);
           } else {
             console.warn(`Decryption failed for historical message ${raw.id}.`);
             content = resolveDecryptFallbackText(preview, attachments);
             decryptFailed = true;
-            missingEnvelope = true;
+            if (!decryptionCache.has(String(idValue))) {
+              missingEnvelope = true;
+            }
           }
         } else {
           content = raw.content ?? preview ?? '';
@@ -2412,7 +2421,9 @@ const ChatScreen: React.FC = () => {
             content = buildDeletedLabel(deletedByName || resolveSenderProfile(String(senderId)).name);
           } else {
             content = preview || '[Message unavailable]';
-            missingEnvelope = true;
+            if (!decryptionCache.has(String(idValue))) {
+              missingEnvelope = true;
+            }
             decryptFailed = true;
           }
         }
@@ -2457,16 +2468,12 @@ const ChatScreen: React.FC = () => {
         const pollData = (raw as any)?.poll;
         const userVotes = (raw as any)?.userVotes;
         
-        // Store poll data in pollsData state
+        // Store poll data for batch update
         if (isPollMessage && pollData) {
           const pollEntry = pollData;
-          setPollsData((prev) => {
-            const newMap = new Map(prev);
-            newMap.set(String(idValue), {
-              poll: pollEntry,
-              userVotes: userVotes || [],
-            });
-            return newMap;
+          pollUpdates.set(String(idValue), {
+            poll: pollEntry,
+            userVotes: userVotes || [],
           });
           void hydratePollFromEncrypted(String(idValue), pollEntry);
         }
@@ -2499,6 +2506,17 @@ const ChatScreen: React.FC = () => {
           // Poll data
           isPoll: isPollMessage,
           poll: pollData,
+        });
+      }
+
+      // Batch update polls state
+      if (pollUpdates.size > 0) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          for (const [msgId, pollInfo] of pollUpdates) {
+            newMap.set(msgId, pollInfo);
+          }
+          return newMap;
         });
       }
 
@@ -2809,7 +2827,7 @@ const ChatScreen: React.FC = () => {
         const cleaned = transformed.filter(Boolean);
         const sorted = sortMessagesChronologically(cleaned);
 
-        setMessagesAnimated((prev) => {
+        setMessagesWithoutAnimation((prev) => {
           const existingIds = new Set(sorted.map((msg) => msg.id));
           const localSending = prev.filter(
             (msg) =>
