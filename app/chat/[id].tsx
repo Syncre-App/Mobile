@@ -446,10 +446,14 @@ const resolveDecryptFallbackText = (
   attachments: MessageAttachment[]
 ): string => {
   if (attachments.length > 0) {
+    // Media messages will show their own placeholder/icon if decryption fails
     return '';
   }
   const trimmedPreview = typeof preview === 'string' ? preview.trim() : '';
-  return trimmedPreview;
+  if (trimmedPreview.length > 0) {
+    return trimmedPreview;
+  }
+  return '[Encrypted message]';
 };
 
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -1519,6 +1523,7 @@ const ChatScreen: React.FC = () => {
   const missingEnvelopeRef = useRef(false);
   const missingHistoryPromptedRef = useRef(false);
   const reencryptRequestedRef = useRef(false);
+  const lastReencryptRequestRef = useRef<number>(0);
   const pendingRefreshRef = useRef(false);
   const identityRepairRef = useRef(false);
   const requestReencrypt = useCallback(
@@ -1526,6 +1531,13 @@ const ChatScreen: React.FC = () => {
       if (!chatId) {
         return;
       }
+      const now = Date.now();
+      const COOLDOWN_MS = 30000;
+      if (now - lastReencryptRequestRef.current < COOLDOWN_MS && reason !== 'manual') {
+        console.log(`[Chat] Skipping re-encrypt request (cooldown active, reason: ${reason})`);
+        return;
+      }
+
       const payload: WebSocketMessage = {
         type: 'request_reencrypt',
         chatId,
@@ -1534,6 +1546,7 @@ const ChatScreen: React.FC = () => {
       };
       wsService.send(payload);
       reencryptRequestedRef.current = true;
+      lastReencryptRequestRef.current = now;
       missingEnvelopeRef.current = false;
     },
     [chatId, wsService]
@@ -2418,14 +2431,16 @@ const ChatScreen: React.FC = () => {
         const decodedPayload = decodeMessagePayload(content ?? '');
         const isSystem = (raw as any)?.messageType === 'system' || (raw as any)?.message_type === 'system' || senderId === 'system';
 
-        if (decryptFailed && !isSystem) {
-          // Skip messages we cannot decrypt instead of rendering empty bubbles
-          continue;
-        }
-
         const contentText = isSystem
           ? (decodedPayload.text?.trim?.() || preview || 'System update')
           : resolveContentText(decodedPayload, preview, attachments.length > 0);
+
+        if (decryptFailed && !isSystem && !contentText && !attachments.length) {
+          // If EVERYTHING failed and there's no preview/attachment info at all, 
+          // then it's truly an empty shell we can skip.
+          continue;
+        }
+
         const serverReply = resolveReplyMetadata((raw as any)?.reply);
         const replyTo = isDeleted
           ? undefined
@@ -5327,7 +5342,7 @@ const ChatScreen: React.FC = () => {
             scheduleRefreshMessages();
           } catch (error) {
             console.error('Failed to decrypt incoming message envelope:', error);
-            refreshMessages();
+            scheduleRefreshMessages();
           }
           return;
         }
@@ -5857,7 +5872,7 @@ const ChatScreen: React.FC = () => {
         return;
       }
       reencryptRequestedRef.current = false;
-      refreshMessages();
+      scheduleRefreshMessages();
     });
     return () => {
       sub.remove();
