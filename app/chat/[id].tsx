@@ -1506,6 +1506,7 @@ const ChatScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const wsService = useMemo(() => WebSocketService.getInstance(), []);
   const flatListRef = useRef<FlatList<ChatListItem>>(null);
+  const handleIncomingMessageRef = useRef<(message: any) => void>(() => {});
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
   const composerLimitWarningRef = useRef(false);
@@ -2375,7 +2376,8 @@ const ChatScreen: React.FC = () => {
             : [];
 
         let content: string | null = null;
-        const cached = decryptionCache.get(String(idValue));
+        const cacheKey = `${chatId}:${idValue}`;
+        const cached = decryptionCache.get(cacheKey);
         if (cached) {
           content = cached;
         } else if (raw.isEncrypted && (Array.isArray(raw.envelopes) || raw.backupEnvelope)) {
@@ -2403,12 +2405,12 @@ const ChatScreen: React.FC = () => {
 
           if (decrypted) {
             content = decrypted;
-            decryptionCache.set(String(idValue), decrypted);
+            decryptionCache.set(cacheKey, decrypted);
           } else {
             console.warn(`Decryption failed for historical message ${raw.id}.`);
             content = resolveDecryptFallbackText(preview, attachments);
             decryptFailed = true;
-            if (!decryptionCache.has(String(idValue))) {
+            if (!decryptionCache.has(cacheKey)) {
               missingEnvelope = true;
             }
           }
@@ -2421,7 +2423,7 @@ const ChatScreen: React.FC = () => {
             content = buildDeletedLabel(deletedByName || resolveSenderProfile(String(senderId)).name);
           } else {
             content = preview || '[Message unavailable]';
-            if (!decryptionCache.has(String(idValue))) {
+            if (!decryptionCache.has(cacheKey)) {
               missingEnvelope = true;
             }
             decryptFailed = true;
@@ -2839,7 +2841,22 @@ const ChatScreen: React.FC = () => {
                 msg.status === 'delivered' ||
                 msg.status === 'seen')
           );
-          return sortMessagesChronologically([...sorted, ...localSending]);
+          // Preserve existing decrypted content when the re-fetch returns fallback text
+          const prevById = new Map(prev.map((msg) => [msg.id, msg]));
+          const merged = sorted.map((msg) => {
+            const existing = prevById.get(msg.id);
+            if (
+              existing &&
+              existing.content &&
+              existing.content !== '[Encrypted message]' &&
+              existing.content !== '[Message unavailable]' &&
+              (msg.content === '[Encrypted message]' || msg.content === '[Message unavailable]' || msg.content === '')
+            ) {
+              return { ...msg, content: existing.content };
+            }
+            return msg;
+          });
+          return sortMessagesChronologically([...merged, ...localSending]);
         });
         if (missingEnvelopeRef.current) {
           requestReencrypt('missing_history');
@@ -3241,7 +3258,8 @@ const ChatScreen: React.FC = () => {
         isNearTopRef.current = false;
       }
     },
-    [chatId, hasMore, isLoadingMore, messages, setMessagesAnimated, transformMessages]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chatId, hasMore, isLoadingMore, transformMessages]
   );
 
   const handleComposerChange = useCallback(
@@ -5272,11 +5290,18 @@ const ChatScreen: React.FC = () => {
             setMessagesAnimated((prev) => {
               const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
               if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
-                return withoutPlaceholders;
+                // Already acked by applyAckToLatestMessage — replace with decrypted version
+                return sortMessagesChronologically(
+                  withoutPlaceholders.map((msg) => (msg.id === newEntry.id ? newEntry : msg))
+                );
               }
-              const cleaned = withoutPlaceholders.filter(
-                (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
+              // No acked entry found — remove only the oldest sending message from this user
+              const sendingIdx = withoutPlaceholders.findIndex(
+                (msg) => msg.senderId === currentUserId && msg.status === 'sending'
               );
+              const cleaned = sendingIdx >= 0
+                ? withoutPlaceholders.filter((_, i) => i !== sendingIdx)
+                : withoutPlaceholders;
               return sortMessagesChronologically([...cleaned, newEntry]);
             });
           } catch (error) {
@@ -5357,7 +5382,6 @@ const ChatScreen: React.FC = () => {
               return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
             });
             scrollToBottom();
-            scheduleRefreshMessages();
           } catch (error) {
             console.error('Failed to decrypt incoming message envelope:', error);
             scheduleRefreshMessages();
@@ -5413,7 +5437,6 @@ const ChatScreen: React.FC = () => {
             return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
           });
           scrollToBottom();
-          scheduleRefreshMessages();
           return;
         }
         case 'message_deleted': {
@@ -5722,6 +5745,11 @@ const ChatScreen: React.FC = () => {
     ]
   );
 
+  // Keep ref in sync so the WS subscription stays stable
+  useEffect(() => {
+    handleIncomingMessageRef.current = handleIncomingMessage;
+  }, [handleIncomingMessage]);
+
   const handleRefresh = useCallback(() => {
     if (!hasMore || isLoadingMore || isRefreshing) {
       setIsRefreshing(false);
@@ -5868,7 +5896,10 @@ const ChatScreen: React.FC = () => {
 
   useEffect(() => {
     wsService.connect().catch((error) => console.error('Failed to ensure WebSocket connection for chat screen:', error));
-    const unsubscribe = wsService.addMessageListener(handleIncomingMessage);
+    // Use ref wrapper so the subscription is stable — no unsub/resub churn when deps change
+    const unsubscribe = wsService.addMessageListener((msg: any) => {
+      handleIncomingMessageRef.current(msg);
+    });
 
     return () => {
       if (unsubscribe) {
@@ -5879,7 +5910,8 @@ const ChatScreen: React.FC = () => {
       typingTimersRef.current.clear();
       typingUsersRef.current.clear();
     };
-  }, [ensureTypingStopped, handleIncomingMessage, wsService]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ensureTypingStopped, wsService]);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('chat:envelopes_appended', (event: any) => {
@@ -5895,7 +5927,7 @@ const ChatScreen: React.FC = () => {
     return () => {
       sub.remove();
     };
-  }, [chatId, refreshMessages]);
+  }, [chatId, scheduleRefreshMessages]);
 
   useEffect(() => {
     const showListener = Keyboard.addListener('keyboardDidShow', (event) => {
