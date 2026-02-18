@@ -991,7 +991,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     { maxWidth: messageRowMaxWidth },
     isMine ? styles.messageRowMine : styles.messageRowTheirs,
     !isFirstInGroup && styles.messageRowStacked,
-    isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
+    isLastInGroup && styles.messageRowSpaced,
     message.replyTo && styles.messageRowWithReply,
     isMediaOnlyMessage && styles.messageRowMedia,
     hasReactions && styles.messageRowWithReactions,
@@ -1155,48 +1155,48 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Text>
         </View>
       )}
-      <Animated.View
-        style={[
-          containerStyle,
-          { opacity: 1, transform: [{ translateX: swipeAnim }] },
-        ]}
-        collapsable={false}
-        {...panResponder.panHandlers}
-      >
+      <View style={containerStyle}>
         <Animated.View
-          pointerEvents="none"
           style={[
-            styles.replyHint,
-            isMine && styles.replyHintMine,
-            { opacity: replyHintOpacity, transform: [{ scale: replyHintOpacity }] },
+            styles.swipeContainer,
+            { transform: [{ translateX: swipeAnim }] },
           ]}
-          collapsable={false}
+          {...panResponder.panHandlers}
         >
-          <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
-        </Animated.View>
-        <NativeContextMenu
-          title={message.content ? undefined : 'Message'}
-          actions={contextMenuActions || []}
-          activationMethod="longPress"
-          disabled={
-            Platform.OS === 'android' ||
-            !contextMenuActions ||
-            contextMenuActions.length === 0 ||
-            message.isPlaceholder
-          }
-        >
-          <Pressable
-            onPress={handleBubblePress}
-            onLongPress={Platform.OS === 'android' ? (event) => onBubbleLongPress?.(event) : undefined}
-            style={[
-              styles.messageContent,
-              isMine ? styles.messageContentMine : styles.messageContentTheirs,
-              message.replyTo && styles.messageContentWithReply,
-              isMediaOnlyMessage && styles.messageContentMediaOnly,
-              isFileOnlyMessage && styles.messageContentFileOnly,
-            ]}
-            delayLongPress={120}
+          {!isMine && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.replyHint,
+                { opacity: replyHintOpacity },
+              ]}
+            >
+              <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
+            </Animated.View>
+          )}
+          <NativeContextMenu
+            title={message.content ? undefined : 'Message'}
+            actions={contextMenuActions || []}
+            activationMethod="longPress"
+            disabled={
+              Platform.OS === 'android' ||
+              !contextMenuActions ||
+              contextMenuActions.length === 0 ||
+              message.isPlaceholder
+            }
           >
+            <Pressable
+              onPress={handleBubblePress}
+              onLongPress={Platform.OS === 'android' ? (event) => onBubbleLongPress?.(event) : undefined}
+              style={[
+                styles.messageContent,
+                isMine ? styles.messageContentMine : styles.messageContentTheirs,
+                message.replyTo && styles.messageContentWithReply,
+                isMediaOnlyMessage && styles.messageContentMediaOnly,
+                isFileOnlyMessage && styles.messageContentFileOnly,
+              ]}
+              delayLongPress={120}
+            >
           {showSenderMetadata && !isMine ? (
             <View style={styles.senderMetaRow}>
               <UserAvatar
@@ -1493,9 +1493,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               </View>
             </Pressable>
           )}
-          </Pressable>
-        </NativeContextMenu>
-      </Animated.View>
+            </Pressable>
+          </NativeContextMenu>
+          {isMine && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.replyHint,
+                styles.replyHintMine,
+                { opacity: replyHintOpacity },
+              ]}
+            >
+              <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
+            </Animated.View>
+          )}
+        </Animated.View>
+      </View>
     </>
   );
 };
@@ -6060,7 +6073,7 @@ const ChatScreen: React.FC = () => {
           { maxWidth: pollMaxWidth },
           isMine ? styles.messageRowMine : styles.messageRowTheirs,
           !isFirstInGroup && styles.messageRowStacked,
-          isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
+          isLastInGroup && styles.messageRowSpaced,
         ];
 
         return (
@@ -6560,12 +6573,6 @@ const ChatScreen: React.FC = () => {
                 renderItem={renderChatItem}
                 contentContainerStyle={styles.messageList}
                 ListHeaderComponent={listHeader}
-                ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
-                removeClippedSubviews={false}
-                windowSize={10}
-                initialNumToRender={15}
-                maxToRenderPerBatch={10}
-                updateCellsBatchingPeriod={50}
                 keyboardShouldPersistTaps="always"
                 keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                 onLayout={handleListLayout}
@@ -7349,9 +7356,8 @@ const styles = StyleSheet.create({
   },
   messageList: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 20,
-    gap: 8,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   loadMoreSpinner: {
     paddingVertical: 12,
@@ -7362,28 +7368,20 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     maxWidth: '82%',
-    marginTop: 8,
-    marginBottom: 4,
+    marginVertical: 3,
   },
   messageRowStacked: {
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  messageRowCompact: {
-    marginTop: 4,
-    marginBottom: 8,
+    marginTop: 2,
   },
   messageRowSpaced: {
-    marginTop: 8,
-    marginBottom: 16,
+    marginBottom: 10,
   },
   messageRowWithReply: {
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 6,
+    marginBottom: 4,
   },
   messageRowWithReactions: {
-    marginTop: 8,
-    marginBottom: 36,
+    marginBottom: 28,
   },
   messageRowMedia: {
     maxWidth: '100%',
@@ -7393,6 +7391,10 @@ const styles = StyleSheet.create({
   },
   messageRowTheirs: {
     alignSelf: 'flex-start',
+  },
+  swipeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   messageBubble: {
     paddingVertical: 10,
@@ -7447,7 +7449,6 @@ const styles = StyleSheet.create({
   },
   messageContent: {
     flexShrink: 1,
-    flexDirection: 'column',
   },
   messageContentFileOnly: {
     width: '100%',
@@ -7553,20 +7554,17 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   replyHint: {
-    position: 'absolute',
-    left: -28,
-    top: '50%',
-    marginTop: -12,
     width: 24,
     height: 24,
     borderRadius: 12,
     backgroundColor: '#2C82FF',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 4,
   },
   replyHintMine: {
-    left: undefined,
-    right: -28,
+    marginRight: 0,
+    marginLeft: 4,
   },
   messageText: {
     fontSize: 16,
