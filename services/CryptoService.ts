@@ -553,7 +553,12 @@ export const CryptoService = {
         return;
       } catch (decryptError: any) {
         // Check if it's a nonce length error (old AES-GCM encrypted key)
-        if (decryptError?.message?.includes('incorrect nonce length')) {
+        const errorMessage = decryptError?.message || '';
+        console.log('[CryptoService] Decrypt error caught:', errorMessage);
+        if (errorMessage.toLowerCase().includes('incorrect nonce length') || 
+            errorMessage.toLowerCase().includes('nonce length') ||
+            errorMessage.includes('12') || 
+            errorMessage.includes('24')) {
           console.log('[CryptoService] Old identity key format detected (AES-GCM), resetting...');
           // Delete old identity from server
           try {
