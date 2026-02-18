@@ -200,6 +200,7 @@ const styles = StyleSheet.create({
     marginVertical: spacing.xs,
     borderWidth: 1,
     borderColor: 'rgba(37, 99, 235, 0.2)',
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
@@ -250,8 +251,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
     zIndex: 1,
   },
   optionLeft: {

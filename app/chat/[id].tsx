@@ -1149,13 +1149,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   return (
     <>
       {showTimestamp && (
-        <View style={styles.timestampContainer}>
+        <View style={[styles.timestampContainer, isMine ? styles.timestampContainerMine : styles.timestampContainerTheirs]}>
           <Text style={styles.timestampText}>
             {formatTimestamp(parseDate(message.timestamp))}
           </Text>
         </View>
       )}
-      <View style={containerStyle}>
+      <Animated.View
+        style={[containerStyle, { transform: [{ translateX: swipeAnim }] }]}
+        {...panResponder.panHandlers}
+      >
         <View style={styles.bubbleWrapper}>
           <NativeContextMenu
             title={message.content ? undefined : 'Message'}
@@ -1479,7 +1482,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </Pressable>
           </NativeContextMenu>
         </View>
-      </View>
+      </Animated.View>
     </>
   );
 };
@@ -2205,12 +2208,25 @@ const ChatScreen: React.FC = () => {
 
     let lastDate: Date | null = null;
     messages.forEach((message) => {
+      // Skip deleted messages entirely — don't show any placeholder
+      if (message.isDeleted) {
+        return;
+      }
+      // Skip messages where all attachments have expired and there's no text content
+      const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+      if (
+        attachments.length > 0 &&
+        attachments.every((a) => a.status === 'expired') &&
+        !(message.content || '').trim()
+      ) {
+        return;
+      }
       const messageDate = parseDate(message.timestamp);
       if (!lastDate || startOfDay(messageDate).getTime() !== startOfDay(lastDate).getTime()) {
         lastDate = messageDate;
         items.push({
           kind: 'date',
-          id: `date-${messageDate.toISOString()}`,
+          id: `date-${startOfDay(messageDate).getTime()}`,
           label: formatDateLabel(messageDate),
         });
       }
@@ -2434,9 +2450,8 @@ const ChatScreen: React.FC = () => {
           ? (decodedPayload.text?.trim?.() || preview || 'System update')
           : resolveContentText(decodedPayload, preview, attachments.length > 0);
 
-        if (decryptFailed && !isSystem && !contentText && !attachments.length) {
-          // If EVERYTHING failed and there's no preview/attachment info at all, 
-          // then it's truly an empty shell we can skip.
+        if (decryptFailed && !isSystem && !attachments.length) {
+          // Skip messages that couldn't be decrypted and have no attachments — show nothing
           continue;
         }
 
@@ -5432,29 +5447,8 @@ const ChatScreen: React.FC = () => {
           if (!deletedId) {
             return;
           }
-          const deletedLabel = buildDeletedLabel(payload.deletedByName);
-          setMessagesAnimated((prev) =>
-            prev.map((msg) => {
-              if (msg.id !== deletedId) {
-                return msg;
-              }
-              return {
-                ...msg,
-                content: deletedLabel,
-                isPlaceholder: true,
-                isDeleted: true,
-                deletedLabel,
-                deletedByName: payload.deletedByName || msg.senderName || 'Member',
-                deletedAt: payload.deletedAt || new Date().toISOString(),
-                attachments: (msg.attachments || []).map((attachment) => ({
-                  ...attachment,
-                  status: 'expired' as const,
-                  previewUrl: undefined,
-                  downloadUrl: undefined,
-                })),
-              };
-            })
-          );
+          // Remove the message entirely instead of showing a "deleted" placeholder
+          setMessagesAnimated((prev) => prev.filter((msg) => msg.id !== deletedId));
           return;
         }
         case 'message_expired': {
@@ -6025,7 +6019,8 @@ const ChatScreen: React.FC = () => {
         !nextMessage || nextMessage.senderId !== messageItem.senderId || !!nextMessage.isPlaceholder || !!nextMessage.replyTo;
 
       const shouldShowStatus = lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
-      const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
+      // Show timestamp only on the first message of each group (no tap required)
+      const shouldShowTimestamp = isFirstInGroup && !messageItem.isPlaceholder;
       const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
       // Render PollMessage for poll type messages
@@ -6034,10 +6029,9 @@ const ChatScreen: React.FC = () => {
         const poll = pollDataEntry?.poll ?? messageItem.poll;
         const userVotes = pollDataEntry?.userVotes || [];
         const isCreator = poll.creatorId === currentUserId;
-        const pollMaxWidth = Math.round(Dimensions.get('window').width * 0.82);
         const pollContainerStyle = [
           styles.messageRow,
-          { maxWidth: pollMaxWidth },
+          styles.pollMessageRow,
           isMine ? styles.messageRowMine : styles.messageRowTheirs,
           !isFirstInGroup && styles.messageRowStacked,
           isLastInGroup && styles.messageRowSpaced,
@@ -7352,6 +7346,10 @@ const styles = StyleSheet.create({
   messageRowMedia: {
     maxWidth: '100%',
   },
+  pollMessageRow: {
+    maxWidth: '92%',
+    width: '92%',
+  },
   messageRowMine: {
     alignSelf: 'flex-end',
   },
@@ -7572,12 +7570,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   timestampContainer: {
-    alignSelf: 'center',
-    marginBottom: 10,
+    marginBottom: 2,
+    marginTop: 2,
+  },
+  timestampContainerMine: {
+    alignSelf: 'flex-end',
+    marginRight: 4,
+  },
+  timestampContainerTheirs: {
+    alignSelf: 'flex-start',
+    marginLeft: 4,
   },
   timestampText: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.35)',
+    fontSize: 11,
   },
   dateDivider: {
     flexDirection: 'row',
