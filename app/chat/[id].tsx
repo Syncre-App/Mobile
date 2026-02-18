@@ -2396,7 +2396,15 @@ const ChatScreen: React.FC = () => {
           // Fallback to backup envelope if normal decryption failed
           if (!decrypted && raw.backupEnvelope) {
             console.log(`[Chat] Trying backup envelope fallback for message ${raw.id}...`);
+            console.log(`[Chat] Backup envelope present:`, !!raw.backupEnvelope);
             decrypted = await CryptoService.decryptFromBackup(raw.backupEnvelope);
+            if (decrypted) {
+              console.log(`[Chat] Backup decryption SUCCESS for message ${raw.id}`);
+            } else {
+              console.warn(`[Chat] Backup decryption FAILED for message ${raw.id}`);
+            }
+          } else if (!decrypted && !raw.backupEnvelope) {
+            console.warn(`[Chat] No backup envelope available for message ${raw.id}`);
           }
 
           if (decrypted) {
