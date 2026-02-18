@@ -5763,13 +5763,9 @@ const ChatScreen: React.FC = () => {
         requestAnimationFrame(() => {
           flatListRef.current?.scrollToEnd({ animated: false });
         });
-        return;
-      }
-      if (!initialLoadCompleteRef.current || isNearBottomRef.current) {
-        requestAnimationFrame(() => scrollToBottom(true));
       }
     },
-    [scrollToBottom]
+    []
   );
 
   const handleScroll = useCallback(
