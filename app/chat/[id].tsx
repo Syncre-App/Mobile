@@ -7343,16 +7343,18 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     maxWidth: '82%',
-    position: 'relative',
+    marginVertical: 2,
+    display: 'flex',
+    flexDirection: 'column',
   },
   messageRowStacked: {
-    marginTop: 6,
+    marginTop: 4,
   },
   messageRowCompact: {
-    marginBottom: 4,
+    marginBottom: 8,
   },
   messageRowSpaced: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   messageRowWithReply: {
     marginTop: 10,
