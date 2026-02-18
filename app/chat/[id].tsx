@@ -145,6 +145,8 @@ interface Message {
   isEphemeral?: boolean;
   poll?: PollData | null;
   isPoll?: boolean;
+  isSkeleton?: boolean;
+  skeletonWidth?: number;
 }
 
 interface ChatParticipant {
@@ -1476,13 +1478,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </NativeContextMenu>
         </View>
       </Animated.View>
-      {showTimestamp && (
-        <View style={[styles.timestampContainer, isMine ? styles.timestampContainerMine : styles.timestampContainerTheirs]}>
-          <Text style={styles.timestampText}>
-            {formatTimestamp(parseDate(message.timestamp))}
-          </Text>
-        </View>
-      )}
     </>
   );
 };
@@ -2562,6 +2557,26 @@ const ChatScreen: React.FC = () => {
     [currentUserId, user?.profile_picture]
   );
 
+  // Generate skeleton messages for Discord-style loading
+  const generateSkeletonMessages = useCallback(
+    (count: number = 5): Message[] => {
+      const now = Date.now();
+      return Array.from({ length: count }, (_, i) => ({
+        id: `skeleton-${i}-${now}`,
+        senderId: i % 2 === 0 ? 'skeleton-left' : 'skeleton-right',
+        receiverId: '',
+        senderName: '',
+        senderAvatar: null,
+        content: '',
+        timestamp: new Date(now - (count - i) * 60_000).toISOString(),
+        isPlaceholder: true,
+        isSkeleton: true,
+        skeletonWidth: Math.random() * 150 + 100, // Random width between 100-250
+      })) as Message[];
+    },
+    []
+  );
+
   const ensureTypingStopped = useCallback(() => {
     if (!chatId) {
       return;
@@ -2769,6 +2784,10 @@ const ChatScreen: React.FC = () => {
   const loadMessagesForChat = useCallback(
     async (token: string, chatIdentifier: string, displayName: string, otherUserId?: string | null) => {
       try {
+        // Show skeleton messages while loading (Discord-style)
+        const skeletonMessages = generateSkeletonMessages(5);
+        setMessagesAnimated(() => skeletonMessages);
+
         const deviceIdentifier = deviceIdRef.current;
         const params = new URLSearchParams();
         params.set('limit', '20');
@@ -2892,6 +2911,7 @@ const ChatScreen: React.FC = () => {
     [
       currentUserId,
       generatePlaceholderMessages,
+      generateSkeletonMessages,
       scrollToBottom,
       setMessagesAnimated,
       transformMessages,
@@ -6024,6 +6044,17 @@ const ChatScreen: React.FC = () => {
       const shouldShowTimestamp = isFirstInGroup && !messageItem.isPlaceholder;
       const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
+      // Render skeleton messages for Discord-style loading
+      if (messageItem.isSkeleton) {
+        return (
+          <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowTheirs]}>
+            <View style={[styles.skeletonBubble, isMine ? styles.skeletonBubbleMine : styles.skeletonBubbleTheirs, { width: messageItem.skeletonWidth || 200 }]}>
+              <View style={styles.skeletonContent} />
+            </View>
+          </View>
+        );
+      }
+
       // Render PollMessage for poll type messages
       if (messageItem.isPoll && messageItem.poll) {
         const pollDataEntry = pollsData.get(messageItem.id);
@@ -6053,44 +6084,55 @@ const ChatScreen: React.FC = () => {
         );
       }
 
+      // Group timestamp - shown above the first message of each group
+      const groupTimestamp = isFirstInGroup && !messageItem.isPlaceholder ? (
+        <View style={[styles.groupTimestampContainer, isMine ? styles.groupTimestampContainerMine : styles.groupTimestampContainerTheirs]}>
+          <Text style={styles.groupTimestampText}>
+            {formatTimestamp(parseDate(messageItem.timestamp))}
+          </Text>
+        </View>
+      ) : null;
+
       return (
-        <MessageBubble
-          key={messageItem.id}
-          message={messageItem}
-          isMine={isMine}
-          isFirstInGroup={isFirstInGroup}
-          isLastInGroup={isLastInGroup}
-          showStatus={shouldShowStatus}
-          showTimestamp={shouldShowTimestamp}
-          onReplyPress={(reply) => setThreadRootId(reply.messageId)}
-          onReplySwipe={() => {
-            if (messageItem.isPlaceholder) return;
-            setReplyContext(buildReplyPayloadFromMessage(messageItem));
-          }}
-          isHighlighted={highlightedMessageId === messageItem.id || contextTargetId === messageItem.id}
-          replyCount={replyCount}
-          onOpenThread={(messageId) => setThreadRootId(messageId)}
-          showSenderMetadata={Boolean(chatDetails?.isGroup && isFirstInGroup && !messageItem.isPlaceholder)}
-          onBubblePress={() => {
-            if (reactionPicker) {
-              closeReactionPicker();
-              return;
-            }
-            setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id));
-          }}
-          onBubbleDoubleTap={(event) => handleBubbleDoubleTap(messageItem, event)}
-          onBubbleLongPress={(event) => handleBubbleLongPress(messageItem, event)}
-          contextMenuActions={buildContextMenuActions(messageItem)}
-          onAttachmentPress={handleAttachmentTap}
-          onDownloadAttachment={handleDownloadAttachment}
-          onLinkPress={handleOpenLink}
-          isGroupChat={Boolean(chatDetails?.isGroup)}
-          directRecipient={directRecipient}
-          seenOverride={seenPlacementMap.get(messageItem.id) ?? null}
-          onReact={handleToggleReaction}
-          currentUserId={currentUserId}
-          isFiltered={contentFilterMode === 'standard' && !isMine && shouldFilterMessage(messageItem.content)}
-        />
+        <View key={messageItem.id} style={styles.messageGroupWrapper}>
+          {groupTimestamp}
+          <MessageBubble
+            message={messageItem}
+            isMine={isMine}
+            isFirstInGroup={isFirstInGroup}
+            isLastInGroup={isLastInGroup}
+            showStatus={shouldShowStatus}
+            showTimestamp={false}
+            onReplyPress={(reply) => setThreadRootId(reply.messageId)}
+            onReplySwipe={() => {
+              if (messageItem.isPlaceholder) return;
+              setReplyContext(buildReplyPayloadFromMessage(messageItem));
+            }}
+            isHighlighted={highlightedMessageId === messageItem.id || contextTargetId === messageItem.id}
+            replyCount={replyCount}
+            onOpenThread={(messageId) => setThreadRootId(messageId)}
+            showSenderMetadata={Boolean(chatDetails?.isGroup && isFirstInGroup && !messageItem.isPlaceholder)}
+            onBubblePress={() => {
+              if (reactionPicker) {
+                closeReactionPicker();
+                return;
+              }
+              setTimestampVisibleFor((prev) => (prev === messageItem.id ? null : messageItem.id));
+            }}
+            onBubbleDoubleTap={(event) => handleBubbleDoubleTap(messageItem, event)}
+            onBubbleLongPress={(event) => handleBubbleLongPress(messageItem, event)}
+            contextMenuActions={buildContextMenuActions(messageItem)}
+            onAttachmentPress={handleAttachmentTap}
+            onDownloadAttachment={handleDownloadAttachment}
+            onLinkPress={handleOpenLink}
+            isGroupChat={Boolean(chatDetails?.isGroup)}
+            directRecipient={directRecipient}
+            seenOverride={seenPlacementMap.get(messageItem.id) ?? null}
+            onReact={handleToggleReaction}
+            currentUserId={currentUserId}
+            isFiltered={contentFilterMode === 'standard' && !isMine && shouldFilterMessage(messageItem.content)}
+          />
+        </View>
       );
     },
     [
@@ -7582,6 +7624,48 @@ const styles = StyleSheet.create({
   timestampText: {
     color: 'rgba(255, 255, 255, 0.35)',
     fontSize: 11,
+  },
+  messageGroupWrapper: {
+    width: '100%',
+  },
+  groupTimestampContainer: {
+    marginBottom: 4,
+    marginTop: 8,
+  },
+  groupTimestampContainerMine: {
+    alignSelf: 'flex-end',
+    marginRight: 12,
+  },
+  groupTimestampContainerTheirs: {
+    alignSelf: 'flex-start',
+    marginLeft: 12,
+  },
+  groupTimestampText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  skeletonBubble: {
+    borderRadius: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    minHeight: 40,
+  },
+  skeletonBubbleMine: {
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
+    marginRight: 8,
+  },
+  skeletonBubbleTheirs: {
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 4,
+    marginLeft: 8,
+  },
+  skeletonContent: {
+    height: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 4,
+    width: '100%',
   },
   dateDivider: {
     flexDirection: 'row',
