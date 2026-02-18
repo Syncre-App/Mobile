@@ -6554,7 +6554,6 @@ const ChatScreen: React.FC = () => {
                 viewabilityConfig={viewabilityConfigRef.current}
                 maintainVisibleContentPosition={{
                   minIndexForVisible: 1,
-                  autoscrollToTopThreshold: 100,
                 }}
                 refreshControl={
                   <RefreshControl
