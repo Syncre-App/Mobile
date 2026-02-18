@@ -1158,8 +1158,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       <Animated.View
         style={[
           containerStyle,
-          { opacity: fadeAnim, transform: [{ translateX: swipeAnim }] },
+          { opacity: 1, transform: [{ translateX: swipeAnim }] },
         ]}
+        collapsable={false}
         {...panResponder.panHandlers}
       >
         <Animated.View
@@ -1169,6 +1170,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             isMine && styles.replyHintMine,
             { opacity: replyHintOpacity, transform: [{ scale: replyHintOpacity }] },
           ]}
+          collapsable={false}
         >
           <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
         </Animated.View>
@@ -6052,17 +6054,27 @@ const ChatScreen: React.FC = () => {
         const poll = pollDataEntry?.poll ?? messageItem.poll;
         const userVotes = pollDataEntry?.userVotes || [];
         const isCreator = poll.creatorId === currentUserId;
+        const pollMaxWidth = Math.round(Dimensions.get('window').width * 0.82);
+        const pollContainerStyle = [
+          styles.messageRow,
+          { maxWidth: pollMaxWidth },
+          isMine ? styles.messageRowMine : styles.messageRowTheirs,
+          !isFirstInGroup && styles.messageRowStacked,
+          isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
+        ];
 
         return (
-          <PollMessage
-            key={messageItem.id}
-            poll={poll}
-            userVotes={userVotes}
-            onVote={(optionId) => handlePollVote(messageItem.id, poll.id, optionId)}
-            onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, poll.id, optionId)}
-            onClose={() => handleClosePoll(messageItem.id, poll.id)}
-            isCreator={isCreator}
-          />
+          <View style={pollContainerStyle}>
+            <PollMessage
+              key={messageItem.id}
+              poll={poll}
+              userVotes={userVotes}
+              onVote={(optionId) => handlePollVote(messageItem.id, poll.id, optionId)}
+              onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, poll.id, optionId)}
+              onClose={() => handleClosePoll(messageItem.id, poll.id)}
+              isCreator={isCreator}
+            />
+          </View>
         );
       }
 
@@ -6548,6 +6560,12 @@ const ChatScreen: React.FC = () => {
                 renderItem={renderChatItem}
                 contentContainerStyle={styles.messageList}
                 ListHeaderComponent={listHeader}
+                ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
+                removeClippedSubviews={false}
+                windowSize={10}
+                initialNumToRender={15}
+                maxToRenderPerBatch={10}
+                updateCellsBatchingPeriod={50}
                 keyboardShouldPersistTaps="always"
                 keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                 onLayout={handleListLayout}
@@ -7331,8 +7349,9 @@ const styles = StyleSheet.create({
   },
   messageList: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingTop: 12,
+    paddingBottom: 20,
+    gap: 8,
   },
   loadMoreSpinner: {
     paddingVertical: 12,
@@ -7343,24 +7362,27 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     maxWidth: '82%',
-    marginVertical: 2,
-    display: 'flex',
-    flexDirection: 'column',
+    marginTop: 8,
+    marginBottom: 4,
   },
   messageRowStacked: {
     marginTop: 4,
+    marginBottom: 4,
   },
   messageRowCompact: {
+    marginTop: 4,
     marginBottom: 8,
   },
   messageRowSpaced: {
+    marginTop: 8,
     marginBottom: 16,
   },
   messageRowWithReply: {
-    marginTop: 10,
-    marginBottom: 6,
+    marginTop: 12,
+    marginBottom: 8,
   },
   messageRowWithReactions: {
+    marginTop: 8,
     marginBottom: 36,
   },
   messageRowMedia: {
@@ -7424,7 +7446,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 22,
   },
   messageContent: {
-    flexShrink: 0,
+    flexShrink: 1,
+    flexDirection: 'column',
   },
   messageContentFileOnly: {
     width: '100%',
