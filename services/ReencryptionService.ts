@@ -119,14 +119,23 @@ class ReencryptionServiceClass {
           continue;
         }
 
-        const plaintext = await CryptoService.decryptMessage({
+        // Try to decrypt with current identity key
+        let plaintext = await CryptoService.decryptMessage({
           chatId,
           envelopes: raw.envelopes,
           senderId,
           currentUserId,
           token,
         });
+        
+        // If that fails, try backup envelope (for messages sent with old identity)
+        if (!plaintext && raw.backupEnvelope) {
+          console.log(`[ReencryptionService] Trying backup envelope for message ${raw.id}...`);
+          plaintext = await CryptoService.decryptFromBackup(raw.backupEnvelope);
+        }
+        
         if (!plaintext) {
+          console.warn(`[ReencryptionService] Could not decrypt message ${raw.id} for re-encryption`);
           continue;
         }
 
