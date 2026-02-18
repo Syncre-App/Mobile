@@ -1148,13 +1148,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   return (
     <>
-      {showTimestamp && (
-        <View style={[styles.timestampContainer, isMine ? styles.timestampContainerMine : styles.timestampContainerTheirs]}>
-          <Text style={styles.timestampText}>
-            {formatTimestamp(parseDate(message.timestamp))}
-          </Text>
-        </View>
-      )}
       <Animated.View
         style={[containerStyle, { transform: [{ translateX: swipeAnim }] }]}
         {...panResponder.panHandlers}
@@ -1483,6 +1476,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </NativeContextMenu>
         </View>
       </Animated.View>
+      {showTimestamp && (
+        <View style={[styles.timestampContainer, isMine ? styles.timestampContainerMine : styles.timestampContainerTheirs]}>
+          <Text style={styles.timestampText}>
+            {formatTimestamp(parseDate(message.timestamp))}
+          </Text>
+        </View>
+      )}
     </>
   );
 };
@@ -2173,7 +2173,8 @@ const ChatScreen: React.FC = () => {
 
   const setMessagesAnimated = useCallback(
     (updater: (prev: Message[]) => Message[]) => {
-      layoutNext();
+      // LayoutAnimation removed — it caused iOS FlatList item overlap
+      // when list updates and scroll position changed simultaneously.
       setMessages((prev) => updater(prev));
     },
     []
@@ -6542,9 +6543,6 @@ const ChatScreen: React.FC = () => {
                 scrollEventThrottle={16}
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfigRef.current}
-                maintainVisibleContentPosition={{
-                  minIndexForVisible: 1,
-                }}
                 refreshControl={
                   <RefreshControl
                     tintColor="#2C82FF"
