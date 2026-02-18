@@ -532,24 +532,42 @@ export const CryptoService = {
     // If server has identity, decrypt it
     if (identityKey && identityKey.encryptedPrivateKey) {
       console.log('[CryptoService] Decrypting identity from server...');
-      const privateKeyBytes = await decryptPrivateKeyWithPassword(
-        identityKey.encryptedPrivateKey,
-        identityKey.nonce,
-        identityKey.salt,
-        identityKey.iterations || IDENTITY_PBKDF_ITERATIONS,
-        password
-      );
+      try {
+        const privateKeyBytes = await decryptPrivateKeyWithPassword(
+          identityKey.encryptedPrivateKey,
+          identityKey.nonce,
+          identityKey.salt,
+          identityKey.iterations || IDENTITY_PBKDF_ITERATIONS,
+          password
+        );
 
-      const identity: IdentityKeyPair = {
-        privateKey: toBase64(privateKeyBytes),
-        publicKey: identityKey.publicKey,
-        keyVersion: identityKey.version || 1,
-      };
+        const identity: IdentityKeyPair = {
+          privateKey: toBase64(privateKeyBytes),
+          publicKey: identityKey.publicKey,
+          keyVersion: identityKey.version || 1,
+        };
 
-      await persistLocalIdentity(identity);
-      await registerDeviceIdentity(identity, token, { force: true });
-      console.log('[CryptoService] Identity decrypted and stored locally');
-      return;
+        await persistLocalIdentity(identity);
+        await registerDeviceIdentity(identity, token, { force: true });
+        console.log('[CryptoService] Identity decrypted and stored locally');
+        return;
+      } catch (decryptError: any) {
+        // Check if it's a nonce length error (old AES-GCM encrypted key)
+        if (decryptError?.message?.includes('incorrect nonce length')) {
+          console.log('[CryptoService] Old identity key format detected (AES-GCM), resetting...');
+          // Delete old identity from server
+          try {
+            await ApiService.delete('/keys/identity', undefined, token);
+            console.log('[CryptoService] Old identity deleted from server');
+          } catch (deleteErr) {
+            console.warn('[CryptoService] Could not delete old identity:', deleteErr);
+          }
+          // Fall through to create new identity
+        } else {
+          // Other error - rethrow
+          throw decryptError;
+        }
+      }
     }
 
     // No identity exists - create new one
