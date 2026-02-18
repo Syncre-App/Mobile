@@ -1,0 +1,79 @@
+name: iOS Build and Publish
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Mobile/**'
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./Mobile
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './Mobile/package-lock.json'
+      
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Get version from app.json
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Configure EAS credentials
+        run: |
+          # Create EAS credentials config
+          mkdir -p ~/.expo
+          cat > ~/.expo/state.json << 'EOF'
+          {
+            "uuid": "$(uuidgen || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo $(date +%s)-random)"
+          }
+          EOF
+      
+      - name: Build iOS with EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          # Build iOS with EAS (EAS handles signing automatically)
+          eas build \
+            --platform ios \
+            --profile production \
+            --non-interactive \
+            --auto-submit \
+            --wait
+      
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          
+          # Create GitHub release for tracking
+          if ! gh release view "v$VERSION" --repo ${{ github.repository }} >/dev/null 2>&1; then
+            echo "Creating release v$VERSION..."
+            gh release create "v$VERSION" \
+              --title "Release v$VERSION" \
+              --notes "iOS release version $VERSION submitted to App Store Connect" \
+              --repo ${{ github.repository }}
+          fi
