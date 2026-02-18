@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
 import { UserCacheService } from '../services/UserCacheService';
@@ -11,6 +12,7 @@ import { font, palette, radii, spacing } from '../theme/designSystem';
 import { UserAvatar } from './UserAvatar';
 import BadgeIcon from './BadgeIcon';
 import { ProfileCard } from './ProfileCard';
+import { NativeContextMenu, ContextMenuAction } from './NativeContextMenu';
 
 interface Chat {
   id: number;
@@ -85,11 +87,28 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   onLeaveGroup = () => {},
   onMarkRead = () => {},
 }) => {
+  const insets = useSafeAreaInsets();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [userDetails, setUserDetails] = useState<{ [key: string]: User }>({});
   const [profileCardUser, setProfileCardUser] = useState<User | null>(null);
   const [profileCardVisible, setProfileCardVisible] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  
+
+  
+  // Ref to track userDetails for async operations
+  const userDetailsRef = useRef<{ [key: string]: User }>({});
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    userDetailsRef.current = userDetails;
+  }, [userDetails]);
+  
+  // Double-tap detection for DM chats
+  const lastTapRef = useRef<{ chatId: string; timestamp: number } | null>(null);
+  const pendingNavigationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const DOUBLE_TAP_DELAY = 300; // ms
   
   const getCurrentUserId = async () => {
     try {
@@ -97,7 +116,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       if (token) {
         const response = await ApiService.get('/user/me', token);
         if (response.success && response.data) {
-          setCurrentUserId(response.data.id);
+          setCurrentUserId(String(response.data.id));
         }
       }
     } catch (error) {
@@ -108,52 +127,117 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
   const fetchUserDetails = useCallback(async () => {
     try {
       const token = await StorageService.getAuthToken();
-      if (!token) return;
+      if (!token || !currentUserId) return;
 
-      const userIds = new Set<string>();
-      
+      // First, extract users directly from chat.participants (already hydrated by backend)
+      const usersFromParticipants: { [key: string]: User } = {};
+      const userIdsNeeded = new Set<string>();
+
       chats.forEach(chat => {
+        // Get userIds from chat.users
+        let chatUserIds: string[] = [];
         try {
-          const chatUserIds = JSON.parse(chat.users);
-          chatUserIds.forEach((id: string) => {
-            if (id !== currentUserId) {
-              userIds.add(id);
-            }
-          });
+          chatUserIds = JSON.parse(chat.users).map((id: string | number) => String(id));
         } catch (error) {
           console.log('Error parsing chat users:', error);
+          return;
+        }
+
+        // If participants are available, use them directly
+        if (Array.isArray(chat.participants) && chat.participants.length > 0) {
+          chat.participants.forEach((participant) => {
+            const participantId = String(participant.id);
+            if (participantId !== currentUserId) {
+              // Find the matching userIds entry for this participant
+              // The participant.id might be padded (e.g., '0759724098076751')
+              // but chatUserIds might have it without padding ('759724098076751')
+              const matchingUserId = chatUserIds.find(uid => 
+                uid === participantId || 
+                uid === participantId.replace(/^0+/, '') ||
+                participantId === uid.padStart(16, '0')
+              );
+              
+              if (matchingUserId) {
+                // Store under the userIds key (what we'll look up by)
+                usersFromParticipants[matchingUserId] = {
+                  ...participant,
+                  id: matchingUserId, // Use the ID format from userIds
+                } as User;
+              } else {
+                // Fallback: store under participant's own ID
+                usersFromParticipants[participantId] = participant as User;
+              }
+            }
+          });
+        } else {
+          // No participants, need to fetch these users
+          chatUserIds.forEach(id => {
+            if (id !== currentUserId) {
+              userIdsNeeded.add(id);
+            }
+          });
         }
       });
 
-      const newUserDetails: { [key: string]: User } = { ...userDetails };
+      // Add users from participants to cache and state
+      if (Object.keys(usersFromParticipants).length > 0) {
+        UserCacheService.addUsers(Object.values(usersFromParticipants));
+        setUserDetails(prev => ({ ...prev, ...usersFromParticipants }));
+        userDetailsRef.current = { ...userDetailsRef.current, ...usersFromParticipants };
+      }
+
+      // Check which users still need to be fetched
+      const currentDetails = userDetailsRef.current;
+      const userIdsToFetch: string[] = [];
       
-      for (const userId of userIds) {
-        if (!newUserDetails[userId]) {
-          try {
-            const response = await ApiService.getUserById(userId, token);
-            if (response.success && response.data) {
-              newUserDetails[userId] = response.data;
-              UserCacheService.addUser({
-                ...response.data,
-                id: response.data.id?.toString?.() ?? String(response.data.id),
-              });
-            }
-          } catch (error) {
-            console.log(`Error fetching user ${userId}:`, error);
-            newUserDetails[userId] = {
-              id: userId,
-              username: 'Loading...',
-              email: '',
-            };
-          }
+      for (const userId of userIdsNeeded) {
+        const existing = currentDetails[userId];
+        if (!existing || existing.username === 'Loading...') {
+          userIdsToFetch.push(userId);
         }
       }
 
-      setUserDetails(newUserDetails);
+      if (userIdsToFetch.length === 0) return;
+
+      console.log(`[ChatListWidget] Fetching ${userIdsToFetch.length} users:`, userIdsToFetch);
+
+      // Fetch remaining users in parallel
+      const fetchPromises = userIdsToFetch.map(async (userId) => {
+        try {
+          const response = await ApiService.getUserById(userId, token);
+          if (response.success && response.data) {
+            const userData: User = {
+              ...response.data,
+              id: userId, // Use the requested ID, not the DB ID
+            };
+            UserCacheService.addUser(userData);
+            return { userId, userData };
+          }
+        } catch (error) {
+          console.log(`Error fetching user ${userId}:`, error);
+        }
+        return null;
+      });
+
+      const results = await Promise.all(fetchPromises);
+      
+      // Collect successful fetches
+      const fetchedUsers: { [key: string]: User } = {};
+      for (const result of results) {
+        if (result) {
+          fetchedUsers[result.userId] = result.userData;
+        }
+      }
+
+      // Update state with all fetched users at once
+      if (Object.keys(fetchedUsers).length > 0) {
+        console.log(`[ChatListWidget] Fetched ${Object.keys(fetchedUsers).length} users successfully`);
+        setUserDetails(prev => ({ ...prev, ...fetchedUsers }));
+      }
     } catch (error) {
       console.log('❌ Error fetching user details:', error);
     }
-  }, [chats, currentUserId, userDetails]);
+  }, [chats, currentUserId]);
 
   useEffect(() => {
     getCurrentUserId();
@@ -165,6 +249,14 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     }
   }, [chats, currentUserId, fetchUserDetails]);
 
+  useEffect(() => {
+    if (!profileCardVisible || !profileCardUser?.id) return;
+    const updatedUser = userDetails[profileCardUser.id];
+    if (updatedUser && updatedUser !== profileCardUser) {
+      setProfileCardUser(updatedUser);
+    }
+  }, [profileCardVisible, profileCardUser, userDetails]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await onRefresh();
@@ -175,23 +267,40 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     if (!currentUserId) return null;
     try {
       const userIds = JSON.parse(chat.users);
-      const otherUserId = userIds.find((id: string) => id !== currentUserId);
-      return otherUserId || null;
+      const otherUserId = userIds.find((id: string | number) => String(id) !== currentUserId);
+      return otherUserId ? String(otherUserId) : null;
     } catch (error) {
-      console.log('Error parsing chat users:', error);
       return null;
     }
   };
 
   const getChatDisplayName = (chat: Chat): string => {
     if (!currentUserId) return 'Loading...';
-    
+
     const otherUserId = getOtherUserId(chat);
     if (!otherUserId) return 'Unknown User';
 
+    // First try to get user from chat.participants (already hydrated by backend)
+    const participantUser = chat.participants?.find(p => {
+      const pId = String(p.id);
+      return pId === otherUserId ||
+             pId.replace(/^0+/, '') === otherUserId.replace(/^0+/, '');
+    });
+
+    if (participantUser) {
+      const username = participantUser.username?.trim();
+      if (username && username.length > 0) return username;
+      const email = participantUser.email?.trim();
+      if (email && email.length > 0) return email;
+    }
+
+    // Fallback to userDetails state
     const user = userDetails[otherUserId];
     if (user) {
-      return user.username || user.email || 'Loading...';
+      const username = user.username?.trim();
+      if (username && username.length > 0) return username;
+      const email = user.email?.trim();
+      if (email && email.length > 0) return email;
     }
 
     return 'Loading...';
@@ -237,14 +346,101 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     return label;
   };
 
+  const matchesUserId = (a?: string | number | null, b?: string | number | null): boolean => {
+    if (!a || !b) return false;
+    const aStr = String(a);
+    const bStr = String(b);
+    return (
+      aStr === bStr ||
+      aStr.replace(/^0+/, '') === bStr.replace(/^0+/, '') ||
+      aStr.padStart(16, '0') === bStr.padStart(16, '0')
+    );
+  };
+
+  const resolveUserLabel = (userId: string | null | undefined, participants: User[] = []): string => {
+    if (!userId) return 'Someone';
+    const normalized = String(userId);
+    const participant = participants.find((p) => matchesUserId(p.id, normalized));
+    if (participant?.username) return participant.username;
+    if (participant?.email) return participant.email;
+    const cached = userDetails[normalized];
+    if (cached?.username) return cached.username;
+    if (cached?.email) return cached.email;
+    return 'Someone';
+  };
+
+  const getLastMessagePreview = (chat: Chat, isGroupChat: boolean, fallback: string): string => {
+    const lastMessage = chat.lastMessage;
+    if (!lastMessage || !lastMessage.content) {
+      return fallback;
+    }
+    const preview = String(lastMessage.content).trim();
+    if (!preview) return fallback;
+    if (!isGroupChat) return preview;
+    const senderId = (lastMessage as any).sender_id ?? (lastMessage as any).senderId ?? null;
+    const senderLabel = resolveUserLabel(senderId, chat.participants || []);
+    return `${senderLabel}: ${preview}`;
+  };
+
   const handleChatPress = (chat: Chat) => {
+    const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
+    const now = Date.now();
+    
+    // For DM chats, check for double-tap to show ProfileCard
+    if (!chat.isGroup) {
+      const lastTap = lastTapRef.current;
+      
+      // Check if this is a double-tap
+      if (lastTap && lastTap.chatId === chatIdKey && now - lastTap.timestamp < DOUBLE_TAP_DELAY) {
+        // Double-tap detected - cancel pending navigation and show ProfileCard
+        if (pendingNavigationRef.current) {
+          clearTimeout(pendingNavigationRef.current);
+          pendingNavigationRef.current = null;
+        }
+        lastTapRef.current = null;
+        
+        const otherUserId = getOtherUserId(chat);
+        if (otherUserId) {
+          const cachedUser = userDetails[otherUserId];
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setProfileCardUser(cachedUser || { id: otherUserId, username: 'Loading...', email: '' });
+          setProfileCardVisible(true);
+        }
+        return;
+      }
+      
+      // First tap - record it and schedule navigation after delay
+      lastTapRef.current = { chatId: chatIdKey, timestamp: now };
+      
+      // Cancel any existing pending navigation
+      if (pendingNavigationRef.current) {
+        clearTimeout(pendingNavigationRef.current);
+      }
+      
+      // Schedule navigation - will be cancelled if double-tap occurs
+      pendingNavigationRef.current = setTimeout(() => {
+        pendingNavigationRef.current = null;
+        router.push({
+          pathname: '/chat/[id]',
+          params: { id: chatIdKey },
+        } as any);
+      }, DOUBLE_TAP_DELAY);
+      
+      return;
+    }
+    
+    // For group chats, navigate immediately
     router.push({
       pathname: '/chat/[id]',
-      params: { id: chat.id?.toString?.() ?? String(chat.id) },
+      params: { id: chatIdKey },
     } as any);
   };
 
   const handleChatLongPress = (chat: Chat) => {
+    // Only handle long press for group chats
+    // DM chats use NativeContextMenu instead
+    if (!chat.isGroup) return;
+    
     const chatIdKey = chat.id?.toString?.() ?? String(chat.id);
     const unread = unreadCounts[chatIdKey] || 0;
     const commonActions = [
@@ -252,30 +448,54 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
       { text: 'Cancel', style: 'cancel' as const },
     ].filter(Boolean) as { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[];
 
-    if (chat.isGroup) {
-      const actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [];
-      actions.push({ text: 'Leave group', style: 'destructive', onPress: () => onLeaveGroup(chat) });
-      actions.push(...commonActions);
+    const actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [];
+    actions.push({ text: 'Leave group', style: 'destructive', onPress: () => onLeaveGroup(chat) });
+    actions.push(...commonActions);
 
-      Alert.alert('Group Options', getGroupDisplayName(chat), actions);
-      return;
-    }
-
-    // For DM chats, show ProfileCard instead of Alert
-    const otherUserId = getOtherUserId(chat);
-    if (!otherUserId) return;
-
-    const cachedUser = userDetails[otherUserId];
-    if (cachedUser) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setProfileCardUser(cachedUser);
-      setProfileCardVisible(true);
-    }
+    Alert.alert('Group Options', getGroupDisplayName(chat), actions);
   };
 
   const handleProfileCardClose = () => {
     setProfileCardVisible(false);
     setProfileCardUser(null);
+  };
+
+  // Get context menu actions for DM chats
+  const getDMContextMenuActions = (otherUserId: string, chatIdKey: string): ContextMenuAction[] => {
+    const unread = unreadCounts[chatIdKey] || 0;
+    const isUserBlocked = blockedUserIds?.has(otherUserId) ?? false;
+    
+    const actions: ContextMenuAction[] = [];
+    
+    if (unread > 0) {
+      actions.push({
+        title: 'Mark as read',
+        systemIcon: 'checkmark.circle',
+        onPress: () => onMarkRead(chatIdKey),
+      });
+    }
+    
+    actions.push({
+      title: 'Remove friend',
+      systemIcon: 'person.badge.minus',
+      destructive: true,
+      onPress: () => onRemoveFriend(otherUserId),
+    });
+    
+    actions.push({
+      title: isUserBlocked ? 'Unblock' : 'Block',
+      systemIcon: isUserBlocked ? 'hand.raised.slash' : 'hand.raised',
+      destructive: !isUserBlocked,
+      onPress: () => onToggleBlock(otherUserId, isUserBlocked),
+    });
+    
+    actions.push({
+      title: 'Report',
+      systemIcon: 'flag',
+      onPress: () => onReportUser(otherUserId),
+    });
+    
+    return actions;
   };
 
   const getPresenceForUser = (userId: string): 'online' | 'idle' | 'offline' => {
@@ -290,7 +510,28 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const isGroupChat = Boolean(chat.isGroup);
     const displayName = isGroupChat ? getGroupDisplayName(chat) : getChatDisplayName(chat);
     const otherUserId = isGroupChat ? null : getOtherUserId(chat);
-    const cachedUser = otherUserId ? userDetails[otherUserId] : null;
+    
+    // Try to get user from chat.participants first (already hydrated by backend),
+    // then fallback to userDetails state
+    const cachedUser = otherUserId 
+      ? (chat.participants?.find(p => {
+          const pId = String(p.id);
+          // Match with or without leading zeros
+          return pId === otherUserId || 
+                 pId.replace(/^0+/, '') === otherUserId.replace(/^0+/, '');
+        }) || userDetails[otherUserId])
+      : null;
+
+    // Debug log for DM chats
+    if (!isGroupChat) {
+      console.log(`[ChatListWidget] Chat ${chat.id} DM:`, {
+        otherUserId,
+        displayName,
+        cachedUserName: cachedUser?.username,
+        cachedUserBadges: cachedUser?.badges,
+        participantsCount: chat.participants?.length,
+      });
+    }
     const statusValueRaw =
       otherUserId && userStatuses[otherUserId]
         ? userStatuses[otherUserId]
@@ -306,9 +547,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const hasUnread = unread > 0;
     const avatarUri = isGroupChat
       ? chat.avatarUrl || undefined
-      : otherUserId
-        ? userDetails[otherUserId]?.profile_picture
-        : undefined;
+      : (cachedUser as User | undefined)?.profile_picture || undefined;
     const groupSubtitle = isGroupChat ? getGroupSubtitle(chat) : null;
     const presenceValue = isGroupChat
       ? undefined
@@ -323,6 +562,88 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     const chatStreak = streaks[chatIdKey];
     const streakCount = chatStreak?.currentStreak || 0;
 
+    const subtitleFallback = isGroupChat ? groupSubtitle || '' : (lastSeenLabel || '');
+    const lastMessagePreview = getLastMessagePreview(chat, isGroupChat, subtitleFallback);
+
+    const chatCardContent = (
+      <View style={[styles.chatCard, hasUnread && styles.chatCardUnread]}>
+        <UserAvatar
+          uri={avatarUri}
+          name={displayName}
+          size={56}
+          presence={presenceValue}
+          presencePlacement="overlay"
+          style={styles.avatarContainer}
+        />
+
+        <View style={styles.chatContent}>
+          <View style={styles.chatTitleRow}>
+            <Text style={styles.chatName} numberOfLines={1}>
+              {displayName || 'Unknown'}
+            </Text>
+            {userBadges.length > 0 && (
+              <View style={styles.badgeContainer}>
+                {userBadges.slice(0, 3).map((badge: string, idx: number) => (
+                  <View key={`${chat.id}-badge-${badge}-${idx}`} style={styles.badgeWrapper}>
+                    <BadgeIcon
+                      type={badge as any}
+                      size={22}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+            {hasUnread && (
+              <View style={styles.chatUnreadPill}>
+                <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
+              </View>
+            )}
+            {streakCount > 0 && (
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakText}>{streakCount}</Text>
+              </View>
+            )}
+          </View>
+          {lastMessagePreview ? (
+            <Text style={styles.chatSubtitle} numberOfLines={1}>
+              {lastMessagePreview}
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={styles.rightColumn}>
+          {isRemoving ? (
+            <ActivityIndicator size="small" color={palette.error} />
+          ) : (
+            <Ionicons name="chevron-forward" size={16} color="rgba(255, 255, 255, 0.4)" />
+          )}
+        </View>
+      </View>
+    );
+
+    // For DM chats, wrap with NativeContextMenu
+    if (!isGroupChat && otherUserId) {
+      const contextMenuActions = getDMContextMenuActions(otherUserId, chatIdKey);
+      
+      return (
+        <NativeContextMenu
+          actions={contextMenuActions}
+          title={displayName}
+          disabled={isRemoving}
+        >
+          <TouchableOpacity
+            onPress={() => !isRemoving && handleChatPress(chat)}
+            style={styles.chatItem}
+            activeOpacity={0.75}
+            disabled={isRemoving}
+          >
+            {chatCardContent}
+          </TouchableOpacity>
+        </NativeContextMenu>
+      );
+    }
+
+    // For group chats, use regular long press
     return (
       <TouchableOpacity
         onPress={() => !isRemoving && handleChatPress(chat)}
@@ -331,65 +652,7 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
         activeOpacity={0.75}
         disabled={isRemoving}
       >
-        <View style={[styles.chatCard, hasUnread && styles.chatCardUnread]}>
-          <UserAvatar
-            uri={avatarUri}
-            name={displayName}
-            size={56}
-            presence={presenceValue}
-            presencePlacement="overlay"
-            style={styles.avatarContainer}
-          />
-
-          <View style={styles.chatContent}>
-            <View style={styles.chatTitleRow}>
-              <Text style={styles.chatName} numberOfLines={1}>
-                {displayName}
-              </Text>
-              {userBadges.length > 0 && (
-                <View style={styles.badgeContainer}>
-                  {userBadges.slice(0, 3).map((badge: string, idx: number) => (
-                    <View key={`${chat.id}-badge-${badge}-${idx}`} style={styles.badgeWrapper}>
-                      <BadgeIcon
-                        type={badge as any}
-                        size={22}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-              {hasUnread && (
-                <View style={styles.chatUnreadPill}>
-                  <Text style={styles.chatUnreadText}>{unread > 99 ? '99+' : unread}</Text>
-                </View>
-              )}
-              {streakCount > 0 && (
-                <View style={styles.streakBadge}>
-                  <Text style={styles.streakText}>🔥 {streakCount}</Text>
-                </View>
-              )}
-            </View>
-            {groupSubtitle ? (
-              <Text style={styles.chatSubtitle} numberOfLines={1}>
-                {groupSubtitle}
-              </Text>
-            ) : (
-              !isGroupChat && lastSeenLabel ? (
-                <Text style={styles.chatSubtitle} numberOfLines={1}>
-                  {lastSeenLabel}
-                </Text>
-              ) : null
-            )}
-          </View>
-
-          <View style={styles.rightColumn}>
-            {isRemoving ? (
-              <ActivityIndicator size="small" color={palette.error} />
-            ) : (
-              <Ionicons name="chevron-forward" size={16} color="rgba(255, 255, 255, 0.4)" />
-            )}
-          </View>
-        </View>
+        {chatCardContent}
       </TouchableOpacity>
     );
   };
@@ -433,12 +696,18 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
     </View>
   );
 
+  // Tab bar height (approximate) + extra spacing for safe scrolling
+  const TAB_BAR_HEIGHT = 140;
+  const bottomPadding = insets.bottom + TAB_BAR_HEIGHT + spacing.xxl;
+
   return (
-    <>
+    <View style={styles.container}>
       <FlatList
+        ref={flatListRef}
         data={chats}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={(item) => `chat-${item.id}`}
         renderItem={renderChatItem}
+        extraData={{ userDetails, userStatuses, currentUserId }}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl
@@ -448,30 +717,33 @@ export const ChatListWidget: React.FC<ChatListWidgetProps> = ({
             colors={[palette.accent]}
           />
         }
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[styles.listContainer, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        removeClippedSubviews={false}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={21}
       />
 
       <ProfileCard
         visible={profileCardVisible}
         user={profileCardUser}
         onClose={handleProfileCardClose}
-        onRemoveFriend={onRemoveFriend}
-        onBlockUser={(userId) => onToggleBlock(userId, blockedUserIds?.has(userId) ?? false)}
-        onReportUser={onReportUser}
-        isBlocked={profileCardUser ? (blockedUserIds?.has(profileCardUser.id) ?? false) : false}
         presence={profileCardUser ? getPresenceForUser(profileCardUser.id) : 'offline'}
       />
-    </>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   listContainer: {
     flexGrow: 1,
     paddingHorizontal: spacing.sm,
-    paddingBottom: spacing.xxl,
+    // paddingBottom is set dynamically in the component
   },
   chatItem: {
     marginBottom: spacing.sm,
@@ -505,13 +777,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Border removed for cleaner UI
     shadowColor: '#010103',
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   chatCardUnread: {
     borderColor: 'rgba(37, 99, 235, 0.35)',
@@ -534,12 +805,14 @@ const styles = StyleSheet.create({
     ...font('semibold'),
     marginBottom: 2,
     flexShrink: 1,
+    minWidth: 40,
   },
   badgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginLeft: 1,
+    flexShrink: 0,
   },
   badgeWrapper: {
     shadowColor: '#ffffff',
@@ -622,8 +895,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.xl,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Border removed to match chatCard
   },
   skeletonAvatar: {
     width: 56,

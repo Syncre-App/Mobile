@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
@@ -215,7 +215,7 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
     );
   };
 
-  const renderSearchResult = ({ item }: { item: User }) => {
+  const renderSearchResult = (item: User) => {
     const status = resolveStatus(item);
     const actionable = status === 'available' || status === 'pending_outgoing';
     const onPress =
@@ -260,13 +260,22 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
 
     if (actionable) {
       return (
-        <TouchableOpacity style={styles.searchResultItem} onPress={onPress} disabled={!onPress}>
+        <TouchableOpacity
+          key={item.id}
+          style={styles.searchResultItem}
+          onPress={onPress}
+          disabled={!onPress}
+        >
           {content}
         </TouchableOpacity>
       );
     }
 
-    return <View style={[styles.searchResultItem, styles.searchResultItemDisabled]}>{content}</View>;
+    return (
+      <View key={item.id} style={[styles.searchResultItem, styles.searchResultItemDisabled]}>
+        {content}
+      </View>
+    );
   };
 
   return (
@@ -292,14 +301,9 @@ export const FriendSearchWidget: React.FC<FriendSearchWidgetProps> = ({
       />
 
       {searchResults.length > 0 && (
-        <FlatList
-          data={searchResults}
-          keyExtractor={(item) => item.id}
-          renderItem={renderSearchResult}
-          style={styles.searchResults}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
+        <View style={styles.searchResults}>
+          {searchResults.map(renderSearchResult)}
+        </View>
       )}
 
       {searchQuery.length > 0 && searchResults.length === 0 && !isSearching && (
@@ -326,7 +330,6 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   searchResults: {
-    maxHeight: 220,
     marginTop: spacing.xs,
   },
   searchResultItem: {

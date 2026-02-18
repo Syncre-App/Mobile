@@ -1,24 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassCard } from './GlassCard';
 
 const MAX_OPTIONS = 10;
 const MAX_OPTION_LENGTH = 50;
 const MAX_QUESTION_LENGTH = 255;
 const MIN_OPTIONS = 2;
+
+type PollOption = { id: string; text: string };
 
 interface CreatePollSheetProps {
   visible: boolean;
@@ -33,15 +35,22 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   onCreatePoll,
   isCreating = false,
 }) => {
+  const optionIdRef = useRef(0);
+  const buildOption = useCallback((): PollOption => {
+    const id = optionIdRef.current;
+    optionIdRef.current += 1;
+    return { id: `option-${id}`, text: '' };
+  }, []);
   const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState<string[]>(['', '']);
+  const [options, setOptions] = useState<PollOption[]>(() => [buildOption(), buildOption()]);
   const [multiSelect, setMultiSelect] = useState(false);
 
   const resetForm = useCallback(() => {
+    optionIdRef.current = 0;
     setQuestion('');
-    setOptions(['', '']);
+    setOptions([buildOption(), buildOption()]);
     setMultiSelect(false);
-  }, []);
+  }, [buildOption]);
 
   const handleClose = useCallback(() => {
     resetForm();
@@ -50,28 +59,32 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
 
   const handleAddOption = useCallback(() => {
     if (options.length < MAX_OPTIONS) {
-      setOptions([...options, '']);
+      setOptions((prev) => [...prev, buildOption()]);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, [options]);
+  }, [buildOption, options.length]);
 
-  const handleRemoveOption = useCallback((index: number) => {
+  const handleRemoveOption = useCallback((optionId: string) => {
     if (options.length > MIN_OPTIONS) {
-      setOptions(options.filter((_, i) => i !== index));
+      setOptions((prev) => prev.filter((option) => option.id !== optionId));
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, [options]);
+  }, [options.length]);
 
-  const handleOptionChange = useCallback((index: number, value: string) => {
-    const newOptions = [...options];
-    newOptions[index] = value.slice(0, MAX_OPTION_LENGTH);
-    setOptions(newOptions);
-  }, [options]);
+  const handleOptionChange = useCallback((optionId: string, value: string) => {
+    setOptions((prev) =>
+      prev.map((option) =>
+        option.id === optionId
+          ? { ...option, text: value.slice(0, MAX_OPTION_LENGTH) }
+          : option
+      )
+    );
+  }, []);
 
   const handleCreate = useCallback(() => {
     const trimmedQuestion = question.trim();
     const validOptions = options
-      .map((opt) => opt.trim())
+      .map((opt) => opt.text.trim())
       .filter((opt) => opt.length > 0);
 
     if (!trimmedQuestion) {
@@ -92,286 +105,334 @@ export const CreatePollSheet: React.FC<CreatePollSheetProps> = ({
   }, [question, options, multiSelect, onCreatePoll, resetForm]);
 
   const isValid = question.trim().length > 0 &&
-    options.filter((opt) => opt.trim().length > 0).length >= MIN_OPTIONS;
+    options.filter((opt) => opt.text.trim().length > 0).length >= MIN_OPTIONS;
 
   return (
     <Modal
       visible={visible}
-      transparent
-      animationType="fade"
+      animationType="slide"
+      presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalOverlay}
+        style={styles.container}
       >
-        <Pressable style={styles.backdrop} onPress={handleClose} />
-        <GlassCard width="90%" variant="default" padding={0}>
-          <View style={styles.content}>
-            <View style={styles.header}>
-              <Ionicons name="stats-chart" size={24} color={palette.accent} />
-              <Text style={styles.title}>Create poll</Text>
-              <Pressable onPress={handleClose} style={styles.closeButton}>
-                <Ionicons name="close" size={22} color={palette.textMuted} />
-              </Pressable>
-            </View>
+        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={styles.dimOverlay} />
+        <View style={styles.dragIndicator} />
 
-            <ScrollView
-              style={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={styles.label}>Question</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerIcon}>
+            <Ionicons name="stats-chart" size={20} color={palette.accent} />
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Create Poll</Text>
+            <Text style={styles.subtitle}>Ask a question and collect votes</Text>
+          </View>
+          <Pressable style={styles.closeButton} onPress={handleClose}>
+            <Ionicons name="close" size={20} color={palette.textMuted} />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          style={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Question */}
+          <Text style={styles.label}>Question</Text>
+          <TextInput
+            style={styles.questionInput}
+            value={question}
+            onChangeText={(text) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
+            placeholder="What's the question?"
+            placeholderTextColor="rgba(255, 255, 255, 0.4)"
+            multiline
+            maxLength={MAX_QUESTION_LENGTH}
+          />
+          <Text style={styles.charCount}>
+            {question.length}/{MAX_QUESTION_LENGTH}
+          </Text>
+
+          {/* Options */}
+          <Text style={styles.label}>Options</Text>
+          {options.map((option, index) => (
+            <View key={option.id} style={styles.optionRow}>
+              <View style={styles.optionNumber}>
+                <Text style={styles.optionNumberText}>{index + 1}</Text>
+              </View>
               <TextInput
-                style={styles.questionInput}
-                value={question}
-                onChangeText={(text) => setQuestion(text.slice(0, MAX_QUESTION_LENGTH))}
-                placeholder="What's the question?"
+                style={styles.optionInput}
+                value={option.text}
+                onChangeText={(text) => handleOptionChange(option.id, text)}
+                placeholder={`Option ${index + 1}`}
                 placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                multiline
-                maxLength={MAX_QUESTION_LENGTH}
+                maxLength={MAX_OPTION_LENGTH}
               />
-              <Text style={styles.charCount}>
-                {question.length}/{MAX_QUESTION_LENGTH}
-              </Text>
-
-              <Text style={styles.label}>Options</Text>
-              {options.map((option, index) => (
-                <View key={index} style={styles.optionRow}>
-                  <View style={styles.optionNumber}>
-                    <Text style={styles.optionNumberText}>{index + 1}</Text>
-                  </View>
-                  <TextInput
-                    style={styles.optionInput}
-                    value={option}
-                    onChangeText={(text) => handleOptionChange(index, text)}
-                    placeholder={`${index + 1}. option`}
-                    placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                    maxLength={MAX_OPTION_LENGTH}
-                  />
-                  {options.length > MIN_OPTIONS && (
-                    <Pressable
-                      onPress={() => handleRemoveOption(index)}
-                      style={styles.removeOptionButton}
-                    >
-                      <Ionicons name="close-circle" size={22} color="#EF4444" />
-                    </Pressable>
-                  )}
-                </View>
-              ))}
-
-              {options.length < MAX_OPTIONS && (
-                <Pressable style={styles.addOptionButton} onPress={handleAddOption}>
-                  <Ionicons name="add-circle-outline" size={20} color={palette.accent} />
-                  <Text style={styles.addOptionText}>Add option</Text>
+              {options.length > MIN_OPTIONS && (
+                <Pressable
+                  onPress={() => handleRemoveOption(option.id)}
+                  style={styles.removeOptionButton}
+                >
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
                 </Pressable>
               )}
-
-              <Pressable
-                style={styles.multiSelectRow}
-                onPress={() => {
-                  setMultiSelect(!multiSelect);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-              >
-                <View style={[styles.checkbox, multiSelect && styles.checkboxChecked]}>
-                  {multiSelect && <Ionicons name="checkmark" size={14} color="#ffffff" />}
-                </View>
-                <Text style={styles.multiSelectText}>Allow multiple answers</Text>
-              </Pressable>
-            </ScrollView>
-
-            <View style={styles.footer}>
-              <Pressable style={styles.cancelButton} onPress={handleClose}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.createButton,
-                  (!isValid || isCreating) && styles.createButtonDisabled,
-                ]}
-                onPress={handleCreate}
-                disabled={!isValid || isCreating}
-              >
-                <Ionicons name="stats-chart" size={18} color="#ffffff" />
-                <Text style={styles.createButtonText}>
-                  {isCreating ? 'Creating...' : 'Create'}
-                </Text>
-              </Pressable>
             </View>
-          </View>
-        </GlassCard>
+          ))}
+
+          {options.length < MAX_OPTIONS && (
+            <Pressable style={styles.addOptionButton} onPress={handleAddOption}>
+              <Ionicons name="add-circle-outline" size={22} color={palette.accent} />
+              <Text style={styles.addOptionText}>Add option</Text>
+            </Pressable>
+          )}
+
+          {/* Multi-select toggle */}
+          <Pressable
+            style={styles.multiSelectRow}
+            onPress={() => {
+              setMultiSelect(!multiSelect);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+          >
+            <View style={[styles.checkbox, multiSelect && styles.checkboxChecked]}>
+              {multiSelect && <Ionicons name="checkmark" size={16} color="#0B1630" />}
+            </View>
+            <Text style={styles.multiSelectText}>Allow multiple answers</Text>
+          </Pressable>
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Pressable style={styles.cancelButton} onPress={handleClose}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.createButton,
+              (!isValid || isCreating) && styles.createButtonDisabled,
+            ]}
+            onPress={handleCreate}
+            disabled={!isValid || isCreating}
+          >
+            <Ionicons name="stats-chart" size={18} color="#ffffff" />
+            <Text style={styles.createButtonText}>
+              {isCreating ? 'Creating...' : 'Create Poll'}
+            </Text>
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.md,
+    backgroundColor: 'rgba(8, 10, 16, 0.92)',
   },
-  backdrop: {
+  dimOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(5, 7, 12, 0.35)',
   },
-  content: {
-    maxHeight: 500,
+  dragIndicator: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 12,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
-    flex: 1,
-    color: palette.text,
-    fontSize: 18,
-    ...font('semibold'),
+    color: '#ffffff',
+    fontSize: 20,
+    ...font('bold'),
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    marginTop: 4,
   },
   closeButton: {
-    padding: spacing.xs,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
-    padding: spacing.md,
-    maxHeight: 320,
+    flex: 1,
+    paddingHorizontal: 20,
   },
   label: {
-    color: palette.textMuted,
-    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 13,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
+    letterSpacing: 0.6,
+    marginBottom: 10,
+    ...font('semibold'),
   },
   questionInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: radii.md,
-    padding: spacing.sm,
-    color: palette.text,
-    fontSize: 15,
-    minHeight: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: radii.lg,
+    padding: 16,
+    color: '#ffffff',
+    fontSize: 17,
+    minHeight: 100,
     textAlignVertical: 'top',
+    lineHeight: 24,
   },
   charCount: {
-    color: palette.textMuted,
-    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 12,
     textAlign: 'right',
-    marginTop: 4,
-    marginBottom: spacing.md,
+    marginTop: 6,
+    marginBottom: 24,
   },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
+    gap: 12,
+    marginBottom: 12,
   },
   optionNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   optionNumberText: {
     color: palette.accent,
-    fontSize: 12,
-    ...font('semibold'),
+    fontSize: 14,
+    ...font('bold'),
   },
   optionInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    color: palette.text,
-    fontSize: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: radii.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: '#ffffff',
+    fontSize: 16,
+    minHeight: 50,
   },
   removeOptionButton: {
-    padding: 4,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addOptionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    marginTop: spacing.xs,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: 'rgba(37, 99, 235, 0.3)',
-    borderStyle: 'dashed',
+    gap: 10,
+    paddingVertical: 16,
+    marginTop: 8,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(10, 132, 255, 0.08)',
+    minHeight: 56,
   },
   addOptionText: {
     color: palette.accent,
-    fontSize: 14,
+    fontSize: 16,
+    ...font('semibold'),
   },
   multiSelectRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    paddingVertical: spacing.xs,
+    gap: 14,
+    marginTop: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.lg,
+    minHeight: 60,
   },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: palette.accent,
-    borderColor: palette.accent,
+    backgroundColor: '#ffffff',
+    borderColor: '#ffffff',
   },
   multiSelectText: {
-    color: palette.text,
-    fontSize: 14,
+    color: '#ffffff',
+    fontSize: 16,
+    ...font('medium'),
   },
   footer: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderTopWidth: 1,
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
   },
   cancelButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 16,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    minHeight: 54,
   },
   cancelButtonText: {
-    color: palette.textMuted,
-    fontSize: 14,
-    ...font('medium'),
+    color: '#ffffff',
+    fontSize: 16,
+    ...font('semibold'),
   },
   createButton: {
-    flex: 1,
+    flex: 1.5,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: radii.lg,
     backgroundColor: palette.accent,
+    minHeight: 54,
   },
   createButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   createButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    ...font('semibold'),
+    fontSize: 16,
+    ...font('bold'),
   },
 });
 

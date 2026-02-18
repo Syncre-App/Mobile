@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { NativeBlur, BlurPresets } from './NativeBlur';
+import { BlurView } from 'expo-blur';
+import { radii } from '../theme/designSystem';
 
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
@@ -51,10 +52,40 @@ const ToastItem: React.FC<{ notification: Notification }> = ({ notification }) =
   const icon = ICON_MAP[notification.type] || ICON_MAP.info;
   const borderColor = BORDER_COLORS[notification.type] || BORDER_COLORS.info;
 
+  // iOS: Use native blur
+  if (Platform.OS === 'ios') {
+    return (
+      <Animated.View
+        style={[
+          styles.toastContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY }],
+            borderColor,
+          },
+        ]}
+      >
+        <BlurView intensity={80} tint="dark" style={styles.blurView}>
+          <View style={styles.toastContent}>
+            <Ionicons name={icon.name} size={22} color={icon.color} style={styles.icon} />
+            <View style={styles.textContainer}>
+              {notification.title ? (
+                <Text style={styles.title}>{notification.title}</Text>
+              ) : null}
+              <Text style={styles.message} numberOfLines={3}>{notification.message}</Text>
+            </View>
+          </View>
+        </BlurView>
+      </Animated.View>
+    );
+  }
+
+  // Android: Semi-transparent background fallback
   return (
     <Animated.View
       style={[
         styles.toastContainer,
+        styles.toastContainerAndroid,
         {
           opacity: fadeAnim,
           transform: [{ translateY }],
@@ -62,17 +93,15 @@ const ToastItem: React.FC<{ notification: Notification }> = ({ notification }) =
         },
       ]}
     >
-      <NativeBlur {...BlurPresets.toast} style={styles.blurView}>
-        <View style={styles.toastContent}>
-          <Ionicons name={icon.name} size={22} color={icon.color} style={styles.icon} />
-          <View style={styles.textContainer}>
-            {notification.title ? (
-              <Text style={styles.title}>{notification.title}</Text>
-            ) : null}
-            <Text style={styles.message} numberOfLines={3}>{notification.message}</Text>
-          </View>
+      <View style={styles.toastContent}>
+        <Ionicons name={icon.name} size={22} color={icon.color} style={styles.icon} />
+        <View style={styles.textContainer}>
+          {notification.title ? (
+            <Text style={styles.title}>{notification.title}</Text>
+          ) : null}
+          <Text style={styles.message} numberOfLines={3}>{notification.message}</Text>
         </View>
-      </NativeBlur>
+      </View>
     </Animated.View>
   );
 };
@@ -109,7 +138,7 @@ const styles = StyleSheet.create({
   },
   toastContainer: {
     marginBottom: 10,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     overflow: 'hidden',
     borderWidth: 1,
     shadowColor: '#000',
@@ -118,6 +147,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  toastContainerAndroid: {
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+  },
   blurView: {
     overflow: 'hidden',
   },
@@ -125,7 +157,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(15, 23, 42, 0.7)' : 'transparent',
   },
   icon: {
     marginRight: 12,

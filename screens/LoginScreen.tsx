@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -12,13 +11,11 @@ import {
     View,
 } from 'react-native';
 import { AppBackground } from '../components/AppBackground';
-import { GlassCard } from '../components/GlassCard';
 import { TransparentField } from '../components/TransparentField';
 import { ApiService } from '../services/ApiService';
 import { notificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
-import { IdentityService } from '../services/IdentityService';
-import { CryptoService } from '../services/CryptoService';
+import { CryptoService, EncryptedIdentityKey } from '../services/CryptoService';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 
 export const LoginScreen: React.FC = () => {
@@ -72,21 +69,38 @@ export const LoginScreen: React.FC = () => {
         }
 
         if (token) {
-          const [needsSetup, localIdentity] = await Promise.all([
-            IdentityService.requiresBootstrap(token),
-            CryptoService.getStoredIdentity(),
-          ]);
+          // Initialize E2EE identity with password
+          try {
+            const identityKey = (data?.identityKey as EncryptedIdentityKey) || null;
+            await CryptoService.initializeFromLogin({
+              password: password,
+              token: token,
+              identityKey: identityKey,
+            });
+            console.log('[LoginScreen] E2EE identity initialized');
+
+            // Initialize backup key for message history access
+            const backupKeySuccess = await CryptoService.initializeBackupKey({
+              password: password,
+              token: token,
+            });
+            if (backupKeySuccess) {
+              console.log('[LoginScreen] Backup key initialized');
+            } else {
+              console.warn('[LoginScreen] Backup key initialization failed (non-blocking)');
+            }
+          } catch (cryptoError: any) {
+            console.error('[LoginScreen] Failed to initialize E2EE:', cryptoError);
+            // Don't block login, but warn user
+            notificationService.show('error', 'Failed to initialize secure messaging. Some features may not work.', 'Warning');
+          }
 
           notificationService.show('success', `Welcome, ${user?.username || user?.name || email}!`, 'Login successful');
 
           if (data?.requires_terms_acceptance || !user?.terms_accepted_at) {
             router.replace('/terms' as any);
-          } else if (needsSetup) {
-            router.replace('/identity?mode=setup' as any);
-          } else if (!localIdentity) {
-            router.replace('/identity?mode=unlock' as any);
           } else {
-            router.replace('/home' as any);
+            router.replace('/(tabs)' as any);
           }
         } else {
           setErrorMessage('Missing authentication token');
@@ -135,7 +149,7 @@ export const LoginScreen: React.FC = () => {
           <Text style={styles.heroSubtitle}>Stay close. Own your data.</Text>
         </View>
 
-        <GlassCard width="100%" style={styles.card} variant="subtle" padding={spacing.lg}>
+        <View style={styles.card}>
           <View style={styles.cardContent}>
             <Text style={styles.title}>Sign in to Syncre</Text>
             <Text style={styles.subtitle}>Secure messaging that mirrors our web glow.</Text>
@@ -199,7 +213,7 @@ export const LoginScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        </GlassCard>
+        </View>
       </ScrollView>
     </View>
   );
@@ -221,7 +235,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  logo: { width: 96, height: 96, marginBottom: spacing.sm },
   overline: {
     color: palette.textSubtle,
     ...font('displayMedium'),
@@ -240,7 +253,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     ...font('regular'),
   },
-  card: { width: '100%', maxWidth: 420 },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    padding: spacing.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
   cardContent: { width: '100%' },
   title: {
     color: palette.text,

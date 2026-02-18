@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "syncre",
+    "name": "Syncre",
     "slug": "syncre",
-    "version": "1.1.4",
+    "version": "2.0.3",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "scheme": "syncre",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
     "jsEngine": "hermes",
     "notification": {
       "icon": "./assets/logo.png",
@@ -46,6 +46,21 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "syncre"
+            }
+          ],
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ]
+        }
       ]
     },
     "web": {
@@ -74,7 +89,12 @@
           "color": "#2C82FF"
         }
       ],
-      "expo-video"
+      "expo-video",
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "expo-localization",
+      "expo-secure-store",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,

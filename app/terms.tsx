@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppBackground } from '../components/AppBackground';
-import { GlassCard } from '../components/GlassCard';
+
 import { NotificationService, notificationService } from '../services/NotificationService';
 import { ApiService } from '../services/ApiService';
 import { StorageService } from '../services/StorageService';
@@ -78,7 +78,7 @@ export default function TermsAcceptScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <GlassCard width="100%" variant="subtle" style={styles.card} padding={spacing.lg}>
+        <View style={styles.card}>
           <View style={styles.header}>
             <View style={styles.iconBadge}>
               <Ionicons name="shield-checkmark" size={22} color="#0b1220" />
@@ -124,7 +124,7 @@ export default function TermsAcceptScreen() {
               )}
             </LinearGradient>
           </TouchableOpacity>
-        </GlassCard>
+        </View>
       </ScrollView>
     </View>
   );
@@ -144,6 +144,12 @@ const styles = StyleSheet.create({
   card: {
     alignSelf: 'center',
     maxWidth: 520,
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: spacing.lg,
   },
   header: {
     gap: spacing.sm,

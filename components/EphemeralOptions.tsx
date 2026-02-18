@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Modal,
   Pressable,
@@ -7,14 +7,16 @@ import {
   Text,
   View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassCard } from './GlassCard';
 
 export type EphemeralDuration = '5m' | '1h' | '24h' | '7d' | null;
 
 interface EphemeralOptionsProps {
   selectedDuration: EphemeralDuration;
   onSelectDuration: (duration: EphemeralDuration) => void;
+  visible?: boolean;
+  onClose?: () => void;
 }
 
 const DURATION_OPTIONS: { value: EphemeralDuration; label: string; description: string }[] = [
@@ -28,144 +30,166 @@ const DURATION_OPTIONS: { value: EphemeralDuration; label: string; description: 
 export const EphemeralOptions: React.FC<EphemeralOptionsProps> = ({
   selectedDuration,
   onSelectDuration,
+  visible = false,
+  onClose,
 }) => {
-  const [isModalVisible, setIsModalVisible] = useState(false);
-
-  const handleToggleModal = () => {
-    setIsModalVisible(!isModalVisible);
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    }
   };
 
   const handleSelectOption = (duration: EphemeralDuration) => {
     onSelectDuration(duration);
-    setIsModalVisible(false);
+    handleClose();
   };
 
-  const isActive = selectedDuration !== null;
-
   return (
-    <>
-      <Pressable
-        onPress={handleToggleModal}
-        style={[styles.triggerButton, isActive && styles.triggerButtonActive]}
-        accessibilityLabel="Ephemeral message options"
-        accessibilityRole="button"
-      >
-        <Ionicons
-          name="timer-outline"
-          size={22}
-          color={isActive ? '#FB923C' : 'rgba(255, 255, 255, 0.6)'}
-        />
-      </Pressable>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <View style={styles.container}>
+        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={styles.dimOverlay} />
+        <View style={styles.dragIndicator} />
 
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setIsModalVisible(false)}>
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <GlassCard width={280} variant="default" padding={0}>
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Ionicons name="timer-outline" size={24} color={palette.text} />
-                  <Text style={styles.modalTitle}>Disappearing Message</Text>
-                </View>
-                <Text style={styles.modalDescription}>
-                  Choose how long before this message disappears
-                </Text>
-
-                <View style={styles.optionsList}>
-                  {DURATION_OPTIONS.map((option) => (
-                    <Pressable
-                      key={option.value ?? 'off'}
-                      style={[
-                        styles.optionItem,
-                        selectedDuration === option.value && styles.optionItemSelected,
-                      ]}
-                      onPress={() => handleSelectOption(option.value)}
-                    >
-                      <View style={styles.optionContent}>
-                        <Text style={styles.optionLabel}>{option.label}</Text>
-                        <Text style={styles.optionDescription}>{option.description}</Text>
-                      </View>
-                      {selectedDuration === option.value && (
-                        <Ionicons name="checkmark-circle" size={22} color={palette.accent} />
-                      )}
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            </GlassCard>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerIcon}>
+            <Ionicons name="timer-outline" size={20} color={palette.accent} />
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Disappearing Message</Text>
+            <Text style={styles.subtitle}>Choose how long before messages disappear</Text>
+          </View>
+          <Pressable style={styles.closeButton} onPress={handleClose}>
+            <Ionicons name="close" size={20} color={palette.textMuted} />
           </Pressable>
-        </Pressable>
-      </Modal>
-    </>
+        </View>
+
+        {/* Options */}
+        <View style={styles.optionsList}>
+          {DURATION_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value ?? 'off'}
+              style={[
+                styles.optionItem,
+                selectedDuration === option.value && styles.optionItemSelected,
+              ]}
+              onPress={() => handleSelectOption(option.value)}
+            >
+              <View style={styles.optionContent}>
+                <Text style={styles.optionLabel}>{option.label}</Text>
+                <Text style={styles.optionDescription}>{option.description}</Text>
+              </View>
+              {selectedDuration === option.value && (
+                <View style={styles.checkCircle}>
+                  <Ionicons name="checkmark" size={16} color="#0B1630" />
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  triggerButton: {
-    padding: spacing.xs,
-    borderRadius: radii.md,
-  },
-  triggerButtonActive: {
-    backgroundColor: 'rgba(251, 146, 60, 0.15)',
-  },
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
+    backgroundColor: 'rgba(8, 10, 16, 0.92)',
   },
-  modalContent: {
-    padding: spacing.md,
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 7, 12, 0.35)',
   },
-  modalHeader: {
+  dragIndicator: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    gap: 12,
   },
-  modalTitle: {
-    color: palette.text,
-    fontSize: 18,
-    ...font('semibold'),
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modalDescription: {
-    color: palette.textMuted,
+  headerText: {
+    flex: 1,
+  },
+  title: {
+    color: '#ffffff',
+    fontSize: 20,
+    ...font('bold'),
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 14,
-    marginBottom: spacing.md,
+    marginTop: 4,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   optionsList: {
-    gap: spacing.xs,
+    paddingHorizontal: 20,
+    gap: spacing.sm,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    minHeight: 64,
   },
   optionItemSelected: {
-    backgroundColor: 'rgba(37, 99, 235, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(37, 99, 235, 0.4)',
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
   },
   optionContent: {
     flex: 1,
   },
   optionLabel: {
-    color: palette.text,
-    fontSize: 15,
-    ...font('medium'),
+    color: '#ffffff',
+    fontSize: 17,
+    ...font('semibold'),
   },
   optionDescription: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

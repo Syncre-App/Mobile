@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackground } from '../components/AppBackground';
-import { GlassCard } from '../components/GlassCard';
 import { ApiService } from '../services/ApiService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
@@ -205,6 +204,24 @@ export const EditProfileScreen: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
+        <AppBackground />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={palette.accent} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const displayImage = selectedImage?.uri || profilePicture;
+
+  // ═══════════════════════════════════════════════════════════════
+  // Android / Fallback: React Native components
+  // ═══════════════════════════════════════════════════════════════
+
   const renderSettingItem = (
     icon: string,
     title: string,
@@ -232,20 +249,6 @@ export const EditProfileScreen: React.FC = () => {
       ) : null}
     </TouchableOpacity>
   );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
-        <AppBackground />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={palette.accent} />
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const displayImage = selectedImage?.uri || profilePicture;
 
   return (
     <SafeAreaView style={[styles.container, { paddingTop: extraTopPadding }]} edges={['top', 'left', 'right']}>
@@ -281,12 +284,12 @@ export const EditProfileScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Picture Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Profile Picture</Text>
           </View>
 
-          <TouchableOpacity style={styles.avatarRow} onPress={handlePickImage} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.avatarRowSection} onPress={handlePickImage} activeOpacity={0.8}>
             <View style={styles.avatarContainer}>
               {displayImage ? (
                 <Image source={{ uri: displayImage }} style={styles.avatar} />
@@ -309,10 +312,10 @@ export const EditProfileScreen: React.FC = () => {
             </View>
             <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.3)" />
           </TouchableOpacity>
-        </GlassCard>
+        </View>
 
         {/* Account Info Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Account Info</Text>
           </View>
@@ -333,7 +336,7 @@ export const EditProfileScreen: React.FC = () => {
             undefined,
             undefined
           )}
-        </GlassCard>
+        </View>
 
         {/* Hint */}
         <View style={styles.hintContainer}>
@@ -404,8 +407,21 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.lg,
   },
+  avatarSection: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    overflow: 'hidden',
+  },
   section: {
     marginBottom: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
     width: '100%',
     maxWidth: 440,
@@ -422,6 +438,12 @@ const styles = StyleSheet.create({
     ...font('semibold'),
   },
   avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  avatarRowSection: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,

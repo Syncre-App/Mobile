@@ -3,7 +3,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppBackground } from '../components/AppBackground';
-import { GlassCard } from '../components/GlassCard';
+
 import { font, palette, spacing } from '../theme/designSystem';
 
 export const MaintenanceScreen: React.FC = () => {
@@ -19,7 +19,7 @@ export const MaintenanceScreen: React.FC = () => {
           </Text>
         </View>
 
-        <GlassCard width={360} style={styles.card} variant="subtle" padding={spacing.lg}>
+        <View style={styles.card}>
           <View style={styles.cardContent}>
             <Ionicons name="construct" size={48} color="#fff7" />
             <Text style={styles.cardTitle}>Under Maintenance</Text>
@@ -28,7 +28,7 @@ export const MaintenanceScreen: React.FC = () => {
               We&apos;re updating infrastructure and tightening security. Your data remains safe.
             </Text>
           </View>
-        </GlassCard>
+        </View>
       </ScrollView>
     </View>
   );
@@ -67,7 +67,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xs,
   },
-  card: { alignSelf: 'center', width: '100%', maxWidth: 420 },
+  card: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: spacing.lg,
+  },
   cardContent: { alignItems: 'center', padding: spacing.sm },
   cardTitle: {
     color: 'white',

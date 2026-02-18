@@ -308,6 +308,26 @@ export class ApiService {
       replyTo?: number;
       scheduledFor: string;
       timezone?: string;
+      // E2EE fields
+      isEncrypted?: boolean;
+      envelopes?: Array<{
+        recipientId: string;
+        recipientDevice: string | null;
+        payload: string;
+        nonce: string;
+        keyVersion: number;
+        alg: string;
+        senderIdentityKey: string | null;
+        version: number;
+      }>;
+      backupEnvelopes?: Array<{ userId: string; payload: string; nonce: string }>;
+      senderDeviceId?: string;
+      replyMetadata?: {
+        messageId: string;
+        senderId?: string;
+        senderName?: string;
+        content?: string;
+      } | null;
     },
     token: string
   ): Promise<ApiResponse> {
@@ -343,9 +363,14 @@ export class ApiService {
   static async createPoll(
     chatId: string | number,
     data: {
-      question: string;
-      options: string[];
+      question?: string;
+      options?: string[];
+      optionsCount?: number;
       multiSelect?: boolean;
+      encryptedPollPayload?: any;
+      backupEnvelopes?: any;
+      pollPayloadVersion?: number;
+      senderDeviceId?: string | null;
     },
     token: string
   ): Promise<ApiResponse> {

@@ -7,16 +7,17 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
+  Switch as RNSwitch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassCard } from '../components/GlassCard';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { UpdateService } from '../services/UpdateService';
+import { ApiService } from '../services/ApiService';
 import { AppBackground } from '../components/AppBackground';
 import { font, palette, radii, spacing } from '../theme/designSystem';
 import { SpotifyConnection } from '../components/SpotifyConnection';
@@ -29,8 +30,7 @@ export const SettingsScreen: React.FC = () => {
   const minTopPadding = spacing.lg;
   const extraTopPadding = Math.max(minTopPadding - insets.top, 0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = useState(true); // Always true for now
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
+  const [darkModeEnabled, setDarkModeEnabled] = useState(true);
   const appVersion = UpdateService.getCurrentVersion();
 
   const handleBack = () => {
@@ -42,15 +42,11 @@ export const SettingsScreen: React.FC = () => {
       'Clear Cache',
       'This will clear all cached data. Are you sure?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Clear',
           onPress: async () => {
             try {
-              // Clear cache but keep auth token
               const token = await StorageService.getAuthToken();
               await StorageService.clear();
               if (token) {
@@ -66,6 +62,33 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  const handleBlockedUsers = () => {
+    router.push('/settings/blocked-users');
+  };
+
+  const handleChangePassword = () => {
+    router.push('/settings/change-password');
+  };
+
+  const handleReportInfo = () => {
+    Alert.alert(
+      'How to Report Content',
+      'To report objectionable content or users:\n\n- Long-press on any message in a chat\n- Select "Report" from the menu\n- Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
+      [{ text: 'Got it', style: 'default' }]
+    );
+  };
+
+  const handleCommunityGuidelines = () => {
+    Linking.openURL('https://syncre.xyz/terms');
+  };
+
+  const handleLanguagePress = () => {
+    Alert.alert('Language', 'Multiple languages will be supported in future updates');
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // Android / Fallback: React Native components
+  // ═══════════════════════════════════════════════════════════════
 
   const renderSettingItem = (
     icon: string | null,
@@ -73,7 +96,7 @@ export const SettingsScreen: React.FC = () => {
     subtitle?: string,
     onPress?: () => void,
     rightComponent?: React.ReactNode,
-    hasTopBorder: boolean = true,
+    hasTopBorder: boolean = true
   ) => (
     <TouchableOpacity
       onPress={onPress}
@@ -89,19 +112,11 @@ export const SettingsScreen: React.FC = () => {
           {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
         </View>
       </View>
-      
-      {rightComponent && (
-        <View style={styles.settingRight}>
-          {rightComponent}
-        </View>
-      )}
-      
+
+      {rightComponent && <View style={styles.settingRight}>{rightComponent}</View>}
+
       {onPress && !rightComponent && (
-        <Ionicons
-          name="chevron-forward"
-          size={20}
-          color="rgba(255, 255, 255, 0.3)"
-        />
+        <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.3)" />
       )}
     </TouchableOpacity>
   );
@@ -112,7 +127,6 @@ export const SettingsScreen: React.FC = () => {
       edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
       <AppBackground />
 
       {/* Header */}
@@ -120,12 +134,9 @@ export const SettingsScreen: React.FC = () => {
         <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-
-        {/* Absolutely centered title so it aligns with centered cards */}
         <View style={styles.headerCentered} pointerEvents="none">
           <Text style={styles.headerTitle}>Settings</Text>
         </View>
-
         <View style={styles.headerPlaceholder} />
       </View>
 
@@ -135,17 +146,16 @@ export const SettingsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Notifications Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>Notifications</Text>
           </View>
-          
           {renderSettingItem(
             'notifications',
             'Push Notifications',
             'Receive notifications for new messages',
             undefined,
-            <Switch
+            <RNSwitch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
               trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
@@ -153,45 +163,35 @@ export const SettingsScreen: React.FC = () => {
             />,
             false
           )}
-        </GlassCard>
+        </View>
 
         {/* Appearance Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>Appearance</Text>
           </View>
-          
           {renderSettingItem(
             'moon',
             'Dark Mode',
             'Currently enabled by default',
             undefined,
-            <Switch
+            <RNSwitch
               value={darkModeEnabled}
               onValueChange={setDarkModeEnabled}
-              disabled={true} // Disabled for now
+              disabled={true}
               trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: palette.accent }}
               thumbColor="white"
             />,
             false
           )}
-          
-          {renderSettingItem(
-            'language',
-            'Language',
-            selectedLanguage,
-            () => {
-              Alert.alert('Language', 'Multiple languages will be supported in future updates');
-            }
-          )}
-        </GlassCard>
+          {renderSettingItem('language', 'Language', 'English', handleLanguagePress)}
+        </View>
 
         {/* Storage Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>Storage</Text>
           </View>
-          
           {renderSettingItem(
             'trash',
             'Clear Cache',
@@ -200,70 +200,48 @@ export const SettingsScreen: React.FC = () => {
             undefined,
             false
           )}
-        </GlassCard>
+        </View>
 
-        {/* Safety & Reporting Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Safety & Reporting</Text>
+        {/* Account Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
+            <Text style={styles.sectionTitle}>Account</Text>
           </View>
-          
           {renderSettingItem(
-            'ban',
-            'Blocked Users',
-            'Manage blocked users',
-            () => router.push('/settings/blocked-users'),
+            'key',
+            'Change Password',
+            'Update your account password',
+            handleChangePassword,
             undefined,
             false
           )}
+        </View>
 
-          {renderSettingItem(
-            'flag',
-            'Report Content',
-            'Long-press any message to report',
-            () => {
-              Alert.alert(
-                'How to Report Content',
-                'To report objectionable content or users:\n\n- Long-press on any message in a chat\n- Select "Report" from the menu\n- Our team will review the report\n\nYou can also block users to prevent them from contacting you.',
-                [{ text: 'Got it', style: 'default' }]
-              );
-            }
-          )}
-
-          {renderSettingItem(
-            'shield-checkmark',
-            'Community Guidelines',
-            'View our content policies',
-            () => Linking.openURL('https://syncre.app/terms')
-          )}
-        </GlassCard>
+        {/* Safety Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
+            <Text style={styles.sectionTitle}>Safety & Reporting</Text>
+          </View>
+          {renderSettingItem('ban', 'Blocked Users', 'Manage blocked users', handleBlockedUsers, undefined, false)}
+          {renderSettingItem('flag', 'Report Content', 'Long-press any message to report', handleReportInfo)}
+          {renderSettingItem('shield-checkmark', 'Community Guidelines', 'View our content policies', handleCommunityGuidelines)}
+        </View>
 
         {/* Integrations Section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>Integrations</Text>
           </View>
-          <View style={styles.integrationCardWrapper}>
-            <SpotifyConnection />
-          </View>
+          <SpotifyConnection />
         </View>
 
         {/* About Section */}
-        <GlassCard width="100%" style={styles.section} variant="subtle">
-          <View style={styles.sectionHeader}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderView}>
             <Text style={styles.sectionTitle}>About</Text>
           </View>
-
-          {renderSettingItem(
-            null,
-            'App Version',
-            appVersion,
-            undefined,
-            undefined,
-            false
-          )}
-        </GlassCard>
-
+          {renderSettingItem(null, 'App Version', appVersion, undefined, undefined, false)}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -300,6 +278,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     ...font('display'),
   },
+  headerCentered: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   content: {
     flex: 1,
   },
@@ -308,18 +295,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'stretch',
   },
+  integrationsSection: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
   section: {
     marginBottom: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
     width: '100%',
     maxWidth: 440,
     alignSelf: 'center',
   },
-  integrationCardWrapper: {
-    width: '100%',
-    marginTop: spacing.xs,
-  },
-  sectionHeader: {
+  sectionHeaderView: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.xs,
@@ -364,14 +355,5 @@ const styles = StyleSheet.create({
   },
   settingRight: {
     marginLeft: spacing.md,
-  },
-  headerCentered: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

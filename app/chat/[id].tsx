@@ -1,5 +1,4 @@
 import React, {
-  ComponentProps,
   useCallback,
   useEffect,
   useMemo,
@@ -39,11 +38,48 @@ import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
 import { CreatePollSheet } from '../../components/CreatePollSheet';
 import { PollMessage, type PollData } from '../../components/PollMessage';
 import { NativeContextMenu, type ContextMenuAction } from '../../components/NativeContextMenu';
+import { canUseSwiftUI } from '../../utils/swiftUi';
+import { decodePollPayload, decodePollPayloadFromJson, encodePollPayload } from '../../utils/pollPayload';
 import { font, palette, radii, spacing } from '../../theme/designSystem';
 import leo from 'leo-profanity';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// SwiftUI imports for iOS
+let SwiftUIHost: any = null;
+let SwiftUIHStack: any = null;
+let SwiftUIButton: any = null;
+let SwiftUIText: any = null;
+let SwiftUIVStack: any = null;
+let SwiftUIBottomSheet: any = null;
+let swiftUIBackground: any = null;
+let swiftUICornerRadius: any = null;
+let swiftUIPadding: any = null;
+let swiftUIFrame: any = null;
+let swiftUIBorder: any = null;
+let swiftUIShadow: any = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIHost = swiftUI.Host;
+    SwiftUIHStack = swiftUI.HStack;
+    SwiftUIButton = swiftUI.Button;
+    SwiftUIText = swiftUI.Text;
+    SwiftUIVStack = swiftUI.VStack;
+    SwiftUIBottomSheet = swiftUI.BottomSheet;
+    const modifiers = require('@expo/ui/swift-ui/modifiers');
+    swiftUIBackground = modifiers.background;
+    swiftUICornerRadius = modifiers.cornerRadius;
+    swiftUIPadding = modifiers.padding;
+    swiftUIFrame = modifiers.frame;
+    swiftUIBorder = modifiers.border;
+    swiftUIShadow = modifiers.shadow;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
+  }
 }
 
 type MessageStatus = 'sending' | 'sent' | 'delivered' | 'seen';
@@ -124,8 +160,6 @@ type ChatListItem =
   | { kind: 'message'; id: string; message: Message }
   | { kind: 'date'; id: string; label: string }
   | { kind: 'typing'; id: string };
-
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const MESSAGE_PAYLOAD_VERSION = 1;
 const API_ROOT = ApiService.baseUrl.replace(/\/v1\/?$/i, '');
@@ -412,10 +446,14 @@ const resolveDecryptFallbackText = (
   attachments: MessageAttachment[]
 ): string => {
   if (attachments.length > 0) {
+    // Media messages will show their own placeholder/icon if decryption fails
     return '';
   }
   const trimmedPreview = typeof preview === 'string' ? preview.trim() : '';
-  return trimmedPreview;
+  if (trimmedPreview.length > 0) {
+    return trimmedPreview;
+  }
+  return '[Encrypted message]';
 };
 
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -595,6 +633,12 @@ const SWIPE_REPLY_RETURN_DURATION = 420;
 const MIN_GROUP_MEMBERS = 3;
 const MAX_GROUP_MEMBERS = 10;
 const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+const REACTION_ROWS = [DEFAULT_REACTIONS];
+const REACTION_BUTTON_SIZE = 36;
+const REACTION_BUTTON_GAP = 8;
+const REACTION_CARD_PADDING = 10;
+const REACTION_LABEL_HEIGHT = 24;
+const decryptionCache = new Map<string, string>();
 const huWords = [
   "bazdmeg", "bazmeg", "geci", "fasz", "kurva", "picsa", "szar", "szopd", "kibaszott",
   "buzi", "köcsög", "baszik", "kúr", "nemnormális", "balfasz", "fing", "ribanc",
@@ -940,13 +984,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const hasContent = Boolean((message.content || '').trim().length) && !isDeletedMessage && !showExpiredBubble;
   const isMediaOnlyMessage =
     hasPreviewableMedia && !hasContent && !message.replyTo && !message.isPlaceholder && !isDeletedMessage && !showExpiredBubble;
+  const messageRowMaxWidth = Math.round(Dimensions.get('window').width * 0.82);
+  const hasReactions = Array.isArray(message.reactions) && message.reactions.length > 0;
   const containerStyle = [
     styles.messageRow,
+    { maxWidth: messageRowMaxWidth },
     isMine ? styles.messageRowMine : styles.messageRowTheirs,
     !isFirstInGroup && styles.messageRowStacked,
     isLastInGroup ? styles.messageRowSpaced : styles.messageRowCompact,
     message.replyTo && styles.messageRowWithReply,
     isMediaOnlyMessage && styles.messageRowMedia,
+    hasReactions && styles.messageRowWithReactions,
   ];
   const previewableImageAttachments = useMemo(
     () =>
@@ -1127,7 +1175,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         <NativeContextMenu
           title={message.content ? undefined : 'Message'}
           actions={contextMenuActions || []}
-          disabled={!contextMenuActions || contextMenuActions.length === 0 || message.isPlaceholder}
+          activationMethod="longPress"
+          disabled={
+            Platform.OS === 'android' ||
+            !contextMenuActions ||
+            contextMenuActions.length === 0 ||
+            message.isPlaceholder
+          }
         >
           <Pressable
             onPress={handleBubblePress}
@@ -1452,6 +1506,7 @@ const ChatScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const wsService = useMemo(() => WebSocketService.getInstance(), []);
   const flatListRef = useRef<FlatList<ChatListItem>>(null);
+  const handleIncomingMessageRef = useRef<(message: any) => void>(() => {});
   const listLayoutHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
   const composerLimitWarningRef = useRef(false);
@@ -1470,6 +1525,7 @@ const ChatScreen: React.FC = () => {
   const missingEnvelopeRef = useRef(false);
   const missingHistoryPromptedRef = useRef(false);
   const reencryptRequestedRef = useRef(false);
+  const lastReencryptRequestRef = useRef<number>(0);
   const pendingRefreshRef = useRef(false);
   const identityRepairRef = useRef(false);
   const requestReencrypt = useCallback(
@@ -1477,6 +1533,13 @@ const ChatScreen: React.FC = () => {
       if (!chatId) {
         return;
       }
+      const now = Date.now();
+      const COOLDOWN_MS = 30000;
+      if (now - lastReencryptRequestRef.current < COOLDOWN_MS && reason !== 'manual') {
+        console.log(`[Chat] Skipping re-encrypt request (cooldown active, reason: ${reason})`);
+        return;
+      }
+
       const payload: WebSocketMessage = {
         type: 'request_reencrypt',
         chatId,
@@ -1485,6 +1548,7 @@ const ChatScreen: React.FC = () => {
       };
       wsService.send(payload);
       reencryptRequestedRef.current = true;
+      lastReencryptRequestRef.current = now;
       missingEnvelopeRef.current = false;
     },
     [chatId, wsService]
@@ -1515,9 +1579,11 @@ const ChatScreen: React.FC = () => {
     identityRepairRef.current = true;
     NotificationService.show(
       'error',
-      'Secure identity missing. Please set up your PIN to unlock messages.'
+      'Secure identity missing. Please log in again to restore encryption.'
     );
-    router.push('/identity?mode=setup');
+    // Clear auth and redirect to login - password is needed to decrypt identity
+    StorageService.removeAuthToken();
+    router.replace('/');
   }, []);
   const typingStateRef = useRef<{ isTyping: boolean }>({ isTyping: false });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1539,8 +1605,6 @@ const ChatScreen: React.FC = () => {
     return safeTop + 64;
   }, [insets.top]);
   const previewBottomChromeHeight = useMemo(() => Math.max(insets.bottom, 10) + 126, [insets.bottom]);
-  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
-  const attachmentSheetAnim = useRef(new Animated.Value(0)).current;
   const previewChromeTopPadding = useMemo(
     () => (previewChromeVisible ? previewTopChromeHeight : 0),
     [previewChromeVisible, previewTopChromeHeight]
@@ -1627,21 +1691,6 @@ const ChatScreen: React.FC = () => {
     },
     [togglePreviewChrome]
   );
-  const closeAttachmentSheet = useCallback((onFinished?: () => void) => {
-    console.log('[DEBUG] closeAttachmentSheet called, onFinished:', typeof onFinished);
-    Animated.timing(attachmentSheetAnim, {
-      toValue: 0,
-      duration: 160,
-      useNativeDriver: true,
-    }).start((result) => {
-      console.log('[DEBUG] Animation finished, result:', result, 'calling onFinished:', typeof onFinished);
-      setAttachmentSheetVisible(false);
-      if (onFinished) {
-        console.log('[DEBUG] Executing onFinished callback');
-        onFinished();
-      }
-    });
-  }, [attachmentSheetAnim]);
   const resolveActionIcon = useCallback((label: string): any => {
     const normalized = label.toLowerCase();
     if (normalized.includes('reply')) return 'return-down-back';
@@ -1676,8 +1725,10 @@ const ChatScreen: React.FC = () => {
   const [ephemeralDuration, setEphemeralDuration] = useState<EphemeralDuration>(null);
   const [showScheduleSheet, setShowScheduleSheet] = useState(false);
   const [showPollSheet, setShowPollSheet] = useState(false);
+  const [showEphemeralSheet, setShowEphemeralSheet] = useState(false);
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
   const [pollsData, setPollsData] = useState<Map<string, { poll: PollData; userVotes: number[] }>>(new Map());
+  const pollDecryptAttemptedRef = useRef<Set<string>>(new Set());
   const [isThreadLoading, setIsThreadLoading] = useState(true);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const composerRef = useRef<TextInput>(null);
@@ -1708,7 +1759,6 @@ const ChatScreen: React.FC = () => {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const windowHeight = Dimensions.get('window').height;
   const ACTION_CARD_WIDTH = 280;
-  const ATTACHMENT_DROPDOWN_WIDTH = 260;
   const ACTION_CARD_HEIGHT = 240;
   const SCREEN_WIDTH = Dimensions.get('window').width;
   const reactionAnim = useRef(new Animated.Value(0)).current;
@@ -1776,26 +1826,54 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   const currentUserId = user?.id ? String(user.id) : null;
+  // Disable SwiftUI reaction picker - the border/cornerRadius/background modifiers don't blend well
+  // The React Native fallback looks better with proper styling
+  const shouldUseSwiftUIReactionPicker = false;
+
+  // Direct recipient for 1:1 chats (must be defined before handleReportUser and chatHeaderMenuActions)
+  const directRecipient = useMemo(() => {
+    if (chatDetails?.isGroup) {
+      return null;
+    }
+    const participants = chatDetails?.participants || [];
+    return (
+      participants.find((participant) => participant.id !== currentUserId) || null
+    );
+  }, [chatDetails?.isGroup, chatDetails?.participants, currentUserId]);
 
   const reactionPickerPosition = useMemo(() => {
     if (!reactionPicker) {
       return null;
     }
-    const buttonCount = DEFAULT_REACTIONS.length + 1; // emojis + menu
-    const width = buttonCount * 40 + 24;
-    const pickerHeight = 68;
+    const rowCount = REACTION_ROWS.length;
+    const rowSize = Math.max(REACTION_ROWS[0]?.length ?? 0, 1);
+    const width =
+      rowSize * REACTION_BUTTON_SIZE +
+      (rowSize - 1) * REACTION_BUTTON_GAP +
+      REACTION_CARD_PADDING * 2;
+    const pickerHeight =
+      rowCount * REACTION_BUTTON_SIZE +
+      (rowCount - 1) * REACTION_BUTTON_GAP +
+      REACTION_CARD_PADDING * 2 +
+      REACTION_LABEL_HEIGHT;
     const showAbove = reactionPicker.anchorY > windowHeight * 0.6;
-    const rawLeft = reactionPicker.anchorX - width / 2;
+    const isOutgoing = currentUserId
+      ? reactionPicker.message.senderId === currentUserId
+      : false;
+    const edgeOffset = REACTION_BUTTON_SIZE * 0.8;
+    const rawLeft = isOutgoing
+      ? reactionPicker.anchorX - width + edgeOffset
+      : reactionPicker.anchorX - edgeOffset;
     const left = Math.max(12, Math.min(rawLeft, SCREEN_WIDTH - width - 12));
     const rawTop = showAbove
-      ? reactionPicker.anchorY - pickerHeight - 12
-      : reactionPicker.anchorY + 12;
+      ? reactionPicker.anchorY - pickerHeight - 10
+      : reactionPicker.anchorY + 10;
     const top = Math.max(
       insets.top + 12,
       Math.min(rawTop, windowHeight - pickerHeight - insets.bottom - 12)
     );
     return { top, left, width, height: pickerHeight };
-  }, [SCREEN_WIDTH, insets.bottom, insets.top, reactionPicker, windowHeight]);
+  }, [SCREEN_WIDTH, currentUserId, insets.bottom, insets.top, reactionPicker, windowHeight]);
 
   const currentUserReaction = useMemo(() => {
     if (!reactionPicker || !currentUserId) {
@@ -1817,7 +1895,6 @@ const ChatScreen: React.FC = () => {
     const reactions = Array.isArray(liveMessage?.reactions) ? liveMessage.reactions : [];
     return reactions.filter((entry) => entry.count > 0);
   }, [messages, reactionPicker]);
-
   useEffect(() => {
     if (reactionPicker) {
       reactionAnim.setValue(0);
@@ -1887,18 +1964,6 @@ const ChatScreen: React.FC = () => {
       }).start();
     }
   }, [messageActionAnim, messageActionContext]);
-
-  useEffect(() => {
-    if (attachmentSheetVisible) {
-      attachmentSheetAnim.setValue(0);
-      Animated.spring(attachmentSheetAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 90,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [attachmentSheetAnim, attachmentSheetVisible]);
 
   const getReplyLabel = useCallback(
     (senderId: string) => {
@@ -2275,6 +2340,8 @@ const ChatScreen: React.FC = () => {
       let missingEnvelope = false;
       const timezoneFallback = options?.timezone || TimezoneService.getTimezone();
 
+      const pollUpdates = new Map<string, { poll: PollData; userVotes: number[] }>();
+
       for (const raw of rawMessages) {
         const idValue = raw.id ?? `${chatId}-${raw.createdAt ?? raw.created_at ?? Date.now()}`;
         const senderId = raw.senderId ?? raw.sender_id;
@@ -2309,24 +2376,43 @@ const ChatScreen: React.FC = () => {
             : [];
 
         let content: string | null = null;
-        if (raw.isEncrypted && Array.isArray(raw.envelopes)) {
+        const cacheKey = `${chatId}:${idValue}`;
+        const cached = decryptionCache.get(cacheKey);
+        if (cached) {
+          content = cached;
+        } else if (raw.isEncrypted && (Array.isArray(raw.envelopes) || raw.backupEnvelope)) {
           if (!chatId) {
             continue;
           }
-          const decrypted = await CryptoService.decryptMessage({
-            chatId: String(chatId),
-            envelopes: raw.envelopes,
-            senderId,
-            currentUserId: ownerId,
-            token: token || undefined,
-          });
+          let decrypted: string | null = null;
+
+          // Try normal decryption first
+          if (Array.isArray(raw.envelopes) && raw.envelopes.length) {
+            decrypted = await CryptoService.decryptMessage({
+              chatId: String(chatId),
+              envelopes: raw.envelopes,
+              senderId,
+              currentUserId: ownerId,
+              token: token || undefined,
+            });
+          }
+
+          // Fallback to backup envelope if normal decryption failed
+          if (!decrypted && raw.backupEnvelope) {
+            console.log(`[Chat] Trying backup envelope fallback for message ${raw.id}...`);
+            decrypted = await CryptoService.decryptFromBackup(raw.backupEnvelope);
+          }
+
           if (decrypted) {
             content = decrypted;
+            decryptionCache.set(cacheKey, decrypted);
           } else {
             console.warn(`Decryption failed for historical message ${raw.id}.`);
             content = resolveDecryptFallbackText(preview, attachments);
             decryptFailed = true;
-            missingEnvelope = true;
+            if (!decryptionCache.has(cacheKey)) {
+              missingEnvelope = true;
+            }
           }
         } else {
           content = raw.content ?? preview ?? '';
@@ -2337,7 +2423,9 @@ const ChatScreen: React.FC = () => {
             content = buildDeletedLabel(deletedByName || resolveSenderProfile(String(senderId)).name);
           } else {
             content = preview || '[Message unavailable]';
-            missingEnvelope = true;
+            if (!decryptionCache.has(cacheKey)) {
+              missingEnvelope = true;
+            }
             decryptFailed = true;
           }
         }
@@ -2356,14 +2444,16 @@ const ChatScreen: React.FC = () => {
         const decodedPayload = decodeMessagePayload(content ?? '');
         const isSystem = (raw as any)?.messageType === 'system' || (raw as any)?.message_type === 'system' || senderId === 'system';
 
-        if (decryptFailed && !isSystem) {
-          // Skip messages we cannot decrypt instead of rendering empty bubbles
-          continue;
-        }
-
         const contentText = isSystem
           ? (decodedPayload.text?.trim?.() || preview || 'System update')
           : resolveContentText(decodedPayload, preview, attachments.length > 0);
+
+        if (decryptFailed && !isSystem && !contentText && !attachments.length) {
+          // If EVERYTHING failed and there's no preview/attachment info at all, 
+          // then it's truly an empty shell we can skip.
+          continue;
+        }
+
         const serverReply = resolveReplyMetadata((raw as any)?.reply);
         const replyTo = isDeleted
           ? undefined
@@ -2374,6 +2464,22 @@ const ChatScreen: React.FC = () => {
           ? rawBadges.map((entry: any) => String(entry))
           : senderProfile.badges || [];
         const seenBy = isSystem ? [] : mapServerReceipts((raw as any)?.seenBy);
+        
+        // Handle poll messages
+        const isPollMessage = (raw as any)?.isPoll || (raw as any)?.messageType === 'poll' || (raw as any)?.message_type === 'poll';
+        const pollData = (raw as any)?.poll;
+        const userVotes = (raw as any)?.userVotes;
+        
+        // Store poll data for batch update
+        if (isPollMessage && pollData) {
+          const pollEntry = pollData;
+          pollUpdates.set(String(idValue), {
+            poll: pollEntry,
+            userVotes: userVotes || [],
+          });
+          void hydratePollFromEncrypted(String(idValue), pollEntry);
+        }
+
         results.push({
           id: String(idValue),
           senderId: isSystem ? 'system' : String(senderId),
@@ -2399,6 +2505,20 @@ const ChatScreen: React.FC = () => {
           isPlaceholder: Boolean(isDeleted),
           seenBy,
           reactions,
+          // Poll data
+          isPoll: isPollMessage,
+          poll: pollData,
+        });
+      }
+
+      // Batch update polls state
+      if (pollUpdates.size > 0) {
+        setPollsData((prev) => {
+          const newMap = new Map(prev);
+          for (const [msgId, pollInfo] of pollUpdates) {
+            newMap.set(msgId, pollInfo);
+          }
+          return newMap;
         });
       }
 
@@ -2465,54 +2585,65 @@ const ChatScreen: React.FC = () => {
         return;
       }
 
-      setMessagesAnimated((prev) => {
+      // Use setMessagesWithoutAnimation to avoid layout jumps on status updates
+      setMessagesWithoutAnimation((prev) => {
+        // If we have a specific messageId, only update that message
+        if (messageId) {
+          const targetIndex = prev.findIndex((msg) => msg.id === String(messageId));
+          if (targetIndex === -1) {
+            return prev;
+          }
+          const target = prev[targetIndex];
+          if (target.senderId !== currentUserId || target.isPlaceholder) {
+            return prev;
+          }
+          // Skip if already at same or higher status
+          const statusOrder = { sending: 0, sent: 1, delivered: 2, seen: 3 };
+          if (statusOrder[target.status || 'sending'] >= statusOrder[status]) {
+            // Still add receipt if it's a new one
+            if (status === 'seen' && receipt?.userId) {
+              const existing = Array.isArray(target.seenBy) ? target.seenBy : [];
+              if (!existing.some((entry) => entry.userId === receipt.userId)) {
+                const next = [...prev];
+                next[targetIndex] = { ...target, seenBy: [...existing, receipt] };
+                return next;
+              }
+            }
+            return prev;
+          }
+          const deliveredAt = status === 'delivered' && timestamp ? timestamp : target.deliveredAt;
+          const seenAtValue = status === 'seen' && timestamp ? timestamp : target.seenAt;
+          const seenBy = status === 'seen' && receipt?.userId
+            ? [...(Array.isArray(target.seenBy) ? target.seenBy : []).filter((e) => e.userId !== receipt.userId), receipt]
+            : target.seenBy;
+          const next = [...prev];
+          next[targetIndex] = { ...target, status, deliveredAt, seenAt: seenAtValue ?? target.seenAt, seenBy };
+          return next;
+        }
+
+        // Batch update for all unread outgoing messages (legacy fallback)
+        let hasChanges = false;
         const next = prev.map((msg) => {
-          if (msg.senderId !== currentUserId || msg.isPlaceholder) {
+          if (msg.senderId !== currentUserId || msg.isPlaceholder || msg.status === 'seen') {
             return msg;
           }
-
-          const applyReceipt = (target: Message): Message => {
-            const deliveredAt = status === 'delivered' && timestamp ? timestamp : target.deliveredAt;
-            const seenAtValue = status === 'seen' && timestamp ? timestamp : target.seenAt;
-
-            if (status !== 'seen' || !receipt?.userId) {
-              return {
-                ...target,
-                status,
-                deliveredAt,
-                seenAt: seenAtValue ?? target.seenAt,
-              };
-            }
-            const existing = Array.isArray(target.seenBy) ? target.seenBy : [];
-            const alreadyIndexed = existing.some((entry) => entry.userId === receipt.userId);
-            const mergedReceipts = alreadyIndexed ? existing : [...existing, receipt];
-            return {
-              ...target,
-              status,
-              deliveredAt,
-              seenAt: seenAtValue ?? target.seenAt,
-              seenBy: mergedReceipts,
-            };
-          };
-
-          if (messageId) {
-            if (msg.id === String(messageId)) {
-              return applyReceipt(msg);
-            }
+          const statusOrder = { sending: 0, sent: 1, delivered: 2, seen: 3 };
+          if (statusOrder[msg.status || 'sending'] >= statusOrder[status]) {
             return msg;
           }
-
-          if (msg.status !== 'seen') {
-            return applyReceipt(msg);
-          }
-
-          return msg;
+          hasChanges = true;
+          const deliveredAt = status === 'delivered' && timestamp ? timestamp : msg.deliveredAt;
+          const seenAtValue = status === 'seen' && timestamp ? timestamp : msg.seenAt;
+          const seenBy = status === 'seen' && receipt?.userId
+            ? [...(Array.isArray(msg.seenBy) ? msg.seenBy : []).filter((e) => e.userId !== receipt.userId), receipt]
+            : msg.seenBy;
+          return { ...msg, status, deliveredAt, seenAt: seenAtValue ?? msg.seenAt, seenBy };
         });
 
-        return next;
+        return hasChanges ? next : prev;
       });
     },
-    [currentUserId, setMessagesAnimated]
+    [currentUserId, setMessagesWithoutAnimation]
   );
 
   const applyAckToLatestMessage = useCallback(
@@ -2532,7 +2663,8 @@ const ChatScreen: React.FC = () => {
       const normalizePreview = (value: string) => value.trim().slice(0, 300);
       const incomingPreview = normalizePreview(previewText);
 
-      setMessagesAnimated((prev) => {
+      // Use setMessagesWithoutAnimation to avoid layout jumps when updating message ID
+      setMessagesWithoutAnimation((prev) => {
         const candidates = prev
           .map((msg, index) => ({ msg, index }))
           .filter(
@@ -2582,7 +2714,7 @@ const ChatScreen: React.FC = () => {
         return next;
       });
     },
-    [currentUserId, setMessagesAnimated]
+    [currentUserId, setMessagesWithoutAnimation]
   );
 
   const markChatAsSeen = useCallback(async () => {
@@ -2668,13 +2800,36 @@ const ChatScreen: React.FC = () => {
           return;
         }
 
+        // Extract poll data from raw messages before transforming
+        const pollUpdates = new Map<string, { poll: PollData; userVotes: number[] }>();
+        for (const raw of rawMessages) {
+          const isPollMsg = raw?.isPoll || raw?.messageType === 'poll' || raw?.message_type === 'poll';
+          if (isPollMsg && raw?.poll) {
+            const msgId = String(raw.id ?? `${chatIdentifier}-${raw.createdAt ?? raw.created_at ?? Date.now()}`);
+            pollUpdates.set(msgId, {
+              poll: raw.poll,
+              userVotes: raw.userVotes || [],
+            });
+          }
+        }
+        // Update polls state
+        if (pollUpdates.size > 0) {
+          setPollsData((prev) => {
+            const newMap = new Map(prev);
+            for (const [msgId, pollInfo] of pollUpdates) {
+              newMap.set(msgId, pollInfo);
+            }
+            return newMap;
+          });
+        }
+
         const transformed = await transformMessages(rawMessages, otherUserId ?? null, token, {
           timezone: responseTimezone,
         });
         const cleaned = transformed.filter(Boolean);
         const sorted = sortMessagesChronologically(cleaned);
 
-        setMessagesAnimated((prev) => {
+        setMessagesWithoutAnimation((prev) => {
           const existingIds = new Set(sorted.map((msg) => msg.id));
           const localSending = prev.filter(
             (msg) =>
@@ -2686,7 +2841,22 @@ const ChatScreen: React.FC = () => {
                 msg.status === 'delivered' ||
                 msg.status === 'seen')
           );
-          return sortMessagesChronologically([...sorted, ...localSending]);
+          // Preserve existing decrypted content when the re-fetch returns fallback text
+          const prevById = new Map(prev.map((msg) => [msg.id, msg]));
+          const merged = sorted.map((msg) => {
+            const existing = prevById.get(msg.id);
+            if (
+              existing &&
+              existing.content &&
+              existing.content !== '[Encrypted message]' &&
+              existing.content !== '[Message unavailable]' &&
+              (msg.content === '[Encrypted message]' || msg.content === '[Message unavailable]' || msg.content === '')
+            ) {
+              return { ...msg, content: existing.content };
+            }
+            return msg;
+          });
+          return sortMessagesChronologically([...merged, ...localSending]);
         });
         if (missingEnvelopeRef.current) {
           requestReencrypt('missing_history');
@@ -3088,7 +3258,8 @@ const ChatScreen: React.FC = () => {
         isNearTopRef.current = false;
       }
     },
-    [chatId, hasMore, isLoadingMore, messages, setMessagesAnimated, transformMessages]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chatId, hasMore, isLoadingMore, transformMessages]
   );
 
   const handleComposerChange = useCallback(
@@ -3596,21 +3767,6 @@ const ChatScreen: React.FC = () => {
     }
   }, [attachmentPickerBusy, handleUploadBatch]);
 
-  const handleAttachmentTrigger = useCallback(() => {
-    if (!chatId) {
-      NotificationService.show('error', 'This conversation is not available');
-      return;
-    }
-    if (attachmentPickerBusy) {
-      NotificationService.show('info', 'Please wait for the current upload to complete');
-      return;
-    }
-    if (pendingAttachments.length >= MAX_PENDING_ATTACHMENTS) {
-      NotificationService.show('warning', `You can attach up to ${MAX_PENDING_ATTACHMENTS} items per message`);
-      return;
-    }
-    setAttachmentSheetVisible(true);
-  }, [attachmentPickerBusy, chatId, pendingAttachments.length]);
 
   const handleRemoveAttachment = useCallback(
     async (attachmentId: string) => {
@@ -3747,7 +3903,7 @@ const ChatScreen: React.FC = () => {
         throw new Error('No chat recipients available');
       }
 
-      const encryptedPayload = await CryptoService.buildEncryptedPayload({
+      const encryptedPayload = await CryptoService.buildEncryptedPayloadWithBackup({
         chatId,
         message: encodeMessagePayload(trimmed, resolveReplyMetadata(editingMessage.replyTo)),
         recipientUserIds: recipientIds,
@@ -3760,6 +3916,7 @@ const ChatScreen: React.FC = () => {
         chatId,
         messageId: editingMessage.id,
         envelopes: encryptedPayload.envelopes,
+        backupEnvelopes: encryptedPayload.backupEnvelopes,
         senderDeviceId: encryptedPayload.senderDeviceId,
         messageType: 'e2ee',
       });
@@ -4132,7 +4289,7 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   const handleReportUser = useCallback(async () => {
-    const targetId = otherUserIdRef.current;
+    const targetId = directRecipient?.id?.toString?.() ?? otherUserIdRef.current;
     if (!targetId) {
       NotificationService.show('error', 'Unable to identify user');
       return;
@@ -4174,33 +4331,28 @@ const ChatScreen: React.FC = () => {
         },
       ]
     );
-  }, [chatId]);
+  }, [chatId, directRecipient?.id]);
 
-  const handleShowChatOptions = useCallback(() => {
-    const targetId = otherUserIdRef.current;
-    if (!targetId) return;
+  const chatHeaderMenuActions = useMemo<ContextMenuAction[]>(() => {
+    const targetId = directRecipient?.id?.toString?.() ?? otherUserIdRef.current;
+    if (!targetId) {
+      return [];
+    }
     const createGroupParams = encodeURIComponent(JSON.stringify([targetId.toString()]));
-
-    Alert.alert(
-      'Chat Options',
-      undefined,
-      [
-        {
-          text: 'Create group',
-          onPress: () => router.push(`/group/create?members=${createGroupParams}` as any),
-        },
-        {
-          text: 'Report User',
-          style: 'destructive',
-          onPress: handleReportUser,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
-  }, [handleReportUser]);
+    return [
+      {
+        title: 'Create group',
+        systemIcon: 'person.3',
+        onPress: () => router.push(`/group/create?members=${createGroupParams}` as any),
+      },
+      {
+        title: 'Report user',
+        systemIcon: 'flag',
+        destructive: true,
+        onPress: handleReportUser,
+      },
+    ];
+  }, [directRecipient?.id, handleReportUser]);
 
   const handleCopyAttachmentLink = useCallback(async (attachment?: MessageAttachment | null) => {
     if (!attachment) {
@@ -4500,7 +4652,7 @@ const ChatScreen: React.FC = () => {
       }
 
       const previewText = trimmedMessage.slice(0, 300);
-      const encryptedPayload = await CryptoService.buildEncryptedPayload({
+      const encryptedPayload = await CryptoService.buildEncryptedPayloadWithBackup({
         chatId,
         message: encodedPayload,
         recipientUserIds: recipientIds,
@@ -4512,12 +4664,14 @@ const ChatScreen: React.FC = () => {
         type: 'message_send',
         chatId,
         envelopes: encryptedPayload.envelopes,
+        backupEnvelopes: encryptedPayload.backupEnvelopes,
         senderDeviceId: encryptedPayload.senderDeviceId,
         messageType: 'e2ee',
         replyMetadata: normalizedReply,
         attachments: attachmentIds,
         preview: previewText,
         expiresIn: ephemeralDuration,
+        senderTimestamp: ephemeralDuration ? new Date().toISOString() : undefined,
       });
 
     } catch (error) {
@@ -4565,7 +4719,11 @@ const ChatScreen: React.FC = () => {
     scrollToMessageById(target);
   }, [scrollToMessageById, threadRootId]);
 
-  const handleScheduleMessage = useCallback(async (scheduledFor: Date) => {
+  const handleScheduleMessage = useCallback(async (scheduledFor: Date | null) => {
+    if (!scheduledFor) {
+      // User selected "Off" - just close the sheet
+      return;
+    }
     if (!currentUserId || !chatId) {
       return;
     }
@@ -4590,14 +4748,45 @@ const ChatScreen: React.FC = () => {
 
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+      // Build E2EE encrypted payload for scheduled message
+      const otherParticipants = participantIdsRef.current
+        .filter((participantId) => participantId !== currentUserId)
+        .filter(Boolean);
+
+      const recipientIds =
+        otherParticipants.length > 0
+          ? otherParticipants
+          : otherUserIdRef.current
+            ? [otherUserIdRef.current]
+            : [];
+
+      // Get reply metadata if replying
+      const normalizedReply = replyContext ? resolveReplyMetadata(replyContext) : null;
+      const encodedPayload = encodeMessagePayload(trimmedMessage, normalizedReply);
+
+      // Encrypt the message
+      const encryptedPayload = await CryptoService.buildEncryptedPayloadWithBackup({
+        chatId,
+        message: encodedPayload,
+        recipientUserIds: recipientIds,
+        token,
+        currentUserId,
+      });
+
       const response = await ApiService.scheduleMessage(
         chatId,
         {
-          content: trimmedMessage,
+          content: trimmedMessage, // Plain text for preview only
           attachments: attachmentIds,
           replyTo: replyContext?.messageId ? Number(replyContext.messageId) : undefined,
           scheduledFor: scheduledFor.toISOString(),
           timezone,
+          // E2EE fields
+          isEncrypted: true,
+          envelopes: encryptedPayload.envelopes,
+          backupEnvelopes: encryptedPayload.backupEnvelopes,
+          senderDeviceId: encryptedPayload.senderDeviceId,
+          replyMetadata: normalizedReply,
         },
         token
       );
@@ -4614,7 +4803,7 @@ const ChatScreen: React.FC = () => {
       console.error('Error scheduling message:', error);
       NotificationService.show('error', 'Failed to schedule message');
     }
-  }, [chatId, currentUserId, newMessage, pendingAttachments, replyContext]);
+  }, [chatId, currentUserId, newMessage, pendingAttachments, replyContext, resolveReplyMetadata]);
 
   const handleCreatePoll = useCallback(async (data: { question: string; options: string[]; multiSelect: boolean }) => {
     if (!currentUserId || !chatId) {
@@ -4629,7 +4818,42 @@ const ChatScreen: React.FC = () => {
         throw new Error('Missing auth token');
       }
 
-      const response = await ApiService.createPoll(chatId, data, token);
+      const encodedPayload = encodePollPayload({
+        question: data.question,
+        options: data.options,
+      });
+
+      const otherParticipants = participantIdsRef.current
+        .filter((participantId) => participantId !== currentUserId)
+        .filter(Boolean);
+
+      const recipientIds =
+        otherParticipants.length > 0
+          ? otherParticipants
+          : otherUserIdRef.current
+            ? [otherUserIdRef.current]
+            : [];
+
+      const encryptedPayload = await CryptoService.buildEncryptedPayloadWithBackup({
+        chatId,
+        message: encodedPayload,
+        recipientUserIds: recipientIds,
+        token,
+        currentUserId,
+      });
+
+      const response = await ApiService.createPoll(
+        chatId,
+        {
+          optionsCount: data.options.length,
+          multiSelect: data.multiSelect,
+          encryptedPollPayload: encryptedPayload.envelopes,
+          backupEnvelopes: encryptedPayload.backupEnvelopes,
+          pollPayloadVersion: 1,
+          senderDeviceId: encryptedPayload.senderDeviceId,
+        },
+        token
+      );
 
       if (response.success) {
         NotificationService.show('success', 'Poll created');
@@ -4659,14 +4883,18 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.votePoll(chatId, pollId, [optionId], token);
 
       if (response.success && response.data) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: response.data.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
       }
     } catch (error) {
       console.error('Error voting on poll:', error);
@@ -4688,14 +4916,18 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.removeVotePoll(chatId, pollId, optionId, token);
 
       if (response.success && response.data) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: response.data.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
       }
     } catch (error) {
       console.error('Error removing vote:', error);
@@ -4717,15 +4949,19 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.closePoll(chatId, pollId, token);
 
       if (response.success && response.data) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           const existing = prev.get(messageId);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: existing?.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
         NotificationService.show('success', 'Poll closed');
       }
     } catch (error) {
@@ -4742,19 +4978,111 @@ const ChatScreen: React.FC = () => {
       const response = await ApiService.getPollByMessageId(messageId, token);
 
       if (response.success && response.data?.poll) {
+        const nextPoll = response.data.poll;
         setPollsData((prev) => {
           const newMap = new Map(prev);
           newMap.set(messageId, {
-            poll: response.data.poll,
+            poll: nextPoll,
             userVotes: response.data.userVotes || [],
           });
           return newMap;
         });
+        if (nextPoll?.encryptedPayload) {
+          void hydratePollFromEncrypted(messageId, nextPoll);
+        }
       }
     } catch (error) {
       console.error('Error fetching poll:', error);
     }
   }, []);
+
+  const hydratePollFromEncrypted = useCallback(
+    async (messageId: string, poll: PollData) => {
+      if (!poll?.encryptedPayload || !currentUserId || !chatId) return;
+      const attemptKey = `${messageId}:${poll.payloadVersion || 1}:${Array.isArray(poll.encryptedPayload) ? poll.encryptedPayload.length : 0}`;
+      if (pollDecryptAttemptedRef.current.has(attemptKey)) {
+        return;
+      }
+      pollDecryptAttemptedRef.current.add(attemptKey);
+      const hasPlainText =
+        typeof poll.question === 'string' &&
+        poll.question.trim().length > 0 &&
+        Array.isArray(poll.options) &&
+        poll.options.some((opt) => typeof opt.text === 'string' && opt.text.trim().length > 0);
+      if (hasPlainText) return;
+
+      const envelopes = Array.isArray(poll.encryptedPayload) ? poll.encryptedPayload : [];
+      const backupEnvelopes = Array.isArray(poll.backupEnvelopes) ? poll.backupEnvelopes : [];
+      if (!envelopes.length && !backupEnvelopes.length) return;
+
+      try {
+        const token = authTokenRef.current ?? (await StorageService.getAuthToken());
+        authTokenRef.current = token || null;
+
+        let decrypted = envelopes.length
+          ? await CryptoService.decryptMessage({
+              chatId,
+              envelopes,
+              senderId: poll.creatorId,
+              currentUserId,
+              token: token || undefined,
+            })
+          : null;
+
+        if (!decrypted && backupEnvelopes.length > 0) {
+          const backup =
+            backupEnvelopes.find((entry: any) => String(entry?.userId ?? '') === String(currentUserId)) ||
+            backupEnvelopes[0];
+          if (backup?.payload && backup?.nonce) {
+            decrypted = await CryptoService.decryptFromBackup(backup);
+          }
+        }
+
+        if (!decrypted) {
+          return;
+        }
+
+        const decoded =
+          decodePollPayload(decrypted) ||
+          decodePollPayloadFromJson(decrypted);
+
+        if (!decoded) {
+          return;
+        }
+
+        setPollsData((prev) => {
+          const existing = prev.get(messageId);
+          if (!existing) return prev;
+          const existingOptions = Array.isArray(existing.poll.options) ? existing.poll.options : [];
+          const optionIds = existingOptions.length
+            ? existingOptions.map((opt) => opt.id)
+            : decoded.options.map((_, idx) => idx + 1);
+          const nextOptions = decoded.options.map((text, idx) => ({
+            id: optionIds[idx] ?? idx + 1,
+            text,
+          }));
+          const nextPoll = {
+            ...existing.poll,
+            question: decoded.question,
+            options: nextOptions,
+          };
+          const sameQuestion = existing.poll.question === nextPoll.question;
+          const sameOptions =
+            existingOptions.length === nextOptions.length &&
+            existingOptions.every((opt, idx) => opt.text === nextOptions[idx]?.text);
+          if (sameQuestion && sameOptions) {
+            return prev;
+          }
+          const newMap = new Map(prev);
+          newMap.set(messageId, { ...existing, poll: nextPoll });
+          return newMap;
+        });
+      } catch (error) {
+        console.warn('Failed to decrypt poll payload:', error);
+      }
+    },
+    [chatId, currentUserId]
+  );
 
   useEffect(() => {
     if (replyContext) {
@@ -4907,13 +5235,20 @@ const ChatScreen: React.FC = () => {
           try {
             const token = authTokenRef.current ?? (await StorageService.getAuthToken());
             authTokenRef.current = token || null;
-            const decrypted = await CryptoService.decryptMessage({
+            let decrypted = await CryptoService.decryptMessage({
               chatId: targetChatId,
               envelopes,
               senderId: payload.senderId ?? payload.userId ?? null,
               currentUserId,
               token: token || undefined,
             });
+
+            // Fallback to backup envelope if normal decryption failed
+            if (!decrypted && payload.backupEnvelope) {
+              console.log('[Chat] Trying backup envelope fallback...');
+              decrypted = await CryptoService.decryptFromBackup(payload.backupEnvelope);
+            }
+
             if (!decrypted) {
               console.warn('Decryption failed for sent message envelope.');
               requestReencrypt('live_decrypt_failed');
@@ -4955,11 +5290,18 @@ const ChatScreen: React.FC = () => {
             setMessagesAnimated((prev) => {
               const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
               if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
-                return withoutPlaceholders;
+                // Already acked by applyAckToLatestMessage — replace with decrypted version
+                return sortMessagesChronologically(
+                  withoutPlaceholders.map((msg) => (msg.id === newEntry.id ? newEntry : msg))
+                );
               }
-              const cleaned = withoutPlaceholders.filter(
-                (msg) => !(msg.senderId === currentUserId && msg.status === 'sending')
+              // No acked entry found — remove only the oldest sending message from this user
+              const sendingIdx = withoutPlaceholders.findIndex(
+                (msg) => msg.senderId === currentUserId && msg.status === 'sending'
               );
+              const cleaned = sendingIdx >= 0
+                ? withoutPlaceholders.filter((_, i) => i !== sendingIdx)
+                : withoutPlaceholders;
               return sortMessagesChronologically([...cleaned, newEntry]);
             });
           } catch (error) {
@@ -4970,20 +5312,29 @@ const ChatScreen: React.FC = () => {
         }
         case 'message_envelope': {
           const envelopes = Array.isArray(payload.envelopes) ? payload.envelopes : [];
-          if (!envelopes.length) {
+          if (!envelopes.length && !payload.backupEnvelope) {
             return;
           }
 
           try {
             const token = authTokenRef.current ?? (await StorageService.getAuthToken());
             authTokenRef.current = token || null;
-            const decrypted = await CryptoService.decryptMessage({
-              chatId: targetChatId,
-              envelopes,
-              senderId: payload.senderId ?? payload.userId ?? null,
-              currentUserId,
-              token: token || undefined,
-            });
+            let decrypted = envelopes.length
+              ? await CryptoService.decryptMessage({
+                  chatId: targetChatId,
+                  envelopes,
+                  senderId: payload.senderId ?? payload.userId ?? null,
+                  currentUserId,
+                  token: token || undefined,
+                })
+              : null;
+
+            // Fallback to backup envelope if normal decryption failed
+            if (!decrypted && payload.backupEnvelope) {
+              console.log('[Chat] Trying backup envelope fallback for incoming message...');
+              decrypted = await CryptoService.decryptFromBackup(payload.backupEnvelope);
+            }
+
             if (!decrypted) {
               console.warn('Decryption failed for incoming message envelope.');
               requestReencrypt('live_decrypt_failed');
@@ -5031,10 +5382,9 @@ const ChatScreen: React.FC = () => {
               return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
             });
             scrollToBottom();
-            scheduleRefreshMessages();
           } catch (error) {
             console.error('Failed to decrypt incoming message envelope:', error);
-            refreshMessages();
+            scheduleRefreshMessages();
           }
           return;
         }
@@ -5087,7 +5437,6 @@ const ChatScreen: React.FC = () => {
             return sortMessagesChronologically([...withoutPlaceholders, newEntry]);
           });
           scrollToBottom();
-          scheduleRefreshMessages();
           return;
         }
         case 'message_deleted': {
@@ -5194,6 +5543,10 @@ const ChatScreen: React.FC = () => {
                 voters: [],
               })),
               totalVotes: 0,
+              encryptedPayload: payload.encryptedPayload,
+              backupEnvelopes: payload.backupEnvelopes,
+              payloadVersion: payload.payloadVersion,
+              senderDeviceId: payload.senderDeviceId ?? null,
             },
           };
           setPollsData((prev) => {
@@ -5204,6 +5557,9 @@ const ChatScreen: React.FC = () => {
             });
             return newMap;
           });
+          if (newEntry.poll?.encryptedPayload) {
+            void hydratePollFromEncrypted(String(payload.messageId), newEntry.poll);
+          }
           setMessagesAnimated((prev) => {
             const withoutPlaceholders = prev.filter((msg) => !msg.isPlaceholder || msg.isDeleted);
             if (withoutPlaceholders.some((msg) => msg.id === newEntry.id)) {
@@ -5259,17 +5615,26 @@ const ChatScreen: React.FC = () => {
           }
           const attachments = mapServerAttachments(payload.attachments);
           const editedAt = payload.editedAt || payload.timestamp || new Date().toISOString();
-          if (Array.isArray(payload.envelopes) && payload.envelopes.length) {
+          if ((Array.isArray(payload.envelopes) && payload.envelopes.length) || payload.backupEnvelope) {
             try {
               const token = authTokenRef.current ?? (await StorageService.getAuthToken());
               authTokenRef.current = token || null;
-              const decrypted = await CryptoService.decryptMessage({
-                chatId: targetChatId,
-                envelopes: payload.envelopes,
-                senderId: payload.senderId ?? payload.userId ?? null,
-                currentUserId,
-                token: token || undefined,
-              });
+              let decrypted = payload.envelopes?.length
+                ? await CryptoService.decryptMessage({
+                    chatId: targetChatId,
+                    envelopes: payload.envelopes,
+                    senderId: payload.senderId ?? payload.userId ?? null,
+                    currentUserId,
+                    token: token || undefined,
+                  })
+                : null;
+
+              // Fallback to backup envelope if normal decryption failed
+              if (!decrypted && payload.backupEnvelope) {
+                console.log(`[Chat] Trying backup envelope fallback for edited message ${editedId}...`);
+                decrypted = await CryptoService.decryptFromBackup(payload.backupEnvelope);
+              }
+
               if (!decrypted) {
                 console.warn(`Failed to decrypt edited message ${editedId}`);
                 return;
@@ -5379,6 +5744,11 @@ const ChatScreen: React.FC = () => {
       resolveNamesFromPayload,
     ]
   );
+
+  // Keep ref in sync so the WS subscription stays stable
+  useEffect(() => {
+    handleIncomingMessageRef.current = handleIncomingMessage;
+  }, [handleIncomingMessage]);
 
   const handleRefresh = useCallback(() => {
     if (!hasMore || isLoadingMore || isRefreshing) {
@@ -5526,7 +5896,10 @@ const ChatScreen: React.FC = () => {
 
   useEffect(() => {
     wsService.connect().catch((error) => console.error('Failed to ensure WebSocket connection for chat screen:', error));
-    const unsubscribe = wsService.addMessageListener(handleIncomingMessage);
+    // Use ref wrapper so the subscription is stable — no unsub/resub churn when deps change
+    const unsubscribe = wsService.addMessageListener((msg: any) => {
+      handleIncomingMessageRef.current(msg);
+    });
 
     return () => {
       if (unsubscribe) {
@@ -5537,7 +5910,8 @@ const ChatScreen: React.FC = () => {
       typingTimersRef.current.clear();
       typingUsersRef.current.clear();
     };
-  }, [ensureTypingStopped, handleIncomingMessage, wsService]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ensureTypingStopped, wsService]);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('chat:envelopes_appended', (event: any) => {
@@ -5548,12 +5922,12 @@ const ChatScreen: React.FC = () => {
         return;
       }
       reencryptRequestedRef.current = false;
-      refreshMessages();
+      scheduleRefreshMessages();
     });
     return () => {
       sub.remove();
     };
-  }, [chatId, refreshMessages]);
+  }, [chatId, scheduleRefreshMessages]);
 
   useEffect(() => {
     const showListener = Keyboard.addListener('keyboardDidShow', (event) => {
@@ -5613,16 +5987,6 @@ const ChatScreen: React.FC = () => {
     }
   }, [decoratedData]);
 
-  const directRecipient = useMemo(() => {
-    if (chatDetails?.isGroup) {
-      return null;
-    }
-    const participants = chatDetails?.participants || [];
-    return (
-      participants.find((participant) => participant.id !== currentUserId) || null
-    );
-  }, [chatDetails?.isGroup, chatDetails?.participants, currentUserId]);
-
   const renderChatItem = useCallback(
     ({ item, index }: { item: ChatListItem; index: number }) => {
       if (item.kind === 'typing') {
@@ -5674,7 +6038,7 @@ const ChatScreen: React.FC = () => {
       const isFirstInGroup =
         !previousMessage || previousMessage.senderId !== messageItem.senderId || !!previousMessage.isPlaceholder;
       const isLastInGroup =
-        !nextMessage || nextMessage.senderId !== messageItem.senderId || !!nextMessage.isPlaceholder;
+        !nextMessage || nextMessage.senderId !== messageItem.senderId || !!nextMessage.isPlaceholder || !!nextMessage.replyTo;
 
       const shouldShowStatus = lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
       const shouldShowTimestamp = timestampVisibleFor === messageItem.id;
@@ -5683,17 +6047,18 @@ const ChatScreen: React.FC = () => {
       // Render PollMessage for poll type messages
       if (messageItem.isPoll && messageItem.poll) {
         const pollDataEntry = pollsData.get(messageItem.id);
+        const poll = pollDataEntry?.poll ?? messageItem.poll;
         const userVotes = pollDataEntry?.userVotes || [];
-        const isCreator = messageItem.poll.creatorId === currentUserId;
+        const isCreator = poll.creatorId === currentUserId;
 
         return (
           <PollMessage
             key={messageItem.id}
-            poll={messageItem.poll}
+            poll={poll}
             userVotes={userVotes}
-            onVote={(optionId) => handlePollVote(messageItem.id, messageItem.poll!.id, optionId)}
-            onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, messageItem.poll!.id, optionId)}
-            onClose={() => handleClosePoll(messageItem.id, messageItem.poll!.id)}
+            onVote={(optionId) => handlePollVote(messageItem.id, poll.id, optionId)}
+            onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, poll.id, optionId)}
+            onClose={() => handleClosePoll(messageItem.id, poll.id)}
             isCreator={isCreator}
           />
         );
@@ -5799,11 +6164,6 @@ const ChatScreen: React.FC = () => {
     return Math.max(insets.bottom, 12);
   }, [insets.bottom, isKeyboardVisible]);
 
-  const attachmentSheetBottom = useMemo(() => {
-    const keyboardOffset =
-      Platform.OS === 'android' ? keyboardHeight : Math.max(keyboardHeight - insets.bottom, 0);
-    return Math.max(insets.bottom + 16, 16) + keyboardOffset;
-  }, [insets.bottom, keyboardHeight]);
   const sendButtonDisabled =
     ((isComposerEmpty && !hasPendingAttachments) ||
       isSendingMessage ||
@@ -5813,7 +6173,6 @@ const ChatScreen: React.FC = () => {
 
   interface AttachmentOption {
     key: string;
-    icon: IoniconName;
     label: string;
     hint: string;
     onPress: () => void;
@@ -5823,46 +6182,103 @@ const ChatScreen: React.FC = () => {
     () => [
       {
         key: 'photos',
-        icon: 'images-outline',
         label: 'Photos & Videos',
         hint: 'Camera roll',
         onPress: handlePickPhoto,
       },
       {
         key: 'files',
-        icon: 'document-text-outline',
         label: 'Files',
         hint: 'Browse documents',
         onPress: handlePickDocument,
       },
       {
         key: 'paste',
-        icon: 'clipboard-outline',
         label: 'Paste image',
         hint: 'Add from clipboard',
         onPress: handlePasteImage,
       },
       {
         key: 'schedule',
-        icon: 'calendar-outline',
         label: 'Schedule message',
         hint: 'Send later',
         onPress: () => setShowScheduleSheet(true),
       },
       {
         key: 'poll',
-        icon: 'stats-chart-outline',
         label: 'Create poll',
         hint: 'Start a vote',
         onPress: () => setShowPollSheet(true),
       },
+      {
+        key: 'ephemeral',
+        label: 'Disappearing message',
+        hint: ephemeralDuration ? `Currently: ${ephemeralDuration}` : 'Set timer',
+        onPress: () => setShowEphemeralSheet(true),
+      },
     ],
-    [handlePasteImage, handlePickDocument, handlePickPhoto, setShowPollSheet, setShowScheduleSheet]
+    [ephemeralDuration, handlePasteImage, handlePickDocument, handlePickPhoto, setShowPollSheet, setShowScheduleSheet]
+  );
+  const attachmentMenuDisabled =
+    !chatId ||
+    attachmentPickerBusy ||
+    Boolean(editingMessage) ||
+    pendingAttachments.length >= MAX_PENDING_ATTACHMENTS;
+  const attachmentMenuActions = useMemo<ContextMenuAction[]>(
+    () =>
+      attachmentMenuOptions.map((option) => ({
+        title: option.label,
+        subtitle: option.hint,
+        systemIcon: (() => {
+          switch (option.key) {
+            case 'photos':
+              return 'photo.on.rectangle';
+            case 'files':
+              return 'doc.text';
+            case 'paste':
+              return 'clipboard';
+            case 'schedule':
+              return 'calendar';
+            case 'poll':
+              return 'chart.bar';
+            case 'ephemeral':
+              return 'timer';
+            default:
+              return undefined;
+          }
+        })(),
+        onPress: () => {
+          if (!chatId) {
+            NotificationService.show('error', 'This conversation is not available');
+            return;
+          }
+          if (attachmentPickerBusy) {
+            NotificationService.show('info', 'Please wait for the current upload to complete');
+            return;
+          }
+          if (pendingAttachments.length >= MAX_PENDING_ATTACHMENTS) {
+            NotificationService.show('warning', `You can attach up to ${MAX_PENDING_ATTACHMENTS} items per message`);
+            return;
+          }
+          if (editingMessage) {
+            NotificationService.show('info', 'Finish editing before adding attachments');
+            return;
+          }
+          option.onPress();
+        },
+      })),
+    [
+      attachmentMenuOptions,
+      attachmentPickerBusy,
+      chatId,
+      editingMessage,
+      pendingAttachments.length,
+    ]
   );
 
   const isGroupChat = Boolean(chatDetails?.isGroup);
   const isGroupOwner = isGroupChat && chatDetails?.ownerId === currentUserId;
-  const shouldShowAddButton = !isGroupChat && Boolean(otherUserIdRef.current);
+  const shouldShowAddButton = !isGroupChat && Boolean(directRecipient?.id || otherUserIdRef.current);
   const shouldShowSettingsButton = isGroupChat && isGroupOwner;
   const addButtonMode: 'create' | 'add' = 'create';
   const receiverPresenceLabel = useMemo(() => {
@@ -5913,7 +6329,7 @@ const ChatScreen: React.FC = () => {
           <Ionicons name="ban-outline" size={64} color="rgba(255, 255, 255, 0.4)" />
           <Text style={styles.blockedUserTitle}>This user is blocked</Text>
           <Text style={styles.blockedUserSubtitle}>
-            You won't receive messages from this user while they're blocked.
+            You will not receive messages from this user while they are blocked.
           </Text>
           <Pressable
             style={[styles.unblockButton, isUnblocking && styles.unblockButtonDisabled]}
@@ -5962,15 +6378,21 @@ const ChatScreen: React.FC = () => {
           >
             <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
           </Pressable>
-        ) : !isGroupChat && otherUserIdRef.current ? (
-          <Pressable
-            onPress={handleShowChatOptions}
-            style={styles.headerActionButton}
-            accessibilityRole="button"
-            accessibilityLabel="Chat options"
+        ) : !isGroupChat && (directRecipient?.id || otherUserIdRef.current) ? (
+          <NativeContextMenu
+            title="Chat options"
+            actions={chatHeaderMenuActions}
+            activationMethod="singlePress"
+            disabled={chatHeaderMenuActions.length === 0}
           >
-            <Ionicons name="ellipsis-vertical" size={22} color="#FFFFFF" />
-          </Pressable>
+            <View
+              style={styles.headerActionButton}
+              accessibilityRole="button"
+              accessibilityLabel="Chat options"
+            >
+              <Ionicons name="ellipsis-vertical" size={22} color="#FFFFFF" />
+            </View>
+          </NativeContextMenu>
         ) : shouldShowAddButton ? (
           <Pressable
             onPress={() => handleOpenMemberPicker(addButtonMode)}
@@ -5995,11 +6417,13 @@ const ChatScreen: React.FC = () => {
           />
           <Animated.View
             style={[
-              styles.reactionPickerBar,
+              shouldUseSwiftUIReactionPicker
+                ? styles.reactionPickerSwiftUI
+                : styles.reactionPickerBar,
               {
                 top: reactionPickerPosition.top,
                 left: reactionPickerPosition.left,
-                width: reactionPickerPosition.width,
+                ...(shouldUseSwiftUIReactionPicker ? null : { width: reactionPickerPosition.width }),
                 transform: [
                   {
                     scale: reactionAnim.interpolate({
@@ -6012,31 +6436,93 @@ const ChatScreen: React.FC = () => {
               },
             ]}
           >
-            {DEFAULT_REACTIONS.map((reaction) => (
-              <Pressable
-                key={`reaction-${reaction}`}
-                style={[
-                  styles.reactionEmojiButton,
-                  currentUserReaction === reaction && styles.reactionEmojiButtonActive,
-                ]}
-                onPress={() => {
-                  handleToggleReaction(reactionPicker.message, reaction);
-                  setContextTargetId(reactionPicker.message.id);
-                  closeReactionPicker();
-                }}
-              >
-                <Text style={styles.reactionEmojiText}>{reaction}</Text>
-              </Pressable>
-            ))}
-            {visibleReactions.length ? (
-              <View style={styles.reactionPickerLabel}>
-                <Text style={styles.reactionPickerLabelText} numberOfLines={1}>
-                  {visibleReactions
-                    .map((entry) => `${entry.reaction} ${entry.count}`)
-                    .join('   ')}
-                </Text>
-              </View>
-            ) : null}
+            {shouldUseSwiftUIReactionPicker ? (
+              <SwiftUIHost matchContents>
+                <SwiftUIVStack
+                  spacing={REACTION_BUTTON_GAP}
+                  modifiers={[
+                    swiftUIPadding({ all: REACTION_CARD_PADDING }),
+                    swiftUIBackground('rgba(15, 19, 36, 0.9)'),
+                    swiftUICornerRadius(18),
+                    swiftUIBorder({ color: 'rgba(255, 255, 255, 0.14)', width: 0.5 }),
+                    swiftUIShadow({ radius: 12, y: 8, color: 'rgba(0, 0, 0, 0.35)' }),
+                    swiftUIFrame({ width: reactionPickerPosition.width }),
+                  ]}
+                >
+                  {REACTION_ROWS.map((row, rowIndex) => (
+                    <SwiftUIHStack key={`reaction-row-${rowIndex}`} spacing={REACTION_BUTTON_GAP}>
+                      {row.map((reaction) => {
+                        const isActive = currentUserReaction === reaction;
+                        return (
+                          <SwiftUIButton
+                            key={`reaction-${reaction}`}
+                            variant="borderless"
+                            onPress={() => {
+                              handleToggleReaction(reactionPicker.message, reaction);
+                              setContextTargetId(reactionPicker.message.id);
+                              closeReactionPicker();
+                            }}
+                            modifiers={[
+                              swiftUIFrame({ width: REACTION_BUTTON_SIZE, height: REACTION_BUTTON_SIZE }),
+                              swiftUIBackground(
+                                isActive ? 'rgba(10, 132, 255, 0.24)' : 'rgba(255, 255, 255, 0.08)'
+                              ),
+                              swiftUICornerRadius(REACTION_BUTTON_SIZE / 2),
+                              ...(isActive
+                                ? [swiftUIBorder({ color: 'rgba(10, 132, 255, 0.6)', width: 1 })]
+                                : []),
+                            ]}
+                          >
+                            <SwiftUIText size={20}>{reaction}</SwiftUIText>
+                          </SwiftUIButton>
+                        );
+                      })}
+                    </SwiftUIHStack>
+                  ))}
+                  {visibleReactions.length ? (
+                    <SwiftUIText size={11} color={palette.textMuted}>
+                      {visibleReactions
+                        .map((entry) => `${entry.reaction} ${entry.count}`)
+                        .join('   ')}
+                    </SwiftUIText>
+                  ) : null}
+                </SwiftUIVStack>
+              </SwiftUIHost>
+            ) : (
+              <>
+                <View style={styles.reactionPickerRows}>
+                  {REACTION_ROWS.map((row, rowIndex) => (
+                    <View key={`reaction-row-${rowIndex}`} style={styles.reactionPickerRow}>
+                      {row.map((reaction) => (
+                        <Pressable
+                          key={`reaction-${reaction}`}
+                          style={[
+                            styles.reactionEmojiButton,
+                            currentUserReaction === reaction && styles.reactionEmojiButtonActive,
+                          ]}
+                          onPress={() => {
+                            handleToggleReaction(reactionPicker.message, reaction);
+                            setContextTargetId(reactionPicker.message.id);
+                            closeReactionPicker();
+                          }}
+                        >
+                          <Text style={styles.reactionEmojiText}>{reaction}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+                {visibleReactions.length ? (
+                  <View style={styles.reactionPickerLabel}>
+                    <Text style={styles.reactionPickerLabelText} numberOfLines={1}>
+                      {visibleReactions
+                        .map((entry) => `${entry.reaction} ${entry.count}`)
+                        .join('   ')}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            )}
           </Animated.View>
         </View>
       ) : null}
@@ -6068,6 +6554,10 @@ const ChatScreen: React.FC = () => {
                 scrollEventThrottle={16}
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfigRef.current}
+                maintainVisibleContentPosition={{
+                  minIndexForVisible: 1,
+                  autoscrollToTopThreshold: 100,
+                }}
                 refreshControl={
                   <RefreshControl
                     tintColor="#2C82FF"
@@ -6230,28 +6720,27 @@ const ChatScreen: React.FC = () => {
           ) : null}
 
           <View style={[styles.inputContainer, { paddingBottom: composerBottomPadding }]}>
-            <Pressable
-              onPress={handleAttachmentTrigger}
-              style={[
-                styles.attachButton,
-                (attachmentPickerBusy || Boolean(editingMessage)) && styles.attachButtonDisabled,
-              ]}
-              disabled={attachmentPickerBusy || Boolean(editingMessage)}
-              accessibilityRole="button"
-              accessibilityLabel="Open quick actions"
+            <NativeContextMenu
+              title="Quick actions"
+              actions={attachmentMenuActions}
+              activationMethod="singlePress"
+              disabled={attachmentMenuDisabled || attachmentMenuActions.length === 0}
             >
-              {attachmentPickerBusy ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Ionicons name="add" size={20} color="#ffffff" />
-              )}
-            </Pressable>
-            {!editingMessage && (
-              <EphemeralOptions
-                selectedDuration={ephemeralDuration}
-                onSelectDuration={setEphemeralDuration}
-              />
-            )}
+              <View
+                style={[
+                  styles.attachButton,
+                  attachmentMenuDisabled && styles.attachButtonDisabled,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Open quick actions"
+              >
+                {attachmentPickerBusy ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Ionicons name="add" size={20} color="#ffffff" />
+                )}
+              </View>
+            </NativeContextMenu>
             <View style={styles.composerColumn}>
               <Pressable onPress={() => composerRef.current?.focus()} onLongPress={handlePasteImage}>
                 <TextInput
@@ -6305,7 +6794,6 @@ const ChatScreen: React.FC = () => {
         visible={showScheduleSheet}
         onClose={() => setShowScheduleSheet(false)}
         onSchedule={handleScheduleMessage}
-        messagePreview={newMessage.trim() || undefined}
       />
       <CreatePollSheet
         visible={showPollSheet}
@@ -6313,57 +6801,116 @@ const ChatScreen: React.FC = () => {
         onCreatePoll={handleCreatePoll}
         isCreating={isCreatingPoll}
       />
-      <Modal
-        visible={Boolean(threadRootId)}
-        transparent
-        animationType="slide"
-        onRequestClose={handleThreadClose}
-      >
-        <View style={styles.threadModalOverlay}>
-          <View style={styles.threadModalCard}>
-            <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
-            <View style={styles.threadModalBody}>
-              <View style={styles.threadModalHeader}>
-                <Text style={styles.threadModalTitle}>
+      <EphemeralOptions
+        visible={showEphemeralSheet}
+        onClose={() => setShowEphemeralSheet(false)}
+        selectedDuration={ephemeralDuration}
+        onSelectDuration={setEphemeralDuration}
+      />
+      {/* Thread/Reply Sheet - Uses SwiftUI BottomSheet on iOS, Modal fallback on Android */}
+      {Platform.OS === 'ios' && canUseSwiftUI() && SwiftUIHost && SwiftUIBottomSheet ? (
+        <SwiftUIHost style={styles.swiftUIThreadHost}>
+          <SwiftUIBottomSheet
+            isOpened={Boolean(threadRootId)}
+            onIsOpenedChange={(isOpened: boolean) => {
+              if (!isOpened) {
+                handleThreadClose();
+              }
+            }}
+            presentationDetents={[0.5, 'large']}
+            presentationDragIndicator="visible"
+          >
+            <ScrollView style={styles.threadSheetScroll} contentContainerStyle={styles.threadSheetContent}>
+              <View style={styles.threadSheetHeader}>
+                <Text style={styles.threadSheetTitle}>
                   {threadMessages.length > 1
                     ? `${threadMessages.length - 1} ${threadMessages.length - 1 === 1 ? 'Reply' : 'Replies'}`
                     : 'Thread'}
                 </Text>
-                <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
-                  <Ionicons name="close" size={20} color="#ffffff" />
+              </View>
+              {threadMessages.length ? (
+                threadMessages.map((threadMessage, index) => (
+                  <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
+                    <View style={styles.threadMessageHeader}>
+                      <Text style={styles.threadMessageAuthor}>
+                        {getReplyLabel(threadMessage.senderId)}
+                      </Text>
+                      <Text style={styles.threadMessageTimestamp}>
+                        {formatTimestamp(parseDate(threadMessage.timestamp))}
+                      </Text>
+                    </View>
+                    <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
+                    {index === 0 && (
+                      <Text style={styles.threadMessageBadge}>Original message</Text>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.threadEmptyText}>
+                  Original message is not available in this history.
+                </Text>
+              )}
+              <SwiftUIHost matchContents style={styles.threadSheetButtonHost}>
+                <SwiftUIButton variant="borderedProminent" onPress={handleThreadJumpToChat}>
+                  View in chat
+                </SwiftUIButton>
+              </SwiftUIHost>
+            </ScrollView>
+          </SwiftUIBottomSheet>
+        </SwiftUIHost>
+      ) : (
+        <Modal
+          visible={Boolean(threadRootId)}
+          transparent
+          animationType="slide"
+          onRequestClose={handleThreadClose}
+        >
+          <View style={styles.threadModalOverlay}>
+            <View style={styles.threadModalCard}>
+              <NativeBlur {...BlurPresets.modal} style={StyleSheet.absoluteFillObject} />
+              <View style={styles.threadModalBody}>
+                <View style={styles.threadModalHeader}>
+                  <Text style={styles.threadModalTitle}>
+                    {threadMessages.length > 1
+                      ? `${threadMessages.length - 1} ${threadMessages.length - 1 === 1 ? 'Reply' : 'Replies'}`
+                      : 'Thread'}
+                  </Text>
+                  <Pressable onPress={handleThreadClose} style={styles.threadModalClose} accessibilityRole="button">
+                    <Ionicons name="close" size={20} color="#ffffff" />
+                  </Pressable>
+                </View>
+                <ScrollView contentContainerStyle={styles.threadModalScroll}>
+                  {threadMessages.length ? (
+                    threadMessages.map((threadMessage, index) => (
+                      <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
+                        <View style={styles.threadMessageHeader}>
+                          <Text style={styles.threadMessageAuthor}>
+                            {getReplyLabel(threadMessage.senderId)}
+                          </Text>
+                          <Text style={styles.threadMessageTimestamp}>
+                            {formatTimestamp(parseDate(threadMessage.timestamp))}
+                          </Text>
+                        </View>
+                        <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
+                        {index === 0 && (
+                          <Text style={styles.threadMessageBadge}>Original message</Text>
+                        )}
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.threadEmptyText}>
+                      Original message is not available in this history.
+                    </Text>
+                  )}
+                </ScrollView>
+                <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
+                  <Text style={styles.threadJumpButtonText}>View in chat</Text>
                 </Pressable>
               </View>
-              <ScrollView contentContainerStyle={styles.threadModalScroll}>
-                {threadMessages.length ? (
-                  threadMessages.map((threadMessage, index) => (
-                    <View key={`${threadMessage.id}-${index}`} style={styles.threadMessageCard}>
-                      <View style={styles.threadMessageHeader}>
-                        <Text style={styles.threadMessageAuthor}>
-                          {getReplyLabel(threadMessage.senderId)}
-                        </Text>
-                        <Text style={styles.threadMessageTimestamp}>
-                          {formatTimestamp(parseDate(threadMessage.timestamp))}
-                        </Text>
-                      </View>
-                      <Text style={styles.threadMessageText}>{threadMessage.content}</Text>
-                      {index === 0 && (
-                        <Text style={styles.threadMessageBadge}>Original message</Text>
-                      )}
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.threadEmptyText}>
-                    Original message is not available in this history.
-                  </Text>
-                )}
-              </ScrollView>
-              <Pressable style={styles.threadJumpButton} onPress={handleThreadJumpToChat}>
-                <Text style={styles.threadJumpButtonText}>View in chat</Text>
-              </Pressable>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
       <Modal
         visible={Boolean(previewContext)}
         transparent
@@ -6639,58 +7186,6 @@ const ChatScreen: React.FC = () => {
           </Animated.View>
         </Animated.View>
       ) : null}
-      {attachmentSheetVisible ? (
-        <Animated.View
-          style={[styles.messageActionOverlay, { opacity: attachmentSheetAnim }]}
-          pointerEvents="box-none"
-        >
-          <Pressable
-            style={styles.messageActionBackdrop}
-            onPress={() => closeAttachmentSheet()}
-          />
-          <Animated.View
-            style={[
-              styles.attachmentDropdownWrapper,
-              { bottom: attachmentSheetBottom + 8 },
-              {
-                transform: [
-                  {
-                    translateY: attachmentSheetAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [18, 0],
-                    }),
-                  },
-                ],
-                opacity: attachmentSheetAnim,
-              },
-            ]}
-          >
-            <GlassCard width={ATTACHMENT_DROPDOWN_WIDTH} padding={0} variant="default">
-              <View style={styles.attachmentDropdownContent}>
-                <Text style={styles.attachmentDropdownTitle}>Quick actions</Text>
-                <View style={styles.attachmentDropdownList}>
-                  {attachmentMenuOptions.map((option) => (
-                    <Pressable
-                      key={option.key}
-                      style={({ pressed }) => [
-                        styles.attachmentDropdownOption,
-                        pressed && styles.attachmentDropdownOptionPressed,
-                      ]}
-                      onPress={() => closeAttachmentSheet(() => option.onPress())}
-                    >
-                      <Ionicons name={option.icon} size={20} color="#ffffff" />
-                      <View style={styles.attachmentDropdownLabelColumn}>
-                        <Text style={styles.attachmentDropdownLabel}>{option.label}</Text>
-                        <Text style={styles.attachmentDropdownHint}>{option.hint}</Text>
-                      </View>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            </GlassCard>
-          </Animated.View>
-        </Animated.View>
-      ) : null}
     </SafeAreaView>
   );
 };
@@ -6859,6 +7354,10 @@ const styles = StyleSheet.create({
   },
   messageRowWithReply: {
     marginTop: 10,
+    marginBottom: 6,
+  },
+  messageRowWithReactions: {
+    marginBottom: 36,
   },
   messageRowMedia: {
     maxWidth: '100%',
@@ -6921,8 +7420,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 22,
   },
   messageContent: {
-    flexShrink: 1,
-    maxWidth: '90%',
+    flexShrink: 0,
   },
   messageContentFileOnly: {
     width: '100%',
@@ -6945,18 +7443,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
     minWidth: 120,
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   senderMetaAvatar: {
     marginRight: 8,
+    flexShrink: 0,
   },
   senderMetaDetails: {
     flex: 1,
+    flexShrink: 1,
     marginTop: 2,
+    overflow: 'hidden',
   },
   senderMetaName: {
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 12,
     fontWeight: '600',
+    flexShrink: 1,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -7307,8 +7811,35 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  // SwiftUI BottomSheet styles for thread
+  swiftUIThreadHost: {
+    position: 'absolute',
+    width: Dimensions.get('window').width,
+    height: 0,
+  },
+  threadSheetScroll: {
+    flex: 1,
+  },
+  threadSheetContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  threadSheetHeader: {
+    marginBottom: 16,
+  },
+  threadSheetTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  threadSheetButtonHost: {
+    marginTop: 16,
+    alignSelf: 'stretch',
+  },
   threadSummaryButton: {
-    marginTop: 6,
+    marginTop: 8,
+    marginBottom: 4,
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -7711,48 +8242,57 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 50,
   },
+  reactionPickerSwiftUI: {
+    position: 'absolute',
+    zIndex: 51,
+  },
   reactionPickerBar: {
     position: 'absolute',
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#0F1324',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.12)',
+    gap: REACTION_BUTTON_GAP,
+    paddingHorizontal: REACTION_CARD_PADDING,
+    paddingVertical: REACTION_CARD_PADDING,
+    borderRadius: 24,
+    backgroundColor: 'rgba(28, 28, 30, 0.95)',
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
     elevation: 14,
     zIndex: 51,
   },
+  reactionPickerRows: {
+    gap: REACTION_BUTTON_GAP,
+  },
+  reactionPickerRow: {
+    flexDirection: 'row',
+    gap: REACTION_BUTTON_GAP,
+  },
   reactionEmojiButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    width: REACTION_BUTTON_SIZE,
+    height: REACTION_BUTTON_SIZE,
+    borderRadius: REACTION_BUTTON_SIZE / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   reactionEmojiButtonActive: {
-    backgroundColor: 'rgba(44, 130, 255, 0.35)',
-    borderWidth: 1.5,
-    borderColor: '#2C82FF',
+    backgroundColor: 'rgba(10, 132, 255, 0.25)',
   },
   reactionEmojiText: {
-    fontSize: 24,
+    fontSize: 20,
   },
   reactionPickerLabel: {
-    marginLeft: 6,
+    alignSelf: 'center',
     paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   reactionPickerLabelText: {
     color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
+    fontSize: 11,
+    textAlign: 'center',
   },
   reactionPill: {
     flexDirection: 'row',
@@ -7902,7 +8442,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     columnGap: 12,
-    marginBottom: -12,
+    marginBottom: 0,
   },
   attachmentPreviewSlide: {
     width: Dimensions.get('window').width,
@@ -8033,50 +8573,6 @@ const styles = StyleSheet.create({
   quickReactionRow: {
     paddingVertical: 0,
     paddingHorizontal: 0,
-  },
-  attachmentDropdownWrapper: {
-    position: 'absolute',
-    left: spacing.lg,
-    zIndex: 40,
-  },
-  attachmentDropdownContent: {
-    padding: spacing.sm,
-    gap: spacing.xs,
-  },
-  attachmentDropdownTitle: {
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    fontWeight: '700',
-  },
-  attachmentDropdownList: {
-    gap: spacing.xs,
-  },
-  attachmentDropdownOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.lg,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
-  attachmentDropdownOptionPressed: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  attachmentDropdownLabelColumn: {
-    flex: 1,
-  },
-  attachmentDropdownLabel: {
-    color: palette.text,
-    fontSize: 15,
-    ...font('medium'),
-  },
-  attachmentDropdownHint: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginTop: 2,
   },
   scrollToBottomButton: {
     position: 'absolute',

@@ -14,6 +14,7 @@ interface UserAvatarProps {
   presence?: Presence;
   presenceColor?: string;
   presencePlacement?: PresencePlacement;
+  variant?: 'ring' | 'plain';
 }
 
 const getPresenceColor = (presence: Presence, override?: string) => {
@@ -60,13 +61,14 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   presence,
   presenceColor,
   presencePlacement = 'overlay',
+  variant = 'ring',
 }) => {
   const initials = useMemo(() => getInitials(name), [name]);
   const statusColor = getPresenceColor(presence, presenceColor);
   const showPresence = Boolean(presence);
   const dotSize = Math.max(8, Math.round(size * 0.28));
   const offset = Math.max(2, Math.round(size * 0.12));
-  const ringWidth = Math.max(3, Math.round(size * 0.08));
+  const ringWidth = variant === 'ring' ? Math.max(3, Math.round(size * 0.08)) : 0;
   const avatarSize = Math.max(0, size - ringWidth * 2);
 
   return (
@@ -87,39 +89,62 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       ) : null}
 
       <View style={[styles.avatarFrame, { width: size, height: size }]}>
-        <LinearGradient
-          colors={gradients.avatarRing as [string, string, string]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[
-            styles.ring,
-            {
-              borderRadius: size / 2,
-              padding: ringWidth,
-            },
-          ]}
-        >
+        {variant === 'ring' ? (
+          <LinearGradient
+            colors={gradients.avatarRing as [string, string, string]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.ring,
+              {
+                borderRadius: size / 2,
+                padding: ringWidth,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.imageWrap,
+                {
+                  borderRadius: avatarSize / 2,
+                  width: avatarSize,
+                  height: avatarSize,
+                },
+              ]}
+            >
+              {uri ? (
+                <Image source={{ uri }} style={styles.image} resizeMode="cover" />
+              ) : (
+                <View style={[styles.placeholder, { borderRadius: avatarSize / 2 }]}>
+                  <Text style={[styles.initials, { fontSize: Math.max(12, avatarSize * 0.38) }]}>
+                    {initials}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </LinearGradient>
+        ) : (
           <View
             style={[
-              styles.imageWrap,
+              styles.plainWrap,
               {
-                borderRadius: avatarSize / 2,
-                width: avatarSize,
-                height: avatarSize,
+                borderRadius: size / 2,
+                width: size,
+                height: size,
               },
             ]}
           >
             {uri ? (
               <Image source={{ uri }} style={styles.image} resizeMode="cover" />
             ) : (
-              <View style={[styles.placeholder, { borderRadius: avatarSize / 2 }]}>
-                <Text style={[styles.initials, { fontSize: Math.max(12, avatarSize * 0.38) }]}>
+              <View style={[styles.placeholder, { borderRadius: size / 2 }]}>
+                <Text style={[styles.initials, { fontSize: Math.max(12, size * 0.38) }]}>
                   {initials}
                 </Text>
               </View>
             )}
           </View>
-        </LinearGradient>
+        )}
 
         {showPresence && presencePlacement === 'overlay' ? (
           <View
@@ -161,6 +186,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'rgba(15, 23, 42, 0.85)',
     zIndex: 1,
+  },
+  plainWrap: {
+    overflow: 'hidden',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   image: {
     width: '100%',

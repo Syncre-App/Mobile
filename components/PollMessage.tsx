@@ -38,6 +38,10 @@ export interface PollData {
   isClosed: boolean;
   votes: PollVoteData[];
   totalVotes: number;
+  encryptedPayload?: any;
+  backupEnvelopes?: any;
+  payloadVersion?: number;
+  senderDeviceId?: string | null;
 }
 
 interface PollMessageProps {
@@ -99,7 +103,7 @@ export const PollMessage: React.FC<PollMessageProps> = ({
     <View style={styles.container}>
       <View style={styles.header}>
         <Ionicons name="stats-chart" size={18} color={palette.accent} />
-        <Text style={styles.questionText}>{poll.question}</Text>
+        <Text style={styles.questionText}>{poll.question?.trim() || 'Poll'}</Text>
       </View>
 
       {poll.multiSelect && !poll.isClosed && (
@@ -108,6 +112,10 @@ export const PollMessage: React.FC<PollMessageProps> = ({
 
       <View style={styles.optionsContainer}>
         {poll.options.map((option) => {
+          const optionLabel =
+            typeof option.text === 'string' && option.text.trim().length > 0
+              ? option.text
+              : `Option ${option.id ?? poll.options.indexOf(option) + 1}`;
           const isVoted = userVotes.includes(option.id);
           const voteCount = getVoteCount(option.id);
           const percentage = getPercentage(option.id);
@@ -137,7 +145,7 @@ export const PollMessage: React.FC<PollMessageProps> = ({
                     {isVoted && <Ionicons name="checkmark" size={12} color="#ffffff" />}
                   </View>
                   <Text style={[styles.optionText, isVoted && styles.optionTextVoted]}>
-                    {option.text}
+                    {optionLabel}
                   </Text>
                 </View>
                 <View style={styles.optionRight}>
@@ -149,6 +157,7 @@ export const PollMessage: React.FC<PollMessageProps> = ({
                           uri={voter.profilePicture || undefined}
                           name={voter.username}
                           size={18}
+                          variant="plain"
                           style={[styles.voterAvatar, { marginLeft: i > 0 ? -6 : 0 }]}
                         />
                       ))}
@@ -281,8 +290,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   voterAvatar: {
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.5)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0)',
   },
   voteCount: {
     color: palette.textMuted,

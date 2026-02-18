@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GlassCard } from '../components/GlassCard';
+
 import { AppBackground } from '../components/AppBackground';
 import { UpdateService, ReleaseInfo } from '../services/UpdateService';
 
@@ -77,7 +77,7 @@ export default function UpdateScreen() {
       <AppBackground />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <GlassCard width="100%" style={styles.card}>
+        <View style={styles.card}>
           {isLoading ? (
             <View style={styles.loading}>
               <ActivityIndicator size="large" color="#2C82FF" />
@@ -146,7 +146,7 @@ export default function UpdateScreen() {
               </TouchableOpacity>
             </View>
           )}
-        </GlassCard>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -166,6 +166,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
     maxWidth: 420,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 20,
   },
   loading: {
     alignItems: 'center',

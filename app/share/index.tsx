@@ -266,7 +266,7 @@ const ShareScreen: React.FC = () => {
   useEffect(() => {
     if (!authLoading && !user) {
       NotificationService.show('warning', 'Sign in to share content');
-      router.replace('/identity?mode=unlock&redirect=share');
+      router.replace('/');
     }
   }, [authLoading, user, router]);
 

@@ -1,26 +1,34 @@
 import React, { ReactNode } from 'react';
 import { View, StyleSheet, ViewStyle, DimensionValue, StyleProp, ColorValue, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { NativeBlur } from './NativeBlur';
 import { gradients, palette, radii, shadows, tokens } from '../theme/designSystem';
-import { md3Colors, md3Shape, getMd3CardStyle, type CardVariant } from '../theme/md3Theme';
+import { md3Colors, getMd3CardStyle, type CardVariant } from '../theme/md3Theme';
+import { canUseSwiftUI } from '../utils/swiftUi';
 
 const isIOS = Platform.OS === 'ios';
 const isAndroid = Platform.OS === 'android';
 
-// Cache the liquid glass availability check
-let _liquidGlassAvailable: boolean | null = null;
-const checkLiquidGlass = (): boolean => {
-  if (_liquidGlassAvailable === null) {
-    try {
-      _liquidGlassAvailable = isLiquidGlassAvailable();
-    } catch {
-      _liquidGlassAvailable = false;
-    }
+// SwiftUI components for iOS
+let SwiftUIHost: any = null;
+let SwiftUIRoundedRectangle: any = null;
+let glassEffect: any = null;
+let GlassEffectContainer: any = null;
+let padding: any = null;
+
+if (isIOS) {
+  try {
+    const swiftUI = require('@expo/ui/swift-ui');
+    SwiftUIHost = swiftUI.Host;
+    SwiftUIRoundedRectangle = swiftUI.RoundedRectangle;
+    GlassEffectContainer = swiftUI.GlassEffectContainer;
+    const modifiers = require('@expo/ui/swift-ui/modifiers');
+    glassEffect = modifiers.glassEffect;
+    padding = modifiers.padding;
+  } catch (e) {
+    console.warn('SwiftUI components not available:', e);
   }
-  return _liquidGlassAvailable;
-};
+}
 
 interface GlassCardProps {
   children: ReactNode;
@@ -29,7 +37,7 @@ interface GlassCardProps {
   intensity?: number;
   variant?: CardVariant;
   padding?: number;
-  /** For iOS 26+ GlassView: whether the glass should be interactive */
+  /** Whether the glass should be interactive (iOS) */
   isInteractive?: boolean;
 }
 
@@ -39,11 +47,13 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   style,
   intensity = tokens.blur.card,
   variant = 'default',
-  padding = 20,
+  padding: paddingValue = 20,
   isInteractive = false,
 }) => {
   const isHero = variant === 'hero';
   const isSubtle = variant === 'subtle';
+  const shouldUseSwiftUI = canUseSwiftUI();
+  const canUseGlassEffect = shouldUseSwiftUI && Number(Platform.Version) >= 26;
 
   // ═══════════════════════════════════════════════════════════════
   // ANDROID: Material Design 3 Card
@@ -60,7 +70,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
           style,
         ]}
       >
-        <View style={[styles.md3Content, { padding }]}>
+        <View style={[styles.md3Content, { padding: paddingValue }]}>
           {children}
         </View>
       </View>
@@ -68,33 +78,48 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS 26+: Native Liquid Glass
+  // iOS: Try SwiftUI GlassEffect first
   // ═══════════════════════════════════════════════════════════════
-  if (checkLiquidGlass()) {
-    const glassStyle = isSubtle ? 'clear' : 'regular';
+  if (canUseGlassEffect && SwiftUIHost && SwiftUIRoundedRectangle && glassEffect && GlassEffectContainer) {
+    const glassVariant = isSubtle ? 'clear' : 'regular';
     const tintColor = isHero ? palette.accent : undefined;
     
     return (
-      <GlassView
+      <View
         style={[
-          styles.liquidGlassContainer,
-          isHero && styles.liquidGlassHero,
+          styles.swiftUIContainer,
+          isHero && styles.heroShadow,
+          isSubtle && styles.subtleShadow,
           { width },
           style,
         ]}
-        glassEffectStyle={glassStyle}
-        tintColor={tintColor}
-        isInteractive={isInteractive}
       >
-        <View style={[styles.liquidGlassContent, { padding }]}>
+        <SwiftUIHost style={StyleSheet.absoluteFillObject}>
+          <GlassEffectContainer spacing={0}>
+            <SwiftUIRoundedRectangle
+              cornerRadius={radii.xl}
+              modifiers={[
+                glassEffect({
+                  glass: {
+                    variant: glassVariant,
+                    interactive: isInteractive,
+                    tint: tintColor,
+                  },
+                  shape: 'rectangle',
+                }),
+              ]}
+            />
+          </GlassEffectContainer>
+        </SwiftUIHost>
+        <View style={[styles.swiftUIContent, { padding: paddingValue }]}>
           {children}
         </View>
-      </GlassView>
+      </View>
     );
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // iOS < 26: Traditional Blur + Gradient
+  // iOS Fallback: Traditional Blur + Gradient
   // ═══════════════════════════════════════════════════════════════
   const borderColor = isHero
     ? 'rgba(10, 132, 255, 0.4)'
@@ -121,7 +146,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
           colors={gradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.gradient, { padding }]}
+          style={[styles.gradient, { padding: paddingValue }]}
         >
           <LinearGradient
             colors={gradients.cardStroke as [ColorValue, ColorValue, ...ColorValue[]]}
@@ -137,7 +162,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 };
 
 const styles = StyleSheet.create({
-  // iOS < 26 styles (blur + gradient)
+  // iOS fallback styles (blur + gradient)
   container: {
     borderRadius: radii.xl,
     overflow: 'hidden',
@@ -157,20 +182,12 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
 
-  // iOS 26+ Liquid Glass styles
-  liquidGlassContainer: {
+  // iOS SwiftUI styles
+  swiftUIContainer: {
     borderRadius: radii.xl,
     overflow: 'hidden',
-    // No background color - GlassView provides the glass effect
   },
-  liquidGlassHero: {
-    // Hero variant gets subtle shadow for depth
-    shadowColor: '#0A84FF',
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-  },
-  liquidGlassContent: {
+  swiftUIContent: {
     flex: 1,
     justifyContent: 'center',
   },

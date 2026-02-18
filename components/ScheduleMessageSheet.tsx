@@ -9,377 +9,335 @@ import {
   Text,
   View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { font, palette, radii, spacing } from '../theme/designSystem';
-import { GlassCard } from './GlassCard';
+
+export type ScheduleOption = '30m' | '1h' | '3h' | 'tomorrow' | 'custom' | null;
 
 interface ScheduleMessageSheetProps {
   visible: boolean;
   onClose: () => void;
-  onSchedule: (scheduledFor: Date) => void;
-  messagePreview?: string;
+  onSchedule: (scheduledFor: Date | null) => void;
 }
 
-const formatDate = (date: Date): string => {
+const getScheduleDate = (option: ScheduleOption, customDate?: Date): Date | null => {
+  if (option === null) return null;
+  if (option === 'custom' && customDate) return customDate;
+
   const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const isToday = date.toDateString() === now.toDateString();
-  const isTomorrow = date.toDateString() === tomorrow.toDateString();
-
-  if (isToday) {
-    return 'Today';
+  switch (option) {
+    case '30m':
+      return new Date(now.getTime() + 30 * 60 * 1000);
+    case '1h':
+      return new Date(now.getTime() + 60 * 60 * 1000);
+    case '3h':
+      return new Date(now.getTime() + 3 * 60 * 60 * 1000);
+    case 'tomorrow': {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(9, 0, 0, 0);
+      return tomorrow;
+    }
+    default:
+      return null;
   }
-  if (isTomorrow) {
-    return 'Tomorrow';
-  }
-
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    weekday: 'short',
-  });
 };
 
-const formatTime = (date: Date): string => {
-  return date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+const SCHEDULE_OPTIONS: { value: ScheduleOption; label: string; description: string }[] = [
+  { value: null, label: 'Off', description: 'Send immediately' },
+  { value: '30m', label: 'In 30 minutes', description: 'Send in half an hour' },
+  { value: '1h', label: 'In 1 hour', description: 'Send in one hour' },
+  { value: '3h', label: 'In 3 hours', description: 'Send in three hours' },
+  { value: 'tomorrow', label: 'Tomorrow morning', description: 'Send at 9:00 AM' },
+  { value: 'custom', label: 'Custom time', description: 'Pick a specific date and time' },
+];
 
 export const ScheduleMessageSheet: React.FC<ScheduleMessageSheetProps> = ({
   visible,
   onClose,
   onSchedule,
-  messagePreview,
 }) => {
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+  const [selectedOption, setSelectedOption] = useState<ScheduleOption>(null);
+  const [customDate, setCustomDate] = useState<Date>(() => {
     const date = new Date();
-    date.setMinutes(date.getMinutes() + 30);
+    date.setHours(date.getHours() + 1);
+    date.setMinutes(0);
     date.setSeconds(0);
-    date.setMilliseconds(0);
     return date;
   });
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
 
   useEffect(() => {
     if (visible) {
+      setSelectedOption(null);
+      setShowCustomPicker(false);
       const date = new Date();
-      date.setMinutes(date.getMinutes() + 30);
+      date.setHours(date.getHours() + 1);
+      date.setMinutes(0);
       date.setSeconds(0);
-      date.setMilliseconds(0);
-      setSelectedDate(date);
+      setCustomDate(date);
     }
   }, [visible]);
 
-  const handleDateChange = (_event: any, date?: Date) => {
+  const handleSelectOption = (option: ScheduleOption) => {
+    setSelectedOption(option);
+    if (option === 'custom') {
+      setShowCustomPicker(true);
+    } else {
+      setShowCustomPicker(false);
+      const scheduledDate = getScheduleDate(option);
+      onSchedule(scheduledDate);
+      onClose();
+    }
+  };
+
+  const handleCustomDateChange = (_event: any, date?: Date) => {
     if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-      setShowTimePicker(false);
+      if (pickerMode === 'date') {
+        setPickerMode('time');
+      } else {
+        setShowCustomPicker(false);
+      }
     }
     if (date) {
-      setSelectedDate(date);
+      setCustomDate(date);
     }
   };
 
-  const handleConfirm = () => {
-    if (selectedDate <= new Date()) {
-      return;
-    }
-    onSchedule(selectedDate);
-    onClose();
-  };
-
-  const openDatePicker = () => {
-    setPickerMode('date');
-    if (Platform.OS === 'android') {
-      setShowDatePicker(true);
-    } else {
-      setShowDatePicker(true);
+  const handleConfirmCustom = () => {
+    if (customDate > new Date()) {
+      onSchedule(customDate);
+      onClose();
     }
   };
 
-  const openTimePicker = () => {
-    setPickerMode('time');
-    if (Platform.OS === 'android') {
-      setShowTimePicker(true);
-    } else {
-      setShowTimePicker(true);
-    }
-  };
-
-  const quickScheduleOptions = [
-    { label: '30 min', minutes: 30 },
-    { label: '1 hour', minutes: 60 },
-    { label: '3 hours', minutes: 180 },
-    { label: 'Tomorrow morning', preset: 'tomorrow_morning' },
-  ];
-
-  const handleQuickSchedule = (option: typeof quickScheduleOptions[0]) => {
-    const date = new Date();
-    if (option.preset === 'tomorrow_morning') {
-      date.setDate(date.getDate() + 1);
-      date.setHours(9, 0, 0, 0);
-    } else if (option.minutes) {
-      date.setMinutes(date.getMinutes() + option.minutes);
-    }
-    date.setSeconds(0);
-    date.setMilliseconds(0);
-    setSelectedDate(date);
-  };
-
-  const isValidDate = selectedDate > new Date();
+  const isCustomDateValid = customDate > new Date();
 
   return (
     <Modal
       visible={visible}
-      transparent
-      animationType="fade"
+      animationType="slide"
+      presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable onPress={(e) => e.stopPropagation()}>
-          <GlassCard width={320} variant="default" padding={0}>
-            <View style={styles.content}>
-              <View style={styles.header}>
-                <Ionicons name="calendar-outline" size={24} color={palette.text} />
-                <Text style={styles.title}>Schedule message</Text>
-                <Pressable onPress={onClose} style={styles.closeButton}>
-                  <Ionicons name="close" size={20} color={palette.textMuted} />
-                </Pressable>
+      <View style={styles.container}>
+        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={styles.dimOverlay} />
+        <View style={styles.dragIndicator} />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerIcon}>
+            <Ionicons name="time-outline" size={20} color={palette.accent} />
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Schedule Message</Text>
+            <Text style={styles.subtitle}>Choose when to send this message</Text>
+          </View>
+          <Pressable style={styles.closeButton} onPress={onClose}>
+            <Ionicons name="close" size={20} color={palette.textMuted} />
+          </Pressable>
+        </View>
+
+        {/* Options */}
+        <View style={styles.optionsList}>
+          {SCHEDULE_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value ?? 'off'}
+              style={[
+                styles.optionItem,
+                selectedOption === option.value && styles.optionItemSelected,
+              ]}
+              onPress={() => handleSelectOption(option.value)}
+            >
+              <View style={styles.optionContent}>
+                <Text style={styles.optionLabel}>{option.label}</Text>
+                <Text style={styles.optionDescription}>{option.description}</Text>
               </View>
-
-              {messagePreview ? (
-                <View style={styles.previewContainer}>
-                  <Text style={styles.previewLabel}>Message:</Text>
-                  <Text style={styles.previewText} numberOfLines={2}>
-                    {messagePreview}
-                  </Text>
-                </View>
-              ) : null}
-
-              <Text style={styles.sectionLabel}>Quick picks</Text>
-              <View style={styles.quickOptions}>
-                {quickScheduleOptions.map((option) => (
-                  <Pressable
-                    key={option.label}
-                    style={styles.quickOption}
-                    onPress={() => handleQuickSchedule(option)}
-                  >
-                    <Text style={styles.quickOptionText}>{option.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={styles.sectionLabel}>Custom time</Text>
-              <View style={styles.dateTimeRow}>
-                <Pressable style={styles.dateTimeButton} onPress={openDatePicker}>
-                  <Ionicons name="calendar" size={18} color={palette.accent} />
-                  <Text style={styles.dateTimeText}>{formatDate(selectedDate)}</Text>
-                </Pressable>
-                <Pressable style={styles.dateTimeButton} onPress={openTimePicker}>
-                  <Ionicons name="time" size={18} color={palette.accent} />
-                  <Text style={styles.dateTimeText}>{formatTime(selectedDate)}</Text>
-                </Pressable>
-              </View>
-
-              {(showDatePicker || showTimePicker) && Platform.OS === 'ios' && (
-                <View style={styles.pickerContainer}>
-                  <DateTimePicker
-                    value={selectedDate}
-                    mode={pickerMode}
-                    display="spinner"
-                    onChange={handleDateChange}
-                    minimumDate={new Date()}
-                    locale="en-US"
-                    textColor={palette.text}
-                  />
+              {selectedOption === option.value && (
+                <View style={styles.checkCircle}>
+                  <Ionicons name="checkmark" size={16} color="#0B1630" />
                 </View>
               )}
+            </Pressable>
+          ))}
+        </View>
 
-              {showDatePicker && Platform.OS === 'android' && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display="default"
-                  onChange={handleDateChange}
-                  minimumDate={new Date()}
-                />
+        {/* Custom Date Picker */}
+        {showCustomPicker && Platform.OS === 'ios' && (
+          <View style={styles.customPickerContainer}>
+            <DateTimePicker
+              value={customDate}
+              mode="datetime"
+              display="spinner"
+              onChange={handleCustomDateChange}
+              minimumDate={new Date()}
+              textColor="#ffffff"
+            />
+            <View style={styles.customPickerActions}>
+              {!isCustomDateValid && (
+                <Text style={styles.errorText}>Select a future time</Text>
               )}
-
-              {showTimePicker && Platform.OS === 'android' && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="time"
-                  display="default"
-                  onChange={handleDateChange}
-                  is24Hour
-                />
-              )}
-
-              <View style={styles.footer}>
-                <Pressable style={styles.cancelButton} onPress={onClose}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.scheduleButton,
-                    !isValidDate && styles.scheduleButtonDisabled,
-                  ]}
-                  onPress={handleConfirm}
-                  disabled={!isValidDate}
-                >
-                  <Ionicons name="send" size={16} color="#ffffff" />
-                  <Text style={styles.scheduleButtonText}>Schedule</Text>
-                </Pressable>
-              </View>
-
-              {!isValidDate && (
-                <Text style={styles.errorText}>
-                  Time must be in the future
-                </Text>
-              )}
+              <Pressable
+                style={[
+                  styles.confirmButton,
+                  !isCustomDateValid && styles.confirmButtonDisabled,
+                ]}
+                onPress={handleConfirmCustom}
+                disabled={!isCustomDateValid}
+              >
+                <Ionicons name="checkmark" size={18} color="#ffffff" />
+                <Text style={styles.confirmButtonText}>Schedule</Text>
+              </Pressable>
             </View>
-          </GlassCard>
-        </Pressable>
-      </Pressable>
+          </View>
+        )}
+
+        {showCustomPicker && Platform.OS === 'android' && (
+          <DateTimePicker
+            value={customDate}
+            mode={pickerMode}
+            display="default"
+            onChange={handleCustomDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
+    backgroundColor: 'rgba(8, 10, 16, 0.92)',
   },
-  content: {
-    padding: spacing.md,
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 7, 12, 0.35)',
+  },
+  dragIndicator: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    gap: 12,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
-    flex: 1,
-    color: palette.text,
-    fontSize: 18,
-    ...font('semibold'),
+    color: '#ffffff',
+    fontSize: 20,
+    ...font('bold'),
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    marginTop: 4,
   },
   closeButton: {
-    padding: spacing.xs,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  previewContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: radii.md,
-    padding: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  previewLabel: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  previewText: {
-    color: palette.text,
-    fontSize: 14,
-  },
-  sectionLabel: {
-    color: palette.textMuted,
-    fontSize: 12,
-    marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  quickOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  quickOption: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
-  },
-  quickOptionText: {
-    color: palette.text,
-    fontSize: 13,
-  },
-  dateTimeRow: {
-    flexDirection: 'row',
+  optionsList: {
+    paddingHorizontal: 20,
     gap: spacing.sm,
-    marginBottom: spacing.md,
   },
-  dateTimeButton: {
-    flex: 1,
+  optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: 'rgba(37, 99, 235, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(37, 99, 235, 0.3)',
-    borderRadius: radii.md,
-    paddingVertical: spacing.sm,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    minHeight: 64,
   },
-  dateTimeText: {
-    color: palette.text,
-    fontSize: 14,
-    ...font('medium'),
+  optionItemSelected: {
+    backgroundColor: 'rgba(10, 132, 255, 0.15)',
   },
-  pickerContainer: {
-    marginBottom: spacing.md,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  cancelButton: {
+  optionContent: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  cancelButtonText: {
-    color: palette.textMuted,
-    fontSize: 14,
-    ...font('medium'),
-  },
-  scheduleButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: palette.accent,
-  },
-  scheduleButtonDisabled: {
-    opacity: 0.5,
-  },
-  scheduleButtonText: {
+  optionLabel: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 17,
     ...font('semibold'),
+  },
+  optionDescription: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customPickerContainer: {
+    marginTop: 24,
+    paddingTop: 20,
+    marginHorizontal: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  customPickerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 16,
+    marginTop: 16,
+  },
+  confirmButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: palette.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: radii.lg,
+    minHeight: 50,
+  },
+  confirmButtonDisabled: {
+    opacity: 0.4,
+  },
+  confirmButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    ...font('bold'),
   },
   errorText: {
     color: '#EF4444',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: spacing.xs,
+    fontSize: 14,
+    ...font('medium'),
   },
 });
 

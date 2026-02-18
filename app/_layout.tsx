@@ -8,9 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiService } from '../services/ApiService';
 import Constants from 'expo-constants';
 import { UpdateService } from '../services/UpdateService';
-import { IdentityService } from '../services/IdentityService';
 import { StorageService } from '../services/StorageService';
-import { CryptoService } from '../services/CryptoService';
 import { ShareIntentService } from '../services/ShareIntentService';
 import { palette } from '../theme/designSystem';
 
@@ -45,24 +43,15 @@ export default function RootLayout() {
 
       const token = await StorageService.getAuthToken();
       if (token) {
-        const needsIdentitySetup = await IdentityService.requiresBootstrap(token);
-        const hasLocalIdentity = Boolean(await CryptoService.getStoredIdentity());
-
-        if (needsIdentitySetup) {
-          setMaintenance(false);
-          return { path: '/identity?mode=setup', allowChatNavigation: false };
-        }
-
-        if (!hasLocalIdentity) {
-          setMaintenance(false);
-          return { path: '/identity?mode=unlock', allowChatNavigation: false };
-        }
-
+        // Identity is now handled during login flow via password
+        // No separate identity screen needed
         setMaintenance(false);
-        return { path: '/home', allowChatNavigation: true };
+        // Go to (tabs) which contains the main app - index.tsx will handle further validation
+        return { path: '/(tabs)', allowChatNavigation: true };
       }
 
       setMaintenance(false);
+      // No token - show login screen at root index
       return { path: '/', allowChatNavigation: false };
     } catch {
       setMaintenance(true);
@@ -77,8 +66,16 @@ export default function RootLayout() {
 
   const extractWrapDateFromNotification = (response: Notifications.NotificationResponse | null) => {
     const data = response?.notification?.request?.content?.data as any;
-    if (!data || data?.type !== 'daily_wrap') return null;
-    return data?.date || data?.day || null;
+    if (!data) return null;
+    // Support both daily_wrap and monthly_wrap notification types
+    if (data?.type === 'daily_wrap') {
+      return data?.date || data?.day || null;
+    }
+    if (data?.type === 'monthly_wrap') {
+      // Monthly wrap uses month (YYYY-MM), convert to first day of month for route
+      return data?.month ? `${data.month}-01` : null;
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -105,11 +102,15 @@ export default function RootLayout() {
     bootstrapNavigation();
 
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('📱 Notification tap received:', JSON.stringify(response?.notification?.request?.content?.data));
       const chatId = extractChatIdFromNotification(response);
       const wrapDate = extractWrapDateFromNotification(response);
+      console.log('📱 Extracted - chatId:', chatId, 'wrapDate:', wrapDate);
       if (wrapDate) {
+        console.log('📱 Navigating to wrap:', `/wrap/${wrapDate}`);
         router.push(`/wrap/${wrapDate}` as any);
       } else if (chatId) {
+        console.log('📱 Navigating to chat:', `/chat/${chatId}`);
         router.push(`/chat/${chatId}`);
       }
     });
@@ -189,12 +190,12 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="index" />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="home" />
           <Stack.Screen name="register" />
           <Stack.Screen name="verify" />
           <Stack.Screen name="reset" />
           <Stack.Screen name="terms" />
-          <Stack.Screen name="identity" />
           <Stack.Screen name="maintenance" />
           <Stack.Screen name="update" />
           <Stack.Screen name="profile" />
@@ -205,8 +206,10 @@ export default function RootLayout() {
           <Stack.Screen name="settings/edit-profile" options={{ title: 'Edit Profile' }} />
           <Stack.Screen name="settings/privacy" options={{ title: 'Privacy' }} />
           <Stack.Screen name="settings/blocked-users" options={{ title: 'Blocked Users' }} />
+          <Stack.Screen name="settings/change-password" options={{ title: 'Change Password' }} />
           <Stack.Screen name="spotify/callback" />
           <Stack.Screen name="share/index" />
+          <Stack.Screen name="wrap/[date]" />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

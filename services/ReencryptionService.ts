@@ -96,6 +96,8 @@ class ReencryptionServiceClass {
         break;
       }
 
+      const envelopesToPost: Array<{ messageId: string; envelopes: any[] }> = [];
+
       for (const raw of messages) {
         const senderId = raw.senderId ?? raw.sender_id ?? raw.userId;
         if (!senderId || senderId.toString() !== currentUserId) {
@@ -138,22 +140,33 @@ class ReencryptionServiceClass {
             currentUserId,
           });
 
+          envelopesToPost.push({
+            messageId: String(raw.id ?? raw.messageId),
+            envelopes: [envelope],
+          });
+          appended += 1;
+        } catch (error) {
+          console.warn('[ReencryptionService] Failed to build envelope for message', raw.id, error);
+        }
+      }
+
+      if (envelopesToPost.length > 0) {
+        try {
           await ApiService.post(
-            '/keys/envelopes',
-            {
-              messageId: raw.id ?? raw.messageId,
-              envelopes: [envelope],
-            },
+            '/keys/envelopes/batch',
+            { envelopes: envelopesToPost },
             token
           );
-          appended += 1;
-          console.log('[ReencryptionService] Appended envelope', {
-            messageId: raw.id ?? raw.messageId,
-            targetUserId,
-            targetDeviceId,
+          console.log('[ReencryptionService] Posted batch of envelopes', {
+            count: envelopesToPost.length,
+            chatId,
           });
         } catch (error) {
-          console.warn('[ReencryptionService] Failed to append envelope for message', raw.id, error);
+          console.warn('[ReencryptionService] Failed to post envelope batch, falling back to sequential...', error);
+          // Fallback if batch endpoint doesn't exist yet
+          for (const item of envelopesToPost) {
+            await ApiService.post('/keys/envelopes', item, token).catch(() => null);
+          }
         }
       }
 
