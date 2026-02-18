@@ -166,13 +166,19 @@ export default function ChatsTab() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const response = await ChatService.deleteGroup(chat.id?.toString?.() ?? String(chat.id));
-            if (response.success) {
-              NotificationService.show('success', 'Group deleted');
-              DeviceEventEmitter.emit('chats:refresh');
-              loadChats();
-            } else {
-              NotificationService.show('error', response.error || 'Failed to delete group');
+            try {
+              const chatId = chat.id?.toString?.() ?? String(chat.id);
+              const response = await ChatService.deleteGroup(chatId);
+              if (response.success) {
+                NotificationService.show('success', 'Group deleted');
+                DeviceEventEmitter.emit('chats:refresh');
+                loadChats();
+              } else {
+                NotificationService.show('error', response.error || 'Failed to delete group');
+              }
+            } catch (error: any) {
+              console.error('Failed to delete group:', error);
+              NotificationService.show('error', error?.message || 'Failed to delete group');
             }
           },
         },
@@ -190,19 +196,24 @@ export default function ChatsTab() {
           text: 'Leave',
           style: 'destructive',
           onPress: async () => {
-            const chatId = chat.id?.toString?.() ?? String(chat.id);
-            const memberId = user?.id?.toString?.() ?? String(user?.id || '');
-            if (!memberId) {
-              NotificationService.show('error', 'Missing user context to leave group');
-              return;
-            }
-            const response = await ChatService.removeMember(chatId, memberId);
-            if (response.success) {
-              NotificationService.show('success', 'Left group');
-              DeviceEventEmitter.emit('chats:refresh');
-              loadChats();
-            } else {
-              NotificationService.show('error', response.error || 'Failed to leave group');
+            try {
+              const chatId = chat.id?.toString?.() ?? String(chat.id);
+              const memberId = user?.id?.toString?.() ?? String(user?.id || '');
+              if (!memberId) {
+                NotificationService.show('error', 'Missing user context to leave group');
+                return;
+              }
+              const response = await ChatService.removeMember(chatId, memberId);
+              if (response.success) {
+                NotificationService.show('success', 'Left group');
+                DeviceEventEmitter.emit('chats:refresh');
+                loadChats();
+              } else {
+                NotificationService.show('error', response.error || 'Failed to leave group');
+              }
+            } catch (error: any) {
+              console.error('Failed to leave group:', error);
+              NotificationService.show('error', error?.message || 'Failed to leave group');
             }
           },
         },

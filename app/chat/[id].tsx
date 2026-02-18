@@ -4999,11 +4999,10 @@ const ChatScreen: React.FC = () => {
   const hydratePollFromEncrypted = useCallback(
     async (messageId: string, poll: PollData) => {
       if (!poll?.encryptedPayload || !currentUserId || !chatId) return;
-      const attemptKey = `${messageId}:${poll.payloadVersion || 1}:${Array.isArray(poll.encryptedPayload) ? poll.encryptedPayload.length : 0}`;
+      const attemptKey = `${chatId}:${messageId}:${poll.payloadVersion || 1}:${Array.isArray(poll.encryptedPayload) ? poll.encryptedPayload.length : 0}`;
       if (pollDecryptAttemptedRef.current.has(attemptKey)) {
         return;
       }
-      pollDecryptAttemptedRef.current.add(attemptKey);
       const hasPlainText =
         typeof poll.question === 'string' &&
         poll.question.trim().length > 0 &&
@@ -5049,6 +5048,9 @@ const ChatScreen: React.FC = () => {
         if (!decoded) {
           return;
         }
+
+        // Mark as attempted only after successful decrypt/parse
+        pollDecryptAttemptedRef.current.add(attemptKey);
 
         setPollsData((prev) => {
           const existing = prev.get(messageId);
