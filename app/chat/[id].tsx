@@ -1156,24 +1156,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         </View>
       )}
       <View style={containerStyle}>
-        <Animated.View
-          style={[
-            styles.swipeContainer,
-            { transform: [{ translateX: swipeAnim }] },
-          ]}
-          {...panResponder.panHandlers}
-        >
-          {!isMine && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.replyHint,
-                { opacity: replyHintOpacity },
-              ]}
-            >
-              <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
-            </Animated.View>
-          )}
+        <View style={styles.bubbleWrapper}>
           <NativeContextMenu
             title={message.content ? undefined : 'Message'}
             actions={contextMenuActions || []}
@@ -1495,19 +1478,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
             </Pressable>
           </NativeContextMenu>
-          {isMine && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.replyHint,
-                styles.replyHintMine,
-                { opacity: replyHintOpacity },
-              ]}
-            >
-              <Ionicons name="return-down-back-outline" size={18} color="#ffffff" />
-            </Animated.View>
-          )}
-        </Animated.View>
+        </View>
       </View>
     </>
   );
@@ -7392,9 +7363,8 @@ const styles = StyleSheet.create({
   messageRowTheirs: {
     alignSelf: 'flex-start',
   },
-  swipeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  bubbleWrapper: {
+    flexDirection: 'column',
   },
   messageBubble: {
     paddingVertical: 10,
