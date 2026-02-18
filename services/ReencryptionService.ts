@@ -152,15 +152,23 @@ class ReencryptionServiceClass {
 
       if (envelopesToPost.length > 0) {
         try {
-          await ApiService.post(
+          const response = await ApiService.post(
             '/keys/envelopes/batch',
             { envelopes: envelopesToPost },
             token
           );
-          console.log('[ReencryptionService] Posted batch of envelopes', {
-            count: envelopesToPost.length,
-            chatId,
-          });
+          if (response.success) {
+            console.log('[ReencryptionService] Posted batch of envelopes', {
+              count: envelopesToPost.length,
+              chatId,
+            });
+          } else {
+            console.warn('[ReencryptionService] Batch post returned failure:', response);
+            // Fallback to sequential posting
+            for (const item of envelopesToPost) {
+              await ApiService.post('/keys/envelopes', item, token).catch(() => null);
+            }
+          }
         } catch (error) {
           console.warn('[ReencryptionService] Failed to post envelope batch, falling back to sequential...', error);
           // Fallback if batch endpoint doesn't exist yet

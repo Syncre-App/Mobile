@@ -239,7 +239,14 @@ async function decryptPrivateKeyWithPassword(
   iterations: number,
   password: string
 ): Promise<Uint8Array> {
-  const derivedKey = await derivePasswordKey(password, fromBase64(salt), iterations);
+  // Clamp iterations to safe range to prevent abusive CPU work
+  const MIN_ITERATIONS = 10000;
+  const MAX_ITERATIONS = 200000;
+  const clampedIterations = Math.max(MIN_ITERATIONS, Math.min(MAX_ITERATIONS, iterations));
+  if (clampedIterations !== iterations) {
+    console.warn(`[CryptoService] Iterations ${iterations} clamped to ${clampedIterations}`);
+  }
+  const derivedKey = await derivePasswordKey(password, fromBase64(salt), clampedIterations);
   const cipher = new XChaCha20Poly1305(derivedKey);
   
   const decrypted = cipher.open(fromBase64(nonce), fromBase64(encryptedPrivateKey));
