@@ -914,6 +914,7 @@ export const CryptoService = {
   async getBackupKey(): Promise<Uint8Array | null> {
     try {
       const keyBase64 = await SecureStore.getItemAsync(BACKUP_KEY_STORAGE);
+      console.log('[CryptoService] getBackupKey:', keyBase64 ? 'found' : 'not found');
       if (!keyBase64) {
         return null;
       }
