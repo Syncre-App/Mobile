@@ -145,8 +145,6 @@ interface Message {
   isEphemeral?: boolean;
   poll?: PollData | null;
   isPoll?: boolean;
-  isSkeleton?: boolean;
-  skeletonWidth?: number;
 }
 
 interface ChatParticipant {
@@ -2557,26 +2555,6 @@ const ChatScreen: React.FC = () => {
     [currentUserId, user?.profile_picture]
   );
 
-  // Generate skeleton messages for Discord-style loading
-  const generateSkeletonMessages = useCallback(
-    (count: number = 5): Message[] => {
-      const now = Date.now();
-      return Array.from({ length: count }, (_, i) => ({
-        id: `skeleton-${i}-${now}`,
-        senderId: i % 2 === 0 ? 'skeleton-left' : 'skeleton-right',
-        receiverId: '',
-        senderName: '',
-        senderAvatar: null,
-        content: '',
-        timestamp: new Date(now - (count - i) * 60_000).toISOString(),
-        isPlaceholder: true,
-        isSkeleton: true,
-        skeletonWidth: Math.random() * 150 + 100, // Random width between 100-250
-      })) as Message[];
-    },
-    []
-  );
-
   const ensureTypingStopped = useCallback(() => {
     if (!chatId) {
       return;
@@ -2784,10 +2762,6 @@ const ChatScreen: React.FC = () => {
   const loadMessagesForChat = useCallback(
     async (token: string, chatIdentifier: string, displayName: string, otherUserId?: string | null) => {
       try {
-        // Show skeleton messages while loading (Discord-style)
-        const skeletonMessages = generateSkeletonMessages(5);
-        setMessagesAnimated(() => skeletonMessages);
-
         const deviceIdentifier = deviceIdRef.current;
         const params = new URLSearchParams();
         params.set('limit', '20');
@@ -2800,21 +2774,7 @@ const ChatScreen: React.FC = () => {
         const rawMessages = response.success && Array.isArray(response.data?.messages) ? response.data.messages : [];
 
         if (!rawMessages.length) {
-          setMessagesAnimated((prev) => {
-            const optimistic = prev.filter(
-              (msg) =>
-                msg.senderId === currentUserId &&
-                !msg.isPlaceholder &&
-                (msg.status === 'sending' ||
-                  msg.status === 'sent' ||
-                  msg.status === 'delivered' ||
-                  msg.status === 'seen')
-            );
-            if (optimistic.length) {
-              return optimistic;
-            }
-            return generatePlaceholderMessages(displayName);
-          });
+          setMessages(generatePlaceholderMessages(displayName));
           setHasMore(false);
           nextCursorRef.current = null;
           initialLoadCompleteRef.current = true;
@@ -2850,35 +2810,8 @@ const ChatScreen: React.FC = () => {
         const cleaned = transformed.filter(Boolean);
         const sorted = sortMessagesChronologically(cleaned);
 
-        setMessagesWithoutAnimation((prev) => {
-          const existingIds = new Set(sorted.map((msg) => msg.id));
-          const localSending = prev.filter(
-            (msg) =>
-              msg.senderId === currentUserId &&
-              !msg.isPlaceholder &&
-              !existingIds.has(msg.id) &&
-              (msg.status === 'sending' ||
-                msg.status === 'sent' ||
-                msg.status === 'delivered' ||
-                msg.status === 'seen')
-          );
-          // Preserve existing decrypted content when the re-fetch returns fallback text
-          const prevById = new Map(prev.map((msg) => [msg.id, msg]));
-          const merged = sorted.map((msg) => {
-            const existing = prevById.get(msg.id);
-            if (
-              existing &&
-              existing.content &&
-              existing.content !== '[Encrypted message]' &&
-              existing.content !== '[Message unavailable]' &&
-              (msg.content === '[Encrypted message]' || msg.content === '[Message unavailable]' || msg.content === '')
-            ) {
-              return { ...msg, content: existing.content };
-            }
-            return msg;
-          });
-          return sortMessagesChronologically([...merged, ...localSending]);
-        });
+        // Simple load - no cache, no merge, just set the messages
+        setMessages(sorted);
         if (missingEnvelopeRef.current) {
           requestReencrypt('missing_history');
           promptIncompleteHistory();
@@ -2909,11 +2842,9 @@ const ChatScreen: React.FC = () => {
       }
     },
     [
-      currentUserId,
       generatePlaceholderMessages,
-      generateSkeletonMessages,
       scrollToBottom,
-      setMessagesAnimated,
+      setMessages,
       transformMessages,
       requestReencrypt,
     ]
@@ -6044,17 +5975,6 @@ const ChatScreen: React.FC = () => {
       const shouldShowTimestamp = isFirstInGroup && !messageItem.isPlaceholder;
       const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
-      // Render skeleton messages for Discord-style loading
-      if (messageItem.isSkeleton) {
-        return (
-          <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowTheirs]}>
-            <View style={[styles.skeletonBubble, isMine ? styles.skeletonBubbleMine : styles.skeletonBubbleTheirs, { width: messageItem.skeletonWidth || 200 }]}>
-              <View style={styles.skeletonContent} />
-            </View>
-          </View>
-        );
-      }
-
       // Render PollMessage for poll type messages
       if (messageItem.isPoll && messageItem.poll) {
         const pollDataEntry = pollsData.get(messageItem.id);
@@ -6572,7 +6492,7 @@ const ChatScreen: React.FC = () => {
               <FlatList
                 ref={flatListRef}
                 data={decoratedData}
-                extraData={isRemoteTyping}
+                extraData={{ isRemoteTyping, messagesLength: messages.length }}
                 keyExtractor={(item) => item.id}
                 renderItem={renderChatItem}
                 contentContainerStyle={styles.messageList}
@@ -6585,6 +6505,11 @@ const ChatScreen: React.FC = () => {
                 scrollEventThrottle={16}
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfigRef.current}
+                // iOS overlap fix: disable virtualization to prevent item layout corruption
+                removeClippedSubviews={Platform.OS !== 'ios'}
+                windowSize={21}
+                maxToRenderPerBatch={15}
+                updateCellsBatchingPeriod={30}
                 refreshControl={
                   <RefreshControl
                     tintColor="#2C82FF"
@@ -7644,28 +7569,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.4)',
     fontSize: 11,
     fontWeight: '500',
-  },
-  skeletonBubble: {
-    borderRadius: 16,
-    padding: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    minHeight: 40,
-  },
-  skeletonBubbleMine: {
-    alignSelf: 'flex-end',
-    borderBottomRightRadius: 4,
-    marginRight: 8,
-  },
-  skeletonBubbleTheirs: {
-    alignSelf: 'flex-start',
-    borderBottomLeftRadius: 4,
-    marginLeft: 8,
-  },
-  skeletonContent: {
-    height: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 4,
-    width: '100%',
   },
   dateDivider: {
     flexDirection: 'row',
