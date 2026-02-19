@@ -5983,6 +5983,15 @@ const ChatScreen: React.FC = () => {
       const shouldShowTimestamp = isFirstInGroup && !messageItem.isPlaceholder;
       const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
+      // Group timestamp - shown above the first message of each group
+      const groupTimestamp = isFirstInGroup && !messageItem.isPlaceholder ? (
+        <View style={[styles.groupTimestampContainer, isMine ? styles.groupTimestampContainerMine : styles.groupTimestampContainerTheirs]}>
+          <Text style={styles.groupTimestampText}>
+            {formatTimestamp(parseDate(messageItem.timestamp))}
+          </Text>
+        </View>
+      ) : null;
+
       // Render PollMessage for poll type messages
       if (messageItem.isPoll && messageItem.poll) {
         const pollDataEntry = pollsData.get(messageItem.id);
@@ -5998,28 +6007,22 @@ const ChatScreen: React.FC = () => {
         ];
 
         return (
-          <View style={pollContainerStyle}>
-            <PollMessage
-              key={messageItem.id}
-              poll={poll}
-              userVotes={userVotes}
-              onVote={(optionId) => handlePollVote(messageItem.id, poll.id, optionId)}
-              onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, poll.id, optionId)}
-              onClose={() => handleClosePoll(messageItem.id, poll.id)}
-              isCreator={isCreator}
-            />
+          <View key={messageItem.id} style={styles.messageGroupWrapper}>
+            {groupTimestamp}
+            <View style={pollContainerStyle}>
+              <PollMessage
+                key={messageItem.id}
+                poll={poll}
+                userVotes={userVotes}
+                onVote={(optionId) => handlePollVote(messageItem.id, poll.id, optionId)}
+                onRemoveVote={(optionId) => handlePollRemoveVote(messageItem.id, poll.id, optionId)}
+                onClose={() => handleClosePoll(messageItem.id, poll.id)}
+                isCreator={isCreator}
+              />
+            </View>
           </View>
         );
       }
-
-      // Group timestamp - shown above the first message of each group
-      const groupTimestamp = isFirstInGroup && !messageItem.isPlaceholder ? (
-        <View style={[styles.groupTimestampContainer, isMine ? styles.groupTimestampContainerMine : styles.groupTimestampContainerTheirs]}>
-          <Text style={styles.groupTimestampText}>
-            {formatTimestamp(parseDate(messageItem.timestamp))}
-          </Text>
-        </View>
-      ) : null;
 
       return (
         <View key={messageItem.id} style={styles.messageGroupWrapper}>
@@ -7311,10 +7314,9 @@ const styles = StyleSheet.create({
   },
   messageRowWithReply: {
     marginTop: 6,
-    marginBottom: 4,
   },
   messageRowWithReactions: {
-    marginBottom: 4,
+    marginTop: 4,
   },
   messageRowMedia: {
     maxWidth: '100%',
@@ -7515,14 +7517,14 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
     alignSelf: 'flex-end',
-    marginTop: 0,
+    marginTop: 2,
   },
   seenReceiptRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 4,
-    marginTop: 2,
+    marginTop: 4,
   },
   seenReceiptAvatar: {
     borderWidth: 1,
@@ -7562,8 +7564,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   groupTimestampContainer: {
-    marginBottom: 2,
-    marginTop: 6,
+    marginBottom: 4,
+    marginTop: 12,
   },
   groupTimestampContainerMine: {
     alignSelf: 'flex-end',
