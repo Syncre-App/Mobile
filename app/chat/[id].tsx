@@ -7515,14 +7515,14 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
     alignSelf: 'flex-end',
-    marginTop: 2,
+    marginTop: 0,
   },
   seenReceiptRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 4,
-    marginTop: 4,
+    marginTop: 2,
   },
   seenReceiptAvatar: {
     borderWidth: 1,
@@ -7562,16 +7562,16 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   groupTimestampContainer: {
-    marginBottom: 4,
-    marginTop: 8,
+    marginBottom: 2,
+    marginTop: 6,
   },
   groupTimestampContainerMine: {
     alignSelf: 'flex-end',
-    marginRight: 12,
+    marginRight: 4,
   },
   groupTimestampContainerTheirs: {
     alignSelf: 'flex-start',
-    marginLeft: 12,
+    marginLeft: 4,
   },
   groupTimestampText: {
     color: 'rgba(255, 255, 255, 0.4)',
@@ -7626,8 +7626,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    marginTop: 10,
-    marginBottom: 14,
+    marginTop: 6,
+    marginBottom: 10,
     gap: 10,
   },
   typingBubble: {
@@ -7827,8 +7827,8 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   threadSummaryButton: {
-    marginTop: 8,
-    marginBottom: 4,
+    marginTop: 4,
+    marginBottom: 2,
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
