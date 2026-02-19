@@ -5979,12 +5979,19 @@ const ChatScreen: React.FC = () => {
         !nextMessage || nextMessage.senderId !== messageItem.senderId || !!nextMessage.isPlaceholder || !!nextMessage.replyTo;
 
       const shouldShowStatus = lastOutgoingMessageId === messageItem.id && isMine && Boolean(messageItem.status);
-      // Show timestamp only on the first message of each group (no tap required)
       const shouldShowTimestamp = isFirstInGroup && !messageItem.isPlaceholder;
       const replyCount = replyCounts.get(messageItem.id) ?? 0;
 
-      // Group timestamp - shown above the first message of each group
-      const groupTimestamp = isFirstInGroup && !messageItem.isPlaceholder ? (
+      // Show group timestamp only when 5+ minutes passed since previous message
+      const shouldShowGroupTimestamp = (() => {
+        if (messageItem.isPlaceholder) return false;
+        if (!previousMessage) return true;
+        const prevTime = parseDate(previousMessage.timestamp).getTime();
+        const currTime = parseDate(messageItem.timestamp).getTime();
+        return currTime - prevTime >= 5 * 60 * 1000;
+      })();
+
+      const groupTimestamp = shouldShowGroupTimestamp ? (
         <View style={[styles.groupTimestampContainer, isMine ? styles.groupTimestampContainerMine : styles.groupTimestampContainerTheirs]}>
           <Text style={styles.groupTimestampText}>
             {formatTimestamp(parseDate(messageItem.timestamp))}
