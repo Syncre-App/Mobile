@@ -1064,6 +1064,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         : styles.theirBubbleStacked),
     message.isPlaceholder && styles.placeholderBubble,
     message.replyTo && styles.messageBubbleWithReply,
+    hasContent && !isMediaOnlyMessage && !isFileOnlyMessage && styles.messageBubbleWithContent,
   ];
   const handleAttachmentPress = useCallback(
     (event: GestureResponderEvent, attachment: MessageAttachment, siblings?: MessageAttachment[]) => {
@@ -7371,6 +7372,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   messageBubbleWithReply: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  messageBubbleWithContent: {
     alignSelf: 'stretch',
     width: '100%',
   },
