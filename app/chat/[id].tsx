@@ -4556,6 +4556,16 @@ const ChatScreen: React.FC = () => {
     const attachmentIds = attachmentsSnapshot
       .map((attachment) => attachment.id)
       .filter((id) => /^\d+$/.test(id));
+    // Use the latest message timestamp + 1ms to ensure optimistic message appears at the end
+    // This prevents existing messages (including polls) from "jumping" due to time sync issues
+    const lastMessageTimestamp = messages.length > 0 
+      ? messages[messages.length - 1].timestamp 
+      : new Date().toISOString();
+    const optimisticTimestamp = new Date(Math.max(
+      new Date(lastMessageTimestamp).getTime() + 1,
+      Date.now()
+    )).toISOString();
+
     const optimisticMessage: Message = {
       id: temporaryId,
       senderId: currentUserId,
@@ -4564,7 +4574,7 @@ const ChatScreen: React.FC = () => {
       senderAvatar: user?.profile_picture || null,
       senderBadges: [],
       content: trimmedMessage,
-      timestamp: new Date().toISOString(),
+      timestamp: optimisticTimestamp,
       status: 'sending',
       replyTo: normalizedReply,
       attachments: attachmentsSnapshot,
