@@ -39,7 +39,8 @@ class CallService {
     if (this.callKeepInitialized) return;
 
     try {
-      await CallKeep.setup(CALL_KEEP_OPTIONS as any);
+      const result = await CallKeep.setup(CALL_KEEP_OPTIONS as any);
+      console.log('[CallService] CallKeep setup result:', result);
       CallKeep.setAvailable(true);
 
       this.setupCallKeepEvents();
@@ -149,22 +150,15 @@ class CallService {
         });
       }
 
-      // Show outgoing call UI via CallKeep (wrapped in try-catch to prevent crashes)
-      try {
-        if (Platform.OS === 'ios') {
-          // iOS: startCall(uuid, handle, contactIdentifier, handleType, hasVideo)
-          (CallKeep as any).startCall(
-            callId,
-            'Syncre User', // handle - needs to be a phone number or identifier
-            'Syncre', // contactIdentifier
-            'generic', // handleType
-            callType === 'video' // hasVideo
-          );
-        } else if (Platform.OS === 'android') {
+      // Note: CallKeep.startCall() crashes on iOS without PushKit/VoIP push setup
+      // Only use CallKeep for incoming calls (displayIncomingCall)
+      // For outgoing calls, rely on the in-app call UI via CallScreen
+      if (Platform.OS === 'android') {
+        try {
           (CallKeep as any).startCall(callId, 'Syncre', 'Syncre Call');
+        } catch (callKeepError) {
+          console.warn('[CallService] CallKeep startCall failed:', callKeepError);
         }
-      } catch (callKeepError) {
-        console.warn('[CallService] CallKeep startCall failed:', callKeepError);
       }
 
       console.log('[CallService] Call initiated:', callId);
