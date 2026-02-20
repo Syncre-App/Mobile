@@ -17,6 +17,9 @@ export interface CallSession {
   participants: CallParticipant[];
   startedAt?: Date;
   isE2EEnabled?: boolean;
+  isGroupCall?: boolean;
+  isScreenSharing?: boolean;
+  chatName?: string;
 }
 
 const CALL_KEEP_OPTIONS = {
@@ -285,6 +288,52 @@ class CallService {
       });
     }
     return isMuted;
+  }
+
+  async startScreenShare(): Promise<boolean> {
+    try {
+      const screenStream = await webRTCService.startScreenShare();
+      if (!screenStream) {
+        return false;
+      }
+
+      webRTCService.addScreenShareTrack(screenStream);
+
+      if (this.currentSession) {
+        this.currentSession.isScreenSharing = true;
+        this.notifyListeners();
+      }
+
+      if (this.wsService) {
+        this.wsService.send({
+          type: 'call_screen_share',
+          callId: this.currentSession?.callId,
+          action: 'started',
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[CallService] Error starting screen share:', error);
+      return false;
+    }
+  }
+
+  stopScreenShare(): void {
+    webRTCService.stopScreenShare();
+
+    if (this.currentSession) {
+      this.currentSession.isScreenSharing = false;
+      this.notifyListeners();
+    }
+
+    if (this.wsService) {
+      this.wsService.send({
+        type: 'call_screen_share',
+        callId: this.currentSession?.callId,
+        action: 'stopped',
+      });
+    }
   }
 
   toggleVideo(): boolean {

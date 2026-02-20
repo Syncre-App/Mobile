@@ -1,22 +1,58 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, Dimensions, Animated, ScrollView, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, Animated, ScrollView, SafeAreaView, StatusBar, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RTCView, mediaStream } from 'react-native-webrtc';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { callService, CallSession } from '../services/CallService';
-import { webRTCService } from '../services/WebRTCService';
+import { webRTCService, CallParticipant } from '../services/WebRTCService';
 import { useCall } from '../hooks/useCall';
 
 const { width, height } = Dimensions.get('window');
+
+const ParticipantTile: React.FC<{ participant: CallParticipant; isLocal?: boolean; isMuted?: boolean }> = ({
+  participant,
+  isLocal = false,
+  isMuted = false,
+}) => {
+  const [showName, setShowName] = useState(true);
+
+  return (
+    <View style={styles.participantTile}>
+      {participant.stream ? (
+        <RTCView
+          streamURL={participant.stream.toURL()}
+          style={styles.participantVideo}
+          objectFit="cover"
+          mirror={isLocal}
+        />
+      ) : (
+        <View style={styles.participantPlaceholder}>
+          <Ionicons name="person" size={40} color="rgba(255,255,255,0.3)" />
+        </View>
+      )}
+      
+      <View style={styles.participantOverlay}>
+        {participant.isMuted && (
+          <View style={styles.mutedIndicator}>
+            <Ionicons name="mic-off" size={14} color="#FFFFFF" />
+          </View>
+        )}
+        <Text style={styles.participantName} numberOfLines={1}>
+          {isLocal ? 'You' : participant.userId}
+        </Text>
+      </View>
+    </View>
+  );
+};
 
 export const CallScreen: React.FC = () => {
   const { currentSession, endCall, toggleMute, toggleVideo, switchCamera } = useCall();
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
-  const [participants, setParticipants] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<CallParticipant[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -25,13 +61,17 @@ export const CallScreen: React.FC = () => {
       timerRef.current = setInterval(() => {
         setCallDuration((prev) => prev + 1);
       }, 1000);
-    }
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
+      const interval = setInterval(() => {
+        const parts = Array.from(webRTCService.getParticipants().values());
+        setParticipants(parts);
+      }, 1000);
+
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        clearInterval(interval);
+      };
+    }
   }, [currentSession?.status]);
 
   useEffect(() => {
@@ -93,6 +133,17 @@ export const CallScreen: React.FC = () => {
     await switchCamera();
   };
 
+  const handleScreenShare = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (isScreenSharing) {
+      webRTCService.stopScreenShare();
+      setIsScreenSharing(false);
+    } else {
+      const success = await webRTCService.startScreenShare();
+      setIsScreenSharing(!!success);
+    }
+  };
+
   if (!currentSession) {
     return (
       <View style={styles.container}>
@@ -106,94 +157,99 @@ export const CallScreen: React.FC = () => {
   const isRinging = currentSession.status === 'ringing' || currentSession.status === 'calling';
 
   const localStream = webRTCService.getLocalStream();
+  const remoteStreams = webRTCService.getRemoteStreams();
+  
+  const allParticipants: CallParticipant[] = [
+    { id: 'local', userId: 'You', stream: localStream || null, isMuted, isVideoEnabled: isVideoEnabled },
+    ...participants,
+  ];
+
+  const getGridLayout = (count: number) => {
+    if (count === 1) return { cols: 1, rows: 1 };
+    if (count === 2) return { cols: 2, rows: 1 };
+    if (count <= 4) return { cols: 2, rows: 2 };
+    if (count <= 6) return { cols: 3, rows: 2 };
+    if (count <= 9) return { cols: 3, rows: 3 };
+    return { cols: 4, rows: Math.ceil(count / 4) };
+  };
+
+  const { cols, rows } = getGridLayout(allParticipants.length);
+  const tileWidth = (width - 32 - (cols - 1) * 8) / cols;
+  const tileHeight = tileWidth * 1.3;
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={handleEndCall} style={styles.backButton}>
           <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
         </Pressable>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle}>
-            {isVideo ? 'Video Call' : 'Voice Call'}
+            {currentSession.chatName || (isVideo ? 'Video Call' : 'Voice Call')}
           </Text>
           {isConnected && (
-            <Text style={styles.durationText}>{formatDuration(callDuration)}</Text>
+            <Text style={styles.durationText}>
+              {formatDuration(callDuration)} • {allParticipants.length} participant{allParticipants.length !== 1 ? 's' : ''}
+            </Text>
           )}
         </View>
         <View style={styles.headerRight} />
       </View>
 
-      {/* Main content */}
       <View style={styles.content}>
         {isConnected ? (
           <>
-            {/* Remote video / participant grid */}
             {isVideo ? (
-              <View style={styles.videoContainer}>
-                {participants.length > 0 ? (
-                  <ScrollView horizontal pagingEnabled>
-                    {participants.map((participant) => (
-                      <View key={participant.id} style={styles.remoteVideo}>
-                        <View style={styles.videoPlaceholder}>
-                          <Ionicons name="person" size={64} color="rgba(255,255,255,0.3)" />
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                ) : (
-                  <View style={styles.remoteVideo}>
-                    <View style={styles.videoPlaceholder}>
-                      <Ionicons name="person" size={80} color="rgba(255,255,255,0.3)" />
+              <ScrollView 
+                contentContainerStyle={styles.gridContainer}
+                horizontal={false}
+                pagingEnabled={false}
+              >
+                <View style={[styles.grid, { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }]}>
+                  {allParticipants.map((participant, index) => (
+                    <View 
+                      key={participant.id} 
+                      style={[
+                        styles.tile, 
+                        { width: tileWidth, height: tileHeight }
+                      ]}
+                    >
+                      <ParticipantTile 
+                        participant={participant} 
+                        isLocal={participant.id === 'local'}
+                        isMuted={participant.isMuted}
+                      />
                     </View>
+                  ))}
+                </View>
+              </ScrollView>
+            ) : (
+              <FlatList
+                data={allParticipants}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <View style={styles.voiceParticipant}>
+                    <View style={styles.voiceAvatar}>
+                      <Ionicons name="person" size={32} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.voiceName}>
+                      {item.id === 'local' ? 'You' : item.userId}
+                    </Text>
+                    {item.isMuted && (
+                      <Ionicons name="mic-off" size={16} color="#FF3B30" />
+                    )}
                   </View>
                 )}
-              </View>
-            ) : (
-              /* Voice call - show avatar */
-              <View style={styles.voiceContainer}>
-                <Animated.View 
-                  style={[
-                    styles.avatarWrapper,
-                    { transform: [{ scale: isRinging ? pulseAnim : 1 }] }
-                  ]}
-                >
-                  <View style={styles.avatar}>
-                    <Ionicons name="person" size={80} color="#FFFFFF" />
-                  </View>
-                </Animated.View>
-                <Text style={styles.participantName}>
-                  {currentSession.participants[0]?.id || 'User'}
-                </Text>
-                <Text style={styles.callStatus}>
-                  {isConnected ? 'Connected' : 'Connecting...'}
-                </Text>
-              </View>
-            )}
-
-            {/* Local video preview (PiP) */}
-            {isVideo && isVideoEnabled && localStream && (
-              <View style={styles.localVideo}>
-                <RTCView
-                  streamURL={localStream.toURL()}
-                  style={styles.localVideoInner}
-                  objectFit="cover"
-                  mirror={true}
-                />
-              </View>
+                contentContainerStyle={styles.voiceList}
+              />
             )}
           </>
         ) : (
-          /* Ringing state */
           <View style={styles.ringingContainer}>
             <Animated.View 
-              style={[
-                styles.avatarWrapper,
-                { transform: [{ scale: pulseAnim }] }
-              ]}
+              style={[styles.avatarWrapper, { transform: [{ scale: pulseAnim }] }]}
             >
               <View style={styles.avatar}>
                 <Ionicons name="person" size={80} color="#FFFFFF" />
@@ -206,11 +262,9 @@ export const CallScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Controls */}
       <View style={styles.controls}>
         {isConnected && (
           <>
-            {/* Mute */}
             <Pressable
               style={[styles.controlButton, isMuted && styles.controlButtonActive]}
               onPress={handleMute}
@@ -222,7 +276,6 @@ export const CallScreen: React.FC = () => {
               />
             </Pressable>
 
-            {/* Video toggle (only for video calls) */}
             {isVideo && (
               <Pressable
                 style={[styles.controlButton, !isVideoEnabled && styles.controlButtonActive]}
@@ -236,7 +289,6 @@ export const CallScreen: React.FC = () => {
               </Pressable>
             )}
 
-            {/* Speaker */}
             <Pressable
               style={[styles.controlButton, isSpeakerOn && styles.controlButtonActive]}
               onPress={handleSpeaker}
@@ -248,8 +300,20 @@ export const CallScreen: React.FC = () => {
               />
             </Pressable>
 
-            {/* Switch camera */}
-            {isVideo && isVideoEnabled && (
+            {isVideo && (
+              <Pressable
+                style={[styles.controlButton, isScreenSharing && styles.screenShareButton]}
+                onPress={handleScreenShare}
+              >
+                <Ionicons 
+                  name={isScreenSharing ? 'tv' : 'tv-outline'} 
+                  size={24} 
+                  color="#FFFFFF" 
+                />
+              </Pressable>
+            )}
+
+            {isVideo && (
               <Pressable
                 style={styles.controlButton}
                 onPress={handleSwitchCamera}
@@ -260,7 +324,6 @@ export const CallScreen: React.FC = () => {
           </>
         )}
 
-        {/* End call */}
         <Pressable
           style={[styles.controlButton, styles.endCallButton]}
           onPress={handleEndCall}
@@ -305,28 +368,83 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  videoContainer: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+  gridContainer: {
+    padding: 16,
   },
-  remoteVideo: {
-    width: width,
-    height: height * 0.5,
+  grid: {
+    justifyContent: 'flex-start',
+  },
+  tile: {
+    borderRadius: 12,
+    overflow: 'hidden',
     backgroundColor: '#1a1a2e',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  videoPlaceholder: {
+  participantTile: {
+    flex: 1,
+  },
+  participantVideo: {
+    flex: 1,
+  },
+  participantPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#2a2a3e',
   },
-  voiceContainer: {
+  participantOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  mutedIndicator: {
+    backgroundColor: 'rgba(255, 59, 48, 0.8)',
+    borderRadius: 10,
+    padding: 4,
+  },
+  participantName: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    flex: 1,
+    marginLeft: 4,
+  },
+  voiceList: {
+    padding: 16,
+  },
+  voiceParticipant: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  voiceAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(30, 132, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  voiceName: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  ringingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   avatarWrapper: {
@@ -342,56 +460,31 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: 'rgba(30, 132, 255, 0.5)',
   },
-  participantName: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginTop: 16,
-  },
-  callStatus: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.6)',
-    marginTop: 8,
-  },
-  ringingContainer: {
-    alignItems: 'center',
-  },
   ringingText: {
     fontSize: 18,
     color: 'rgba(255,255,255,0.7)',
-    marginTop: 20,
-  },
-  localVideo: {
-    position: 'absolute',
-    top: 100,
-    right: 16,
-    width: 100,
-    height: 140,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#2a2a3e',
-  },
-  localVideoInner: {
-    flex: 1,
   },
   controls: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 30,
-    gap: 20,
+    gap: 12,
     paddingBottom: 50,
   },
   controlButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   controlButtonActive: {
     backgroundColor: 'rgba(255, 59, 48, 0.8)',
+  },
+  screenShareButton: {
+    backgroundColor: 'rgba(52, 199, 89, 0.8)',
   },
   endCallButton: {
     width: 64,

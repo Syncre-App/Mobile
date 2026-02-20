@@ -6,21 +6,19 @@ import {
   mediaDevices,
   MediaStream,
   MediaStreamTrack,
-  AudioVideoFacade,
-  RTCRtpSender,
-  RTCRtpReceiver,
 } from 'react-native-webrtc';
-import { e2eEncryptionService } from './E2EEncryptionService';
-import { sframeManager } from './SFrameManager';
 
 export type CallType = 'audio' | 'video';
 export type CallStatus = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended';
 
 export interface CallParticipant {
   id: string;
+  userId: string;
   stream: MediaStream | null;
   isMuted: boolean;
   isVideoEnabled: boolean;
+  isScreenSharing?: boolean;
+  audioLevel?: number;
 }
 
 export interface CallState {
@@ -30,10 +28,12 @@ export interface CallState {
   callType: CallType;
   participants: Map<string, CallParticipant>;
   localStream: MediaStream | null;
+  screenStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
   isMuted: boolean;
   isVideoEnabled: boolean;
   isSpeakerOn: boolean;
+  isScreenSharing: boolean;
 }
 
 const ICE_SERVERS = [
@@ -42,12 +42,98 @@ const ICE_SERVERS = [
   { urls: 'stun:stun2.l.google.com:19302' },
 ];
 
+class ScreenShareService {
+  private screenStream: MediaStream | null = null;
+  private isSharing: boolean = false;
+
+  async startScreenShare(): Promise<MediaStream | null> {
+    try {
+      if (Platform.OS === 'ios') {
+        // iOS requires native implementation for screen capture
+        // For now, use front camera as placeholder
+        console.log('[ScreenShare] iOS screen share not fully implemented');
+        return null;
+      }
+
+      if (Platform.OS === 'android') {
+        const hasPermissions = await this.requestAndroidPermissions();
+        if (!hasPermissions) {
+          Alert.alert('Permission Required', 'Screen capture permission is required');
+          return null;
+        }
+      }
+
+      const stream = await (mediaDevices as any).getDisplayMedia({
+        video: {
+          cursor: 'always',
+          displaySurface: 'monitor',
+        },
+        audio: false,
+      });
+
+      this.screenStream = stream as MediaStream;
+      this.isSharing = true;
+
+      // Handle stream ended event
+      this.screenStream.getVideoTracks()[0].onended = () => {
+        this.stopScreenShare();
+      };
+
+      return this.screenStream;
+    } catch (error) {
+      console.error('[ScreenShare] Error starting screen share:', error);
+      return null;
+    }
+  }
+
+  private async requestAndroidPermissions(): Promise<boolean> {
+    if (Platform.OS !== 'android') return true;
+
+    try {
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: 'Screen Capture Permission',
+          message: 'Syncre needs screen capture permission to share your screen',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+      return result === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  stopScreenShare(): void {
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach((track: MediaStreamTrack) => {
+        track.stop();
+      });
+      this.screenStream = null;
+    }
+    this.isSharing = false;
+  }
+
+  getScreenStream(): MediaStream | null {
+    return this.screenStream;
+  }
+
+  isScreenSharing(): boolean {
+    return this.isSharing;
+  }
+}
+
+export const screenShareService = new ScreenShareService();
+
 class WebRTCService {
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
   private remoteStreams: Map<string, MediaStream> = new Map();
   private onRemoteStream: ((userId: string, stream: MediaStream | null) => void) | null = null;
   private onConnectionStateChange: ((state: string) => void) | null = null;
+  private participants: Map<string, CallParticipant> = new Map();
 
   async requestPermissions(): Promise<boolean> {
     if (Platform.OS === 'ios') {
@@ -152,6 +238,21 @@ class WebRTCService {
       if (streams && streams[0]) {
         const userId = streams[0].id || 'unknown';
         this.remoteStreams.set(userId, streams[0]);
+        
+        // Update participant info
+        if (this.participants.has(userId)) {
+          const participant = this.participants.get(userId)!;
+          participant.stream = streams[0];
+        } else {
+          this.participants.set(userId, {
+            id: userId,
+            userId,
+            stream: streams[0],
+            isMuted: false,
+            isVideoEnabled: true,
+          });
+        }
+        
         if (this.onRemoteStream) {
           this.onRemoteStream(userId, streams[0]);
         }
@@ -183,36 +284,35 @@ class WebRTCService {
     return this.peerConnection;
   }
 
-  async enableE2EEncryption(userId: string): Promise<boolean> {
-    try {
-      await e2eEncryptionService.generateKey();
-      
-      console.log('[WebRTC] E2E encryption enabled');
-      return true;
-    } catch (error) {
-      console.error('[WebRTC] Failed to enable E2E encryption:', error);
-      return false;
+  addScreenShareTrack(screenStream: MediaStream): void {
+    if (this.peerConnection && screenStream) {
+      const videoTrack = screenStream.getVideoTracks()[0];
+      if (videoTrack) {
+        const sender = this.peerConnection.getSenders().find((s) => 
+          s.track?.kind === 'video'
+        );
+        if (sender) {
+          sender.replaceTrack(videoTrack);
+        }
+      }
     }
   }
 
-  disableE2EEncryption(): void {
-    e2eEncryptionService.clearKeys();
-    sframeManager.reset();
-    console.log('[WebRTC] E2E encryption disabled');
-  }
-
-  getE2EKeyForSharing(): Promise<ArrayBuffer | null> {
-    const keyId = e2eEncryptionService.getCurrentKeyId();
-    if (!keyId) return Promise.resolve(null);
-    return e2eEncryptionService.exportKey(keyId);
-  }
-
-  async importE2EKey(keyId: string, keyData: ArrayBuffer): Promise<boolean> {
-    return e2eEncryptionService.importKey(keyId, keyData);
+  removeScreenShareTrack(): void {
+    if (this.peerConnection && this.localStream) {
+      const videoTrack = this.localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        const sender = this.peerConnection.getSenders().find((s) => 
+          s.track?.kind === 'video'
+        );
+        if (sender) {
+          sender.replaceTrack(videoTrack);
+        }
+      }
+    }
   }
 
   private handleIceCandidate(candidate: RTCIceCandidate): void {
-    // Will be implemented with signaling
     console.log('ICE Candidate:', candidate);
   }
 
@@ -313,6 +413,15 @@ class WebRTCService {
     }
   }
 
+  async startScreenShare(): Promise<MediaStream | null> {
+    return await screenShareService.startScreenShare();
+  }
+
+  stopScreenShare(): void {
+    screenShareService.stopScreenShare();
+    this.removeScreenShareTrack();
+  }
+
   getLocalStream(): MediaStream | null {
     return this.localStream;
   }
@@ -321,18 +430,40 @@ class WebRTCService {
     return this.remoteStreams;
   }
 
+  getParticipants(): Map<string, CallParticipant> {
+    return this.participants;
+  }
+
+  addParticipant(participant: CallParticipant): void {
+    this.participants.set(participant.id, participant);
+  }
+
+  removeParticipant(participantId: string): void {
+    this.participants.delete(participantId);
+    this.remoteStreams.delete(participantId);
+  }
+
+  updateParticipant(participantId: string, updates: Partial<CallParticipant>): void {
+    const participant = this.participants.get(participantId);
+    if (participant) {
+      this.participants.set(participantId, { ...participant, ...updates });
+    }
+  }
+
   closePeerConnection(): void {
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;
     }
     this.remoteStreams.clear();
+    this.participants.clear();
     this.onRemoteStream = null;
     this.onConnectionStateChange = null;
   }
 
   cleanup(): void {
     this.stopLocalStream();
+    screenShareService.stopScreenShare();
     this.closePeerConnection();
   }
 }
