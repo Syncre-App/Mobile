@@ -323,6 +323,7 @@ PODS:
   - hermes-engine (0.81.5):
     - hermes-engine/Pre-built (= 0.81.5)
   - hermes-engine/Pre-built (0.81.5)
+  - JitsiWebRTC (124.0.2)
   - libavif/core (0.11.1)
   - libavif/libdav1d (0.11.1):
     - libavif/core
@@ -1712,6 +1713,9 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-webrtc (124.0.7):
+    - JitsiWebRTC (~> 124.0.0)
+    - React-Core
   - React-NativeModulesApple (0.81.5):
     - hermes-engine
     - React-callinvoker
@@ -2062,6 +2066,8 @@ PODS:
     - React-utils (= 0.81.5)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.81.5)
+  - RNCallKeep (4.3.16):
+    - React
   - RNCAsyncStorage (2.2.0):
     - hermes-engine
     - RCTRequired
@@ -2084,7 +2090,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RNDateTimePicker (8.4.4):
+  - RNDateTimePicker (8.6.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2339,6 +2345,7 @@ DEPENDENCIES:
   - "react-native-blur (from `../node_modules/.pnpm/@react-native-community+blur@4.4.1_react-native@0.81.5_@babel+core@7.28.5_@types+react@_392508d419faba77a03cb214aa89b3ed/node_modules/@react-native-community/blur`)"
   - "react-native-context-menu-view (from `../node_modules/.pnpm/react-native-context-menu-view@1.21.0_react-native@0.81.5_@babel+core@7.28.5_@types+rea_71ba0f4198aa6048580d129c79161b75/node_modules/react-native-context-menu-view`)"
   - "react-native-safe-area-context (from `../node_modules/.pnpm/react-native-safe-area-context@5.6.2_react-native@0.81.5_@babel+core@7.28.5_@types+reac_af391ae54fcf764d6174d128987d859a/node_modules/react-native-safe-area-context`)"
+  - "react-native-webrtc (from `../node_modules/.pnpm/react-native-webrtc@124.0.7_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/react-native-webrtc`)"
   - "React-NativeModulesApple (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)"
   - "React-oscompat (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/oscompat`)"
   - "React-perflogger (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/reactperflogger`)"
@@ -2370,8 +2377,9 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - "ReactCommon/turbomodule/core (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon`)"
   - "ReactNativeDependencies (from `../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)"
+  - "RNCallKeep (from `../node_modules/.pnpm/react-native-callkeep@4.3.16_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/react-native-callkeep`)"
   - "RNCAsyncStorage (from `../node_modules/.pnpm/@react-native-async-storage+async-storage@2.2.0_react-native@0.81.5_@babel+core@7.28.5__2ad3ca87d21b6e959729e8babddf2871/node_modules/@react-native-async-storage/async-storage`)"
-  - "RNDateTimePicker (from `../node_modules/.pnpm/@react-native-community+datetimepicker@8.4.4_expo@54.0.33_react-native@0.81.5_@babel+co_9e12b734ad51ce1ec490150e1988c69a/node_modules/@react-native-community/datetimepicker`)"
+  - "RNDateTimePicker (from `../node_modules/.pnpm/@react-native-community+datetimepicker@8.6.0_expo@54.0.33_react-native@0.81.5_@babel+co_cb102aa2be031a23fca4e6ff5436b5c0/node_modules/@react-native-community/datetimepicker`)"
   - "RNGestureHandler (from `../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.28.5_@types+react_6878821a9d189a2f0ab87558d9bf061a/node_modules/react-native-gesture-handler`)"
   - "RNReactNativeSharedGroupPreferences (from `../node_modules/.pnpm/react-native-shared-group-preferences@1.1.24_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/react-native-shared-group-preferences`)"
   - "RNScreens (from `../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-screens`)"
@@ -2381,6 +2389,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - JitsiWebRTC
     - libavif
     - libdav1d
     - libwebp
@@ -2551,6 +2560,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/react-native-context-menu-view@1.21.0_react-native@0.81.5_@babel+core@7.28.5_@types+rea_71ba0f4198aa6048580d129c79161b75/node_modules/react-native-context-menu-view"
   react-native-safe-area-context:
     :path: "../node_modules/.pnpm/react-native-safe-area-context@5.6.2_react-native@0.81.5_@babel+core@7.28.5_@types+reac_af391ae54fcf764d6174d128987d859a/node_modules/react-native-safe-area-context"
+  react-native-webrtc:
+    :path: "../node_modules/.pnpm/react-native-webrtc@124.0.7_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/react-native-webrtc"
   React-NativeModulesApple:
     :path: "../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios"
   React-oscompat:
@@ -2613,10 +2624,12 @@ EXTERNAL SOURCES:
     :path: "../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon"
   ReactNativeDependencies:
     :podspec: "../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
+  RNCallKeep:
+    :path: "../node_modules/.pnpm/react-native-callkeep@4.3.16_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/react-native-callkeep"
   RNCAsyncStorage:
     :path: "../node_modules/.pnpm/@react-native-async-storage+async-storage@2.2.0_react-native@0.81.5_@babel+core@7.28.5__2ad3ca87d21b6e959729e8babddf2871/node_modules/@react-native-async-storage/async-storage"
   RNDateTimePicker:
-    :path: "../node_modules/.pnpm/@react-native-community+datetimepicker@8.4.4_expo@54.0.33_react-native@0.81.5_@babel+co_9e12b734ad51ce1ec490150e1988c69a/node_modules/@react-native-community/datetimepicker"
+    :path: "../node_modules/.pnpm/@react-native-community+datetimepicker@8.6.0_expo@54.0.33_react-native@0.81.5_@babel+co_cb102aa2be031a23fca4e6ff5436b5c0/node_modules/@react-native-community/datetimepicker"
   RNGestureHandler:
     :path: "../node_modules/.pnpm/react-native-gesture-handler@2.28.0_react-native@0.81.5_@babel+core@7.28.5_@types+react_6878821a9d189a2f0ab87558d9bf061a/node_modules/react-native-gesture-handler"
   RNReactNativeSharedGroupPreferences:
@@ -2675,6 +2688,7 @@ SPEC CHECKSUMS:
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734
   FBLazyVector: e95a291ad2dadb88e42b06e0c5fb8262de53ec12
   hermes-engine: 9f4dfe93326146a1c99eb535b1cb0b857a3cd172
+  JitsiWebRTC: b47805ab5668be38e7ee60e2258f49badfe8e1d0
   libavif: 84bbb62fb232c3018d6f1bab79beea87e35de7b7
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
@@ -2714,6 +2728,7 @@ SPEC CHECKSUMS:
   react-native-blur: 1b00ef07fe0efdc0c40b37139a5268ccad73c72d
   react-native-context-menu-view: da39a4612c1294d651907162529cfba8421e9b89
   react-native-safe-area-context: 37e680fc4cace3c0030ee46e8987d24f5d3bdab2
+  react-native-webrtc: e8f0ce746353adc2744a2b933645e1aeb41eaa74
   React-NativeModulesApple: 8969913947d5b576de4ed371a939455a8daf28aa
   React-oscompat: ce47230ed20185e91de62d8c6d139ae61763d09c
   React-perflogger: 02b010e665772c7dcb859d85d44c1bfc5ac7c0e4
@@ -2745,8 +2760,9 @@ SPEC CHECKSUMS:
   ReactCodegen: 30482dfc0eb2097a33cac59e06e1e1a8b3bea9dc
   ReactCommon: 08810150b1206cc44aecf5f6ae19af32f29151a8
   ReactNativeDependencies: 71ce9c28beb282aa720ea7b46980fff9669f428a
+  RNCallKeep: 1930a01d8caf48f018be4f2db0c9f03405c2f977
   RNCAsyncStorage: 3a4f5e2777dae1688b781a487923a08569e27fe4
-  RNDateTimePicker: be0e44bcb9ed0607c7c5f47dbedd88cf091f6791
+  RNDateTimePicker: 9c0a849bbe1c256f0854fea255734b715f5ea876
   RNGestureHandler: 2914750df066d89bf9d8f48a10ad5f0051108ac3
   RNReactNativeSharedGroupPreferences: d4869af3c7757405b6b5ac633d0ef5f9886a9be7
   RNScreens: d8d6f1792f6e7ac12b0190d33d8d390efc0c1845
