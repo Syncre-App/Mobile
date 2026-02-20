@@ -4,6 +4,7 @@ import { webRTCService, CallType, CallStatus, CallParticipant } from './WebRTCSe
 import WebSocketService from './WebSocketService';
 import CryptoService from './CryptoService';
 import { StorageService } from './StorageService';
+import { e2eEncryptionService } from './E2EEncryptionService';
 
 export interface CallSession {
   callId: string;
@@ -14,6 +15,7 @@ export interface CallSession {
   status: CallStatus;
   participants: CallParticipant[];
   startedAt?: Date;
+  isE2EEnabled?: boolean;
 }
 
 const CALL_KEEP_OPTIONS = {
@@ -148,12 +150,16 @@ class CallService {
     });
   }
 
-  async initiateCall(chatId: string, callType: CallType): Promise<boolean> {
+  async initiateCall(chatId: string, callType: CallType, enableE2E: boolean = true): Promise<boolean> {
     try {
       const stream = await webRTCService.startLocalStream(callType);
       if (!stream) {
         console.error('[CallService] Failed to start local stream');
         return false;
+      }
+
+      if (enableE2E) {
+        await webRTCService.enableE2EEncryption('');
       }
 
       const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -167,6 +173,7 @@ class CallService {
         callType,
         status: 'calling',
         participants: [],
+        isE2EEnabled: enableE2E,
       };
 
       this.notifyListeners();
@@ -179,6 +186,7 @@ class CallService {
           callId,
           roomId,
           callType,
+          e2eEnabled: enableE2E,
         });
       }
 
@@ -237,6 +245,10 @@ class CallService {
     if (!targetCallId) return;
 
     console.log('[CallService] Ending call:', targetCallId);
+
+    if (this.currentSession?.isE2EEnabled) {
+      webRTCService.disableE2EEncryption();
+    }
 
     // Cleanup WebRTC
     webRTCService.cleanup();

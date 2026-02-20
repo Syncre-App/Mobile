@@ -7,7 +7,11 @@ import {
   MediaStream,
   MediaStreamTrack,
   AudioVideoFacade,
+  RTCRtpSender,
+  RTCRtpReceiver,
 } from 'react-native-webrtc';
+import { e2eEncryptionService } from './E2EEncryptionService';
+import { sframeManager } from './SFrameManager';
 
 export type CallType = 'audio' | 'video';
 export type CallStatus = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended';
@@ -177,6 +181,34 @@ class WebRTCService {
     }
 
     return this.peerConnection;
+  }
+
+  async enableE2EEncryption(userId: string): Promise<boolean> {
+    try {
+      await e2eEncryptionService.generateKey();
+      
+      console.log('[WebRTC] E2E encryption enabled');
+      return true;
+    } catch (error) {
+      console.error('[WebRTC] Failed to enable E2E encryption:', error);
+      return false;
+    }
+  }
+
+  disableE2EEncryption(): void {
+    e2eEncryptionService.clearKeys();
+    sframeManager.reset();
+    console.log('[WebRTC] E2E encryption disabled');
+  }
+
+  getE2EKeyForSharing(): Promise<ArrayBuffer | null> {
+    const keyId = e2eEncryptionService.getCurrentKeyId();
+    if (!keyId) return Promise.resolve(null);
+    return e2eEncryptionService.exportKey(keyId);
+  }
+
+  async importE2EKey(keyId: string, keyData: ArrayBuffer): Promise<boolean> {
+    return e2eEncryptionService.importKey(keyId, keyData);
   }
 
   private handleIceCandidate(candidate: RTCIceCandidate): void {
