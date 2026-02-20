@@ -151,8 +151,17 @@ class CallService {
 
       // Show outgoing call UI via CallKeep (wrapped in try-catch to prevent crashes)
       try {
-        if (Platform.OS === 'ios' || Platform.OS === 'android') {
-          (CallKeep as any).startCall(callId, 'Syncre', 'Syncre Call', 'generic', callType === 'video');
+        if (Platform.OS === 'ios') {
+          // iOS: startCall(uuid, handle, contactIdentifier, handleType, hasVideo)
+          (CallKeep as any).startCall(
+            callId,
+            'Syncre User', // handle - needs to be a phone number or identifier
+            'Syncre', // contactIdentifier
+            'generic', // handleType
+            callType === 'video' // hasVideo
+          );
+        } else if (Platform.OS === 'android') {
+          (CallKeep as any).startCall(callId, 'Syncre', 'Syncre Call');
         }
       } catch (callKeepError) {
         console.warn('[CallService] CallKeep startCall failed:', callKeepError);
