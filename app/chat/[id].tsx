@@ -38,6 +38,7 @@ import { ScheduleMessageSheet } from '../../components/ScheduleMessageSheet';
 import { CreatePollSheet } from '../../components/CreatePollSheet';
 import { PollMessage, type PollData } from '../../components/PollMessage';
 import { NativeContextMenu, type ContextMenuAction } from '../../components/NativeContextMenu';
+import { CallButton } from '../../components/CallButton';
 import { canUseSwiftUI } from '../../utils/swiftUi';
 import { decodePollPayload, decodePollPayloadFromJson, encodePollPayload } from '../../utils/pollPayload';
 import { font, palette, radii, spacing } from '../../theme/designSystem';
@@ -3143,6 +3144,16 @@ const ChatScreen: React.FC = () => {
       setIsUnblocking(false);
     }
   }, [loadChatDetails]);
+
+  const handleVoiceCall = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(`/call?chatId=${chatId}&callType=audio`);
+  }, [chatId]);
+
+  const handleVideoCall = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(`/call?chatId=${chatId}&callType=video`);
+  }, [chatId]);
 
   const loadEarlier = useCallback(
     async (options: { viaRefresh?: boolean } = {}) => {
@@ -6350,6 +6361,24 @@ const ChatScreen: React.FC = () => {
             <Text style={styles.presenceLabel}>{receiverPresenceLabel}</Text>
           ) : null}
         </View>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={handleVoiceCall}
+            style={styles.headerActionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Voice call"
+          >
+            <Ionicons name="call-outline" size={22} color="#FFFFFF" />
+          </Pressable>
+          <Pressable
+            onPress={handleVideoCall}
+            style={styles.headerActionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Video call"
+          >
+            <Ionicons name="videocam-outline" size={22} color="#FFFFFF" />
+          </Pressable>
+        </View>
         {shouldShowSettingsButton ? (
           <Pressable
             onPress={() => router.push(`/group/${chatId}/edit`)}
@@ -7260,6 +7289,11 @@ const styles = StyleSheet.create({
   headerButtonPlaceholder: {
     width: 44,
     height: 44,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   headerTitleWrapper: {
     flex: 1,
