@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { callService } from '../services/CallService';
+import { callService } from '../../services/CallService';
 
 export default function CallRedirectScreen() {
   const { chatId, callType } = useLocalSearchParams<{ chatId: string; callType: string }>();
