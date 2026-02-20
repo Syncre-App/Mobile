@@ -37,6 +37,16 @@ export class WebSocketService {
   private stopTypingListeners: Map<string, ((payload: { userId: string }) => void)[]> = new Map();
   private connectionStatusListeners: ((isConnected: boolean) => void)[] = [];
   private pendingMessages: WebSocketMessage[] = [];
+  
+  // Call event listeners
+  private callRingingListeners: ((payload: any) => void)[] = [];
+  private callOfferListeners: ((payload: any) => void)[] = [];
+  private callAnswerListeners: ((payload: any) => void)[] = [];
+  private callIceListeners: ((payload: any) => void)[] = [];
+  private callEndedListeners: ((payload: any) => void)[] = [];
+  private callParticipantJoinedListeners: ((payload: any) => void)[] = [];
+  private callParticipantLeftListeners: ((payload: any) => void)[] = [];
+  private callMuteChangedListeners: ((payload: any) => void)[] = [];
 
   public get socket(): WebSocket | null {
     return this.ws;
@@ -313,6 +323,34 @@ export class WebSocketService {
           messageId: message.messageId ?? message.data?.messageId,
         });
         break;
+      // Call events
+      case 'call_ringing':
+        this.handleCallRinging(message);
+        break;
+      case 'call_offer':
+        this.handleCallOffer(message);
+        break;
+      case 'call_answered':
+        this.handleCallAnswered(message);
+        break;
+      case 'call_ice':
+        this.handleCallIce(message);
+        break;
+      case 'call_ended':
+        this.handleCallEnded(message);
+        break;
+      case 'call_participant_joined':
+        this.handleCallParticipantJoined(message);
+        break;
+      case 'call_participant_left':
+        this.handleCallParticipantLeft(message);
+        break;
+      case 'call_mute_changed':
+        this.handleCallMuteChanged(message);
+        break;
+      case 'call_initiate':
+        this.handleCallInitiate(message);
+        break;
       default:
         break;
     }
@@ -500,6 +538,118 @@ export class WebSocketService {
 
   private notifyConnectionStatusListeners(isConnected: boolean): void {
     this.connectionStatusListeners.forEach(listener => listener(isConnected));
+  }
+
+  // Call event handlers
+  private handleCallRinging(message: WebSocketMessage) {
+    console.log('[WS] Call ringing:', message);
+    this.callRingingListeners.forEach(listener => listener(message));
+  }
+
+  private handleCallOffer(message: WebSocketMessage) {
+    console.log('[WS] Call offer received:', message);
+    this.callOfferListeners.forEach(listener => listener(message));
+  }
+
+  private handleCallAnswered(message: WebSocketMessage) {
+    console.log('[WS] Call answered:', message);
+    this.callAnswerListeners.forEach(listener => listener(message));
+  }
+
+  private handleCallIce(message: WebSocketMessage) {
+    console.log('[WS] Call ICE candidate:', message);
+    this.callIceListeners.forEach(listener => listener(message));
+  }
+
+  private handleCallEnded(message: WebSocketMessage) {
+    console.log('[WS] Call ended:', message);
+    this.callEndedListeners.forEach(listener => listener(message));
+  }
+
+  private handleCallParticipantJoined(message: WebSocketMessage) {
+    console.log('[WS] Call participant joined:', message);
+    this.callParticipantJoinedListeners.forEach(listener => listener(message));
+  }
+
+  private handleCallParticipantLeft(message: WebSocketMessage) {
+    console.log('[WS] Call participant left:', message);
+    this.callParticipantLeftListeners.forEach(listener => listener(message));
+  }
+
+  private handleCallMuteChanged(message: WebSocketMessage) {
+    console.log('[WS] Call mute changed:', message);
+    this.callMuteChangedListeners.forEach(listener => listener(message));
+  }
+
+  private handleCallInitiate(message: WebSocketMessage) {
+    console.log('[WS] Call initiate received:', message);
+    // Notify all call listeners
+    this.callRingingListeners.forEach(listener => listener(message));
+  }
+
+  // Call event listener registration
+  onCallRinging(callback: (payload: any) => void): () => void {
+    this.callRingingListeners.push(callback);
+    return () => {
+      const index = this.callRingingListeners.indexOf(callback);
+      if (index > -1) this.callRingingListeners.splice(index, 1);
+    };
+  }
+
+  onCallOffer(callback: (payload: any) => void): () => void {
+    this.callOfferListeners.push(callback);
+    return () => {
+      const index = this.callOfferListeners.indexOf(callback);
+      if (index > -1) this.callOfferListeners.splice(index, 1);
+    };
+  }
+
+  onCallAnswered(callback: (payload: any) => void): () => void {
+    this.callAnswerListeners.push(callback);
+    return () => {
+      const index = this.callAnswerListeners.indexOf(callback);
+      if (index > -1) this.callAnswerListeners.splice(index, 1);
+    };
+  }
+
+  onCallIce(callback: (payload: any) => void): () => void {
+    this.callIceListeners.push(callback);
+    return () => {
+      const index = this.callIceListeners.indexOf(callback);
+      if (index > -1) this.callIceListeners.splice(index, 1);
+    };
+  }
+
+  onCallEnded(callback: (payload: any) => void): () => void {
+    this.callEndedListeners.push(callback);
+    return () => {
+      const index = this.callEndedListeners.indexOf(callback);
+      if (index > -1) this.callEndedListeners.splice(index, 1);
+    };
+  }
+
+  onCallParticipantJoined(callback: (payload: any) => void): () => void {
+    this.callParticipantJoinedListeners.push(callback);
+    return () => {
+      const index = this.callParticipantJoinedListeners.indexOf(callback);
+      if (index > -1) this.callParticipantJoinedListeners.splice(index, 1);
+    };
+  }
+
+  onCallParticipantLeft(callback: (payload: any) => void): () => void {
+    this.callParticipantLeftListeners.push(callback);
+    return () => {
+      const index = this.callParticipantLeftListeners.indexOf(callback);
+      if (index > -1) this.callParticipantLeftListeners.splice(index, 1);
+    };
+  }
+
+  onCallMuteChanged(callback: (payload: any) => void): () => void {
+    this.callMuteChangedListeners.push(callback);
+    return () => {
+      const index = this.callMuteChangedListeners.indexOf(callback);
+      if (index > -1) this.callMuteChangedListeners.splice(index, 1);
+    };
   }
 }
 
