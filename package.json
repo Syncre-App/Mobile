@@ -66,6 +66,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-callkeep": "^4.3.16",
     "react-native-context-menu-view": "^1.21.0",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-gradle-plugin": "^0.71.19",
@@ -76,6 +77,7 @@
     "react-native-svg": "^15.12.1",
     "react-native-vector-icons": "^10.3.0",
     "react-native-web": "~0.21.2",
+    "react-native-webrtc": "^124.0.7",
     "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
