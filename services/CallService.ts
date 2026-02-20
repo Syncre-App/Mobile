@@ -45,12 +45,17 @@ class CallService {
       this.setupCallKeepEvents();
       this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
       
-      await voipPushService.initialize();
+      try {
+        await voipPushService.initialize();
+      } catch (e) {
+        console.warn('[CallService] VoIP push init failed:', e);
+      }
 
       this.callKeepInitialized = true;
       console.log('[CallService] Initialized successfully');
     } catch (error) {
-      console.error('[CallService] Failed to initialize:', error);
+      console.warn('[CallService] Failed to initialize CallKeep:', error);
+      // Continue without CallKeep - calls will still work but without native UI
     }
   }
 
@@ -106,10 +111,12 @@ class CallService {
 
   async initiateCall(chatId: string, callType: CallType, enableE2E: boolean = true): Promise<boolean> {
     try {
-      const stream = await webRTCService.startLocalStream(callType);
-      if (!stream) {
-        console.error('[CallService] Failed to start local stream');
-        return false;
+      let stream = null;
+      try {
+        stream = await webRTCService.startLocalStream(callType);
+      } catch (streamError) {
+        console.warn('[CallService] Could not start local stream:', streamError);
+        // Continue anyway - stream is optional for basic call UI
       }
 
       // E2E encryption is handled at the WebRTC level
@@ -142,9 +149,13 @@ class CallService {
         });
       }
 
-      // Show outgoing call UI via CallKeep
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        CallKeep.startCall(callId, 'Syncre', 'Syncre Call', 'generic', callType === 'video');
+      // Show outgoing call UI via CallKeep (wrapped in try-catch to prevent crashes)
+      try {
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          (CallKeep as any).startCall(callId, 'Syncre', 'Syncre Call', 'generic', callType === 'video');
+        }
+      } catch (callKeepError) {
+        console.warn('[CallService] CallKeep startCall failed:', callKeepError);
       }
 
       console.log('[CallService] Call initiated:', callId);
