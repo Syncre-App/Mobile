@@ -100,7 +100,7 @@ class SFUService {
 
       this.peerConnection = new RTCPeerConnection(config);
 
-      this.peerConnection.onicecandidate = (event: any) => {
+      (this.peerConnection as any).onicecandidate = (event: any) => {
         if (event.candidate) {
           this.emit('ice-candidate', {
             candidate: event.candidate,
@@ -109,7 +109,7 @@ class SFUService {
         }
       };
 
-      this.peerConnection.ontrack = (event: any) => {
+      (this.peerConnection as any).ontrack = (event: any) => {
         const streams = event.streams;
         if (streams && streams[0]) {
           const participantId = streams[0].id || 'unknown';
@@ -124,7 +124,7 @@ class SFUService {
         }
       };
 
-      this.peerConnection.oniceconnectionstatechange = () => {
+      (this.peerConnection as any).oniceconnectionstatechange = () => {
         const state = this.peerConnection?.iceConnectionState;
         console.log('[SFU] ICE connection state:', state);
         this.emit('connection-state', { state });

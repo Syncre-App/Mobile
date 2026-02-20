@@ -20,21 +20,20 @@ class E2EEncryptionService {
   private keys: Map<string, EncryptionKey> = new Map();
   private currentKeyId: string | null = null;
 
-  generateKey(): string {
+  async generateKey(): Promise<string> {
     const keyId = `key_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    return crypto.subtle.generateKey(
+    const key = await crypto.subtle.generateKey(
       {
         name: ALGORITHM,
         length: KEY_LENGTH * 8,
       },
       true,
       ['encrypt', 'decrypt']
-    ).then((key) => {
-      this.keys.set(keyId, { keyId, key });
-      this.currentKeyId = keyId;
-      return keyId;
-    });
+    );
+    this.keys.set(keyId, { keyId, key });
+    this.currentKeyId = keyId;
+    return keyId;
   }
 
   async generateKeyFromSeed(seed: Uint8Array): Promise<string> {
@@ -42,7 +41,7 @@ class E2EEncryptionService {
     
     const key = await crypto.subtle.importKey(
       'raw',
-      seed,
+      seed.buffer as ArrayBuffer,
       {
         name: ALGORITHM,
         length: KEY_LENGTH * 8,
@@ -88,13 +87,13 @@ class E2EEncryptionService {
           tagLength: TAG_LENGTH * 8,
         },
         keyEntry.key,
-        frameData
+        frameData as BufferSource
       );
 
       return {
         keyId: this.currentKeyId,
         iv: iv,
-        ciphertext: new Uint8Array(ciphertext),
+        ciphertext: new Uint8Array(ciphertext as ArrayBuffer),
       };
     } catch (error) {
       console.error('[E2EE] Encryption error:', error);
@@ -113,14 +112,14 @@ class E2EEncryptionService {
       const decrypted = await crypto.subtle.decrypt(
         {
           name: ALGORITHM,
-          iv: encryptedFrame.iv,
+          iv: encryptedFrame.iv as BufferSource,
           tagLength: TAG_LENGTH * 8,
         },
         keyEntry.key,
-        encryptedFrame.ciphertext
+        encryptedFrame.ciphertext as BufferSource
       );
 
-      return new Uint8Array(decrypted);
+      return new Uint8Array(decrypted as ArrayBuffer);
     } catch (error) {
       console.error('[E2EE] Decryption error:', error);
       return null;

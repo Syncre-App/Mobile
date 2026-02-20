@@ -135,7 +135,7 @@ class SFrameDecryptor {
         return null;
       }
 
-      return decrypted.buffer;
+      return decrypted.buffer as ArrayBuffer;
     } catch (error) {
       console.error('[SFrame] Decryption error:', error);
       return null;

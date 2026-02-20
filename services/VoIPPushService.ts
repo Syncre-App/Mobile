@@ -143,14 +143,8 @@ class VoIPPushService {
   ): Promise<string | null> {
     try {
       const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data,
-          sound: 'default',
-        },
-        trigger: delayMs > 0 ? { type: Notifications.SchedulableTriggerInputTypes.TIMELESS, date: new Date(Date.now() + delayMs) } : null,
-      });
+        content: { title, body, data, sound: 'default' },
+      } as any);
       return id;
     } catch (error) {
       console.error('[VoIPPush] Error scheduling notification:', error);

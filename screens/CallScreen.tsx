@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions, Animated, ScrollView, SafeAreaView, StatusBar, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RTCView, mediaStream } from 'react-native-webrtc';
+import { RTCView } from 'react-native-webrtc';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { webRTCService, CallParticipant } from '../services/WebRTCService';

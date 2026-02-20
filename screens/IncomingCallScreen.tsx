@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, Pressable, Image, Dimensions, Animated } from '
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useCall, CallSession } from '../hooks/useCall';
+import { useCall } from '../hooks/useCall';
+import type { CallSession } from '../services/CallService';
 
 const { width } = Dimensions.get('window');
 
@@ -36,13 +37,13 @@ export const IncomingCallScreen: React.FC<IncomingCallScreenProps> = ({ session 
   }, [pulseAnim]);
 
   useEffect(() => {
-.notificationAsync    Haptics(Haptics.NotificationFeedbackType.Warning);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   }, []);
 
   const handleAccept = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await answerCall();
-    router.push('/call');
+    router.replace('/(tabs)/chats' as any);
   };
 
   const handleDecline = async () => {
