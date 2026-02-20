@@ -5,6 +5,7 @@ import WebSocketService from './WebSocketService';
 import CryptoService from './CryptoService';
 import { StorageService } from './StorageService';
 import { e2eEncryptionService } from './E2EEncryptionService';
+import { voipPushService } from './VoIPPushService';
 
 export interface CallSession {
   callId: string;
@@ -72,6 +73,9 @@ class CallService {
 
       this.setupCallKeepEvents();
       this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
+      
+      await voipPushService.initialize();
+
       this.callKeepInitialized = true;
       console.log('[CallService] Initialized successfully');
     } catch (error) {
