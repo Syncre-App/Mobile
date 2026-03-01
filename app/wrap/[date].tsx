@@ -17,7 +17,7 @@ import { ApiService } from '../../services/ApiService';
 import { StorageService } from '../../services/StorageService';
 import { UserCacheService } from '../../services/UserCacheService';
 import Svg, { Defs, LinearGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 type TopContact = {
   userId: string;
@@ -143,7 +143,11 @@ export default function DailyWrapScreen() {
     }
     const bars = wrap.hourHistogram.slice(0, 24);
     return (
-      <View style={styles.chartContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chartContainer}
+      >
         {bars.map((value, idx) => {
           const height =
             maxHourValue > 0 ? Math.max(6, (value / maxHourValue) * 110) : 6;
@@ -154,7 +158,7 @@ export default function DailyWrapScreen() {
             </View>
           );
         })}
-      </View>
+      </ScrollView>
     );
   };
 
